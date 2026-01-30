@@ -7,7 +7,7 @@ Ever wished you could hand off a feature request and have it come back fully imp
 It's a complete engineering workflow leveraging subagents to handle distinct concerns:
 
 - **Project Management**: Creates and tracks work in Linear, breaking down features into issues and updating status as work progresses
-- **Code Implementation**: Writes, tests, and iterates on code with browser-based UI verification via Puppeteer
+- **Code Implementation**: Writes, tests, and iterates on code with browser-based UI verification via Playwright
 - **Version Control**: Commits changes, creates branches, and opens pull requests on GitHub
 - **Communication**: Keeps you informed with progress updates in Slack
 
@@ -21,7 +21,7 @@ The multi-agent architecture uses specialized agents (Linear, Coding, GitHub, Sl
 - **GitHub Integration**: Automatic commits, branches, and PR creation
 - **Slack Notifications**: Progress updates delivered to your team
 - **Arcade MCP Gateway**: Single authentication flow for all external services (Linear, GitHub, Slack)
-- **Browser Testing**: Puppeteer MCP for automated UI verification
+- **Browser Testing**: Playwright MCP for automated UI verification
 - **Model Configuration**: Per-agent model selection (Haiku, Sonnet, or Opus)
 
 ## Prerequisites
@@ -156,7 +156,7 @@ uv run python autonomous_agent_demo.py --project-dir my-app --model opus
 3. **Coding Agent:**
    - Implements features based on Linear issues
    - Writes and tests application code
-   - Uses Puppeteer for browser-based UI testing
+   - Uses Playwright for browser-based UI testing
    - Validates previously completed features
 
 4. **GitHub Agent (Optional):**
@@ -269,7 +269,7 @@ generations/my-app/           # Or GENERATIONS_BASE_PATH/my-app/
 | Server | Transport | Purpose |
 |--------|-----------|---------|
 | **Arcade Gateway** | HTTP | Unified access to Linear, GitHub, and Slack via Arcade MCP |
-| **Puppeteer** | stdio | Browser automation for UI testing |
+| **Playwright** | stdio | Browser automation for UI testing |
 
 The Arcade Gateway provides access to:
 - **Linear**: Project management, issues, status, comments (39 tools)

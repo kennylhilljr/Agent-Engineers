@@ -175,7 +175,7 @@ def main() -> int:
         print("  1. Missing or invalid ARCADE_API_KEY in .env")
         print("  2. Invalid project directory path or permissions")
         print("  3. Missing Claude authentication (run: claude login)")
-        print("  4. MCP server installation issues (puppeteer-mcp-server)")
+        print("  4. MCP server installation issues (@playwright/mcp)")
         print("\nFull error details:")
         raise
 

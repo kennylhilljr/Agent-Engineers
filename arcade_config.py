@@ -250,16 +250,17 @@ def get_slack_tools() -> list[str]:
 
 
 def get_coding_tools() -> list[str]:
-    """Get tools for coding agent (file ops + Puppeteer)."""
+    """Get tools for coding agent (file ops + Playwright)."""
     # Define inline to avoid circular dependency with client.py
     builtin_tools = ["Read", "Write", "Edit", "Glob", "Grep", "Bash"]
-    puppeteer_tools = [
-        "mcp__puppeteer__puppeteer_navigate",
-        "mcp__puppeteer__puppeteer_screenshot",
-        "mcp__puppeteer__puppeteer_click",
-        "mcp__puppeteer__puppeteer_fill",
-        "mcp__puppeteer__puppeteer_select",
-        "mcp__puppeteer__puppeteer_hover",
-        "mcp__puppeteer__puppeteer_evaluate",
+    playwright_tools = [
+        "mcp__playwright__browser_navigate",
+        "mcp__playwright__browser_take_screenshot",
+        "mcp__playwright__browser_click",
+        "mcp__playwright__browser_type",
+        "mcp__playwright__browser_select_option",
+        "mcp__playwright__browser_hover",
+        "mcp__playwright__browser_snapshot",
+        "mcp__playwright__browser_wait_for",
     ]
-    return builtin_tools + puppeteer_tools
+    return builtin_tools + playwright_tools

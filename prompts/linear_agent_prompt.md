@@ -148,24 +148,28 @@ When asked to initialize a project:
 
 When asked to check status, return COMPLETE information:
 
-1. Read `.linear_project.json` to get project info
+1. Read `.linear_project.json` to get project info (includes `total_issues` count)
 2. Use `ListIssues` with project filter:
    ```
    ListIssues:
      project: [project name from .linear_project.json]
    ```
 3. Count issues by status (state field)
-4. **Get FULL DETAILS of highest-priority Todo issue**
+   - **IMPORTANT:** Exclude the META issue from feature counts (it stays in Todo forever)
+   - Count only actual feature issues for done/in_progress/todo
+4. **Get FULL DETAILS of highest-priority Todo issue** (if any exist besides META)
 5. Update `claude-progress.txt`
 
 **Return to orchestrator:**
 ```
 status:
-  done: X
-  in_progress: Y
-  todo: Z
+  done: X           # Feature issues only (not META)
+  in_progress: Y    # Feature issues only
+  todo: Z           # Feature issues only (not META)
+  total_features: N # From .linear_project.json total_issues
+  all_complete: true/false  # true if done == total_features
 
-next_issue:
+next_issue: (only if all_complete is false)
   id: "ABC-123"
   title: "Timer Display - Countdown UI"
   description: |
@@ -177,7 +181,8 @@ next_issue:
   priority: high
 ```
 
-The orchestrator needs this full context to pass to the coding agent.
+The orchestrator uses `all_complete` to determine if project is finished.
+If `all_complete: true`, orchestrator will signal PROJECT_COMPLETE to end the session loop.
 
 ---
 
@@ -265,10 +270,12 @@ Always return structured results:
 ```
 action: [what you did]
 status:
-  done: X
+  done: X              # Feature issues only
   in_progress: Y
-  todo: Z
-next_issue: (if checking status)
+  todo: Z              # Feature issues only (excludes META)
+  total_features: N    # From .linear_project.json
+  all_complete: true/false
+next_issue: (only if all_complete is false)
   id: "..."
   title: "..."
   description: "..."
@@ -277,3 +284,5 @@ files_updated:
   - claude-progress.txt
   - .linear_project.json (if changed)
 ```
+
+**CRITICAL:** The `all_complete` field tells the orchestrator whether to continue or signal PROJECT_COMPLETE.

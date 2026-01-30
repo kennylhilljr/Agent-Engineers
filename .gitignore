@@ -9,3 +9,4 @@ venv
 venv_linux
 .env.tmp
 __pycache__
+api-key

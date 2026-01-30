@@ -23,14 +23,15 @@ Write tool: { "file_path": "/path/to/file.js", "content": "file contents here" }
 **Shell:**
 - `Bash` - Run approved commands (npm, node, etc.)
 
-**Browser Testing (Puppeteer MCP):**
-- `mcp__puppeteer__puppeteer_navigate` - Go to URL (starts browser)
-- `mcp__puppeteer__puppeteer_screenshot` - Capture screenshot
-- `mcp__puppeteer__puppeteer_click` - Click elements (CSS selector)
-- `mcp__puppeteer__puppeteer_fill` - Fill form inputs
-- `mcp__puppeteer__puppeteer_select` - Select dropdown options
-- `mcp__puppeteer__puppeteer_hover` - Hover over elements
-- `mcp__puppeteer__puppeteer_evaluate` - Run JavaScript in browser
+**Browser Testing (Playwright MCP):**
+- `mcp__playwright__browser_navigate` - Go to URL (starts browser)
+- `mcp__playwright__browser_take_screenshot` - Capture screenshot
+- `mcp__playwright__browser_click` - Click elements (by ref from snapshot)
+- `mcp__playwright__browser_type` - Type text into inputs
+- `mcp__playwright__browser_select_option` - Select dropdown options
+- `mcp__playwright__browser_hover` - Hover over elements
+- `mcp__playwright__browser_snapshot` - Get page accessibility tree
+- `mcp__playwright__browser_wait_for` - Wait for element/text
 
 ---
 
@@ -53,7 +54,7 @@ The orchestrator will ask you to verify existing features work.
 
 **Steps:**
 1. Run `init.sh` to start dev server (if not running)
-2. Navigate to app via Puppeteer
+2. Navigate to app via Playwright
 3. Test 1-2 core features end-to-end
 4. Take screenshots as evidence
 5. Report PASS/FAIL
@@ -86,7 +87,7 @@ The orchestrator will provide FULL issue context:
 1. Read the issue context (provided by orchestrator)
 2. Read existing code to understand structure
 3. Implement the feature
-4. Test via Puppeteer (mandatory)
+4. Test via Playwright (mandatory)
 5. Take screenshot evidence (mandatory)
 6. Report results
 
@@ -113,10 +114,10 @@ issues_found: none (or list problems)
 #### 3. Fix Bug/Regression
 
 **Steps:**
-1. Reproduce the bug via Puppeteer (screenshot the broken state)
+1. Reproduce the bug via Playwright (screenshot the broken state)
 2. Read relevant code to understand cause
 3. Fix the issue
-4. Verify fix via Puppeteer (screenshot the fixed state)
+4. Verify fix via Playwright (screenshot the fixed state)
 5. Check for regressions in related features
 6. Report results
 
@@ -140,17 +141,20 @@ verification: [related features still work]
 
 ```python
 # 1. Start browser and navigate
-mcp__puppeteer__puppeteer_navigate(url="http://localhost:3000")
+mcp__playwright__browser_navigate(url="http://localhost:3000")
 
-# 2. Interact with UI elements
-mcp__puppeteer__puppeteer_click(selector="#start-button")
-mcp__puppeteer__puppeteer_fill(selector="#name-input", value="Test User")
+# 2. Get page snapshot to find element refs
+mcp__playwright__browser_snapshot()
 
-# 3. Take screenshot BEFORE and AFTER key actions
-mcp__puppeteer__puppeteer_screenshot()  # Saves to file
+# 3. Interact with UI elements (use ref from snapshot)
+mcp__playwright__browser_click(ref="button[Start]")
+mcp__playwright__browser_type(ref="input[Name]", text="Test User")
 
-# 4. Verify results programmatically if needed
-mcp__puppeteer__puppeteer_evaluate(script="document.querySelector('#result').textContent")
+# 4. Take screenshot for evidence
+mcp__playwright__browser_take_screenshot()
+
+# 5. Wait for elements if needed
+mcp__playwright__browser_wait_for(text="Success")
 ```
 
 **DO:**

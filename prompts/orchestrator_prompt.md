@@ -23,7 +23,7 @@ Use the Task tool to delegate to these specialized agents:
 | Agent | Model | Use For |
 |-------|-------|---------|
 | `linear` | haiku | Check/update Linear issues, maintain claude-progress.txt |
-| `coding` | sonnet | Write code, test with Puppeteer, provide screenshot evidence |
+| `coding` | sonnet | Write code, test with Playwright, provide screenshot evidence |
 | `github` | haiku | Git commits, branches, pull requests |
 | `slack` | haiku | Send progress notifications to users |
 
@@ -124,7 +124,7 @@ Implement Linear issue:
 
 Requirements:
 - Implement the feature
-- Test via Puppeteer
+- Test via Playwright
 - Provide screenshot_evidence (REQUIRED)
 - Report files_changed and test_results
 ```
@@ -191,6 +191,36 @@ Delegate to slack agent: "Send to #new-channel: :white_check_mark: Completed: Ti
 3. **Always pass full context** - Don't make agents re-fetch
 4. **Fix regressions first** - Never proceed if verification fails
 5. **One issue at a time** - Complete fully before starting another
+
+---
+
+### Project Complete Detection (CRITICAL)
+
+After getting status from the linear agent in Step 2, check if the project is complete:
+
+**Completion Condition:**
+- The META issue ("[META] Project Progress Tracker") always stays in Todo - ignore it when counting
+- Compare the `done` count to `total_issues` from `.linear_project.json`
+- If `done == total_issues`, the project is COMPLETE
+
+**When project is complete:**
+1. Ask linear agent to add final "PROJECT COMPLETE" comment to META issue
+2. Ask github agent to create final PR summarizing all completed features (if GITHUB_REPO configured)
+3. Ask slack agent to send completion notification: ":tada: Project complete! All X features implemented."
+4. **Output this exact signal on its own line:**
+   ```
+   PROJECT_COMPLETE: All features implemented and verified.
+   ```
+
+**IMPORTANT:** The `PROJECT_COMPLETE:` signal tells the harness to stop the loop. Without it, sessions continue forever.
+
+**Example check:**
+```
+Linear agent returns: done=5, in_progress=0, todo=1 (META only)
+.linear_project.json has: total_issues=5
+
+5 == 5 → PROJECT COMPLETE
+```
 
 ---
 

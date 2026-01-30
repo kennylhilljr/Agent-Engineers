@@ -70,7 +70,7 @@ new, you MUST run verification tests.
 Use `Linear.ListIssues` with the project ID and status "Done" to find 1-2
 completed features that are core to the app's functionality.
 
-Test these through the browser using Puppeteer:
+Test these through the browser using Playwright:
 - Navigate to the feature
 - Verify it still works as expected
 - Take screenshots to confirm
@@ -109,10 +109,10 @@ Read the issue description for test steps and implement accordingly:
 **CRITICAL:** You MUST verify features through the actual UI.
 
 Use browser automation tools:
-- `mcp__puppeteer__puppeteer_navigate` - Start browser and go to URL
-- `mcp__puppeteer__puppeteer_screenshot` - Capture screenshot
-- `mcp__puppeteer__puppeteer_click` - Click elements
-- `mcp__puppeteer__puppeteer_fill` - Fill form inputs
+- `mcp__playwright__browser_navigate` - Start browser and go to URL
+- `mcp__playwright__browser_take_screenshot` - Capture screenshot
+- `mcp__playwright__browser_click` - Click elements (by ref from snapshot)
+- `mcp__playwright__browser_type` - Type text into inputs
 
 **DO:**
 - Test through the UI with clicks and keyboard input
@@ -137,7 +137,7 @@ After thorough verification:
    - [Key implementation details]
 
    ### Verification
-   - Tested via Puppeteer browser automation
+   - Tested via Playwright browser automation
    - Screenshots captured
    - All test steps verified
 
@@ -216,13 +216,15 @@ Before context fills up:
 
 **ALL testing must use browser automation tools.**
 
-Available Puppeteer tools:
-- `mcp__puppeteer__puppeteer_navigate` - Go to URL
-- `mcp__puppeteer__puppeteer_screenshot` - Capture screenshot
-- `mcp__puppeteer__puppeteer_click` - Click elements
-- `mcp__puppeteer__puppeteer_fill` - Fill form inputs
-- `mcp__puppeteer__puppeteer_select` - Select dropdown options
-- `mcp__puppeteer__puppeteer_hover` - Hover over elements
+Available Playwright tools:
+- `mcp__playwright__browser_navigate` - Go to URL (starts browser)
+- `mcp__playwright__browser_take_screenshot` - Capture screenshot
+- `mcp__playwright__browser_click` - Click elements (by ref from snapshot)
+- `mcp__playwright__browser_type` - Type text into inputs
+- `mcp__playwright__browser_select_option` - Select dropdown options
+- `mcp__playwright__browser_hover` - Hover over elements
+- `mcp__playwright__browser_snapshot` - Get page accessibility tree
+- `mcp__playwright__browser_wait_for` - Wait for element/text
 
 Test like a human user with mouse and keyboard.
 
