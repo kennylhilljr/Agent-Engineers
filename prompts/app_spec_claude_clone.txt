@@ -11,7 +11,7 @@
 
   <technology_stack>
     <api_key>
-        You can use an API key located at /tmp/api-key for testing. You will not be allowed to read this file, but you can reference it in code.
+        You can use an API key located at ../../api-key for testing. You will not be allowed to read this file, but you can reference it in code.
     </api_key>
     <frontend>
       <framework>React with Vite</framework>

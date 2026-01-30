@@ -1,0 +1,1193 @@
+# AI Coding Dashboard - Product Requirements Document
+
+## Overview
+
+AI Coding Dashboard is a proof-of-concept generative UI application that demonstrates the power of Google's A2UI specification with CopilotKit's AG-UI protocol and Pydantic AI agents. Users upload an app specification (similar to app_spec.txt), and an autonomous coding agent executes the tasks while dynamically generating a custom dashboard using A2UI components. The agent emits declarative A2UI JSON describing UI components, AG-UI transports these specifications to the frontend, and CopilotKit renders them from a pre-approved component catalog - creating a unique, secure visualization tailored to each project.
+
+IMPORTANT:
+
+This is a sponsored YouTube demonstration project showcasing CopilotKit's generative UI capabilities with A2UI + AG-UI integration.
+
+../../.env contains the following environment variables:
+
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+OPENROUTER_MODEL=anthropic/claude-sonnet-4.5:beta
+POSTGRES_URL=postgresql://user:pass@host/db
+
+Don't read or change these environment variables. Copy this .env into the project folder and leverage these variables.
+
+Required environment variables for this project:
+- OPENROUTER_API_KEY: API key for OpenRouter (used by Pydantic AI agent)
+- OPENROUTER_MODEL: Model identifier for Claude Sonnet 4.5
+- POSTGRES_URL: PostgreSQL connection string from Neon
+
+Optional environment variables:
+- BACKEND_PORT: Port for FastAPI server (default: 8000)
+- NODE_ENV: Development/production mode (default: development)
+
+Configuration:
+- Frontend dev server: port 3010 (DO NOT use 3000, it's taken)
+- Backend server: port 8000
+- AG-UI endpoint: http://localhost:8000/ag-ui/stream
+
+## Target Audience
+
+**Primary Users:** Developers building autonomous coding agents who want to visualize agent progress with dynamic, AI-generated dashboards.
+
+**Key Pain Points:**
+- Static dashboards don't adapt to different project types
+- Hard to visualize what coding agents are doing in real-time
+- No good way to approve high-risk changes mid-execution
+- Progress tracking UIs require manual design for each project type
+
+## Core Features
+
+### 1. Spec Upload & Parsing
+- Upload app_spec.txt (JSON format with task list)
+- Agent parses spec and extracts tasks, categories, dependencies
+- Stores project metadata in PostgreSQL
+- Validates spec format with Pydantic schemas
+
+### 2. Dynamic Dashboard Generation (A2UI Generative UI)
+- Agent analyzes project type and emits A2UI JSON for optimal layout
+- Renders different visualization based on project characteristics:
+  - Kanban board for feature-based projects (a2ui.Card + a2ui.Column)
+  - Timeline view for sequential projects (a2ui.Timeline + a2ui.Event)
+  - Dependency graph for complex interdependent tasks (a2ui.Graph + a2ui.Node)
+- Agent emits declarative A2UI JSON, AG-UI transports it, frontend renders from catalog
+- Security: Agent can only use pre-approved components from catalog
+
+### 3. Task Execution Visualization
+- Real-time task status updates (pending → in_progress → completed)
+- Live file modification feed showing which files agent is editing
+- Command execution logs with output streaming
+- Test results panel with pass/fail status
+- Progress ring showing overall completion percentage
+
+### 4. A2UI Component Catalog
+Pre-approved components that agent can emit via A2UI JSON:
+- **a2ui.TaskCard**: Task cards with status, category, progress
+- **a2ui.ProgressRing**: Circular progress indicator with metrics
+- **a2ui.FileTree**: Shows project files and highlights modified files
+- **a2ui.TestResults**: Live test execution panel
+- **a2ui.CommandLog**: Streams shell command output
+- **a2ui.ApprovalCard**: Human-in-the-loop approval requests
+- **a2ui.ActivityItem**: Timeline events with agent reasoning
+- **a2ui.DiffViewer**: Shows spec/file changes suggested by agent
+
+Agent emits JSON like:
+```json
+{
+  "type": "a2ui.TaskCard",
+  "id": "task-1",
+  "props": {
+    "title": "Setup Database",
+    "status": "in_progress",
+    "category": "setup"
+  },
+  "children": ["progress-bar-1"]
+}
+```
+
+### 5. Tool Call Rendering
+Agent tool executions render as UI components:
+- File modifications → FileModifiedToast
+- Command execution → CommandExecutionLog
+- Test runs → TestRunningIndicator
+- Approvals needed → ApprovalCard
+
+### 6. Human-in-the-Loop Workflows
+- Agent requests approval for high-risk actions
+- Approval queue shows pending decisions
+- User can approve/reject from dashboard
+- Agent receives decision and continues execution
+
+### 7. Shared State Management
+- Bidirectional state sync between agent and UI
+- User can modify task priorities from dashboard
+- Agent sees changes and adapts execution order
+- Real-time updates via AG-UI protocol
+
+### 8. Agent Chat Interface
+- CopilotKit sidebar for conversational interaction
+- Ask agent about task status, progress, blockers
+- Modify spec or skip tasks via natural language
+- Agent explains decisions and reasoning
+
+## Tech Stack
+
+- **Frontend**: Next.js 14+ (App Router)
+- **Styling**: Tailwind CSS + Shadcn/ui
+- **UI Framework**: CopilotKit with A2UI renderer
+- **UI Specification**: A2UI v0.8 (Google's declarative UI format)
+- **Transport Protocol**: AG-UI (CopilotKit's agent-user interaction protocol)
+- **Backend**: FastAPI (Python)
+- **Agent Framework**: Pydantic AI with AG-UI integration
+- **LLM**: Claude Sonnet 4.5 via OpenRouter
+- **Database**: PostgreSQL (Neon)
+- **Real-time**: Server-Sent Events (SSE) via AG-UI
+- **Hosting**: Vercel (frontend) + Render/Railway (backend)
+
+## Architecture
+
+### Primary Architecture: External Agent Integration (Claude Code)
+
+The dashboard acts as an **intelligent observability layer** for external AI coding agents (like Claude Code). The Pydantic AI agent serves as a **UI Orchestrator** - it receives events from external agents and uses LLM intelligence to decide what UI components to generate.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              Human Developer                                 │
+│                          watches & interacts via dashboard                   │
+└────────────────────────────────────────────────────────────────────────────┬─┘
+                                                                             │
+┌────────────────────────────────────────────────────────────────────────────┼─┐
+│                         Dashboard UI (CopilotKit)                          │ │
+│   Generative UI - Agent CHOOSES what components to show based on context   │ │
+│   ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐             │ │
+│   │ TaskCard   │ │DecisionCard│ │ ErrorCard  │ │MilestoneCard│            │ │
+│   └────────────┘ └────────────┘ └────────────┘ └────────────┘             │ │
+└──────────────────────────────────────────▲─────────────────────────────────┴─┘
+                                           │ AG-UI Protocol (streaming A2UI)
+┌──────────────────────────────────────────┼───────────────────────────────────┐
+│              Pydantic AI Agent (UI Orchestrator)                             │
+│                                          │                                   │
+│   Receives events and uses LLM to decide what UI to generate:               │
+│   - task_started → TaskCard + ActivityItem                                   │
+│   - decision_needed → DecisionCard with options                              │
+│   - error → ErrorCard with recovery suggestions                              │
+│   - milestone → MilestoneCard with celebration                               │
+│   - approval_needed → ApprovalCard with risk assessment                      │
+└──────────────────────────────────────────▲───────────────────────────────────┘
+                                           │ REST API (events)
+┌──────────────────────────────────────────┼───────────────────────────────────┐
+│                       Claude Code (External Agent)                           │
+│                                                                              │
+│   Does the actual coding work:                                               │
+│   - Writes files, runs commands                                              │
+│   - Sends events to dashboard API                                            │
+│   - Receives human decisions                                                 │
+│   - Uses skill for API integration                                           │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Secondary Architecture: Internal Agent (Original)
+
+A2UI + AG-UI Integration Architecture (for demo/standalone mode):
+
+```
+┌─────────────────────────────────────────────┐
+│  PYDANTIC AI AGENT (Python)                 │
+│  ┌────────────────────────────────────────┐ │
+│  │ Agent emits A2UI JSON:                 │ │
+│  │ {                                      │ │
+│  │   "type": "a2ui.TaskCard",             │ │
+│  │   "id": "task-1",                      │ │
+│  │   "props": {                           │ │
+│  │     "title": "Setup DB",               │ │
+│  │     "status": "in_progress"            │ │
+│  │   }                                    │ │
+│  │ }                                      │ │
+│  └────────────────────────────────────────┘ │
+└─────────────────────────────────────────────┘
+                   ↓
+        AG-UI Protocol (SSE)
+                   ↓
+┌─────────────────────────────────────────────┐
+│  NEXT.JS FRONTEND                           │
+│  ┌────────────────────────────────────────┐ │
+│  │ A2UI Component Catalog:                │ │
+│  │ {                                      │ │
+│  │   "a2ui.TaskCard": TaskCard,           │ │
+│  │   "a2ui.ProgressRing": ProgressRing,   │ │
+│  │   "a2ui.FileTree": FileTree,           │ │
+│  │   ...                                  │ │
+│  │ }                                      │ │
+│  └────────────────────────────────────────┘ │
+│  CopilotKit maps A2UI JSON → React         │
+└─────────────────────────────────────────────┘
+```
+
+## Event Ingestion API (for External Agents)
+
+External agents like Claude Code can push events to the dashboard via REST API. The UI Orchestrator (Pydantic AI agent) receives these events and uses LLM intelligence to decide what UI components to generate.
+
+### Event Endpoint
+
+```
+POST /api/dashboard/event
+{
+  "project_id": "uuid",
+  "type": "task_started" | "task_completed" | "decision_needed" |
+          "approval_needed" | "error" | "milestone" | "file_changed" | "activity",
+  "payload": { ... type-specific data ... }
+}
+```
+
+### Event Types
+
+**task_started** - External agent started working on a task
+```json
+{"task_id": "uuid", "description": "Setting up authentication"}
+```
+
+**task_completed** - External agent finished a task
+```json
+{"task_id": "uuid", "notes": "Implemented JWT auth with refresh tokens"}
+```
+
+**decision_needed** - External agent needs human to choose between options
+```json
+{
+  "decision_id": "uuid",
+  "question": "Which authentication approach?",
+  "options": [
+    {"id": "jwt", "label": "JWT tokens", "description": "Stateless, scalable"},
+    {"id": "session", "label": "Sessions", "description": "Easy revocation"}
+  ],
+  "recommendation": "jwt",
+  "context": "Building REST API that may scale"
+}
+```
+
+**approval_needed** - External agent needs approval for risky action
+```json
+{
+  "approval_id": "uuid",
+  "action": "Delete test database",
+  "risk_level": "high",
+  "context": "Clearing data for fresh integration tests",
+  "affected_files": ["scripts/clear-db.sql"]
+}
+```
+
+**error** - External agent encountered an error
+```json
+{
+  "error_id": "uuid",
+  "message": "npm install failed",
+  "details": "EACCES permission denied",
+  "recovery_options": [
+    {"id": "sudo", "label": "Run with sudo"},
+    {"id": "fix-perms", "label": "Fix permissions"},
+    {"id": "skip", "label": "Skip this step"}
+  ]
+}
+```
+
+**milestone** - External agent reached a milestone
+```json
+{
+  "title": "Backend API Complete",
+  "summary": "All 5 API endpoints implemented and tested",
+  "tasks_completed": 5,
+  "next_phase": "Frontend development"
+}
+```
+
+**file_changed** - External agent modified a file
+```json
+{"path": "src/auth.ts", "action": "created" | "modified" | "deleted"}
+```
+
+**activity** - General activity log entry
+```json
+{"message": "Installing dependencies...", "reasoning": "Required for JWT support"}
+```
+
+### Human Response Endpoint
+
+```
+POST /api/dashboard/response
+{
+  "project_id": "uuid",
+  "response_type": "decision" | "approval" | "error_recovery",
+  "response_id": "uuid",
+  "value": "jwt" | true | false | "retry"
+}
+```
+
+### Pending Responses Endpoint (for external agent to poll)
+
+```
+GET /api/dashboard/pending/{project_id}
+```
+
+Returns any decisions, approvals, or error recovery choices that have been resolved by the human but not yet acknowledged by the external agent.
+
+## Additional A2UI Components (for External Agent Integration)
+
+### a2ui.DecisionCard
+Human chooses between options presented by external agent.
+```json
+{
+  "type": "a2ui.DecisionCard",
+  "id": "decision-1",
+  "props": {
+    "decisionId": "uuid",
+    "question": "Which authentication approach?",
+    "options": [
+      {"id": "jwt", "label": "JWT tokens", "description": "Stateless, scalable"},
+      {"id": "session", "label": "Sessions", "description": "Easy revocation"}
+    ],
+    "recommendation": "jwt",
+    "context": "Building REST API that may scale"
+  }
+}
+```
+
+### a2ui.MilestoneCard
+Celebrates reaching a milestone with summary.
+```json
+{
+  "type": "a2ui.MilestoneCard",
+  "id": "milestone-1",
+  "props": {
+    "title": "Backend Complete",
+    "summary": "All endpoints implemented",
+    "tasksCompleted": 5,
+    "nextPhase": "Frontend development"
+  }
+}
+```
+
+### a2ui.ErrorCard
+Shows error with recovery options.
+```json
+{
+  "type": "a2ui.ErrorCard",
+  "id": "error-1",
+  "props": {
+    "errorId": "uuid",
+    "message": "npm install failed",
+    "details": "EACCES permission denied",
+    "recoveryOptions": [
+      {"id": "sudo", "label": "Run with sudo"},
+      {"id": "fix-perms", "label": "Fix permissions"},
+      {"id": "skip", "label": "Skip this step"}
+    ]
+  }
+}
+```
+
+## UI Orchestrator (Pydantic AI Agent)
+
+The UI Orchestrator receives events from external agents and uses LLM intelligence to decide what UI components to generate. This is the key "generative" aspect - the AI decides WHAT to show based on context, not just mapping data to templates.
+
+```python
+# agent/ui_orchestrator.py
+async def handle_event(event: DashboardEvent, state: AgentState) -> list[A2UIComponent]:
+    """
+    Use LLM to decide what UI to generate based on event context.
+    """
+    prompt = f"""
+    An external AI coding agent reported this event:
+    Type: {event.type}
+    Payload: {event.payload}
+    Current project state: {state.summary()}
+    Recent activity: {state.recent_activity()}
+
+    Based on this event and context, decide what UI components to show the human.
+    Consider: urgency, whether input is needed, what context would be helpful.
+
+    Available components: TaskCard, ProgressRing, DecisionCard,
+    ApprovalCard, ErrorCard, MilestoneCard, ActivityItem, FileTree, DiffViewer
+
+    Return a JSON list of components to render with their props.
+    """
+
+    decision = await orchestrator_agent.run(prompt)
+    return generate_a2ui_components(decision)
+```
+
+**File Structure:**
+
+```
+project/
+├── agent/                      # Pydantic AI agent (Python)
+│   ├── main.py                 # FastAPI + AG-UI adapter
+│   ├── agent.py                # Pydantic AI agent definition
+│   ├── a2ui_generator.py       # Generates A2UI JSON components
+│   ├── tools.py                # Agent tools (write_file, run_command, etc)
+│   ├── models.py               # Pydantic state models
+│   └── requirements.txt
+├── app/                        # Next.js frontend
+│   ├── (dashboard)/
+│   │   ├── upload/             # Spec upload page
+│   │   └── [projectId]/        # Main dashboard with A2UI renderer
+│   ├── api/
+│   │   └── ag-ui/route.ts      # Proxy to AG-UI backend
+│   └── layout.tsx
+├── components/
+│   ├── a2ui-catalog/           # A2UI component implementations
+│   │   ├── task-card.tsx       # Maps to a2ui.TaskCard
+│   │   ├── progress-ring.tsx   # Maps to a2ui.ProgressRing
+│   │   ├── file-tree.tsx       # Maps to a2ui.FileTree
+│   │   ├── test-results.tsx    # Maps to a2ui.TestResults
+│   │   ├── approval-card.tsx   # Maps to a2ui.ApprovalCard
+│   │   ├── activity-item.tsx   # Maps to a2ui.ActivityItem
+│   │   └── diff-viewer.tsx     # Maps to a2ui.DiffViewer
+│   └── ui/                     # Shadcn base components
+├── lib/
+│   ├── db.ts                   # Drizzle ORM client
+│   ├── a2ui-catalog.ts         # A2UI catalog registration
+│   └── copilot-provider.tsx    # CopilotKit with A2UI renderer
+└── .env
+```
+
+## Data Model
+
+### Projects
+- id: uuid
+- name: string
+- spec: jsonb (full app_spec.txt content)
+- preferredLayout: enum ('kanban', 'timeline', 'graph')
+- createdAt: timestamp
+- userId: string
+
+### Tasks
+- id: uuid
+- projectId: uuid (FK)
+- category: string (setup, feature, styling, testing)
+- description: string
+- steps: jsonb (array of strings)
+- status: enum ('pending', 'in_progress', 'completed', 'blocked')
+- agentNotes: jsonb (reasoning, decisions)
+- order: integer
+
+### ActivityLog
+- id: uuid
+- projectId: uuid (FK)
+- eventType: string (file_modified, test_run, approval_requested, etc)
+- eventData: jsonb
+- agentReasoning: string (why agent took this action)
+- timestamp: timestamp
+
+## UI/UX Requirements
+
+### Design System
+- Dark theme (primary) with blue accent colors
+- Modern, sleek aesthetic matching Claude's design language
+- Shadcn/ui components for consistency
+- Smooth animations for state transitions
+
+### Key Screens
+
+**1. Upload Page**
+- Simple upload area for app_spec.txt
+- Spec validation with error messages
+- Preview of parsed tasks before starting
+
+**2. Dashboard (Main Generative UI)**
+- Auto-generated layout based on project type
+- Multiple generative components (6-8 different types)
+- Real-time updates via SSE
+- CopilotKit chat sidebar
+- Activity feed showing agent actions
+
+**3. Approval Modal**
+- Triggered when agent needs human approval
+- Shows context of requested action
+- Code diff for file changes
+- Approve/Reject buttons
+
+### A2UI Generative UI Behavior
+
+**Agent Emits A2UI JSON:**
+```python
+# agent/a2ui_generator.py
+def generate_task_card(task):
+    """Agent generates A2UI JSON for task card"""
+    return {
+        "type": "a2ui.TaskCard",
+        "id": f"task-{task.id}",
+        "props": {
+            "title": task.description,
+            "status": task.status,  # "pending" | "in_progress" | "completed"
+            "category": task.category,
+            "progress": calculate_progress(task)
+        },
+        "children": [f"progress-{task.id}"]  # Reference child components
+    }
+
+# Agent returns A2UI message stream
+def emit_ui_update(state):
+    return {
+        "messageType": "surfaceUpdate",
+        "components": [
+            generate_task_card(task) for task in state.tasks
+        ]
+    }
+```
+
+**Frontend Catalog Registration:**
+```typescript
+// lib/a2ui-catalog.ts
+import { createA2UIMessageRenderer } from "@copilotkit/react-a2ui";
+import { TaskCard } from "@/components/a2ui-catalog/task-card";
+import { ProgressRing } from "@/components/a2ui-catalog/progress-ring";
+
+export const a2uiCatalog = {
+  "a2ui.TaskCard": TaskCard,
+  "a2ui.ProgressRing": ProgressRing,
+  "a2ui.FileTree": FileTree,
+  "a2ui.TestResults": TestResults,
+  "a2ui.ApprovalCard": ApprovalCard,
+  "a2ui.ActivityItem": ActivityItem,
+  "a2ui.DiffViewer": DiffViewer,
+};
+
+// CopilotKit automatically maps A2UI JSON to React components
+const A2UIRenderer = createA2UIMessageRenderer({
+  catalog: a2uiCatalog,
+  theme: darkTheme
+});
+```
+
+**Security Model:**
+- Agent can ONLY use components in the catalog
+- No arbitrary code execution - just declarative JSON
+- Frontend validates all A2UI messages against catalog
+
+### Interactions
+- Real-time component updates (no page refresh)
+- Toast notifications for tool executions
+- Smooth state transitions
+- Loading states for async operations
+
+## Security Considerations
+
+- Agent runs in sandboxed environment
+- File operations restricted to project directory
+- Environment variables never exposed to frontend
+- Input validation with Pydantic schemas
+- Rate limiting on API endpoints
+
+## Third-Party Integrations
+
+### OpenRouter
+- LLM API access via Claude Sonnet 4.5
+- Cost tracking and token usage monitoring
+- Fallback models if primary unavailable
+
+### CopilotKit (AG-UI)
+- Frontend-agent communication via AG-UI protocol
+- Generative UI component rendering
+- Shared state management
+- Chat interface
+
+### Neon PostgreSQL
+- Serverless Postgres database
+- Connection pooling
+- Project and task storage
+
+## Constraints & Assumptions
+
+### Constraints
+- Proof of concept scope (not production-hardened)
+- Single-user focus (no multi-tenancy)
+- Agent executes tasks sequentially (no parallelization)
+- Limited to Next.js/React projects initially
+
+### Assumptions
+- Users provide valid app_spec.txt format
+- Environment variables configured correctly
+- OpenRouter API key has sufficient credits
+- Projects run in controlled environment (no arbitrary code)
+
+## Success Criteria
+
+1. **Spec Upload**: Upload and parse app_spec.txt successfully
+2. **Agent Execution**: Agent can execute at least 3 task types (file write, command run, test execution)
+3. **A2UI Protocol Compliance**: Agent emits valid A2UI v0.8 JSON conforming to specification
+4. **A2UI Component Catalog**: Frontend registers 6+ A2UI components in catalog
+5. **Generative UI**: Dashboard renders 6+ different A2UI component types based on agent emissions
+6. **Real-time Updates**: UI updates within 500ms of agent A2UI messages via AG-UI
+7. **AG-UI Transport**: SSE connection successfully streams A2UI JSON from agent to frontend
+8. **Human-in-the-Loop**: Approval workflow functions for high-risk actions
+9. **Shared State**: User can modify tasks from UI, agent sees changes via AG-UI events
+10. **Chat Interface**: CopilotKit sidebar responds to questions about progress
+11. **Security Validation**: Agent cannot emit components outside registered catalog
+12. **YouTube Demo**: Full feature demonstration showing A2UI + AG-UI generative UI adapting to different project types
+
+---
+
+## Task List
+
+```json
+[
+  {
+    "category": "setup",
+    "description": "Initialize Next.js project with TypeScript and Tailwind",
+    "steps": [
+      "Run npx create-next-app with TypeScript, Tailwind, App Router",
+      "Install CopilotKit packages: @copilotkit/react-core, @copilotkit/react-ui",
+      "Configure Tailwind with dark theme",
+      "Verify project runs with npm run dev on port 3010"
+    ],
+    "passes": false
+  },
+  {
+    "category": "setup",
+    "description": "Install and configure Shadcn/ui",
+    "steps": [
+      "Initialize shadcn/ui with npx shadcn@latest init",
+      "Install core components: button, card, input, dialog, toast, badge, separator",
+      "Configure dark theme as default",
+      "Verify components render correctly"
+    ],
+    "passes": false
+  },
+  {
+    "category": "setup",
+    "description": "Set up PostgreSQL with Drizzle ORM",
+    "steps": [
+      "Install drizzle-orm, drizzle-kit, and @neondatabase/serverless",
+      "Create schema.ts with Projects, Tasks, and ActivityLog tables",
+      "Create drizzle.config.ts",
+      "Run database migration",
+      "Verify connection works"
+    ],
+    "passes": false
+  },
+  {
+    "category": "setup",
+    "description": "Initialize Python Pydantic AI agent backend",
+    "steps": [
+      "Create agent/ directory",
+      "Create requirements.txt with pydantic-ai, fastapi, uvicorn, ag-ui-protocol",
+      "Initialize virtual environment",
+      "Install dependencies",
+      "Create main.py with FastAPI app"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Configure Pydantic AI agent with OpenRouter",
+    "steps": [
+      "Create agent.py with Pydantic AI agent definition",
+      "Configure OpenRouterModel with Claude Sonnet 4.5",
+      "Set up environment variable for OPENROUTER_API_KEY",
+      "Create AgentState Pydantic model (tasks, currentTask, progress, etc)",
+      "Test agent initialization"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Implement AG-UI adapter for CopilotKit integration",
+    "steps": [
+      "Import AGUIAdapter from ag-ui-protocol",
+      "Create FastAPI endpoint at /ag-ui/stream",
+      "Configure AGUIAdapter.run_stream() for SSE responses",
+      "Set up CORS for Next.js frontend (port 3010)",
+      "Test SSE connection from frontend"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Implement agent tools for task execution",
+    "steps": [
+      "Create tools.py with write_file tool",
+      "Add read_file tool for reading existing files",
+      "Add run_command tool for shell execution (sandboxed)",
+      "Add complete_task tool to mark tasks done",
+      "Add request_approval tool for human-in-the-loop",
+      "Register tools with Pydantic AI agent"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Build spec parser and task generator",
+    "steps": [
+      "Create parse_spec function to read JSON app_spec",
+      "Extract tasks, categories, and dependencies",
+      "Generate initial AgentState with task list",
+      "Determine preferred layout (kanban vs timeline vs graph)",
+      "Save parsed data to PostgreSQL",
+      "Return structured state to frontend"
+    ],
+    "passes": false
+  },
+  {
+    "category": "frontend",
+    "description": "Create spec upload page",
+    "steps": [
+      "Build upload page at app/(dashboard)/upload/page.tsx",
+      "Add file input with drag-and-drop support",
+      "Validate JSON format on upload",
+      "Parse and preview tasks before submission",
+      "Send spec to backend API",
+      "Redirect to dashboard on success"
+    ],
+    "passes": false
+  },
+  {
+    "category": "frontend",
+    "description": "Set up CopilotKit provider and AG-UI connection",
+    "steps": [
+      "Create lib/copilot-provider.tsx",
+      "Configure CopilotKit with AG-UI runtime URL",
+      "Set up proxy API route at app/api/ag-ui/route.ts",
+      "Proxy requests to Python backend (port 8000)",
+      "Wrap app in CopilotProvider in layout.tsx",
+      "Test connection to backend agent"
+    ],
+    "passes": false
+  },
+  {
+    "category": "frontend",
+    "description": "Build main dashboard layout",
+    "steps": [
+      "Create app/(dashboard)/[projectId]/page.tsx",
+      "Add dashboard grid layout (3-column responsive)",
+      "Include header with project name and progress",
+      "Add container for generative UI components",
+      "Add CopilotSidebar for chat interface",
+      "Style with dark theme and blue accents"
+    ],
+    "passes": false
+  },
+  {
+    "category": "a2ui-catalog",
+    "description": "Build A2UI component catalog registration",
+    "steps": [
+      "Create lib/a2ui-catalog.ts for catalog registration",
+      "Import all A2UI component implementations",
+      "Map a2ui.* types to React components",
+      "Create A2UIRenderer with createA2UIMessageRenderer",
+      "Configure dark theme for catalog",
+      "Export catalog for CopilotKit provider"
+    ],
+    "passes": false
+  },
+  {
+    "category": "a2ui-catalog",
+    "description": "Implement a2ui.TaskCard component",
+    "steps": [
+      "Create components/a2ui-catalog/task-card.tsx",
+      "Accept A2UI props: title, status, category, progress",
+      "Build card UI with status badge and progress bar",
+      "Add Shadcn card, badge components",
+      "Style with dark theme and status colors",
+      "Register in catalog as 'a2ui.TaskCard'"
+    ],
+    "passes": false
+  },
+  {
+    "category": "a2ui-catalog",
+    "description": "Implement a2ui.ProgressRing component",
+    "steps": [
+      "Create components/a2ui-catalog/progress-ring.tsx",
+      "Accept A2UI props: percentage, tasksCompleted, filesModified",
+      "Build circular progress SVG with percentage display",
+      "Display metrics below ring",
+      "Add smooth animation transitions",
+      "Color-code based on completion (blue < 80%, green >= 80%)",
+      "Register in catalog as 'a2ui.ProgressRing'"
+    ],
+    "passes": false
+  },
+  {
+    "category": "a2ui-catalog",
+    "description": "Implement a2ui.FileTree component",
+    "steps": [
+      "Create components/a2ui-catalog/file-tree.tsx",
+      "Accept A2UI props: files (array), activeFile, modifiedFiles",
+      "Build collapsible tree structure",
+      "Highlight currently active file",
+      "Show modified badge on changed files",
+      "Register in catalog as 'a2ui.FileTree'"
+    ],
+    "passes": false
+  },
+  {
+    "category": "a2ui-catalog",
+    "description": "Implement a2ui.TestResults component",
+    "steps": [
+      "Create components/a2ui-catalog/test-results.tsx",
+      "Accept A2UI props: tests (array), coverage, status",
+      "Show list of tests with pass/fail badges",
+      "Display coverage percentage if available",
+      "Add loading spinner for 'running' status",
+      "Register in catalog as 'a2ui.TestResults'"
+    ],
+    "passes": false
+  },
+  {
+    "category": "a2ui-catalog",
+    "description": "Implement a2ui.ActivityItem component",
+    "steps": [
+      "Create components/a2ui-catalog/activity-item.tsx",
+      "Accept A2UI props: eventType, message, reasoning, timestamp",
+      "Show event type icon (file, command, test, approval)",
+      "Display agent reasoning",
+      "Format timestamp",
+      "Register in catalog as 'a2ui.ActivityItem'"
+    ],
+    "passes": false
+  },
+  {
+    "category": "a2ui-catalog",
+    "description": "Implement a2ui.ApprovalCard component",
+    "steps": [
+      "Create components/a2ui-catalog/approval-card.tsx",
+      "Accept A2UI props: action, riskLevel, context, approvalId",
+      "Display risk level with color coding",
+      "Add Approve/Reject buttons",
+      "Emit AG-UI events on button click",
+      "Register in catalog as 'a2ui.ApprovalCard'"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Build A2UI JSON generator for agent",
+    "steps": [
+      "Create agent/a2ui_generator.py",
+      "Add generate_task_card() function returning A2UI JSON",
+      "Add generate_progress_ring() function",
+      "Add generate_approval_card() function",
+      "Add emit_ui_update() to send surfaceUpdate messages",
+      "Agent calls these functions to emit UI components"
+    ],
+    "passes": false
+  },
+  {
+    "category": "feature",
+    "description": "Implement shared state for task priority modification",
+    "steps": [
+      "Use useCoAgent hook to access agent state",
+      "Add drag-to-reorder on kanban board",
+      "Send task order update to agent via AG-UI",
+      "Agent receives state change and adapts execution",
+      "Verify bidirectional sync works",
+      "Add loading state during update"
+    ],
+    "passes": false
+  },
+  {
+    "category": "feature",
+    "description": "Build agent execution loop",
+    "steps": [
+      "Implement main execution flow in agent.py",
+      "Loop through pending tasks sequentially",
+      "Update state after each step (emit StateSnapshotEvent)",
+      "Handle tool execution with error recovery",
+      "Request approval for high-risk actions",
+      "Mark tasks complete and move to next"
+    ],
+    "passes": false
+  },
+  {
+    "category": "feature",
+    "description": "Implement dynamic layout selection",
+    "steps": [
+      "Agent analyzes project spec on parse",
+      "Determine optimal layout: kanban (< 20 tasks), timeline (sequential), graph (dependencies)",
+      "Set state.preferredLayout",
+      "Frontend useCoAgentStateRender renders appropriate layout",
+      "Test with different project types",
+      "Verify layout changes based on project"
+    ],
+    "passes": false
+  },
+  {
+    "category": "styling",
+    "description": "Polish UI with dark theme and animations",
+    "steps": [
+      "Ensure all components use dark theme colors",
+      "Add smooth transitions for state changes",
+      "Implement loading skeletons for async operations",
+      "Add hover states and focus indicators",
+      "Use framer-motion for component animations",
+      "Verify consistent spacing and typography"
+    ],
+    "passes": false
+  },
+  {
+    "category": "testing",
+    "description": "Validate A2UI protocol compliance",
+    "steps": [
+      "Create test script to validate A2UI JSON output from agent",
+      "Verify all emitted components match A2UI v0.8 specification",
+      "Check required fields: type, id, props are present",
+      "Validate component types are in registered catalog",
+      "Test messageType values: beginRendering, surfaceUpdate, dataModelUpdate",
+      "Verify JSON structure is LLM-friendly (flat list with ID references)",
+      "Ensure agent cannot emit components outside catalog (security test)",
+      "Log validation results to agent/a2ui_validation.log"
+    ],
+    "passes": false
+  },
+  {
+    "category": "testing",
+    "description": "End-to-end testing with sample project",
+    "steps": [
+      "Create sample app_spec.txt for simple Next.js app",
+      "Upload spec and start agent execution",
+      "Verify all generative UI components render",
+      "Test approval workflow (approve and reject)",
+      "Modify task priority from UI",
+      "Verify chat interface responds to queries",
+      "Ensure real-time updates work smoothly"
+    ],
+    "passes": false
+  },
+  {
+    "category": "testing",
+    "description": "YouTube demo preparation",
+    "steps": [
+      "Create 2-3 different app specs (simple, medium, complex)",
+      "Test that dashboard adapts to each project type",
+      "Prepare talking points about generative UI features",
+      "Highlight CopilotKit AG-UI protocol integration",
+      "Show human-in-the-loop workflow",
+      "Record smooth demo run with no errors"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Implement event ingestion API endpoint for external agents",
+    "steps": [
+      "Create POST /api/dashboard/event endpoint in main.py",
+      "Define DashboardEvent Pydantic model with type and payload fields",
+      "Support event types: task_started, task_completed, decision_needed, approval_needed, error, milestone, file_changed, activity",
+      "Validate event payload against type-specific schemas",
+      "Store events in project state and trigger UI orchestrator",
+      "Return acknowledgment with event_id",
+      "Add error handling for invalid event types or payloads"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Implement human response API endpoint",
+    "steps": [
+      "Create POST /api/dashboard/response endpoint in main.py",
+      "Define ResponsePayload model with response_type, response_id, and value",
+      "Accept decision responses (selected option id)",
+      "Accept approval responses (approved boolean)",
+      "Accept error recovery responses (selected recovery option)",
+      "Store response and mark corresponding request as resolved",
+      "Make response available for external agent to poll"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Implement pending responses polling endpoint",
+    "steps": [
+      "Create GET /api/dashboard/pending/{project_id} endpoint",
+      "Return list of resolved decisions/approvals/error recoveries not yet acknowledged",
+      "Include response values (selected option, approved boolean, etc)",
+      "Create POST /api/dashboard/pending/{project_id}/ack endpoint to acknowledge receipt",
+      "Remove acknowledged responses from pending list",
+      "Support optional filtering by response type"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Implement UI Orchestrator with LLM-based component selection",
+    "steps": [
+      "Create agent/ui_orchestrator.py module",
+      "Create UIOrchestrator class that wraps Pydantic AI agent",
+      "Implement handle_event method that receives DashboardEvent",
+      "Build context-aware prompt including event type, payload, and project state",
+      "Call LLM to decide which A2UI components to generate",
+      "Parse LLM response and generate corresponding A2UI JSON",
+      "Emit components via AG-UI protocol (surfaceUpdate message)",
+      "Add fallback logic if LLM fails (default component mapping)"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Add A2UI generators for new components",
+    "steps": [
+      "Add generate_decision_card() function to a2ui_generator.py",
+      "Add generate_milestone_card() function to a2ui_generator.py",
+      "Add generate_error_card() function to a2ui_generator.py",
+      "Update emit_ui_update() to handle new component types",
+      "Add unit tests for new generator functions",
+      "Verify generated JSON matches A2UI v0.8 specification"
+    ],
+    "passes": false
+  },
+  {
+    "category": "a2ui-catalog",
+    "description": "Implement a2ui.DecisionCard component",
+    "steps": [
+      "Create components/a2ui-catalog/decision-card.tsx",
+      "Accept props: decisionId, question, options, recommendation, context",
+      "Render question text prominently at top",
+      "Display options as selectable cards or radio buttons",
+      "Highlight recommended option with visual indicator",
+      "Show context information in collapsible section",
+      "Call onResponse callback when option selected",
+      "Send response to POST /api/dashboard/response",
+      "Show loading state while response is being sent",
+      "Update card to show selected state after submission",
+      "Register in catalog as 'a2ui.DecisionCard'"
+    ],
+    "passes": false
+  },
+  {
+    "category": "a2ui-catalog",
+    "description": "Implement a2ui.MilestoneCard component",
+    "steps": [
+      "Create components/a2ui-catalog/milestone-card.tsx",
+      "Accept props: title, summary, tasksCompleted, nextPhase",
+      "Render with celebratory styling (green background, checkmark icon)",
+      "Display milestone title in large text",
+      "Show summary of accomplishments",
+      "Display tasks completed count with visual indicator",
+      "Show next phase information if provided",
+      "Add subtle celebration animation (confetti or glow effect)",
+      "Register in catalog as 'a2ui.MilestoneCard'"
+    ],
+    "passes": false
+  },
+  {
+    "category": "a2ui-catalog",
+    "description": "Implement a2ui.ErrorCard component",
+    "steps": [
+      "Create components/a2ui-catalog/error-card.tsx",
+      "Accept props: errorId, message, details, recoveryOptions",
+      "Render with error styling (red accents, warning icon)",
+      "Display error message prominently",
+      "Show details in expandable/collapsible section",
+      "Render recovery options as clickable buttons",
+      "Call onResponse callback when recovery option selected",
+      "Send response to POST /api/dashboard/response",
+      "Show loading state while response is being sent",
+      "Update card to show selected recovery action",
+      "Register in catalog as 'a2ui.ErrorCard'"
+    ],
+    "passes": false
+  },
+  {
+    "category": "frontend",
+    "description": "Update A2UI catalog with new components",
+    "steps": [
+      "Import DecisionCard in lib/a2ui-catalog.ts",
+      "Import MilestoneCard in lib/a2ui-catalog.ts",
+      "Import ErrorCard in lib/a2ui-catalog.ts",
+      "Add 'a2ui.DecisionCard': DecisionCard to catalog",
+      "Add 'a2ui.MilestoneCard': MilestoneCard to catalog",
+      "Add 'a2ui.ErrorCard': ErrorCard to catalog",
+      "Verify all 10 components are registered in catalog",
+      "Test that unknown component types are still rejected"
+    ],
+    "passes": false
+  },
+  {
+    "category": "feature",
+    "description": "Create Claude Code integration skill",
+    "steps": [
+      "Create .claude/skills/coding-dashboard/SKILL.md file",
+      "Document project creation API with example curl command",
+      "Document all event types with payload examples",
+      "Document response endpoint for human decisions",
+      "Document pending endpoint for polling responses",
+      "Add workflow guidance for typical usage pattern",
+      "Include troubleshooting tips for common issues",
+      "Test skill by using it with Claude Code on a sample task"
+    ],
+    "passes": false
+  },
+  {
+    "category": "testing",
+    "description": "End-to-end test external agent integration",
+    "steps": [
+      "Create test script that simulates Claude Code sending events",
+      "Send project creation with initial tasks",
+      "Send task_started events and verify TaskCard renders",
+      "Send decision_needed event and verify DecisionCard renders",
+      "Select decision option and verify response is stored",
+      "Poll pending endpoint and verify decision is returned",
+      "Send milestone event and verify MilestoneCard renders",
+      "Send error event and verify ErrorCard renders",
+      "Select recovery option and verify response flow",
+      "Verify full event flow from API to UI to response"
+    ],
+    "passes": false
+  },
+  {
+    "category": "testing",
+    "description": "Test UI Orchestrator LLM intelligence",
+    "steps": [
+      "Send task_started event and verify orchestrator generates TaskCard + ActivityItem",
+      "Send decision_needed event and verify orchestrator generates DecisionCard",
+      "Send error event and verify orchestrator generates ErrorCard + ActivityItem with context",
+      "Send milestone event and verify orchestrator generates MilestoneCard + ProgressRing update",
+      "Verify orchestrator adds contextual ActivityItem explaining its reasoning",
+      "Test that orchestrator handles rapid sequential events gracefully",
+      "Test fallback behavior when LLM returns invalid response",
+      "Log orchestrator decisions for debugging"
+    ],
+    "passes": false
+  }
+]
+```
+
+---
+
+## Agent Instructions
+
+1. Read `activity.md` first to understand current state
+2. Find next task with `"passes": false`
+3. Complete all steps for that task
+4. Update task to `"passes": true`
+5. Log completion in `activity.md`
+6. Repeat until all tasks pass
+
+**Important:** Only modify the `passes` field. Do not remove or rewrite tasks.
+
+---
+
+## Completion Criteria
+
+All tasks marked with `"passes": true`
+
+## YouTube Demo Flow
+
+1. **Introduction (0:00-0:30)**
+   - Explain autonomous coding agents and why dashboards matter
+   - Introduce CopilotKit and generative UI concept
+
+2. **Upload Spec (0:30-1:30)**
+   - Upload simple app_spec.txt
+   - Show spec parsing and validation
+   - Agent analyzes and chooses kanban layout
+
+3. **Watch Agent Work (1:30-4:00)**
+   - Real-time task execution
+   - Show different generative UI components appearing
+   - Highlight tool call rendering (file modifications, commands)
+   - Activity feed shows agent reasoning
+
+4. **Human Collaboration (4:00-5:30)**
+   - Agent requests approval for database change
+   - Show approval queue component
+   - Approve change and watch agent continue
+   - Modify task priority from UI
+
+5. **Chat Interaction (5:30-6:30)**
+   - Ask agent about progress via CopilotKit sidebar
+   - "Skip the dark mode task"
+   - Agent adapts and continues
+
+6. **Different Project Type (6:30-8:00)**
+   - Upload complex spec with dependencies
+   - Agent chooses dependency graph layout (different visualization!)
+   - Show how generative UI adapts
+
+7. **Wrap-up (8:00-9:00)**
+   - Recap generative UI benefits
+   - CopilotKit sponsor mention
+   - Link to GitHub repo and docs

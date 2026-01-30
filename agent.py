@@ -35,18 +35,25 @@ AUTO_CONTINUE_DELAY_SECONDS: int = 3
 
 
 # Type-safe literal union - no runtime overhead
-SessionStatus = Literal["continue", "error"]
+SessionStatus = Literal["continue", "error", "complete"]
 
 # Constants for code clarity
 SESSION_CONTINUE: SessionStatus = "continue"
 SESSION_ERROR: SessionStatus = "error"
+SESSION_COMPLETE: SessionStatus = "complete"
+
+# Completion signal that orchestrator outputs when all features are done
+COMPLETION_SIGNAL = "PROJECT_COMPLETE:"
 
 
 class SessionResult(NamedTuple):
     """Result of running an agent session.
 
     Attributes:
-        status: "continue" if session completed normally, "error" if exception occurred
+        status: Session outcome:
+            - "continue": Normal completion, agent can continue with more work
+            - "error": Exception occurred, will retry with fresh session
+            - "complete": All features done, orchestrator signaled PROJECT_COMPLETE
         response: Response text from the agent, or error message if status is "error"
     """
 
@@ -71,6 +78,7 @@ async def run_agent_session(
         SessionResult with status and response text:
         - status=CONTINUE: Normal completion, agent can continue
         - status=ERROR: Exception occurred, will retry with fresh session
+        - status=COMPLETE: All features done, PROJECT_COMPLETE signal detected
     """
     print("Sending prompt to Claude Agent SDK...\n")
 
@@ -114,6 +122,11 @@ async def run_agent_session(
                             print("   [Done]", flush=True)
 
         print("\n" + "-" * 70 + "\n")
+
+        # Check for project completion signal from orchestrator
+        if COMPLETION_SIGNAL in response_text:
+            return SessionResult(status=SESSION_COMPLETE, response=response_text)
+
         return SessionResult(status=SESSION_CONTINUE, response=response_text)
 
     except ConnectionError as e:
@@ -257,7 +270,14 @@ async def run_autonomous_agent(
             result = SessionResult(status=SESSION_ERROR, response=str(e))
 
         # Handle status
-        if result.status == SESSION_CONTINUE:
+        if result.status == SESSION_COMPLETE:
+            print("\n" + "=" * 70)
+            print("  PROJECT COMPLETE")
+            print("=" * 70)
+            print("\nAll features have been implemented and verified!")
+            print_progress_summary(project_dir)
+            break
+        elif result.status == SESSION_CONTINUE:
             print(f"\nAgent will auto-continue in {AUTO_CONTINUE_DELAY_SECONDS}s...")
             print_progress_summary(project_dir)
         elif result.status == SESSION_ERROR:

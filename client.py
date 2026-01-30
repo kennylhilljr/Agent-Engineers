@@ -52,15 +52,16 @@ class SecuritySettings(TypedDict):
     permissions: PermissionsConfig
 
 
-# Puppeteer MCP tools for browser automation
-PUPPETEER_TOOLS: list[str] = [
-    "mcp__puppeteer__puppeteer_navigate",
-    "mcp__puppeteer__puppeteer_screenshot",
-    "mcp__puppeteer__puppeteer_click",
-    "mcp__puppeteer__puppeteer_fill",
-    "mcp__puppeteer__puppeteer_select",
-    "mcp__puppeteer__puppeteer_hover",
-    "mcp__puppeteer__puppeteer_evaluate",
+# Playwright MCP tools for browser automation
+PLAYWRIGHT_TOOLS: list[str] = [
+    "mcp__playwright__browser_navigate",
+    "mcp__playwright__browser_take_screenshot",
+    "mcp__playwright__browser_click",
+    "mcp__playwright__browser_type",
+    "mcp__playwright__browser_select_option",
+    "mcp__playwright__browser_hover",
+    "mcp__playwright__browser_snapshot",
+    "mcp__playwright__browser_wait_for",
 ]
 
 # Built-in tools
@@ -103,8 +104,8 @@ def create_security_settings() -> SecuritySettings:
                 # Bash permission granted here, but actual commands are validated
                 # by the bash_security_hook (see security.py for allowed commands)
                 "Bash(*)",
-                # Allow Puppeteer MCP tools for browser automation
-                *PUPPETEER_TOOLS,
+                # Allow Playwright MCP tools for browser automation
+                *PLAYWRIGHT_TOOLS,
                 # Allow all Arcade MCP Gateway tools (Linear + GitHub + Slack)
                 ARCADE_TOOLS_PERMISSION,
             ],
@@ -180,7 +181,7 @@ def create_client(project_dir: Path, model: str) -> ClaudeSDKClient:
     print("   - Sandbox enabled (OS-level bash isolation)")
     print(f"   - Filesystem restricted to: {project_dir.resolve()}")
     print("   - Bash commands restricted to allowlist (see security.py)")
-    print(f"   - MCP servers: puppeteer (browser), arcade ({arcade_config['url']})")
+    print(f"   - MCP servers: playwright (browser), arcade ({arcade_config['url']})")
     print()
 
     # Load orchestrator prompt as system prompt
@@ -192,13 +193,13 @@ def create_client(project_dir: Path, model: str) -> ClaudeSDKClient:
             system_prompt=orchestrator_prompt,
             allowed_tools=[
                 *BUILTIN_TOOLS,
-                *PUPPETEER_TOOLS,
+                *PLAYWRIGHT_TOOLS,
                 *ALL_ARCADE_TOOLS,
             ],
             mcp_servers=cast(
                 dict[str, McpServerConfig],
                 {
-                    "puppeteer": {"command": "npx", "args": ["puppeteer-mcp-server"]},
+                    "playwright": {"command": "npx", "args": ["-y", "@playwright/mcp@latest"]},
                     "arcade": arcade_config,
                 },
             ),

@@ -161,7 +161,7 @@ CreatePullRequest:
     - Integrated with app state
 
     ## Testing
-    - Verified via Puppeteer
+    - Verified via Playwright
     - Screenshots attached
 
     ## Linear Issue

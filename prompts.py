@@ -94,7 +94,7 @@ Get the highest-priority issue details from linear agent, then delegate to `codi
 
 Requirements:
 1. Implement the feature
-2. Test via Puppeteer (mandatory)
+2. Test via Playwright (mandatory)
 3. Take screenshot evidence
 4. Report: files_changed, screenshot_path, test_results"
 
@@ -128,19 +128,27 @@ This is a CONTINUATION session. The project has already been initialized.
 - Read `claude-progress.txt` for recent session history
 - Read `.linear_project.json` for project IDs
 
-### Step 2: Get Status from Linear
+### Step 2: Get Status from Linear (CHECK FOR COMPLETION)
 Delegate to `linear` agent:
 "Read .linear_project.json, then:
-1. List all issues and count by status (Done/In Progress/Todo)
-2. Check for any In Progress issues (interrupted work = priority)
-3. Get the FULL DETAILS of the highest-priority issue to work on
-4. Update claude-progress.txt with current status
-5. Return the complete issue context: id, title, description, test_steps"
+1. List all issues and count by status (Done/In Progress/Todo) - EXCLUDE META issue from counts
+2. Compare done count to total_issues from .linear_project.json
+3. Return all_complete: true if done == total_issues, false otherwise
+4. If not complete: Get FULL DETAILS of highest-priority issue to work on
+5. Update claude-progress.txt with current status
+6. Return: status counts, all_complete flag, and issue context if not complete"
 
-### Step 3: MANDATORY Verification Test (before ANY new work)
+**IF all_complete is true:**
+1. Ask linear agent to add "PROJECT COMPLETE" comment to META issue
+2. Ask github agent to create final PR (if GITHUB_REPO configured)
+3. Ask slack agent to send ":tada: Project complete!" notification
+4. Output: `PROJECT_COMPLETE: All features implemented and verified.`
+5. Session will end.
+
+### Step 3: MANDATORY Verification Test (before ANY new work, only if NOT complete)
 Delegate to `coding` agent:
 "Run init.sh to start the dev server, then verify 1-2 completed features still work:
-1. Navigate to the app via Puppeteer
+1. Navigate to the app via Playwright
 2. Test a core feature end-to-end
 3. Take a screenshot as evidence
 4. Report: PASS/FAIL with screenshot path
@@ -156,7 +164,7 @@ Delegate to `coding` agent with FULL context from Step 2:
 
 Requirements:
 1. Implement the feature
-2. Test via Puppeteer (mandatory)
+2. Test via Playwright (mandatory)
 3. Take screenshot evidence
 4. Report: files_changed, screenshot_path, test_results"
 

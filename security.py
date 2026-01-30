@@ -42,7 +42,7 @@ ALLOWED_COMMANDS: set[str] = {
     "rm",  # For cleanup; validated separately to prevent dangerous operations
     "touch",
     "chmod",  # For making scripts executable; validated separately
-    "unzip",  # For extracting archives (e.g., Chrome for Puppeteer)
+    "unzip",  # For extracting archives (e.g., browser binaries for Playwright)
     # Directory navigation
     "pwd",
     "cd",
