@@ -1,0 +1,2190 @@
+# Second Brain Dashboard - Product Requirements Document
+
+## Overview
+
+Second Brain Dashboard is a generative UI application that transforms Markdown research documents into dynamic, personalized dashboards. Users paste or upload Markdown content from their AI research assistant, and an intelligent UI Orchestrator agent analyzes the content and generates an optimal visual layout using A2UI components. The system adapts its presentation based on content type - news gets magazine layouts, comparisons get side-by-side views, tutorials get step-by-step guides, and data gets stat dashboards.
+
+IMPORTANT:
+
+This is a sponsored YouTube demonstration project showcasing CopilotKit's generative UI capabilities with A2UI + AG-UI integration.
+
+../../.env.tmp contains the following environment variables:
+
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+OPENROUTER_MODEL=anthropic/claude-sonnet-4
+POSTGRES_URL=postgresql://user:pass@host/db
+
+Don't read or change these environment variables. Copy this .env into the project folder and leverage these variables.
+
+Required environment variables for this project:
+- OPENROUTER_API_KEY: API key for OpenRouter (used by Pydantic AI agent)
+- OPENROUTER_MODEL: Model identifier for Claude Sonnet 4
+
+Optional environment variables:
+- BACKEND_PORT: Port for FastAPI server (default: 8000)
+- NODE_ENV: Development/production mode (default: development)
+
+Configuration:
+- Frontend dev server: port 3010 (DO NOT use 3000, it's taken)
+- Backend server: port 8000
+- AG-UI endpoint: http://localhost:8000/ag-ui/stream
+
+## Target Audience
+
+**Primary Users:** Knowledge workers, researchers, and developers who use AI assistants to gather information and want a better way to visualize and consume their research.
+
+**Key Pain Points:**
+- Markdown documents are hard to scan quickly
+- Important statistics and insights get buried in text
+- No visual hierarchy in plain text documents
+- Difficult to compare items or see trends at a glance
+- YouTube links, code snippets, and data tables deserve better presentation
+
+## Core Value Proposition
+
+Transform any research Markdown into a beautiful, scannable dashboard that:
+1. Surfaces key takeaways immediately
+2. Presents data visually (stats, trends, comparisons)
+3. Embeds media properly (videos, images)
+4. Groups related content logically
+5. Adapts layout to content type (news vs tutorial vs comparison)
+
+---
+
+## Core Features
+
+### 1. Markdown Input Interface
+- Large text area to paste Markdown content
+- File upload support for .md files
+- Recent documents history (localStorage)
+- Sample documents for demo purposes
+- Real-time character/word count
+
+### 2. Content Analysis Pipeline
+The agent analyzes Markdown before rendering:
+- **Content Type Detection**: News, Tutorial, Comparison, Data, Resources, Profiles
+- **Structure Analysis**: List-heavy, Table-heavy, Prose-heavy, Mixed
+- **Media Detection**: YouTube links, Images, Code blocks
+- **Quantitative Level**: Data-rich vs Qualitative
+- **Length Classification**: Brief (<500 words), Medium (500-1500), Long (>1500)
+- **Temporal Nature**: Time-sensitive vs Evergreen
+
+### 3. Intelligent Layout Selection
+Based on content analysis, agent selects optimal layout:
+- **Magazine**: For news and mixed content (hero + grid)
+- **Dashboard**: For statistics and metrics (card grid)
+- **Ranked List**: For top 10s and comparisons (vertical numbered)
+- **Timeline**: For events and history (chronological)
+- **Comparison**: For A vs B content (side-by-side columns)
+- **Tutorial**: For how-tos (sequential steps + sidebar)
+- **Gallery**: For resources and media (masonry/carousel)
+- **Report**: For data-heavy analysis (TOC + sections)
+- **Brief**: For quick summaries (TLDR + bullets)
+- **Deep Dive**: For long research (accordion/tabs)
+
+### 4. A2UI Component Rendering
+Agent emits A2UI JSON for 40+ component types:
+- News components (headlines, trends, timeline events)
+- Media components (videos, images, podcasts)
+- Data components (stats, metrics, charts, tables)
+- List components (rankings, checklists, pros/cons)
+- Resource components (links, tools, books, repos)
+- People components (profiles, quotes, expert tips)
+- Summary components (TLDR, takeaways, TOC)
+- Comparison components (tables, vs cards, matrices)
+- Instructional components (steps, code, callouts)
+- Layout components (sections, grids, tabs, accordions)
+
+### 5. Visual Variety Enforcement
+System ensures dashboards look different:
+- Minimum 4 different component types per dashboard
+- No more than 3 identical components in sequence
+- Layout must match content type (not generic grid)
+- Visual hierarchy: important content is prominent
+- Component density matches document length
+
+### 6. Interactive Features
+- Collapsible sections for long content
+- Tabs for multi-topic documents
+- Carousel for media galleries
+- Copy buttons on code blocks
+- Click-to-expand on quotes
+- Video thumbnail previews with play button
+
+---
+
+## Tech Stack
+
+- **Frontend**: React 19 with Vite (Bun runtime)
+- **Styling**: Tailwind CSS + Shadcn/ui
+- **UI Framework**: CopilotKit with A2UI renderer
+- **UI Specification**: A2UI v0.8 (Google's declarative UI format)
+- **Transport Protocol**: AG-UI (CopilotKit's agent-user interaction protocol)
+- **Backend**: FastAPI (Python)
+- **Package Manager**: uv (Python)
+- **Agent Framework**: Pydantic AI with AG-UI integration
+- **LLM**: Claude Sonnet 4 via OpenRouter
+- **Real-time**: Server-Sent Events (SSE) via AG-UI
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              User Interface                                  │
+│                    (React + Vite + CopilotKit + Tailwind)                   │
+│                                                                              │
+│   ┌──────────────────┐    ┌──────────────────────────────────────────────┐  │
+│   │  Markdown Input  │    │           Generated Dashboard                 │  │
+│   │                  │    │  ┌─────────┐ ┌─────────┐ ┌─────────┐        │  │
+│   │  [Paste MD here] │───▶│  │StatCard │ │VideoCard│ │RankedItem│       │  │
+│   │                  │    │  └─────────┘ └─────────┘ └─────────┘        │  │
+│   │  [Generate]      │    │  ┌──────────────────────────────────┐       │  │
+│   └──────────────────┘    │  │        ComparisonTable           │       │  │
+│                           │  └──────────────────────────────────┘       │  │
+│                           └──────────────────────────────────────────────┘  │
+└───────────────────────────────────────────────▲──────────────────────────────┘
+                                                │ AG-UI Protocol (SSE)
+                                                │ Streams A2UI JSON
+┌───────────────────────────────────────────────┼──────────────────────────────┐
+│                    Pydantic AI Agent (UI Orchestrator)                       │
+│                                               │                              │
+│   1. Receive Markdown ──────────────────────────────────────────────────────│
+│   2. Analyze Content (type, structure, media, length)                       │
+│   3. Select Layout Strategy (magazine, dashboard, tutorial, etc.)           │
+│   4. Generate A2UI Component Tree                                            │
+│   5. Stream components via AG-UI                                             │
+│                                                                              │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  A2UI Generator Functions                                            │   │
+│   │  - generate_stat_card(), generate_video_card(), generate_ranked_item │   │
+│   │  - generate_section(), generate_grid(), generate_tabs()              │   │
+│   │  - 40+ component generators                                          │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## A2UI Component Catalog (Complete)
+
+### News & Trends Components
+
+**a2ui.HeadlineCard**
+```json
+{
+  "type": "a2ui.HeadlineCard",
+  "id": "headline-1",
+  "props": {
+    "title": "OpenAI Releases GPT-5",
+    "source": "TechCrunch",
+    "date": "2025-01-28",
+    "sentiment": "positive",
+    "url": "https://...",
+    "imageUrl": "https://..."
+  }
+}
+```
+
+**a2ui.TrendIndicator**
+```json
+{
+  "type": "a2ui.TrendIndicator",
+  "id": "trend-1",
+  "props": {
+    "label": "AI Agent Discussion",
+    "direction": "up",
+    "percentage": 340,
+    "context": "vs last week"
+  }
+}
+```
+
+**a2ui.TimelineEvent**
+```json
+{
+  "type": "a2ui.TimelineEvent",
+  "id": "event-1",
+  "props": {
+    "date": "2025-01-15",
+    "title": "Claude 3.5 Released",
+    "description": "Anthropic releases Claude 3.5 with improved reasoning",
+    "icon": "release"
+  }
+}
+```
+
+**a2ui.NewsTicker**
+```json
+{
+  "type": "a2ui.NewsTicker",
+  "id": "ticker-1",
+  "props": {
+    "items": [
+      {"text": "Breaking: AI regulation bill passes", "url": "..."},
+      {"text": "NVIDIA stock reaches all-time high", "url": "..."}
+    ],
+    "speed": "normal"
+  }
+}
+```
+
+### Media Components
+
+**a2ui.VideoCard**
+```json
+{
+  "type": "a2ui.VideoCard",
+  "id": "video-1",
+  "props": {
+    "videoId": "dQw4w9WgXcQ",
+    "platform": "youtube",
+    "title": "Building AI Agents with Pydantic",
+    "channel": "ArjanCodes",
+    "views": "125K",
+    "duration": "24:35",
+    "thumbnailUrl": "https://..."
+  }
+}
+```
+
+**a2ui.ImageCard**
+```json
+{
+  "type": "a2ui.ImageCard",
+  "id": "image-1",
+  "props": {
+    "src": "https://...",
+    "alt": "Architecture diagram",
+    "caption": "System architecture overview",
+    "aspectRatio": "16:9"
+  }
+}
+```
+
+**a2ui.PlaylistCard**
+```json
+{
+  "type": "a2ui.PlaylistCard",
+  "id": "playlist-1",
+  "props": {
+    "title": "AI Engineering Fundamentals",
+    "videoCount": 12,
+    "totalDuration": "4h 35m",
+    "thumbnailUrl": "https://...",
+    "videos": [
+      {"title": "Intro to LLMs", "duration": "15:20"},
+      {"title": "Prompt Engineering", "duration": "22:45"}
+    ]
+  }
+}
+```
+
+**a2ui.PodcastCard**
+```json
+{
+  "type": "a2ui.PodcastCard",
+  "id": "podcast-1",
+  "props": {
+    "title": "Latent Space: AI Agents Deep Dive",
+    "host": "Swyx & Alessio",
+    "duration": "1h 23m",
+    "episodeNumber": 142,
+    "description": "Discussion on the state of AI agents...",
+    "url": "https://..."
+  }
+}
+```
+
+### Data & Statistics Components
+
+**a2ui.StatCard**
+```json
+{
+  "type": "a2ui.StatCard",
+  "id": "stat-1",
+  "props": {
+    "value": "$196B",
+    "label": "AI Market Size",
+    "trend": "up",
+    "trendValue": "+23%",
+    "comparison": "vs 2023",
+    "icon": "chart"
+  }
+}
+```
+
+**a2ui.MetricRow**
+```json
+{
+  "type": "a2ui.MetricRow",
+  "id": "metric-1",
+  "props": {
+    "label": "Context Window",
+    "value": "200,000",
+    "unit": "tokens",
+    "icon": "document"
+  }
+}
+```
+
+**a2ui.ProgressRing**
+```json
+{
+  "type": "a2ui.ProgressRing",
+  "id": "progress-1",
+  "props": {
+    "percentage": 67,
+    "label": "Enterprise AI Adoption",
+    "color": "blue",
+    "size": "large"
+  }
+}
+```
+
+**a2ui.ComparisonBar**
+```json
+{
+  "type": "a2ui.ComparisonBar",
+  "id": "compare-bar-1",
+  "props": {
+    "labelA": "Claude",
+    "labelB": "GPT-4",
+    "valueA": 85,
+    "valueB": 72,
+    "metric": "Coding Accuracy %"
+  }
+}
+```
+
+**a2ui.DataTable**
+```json
+{
+  "type": "a2ui.DataTable",
+  "id": "table-1",
+  "props": {
+    "columns": [
+      {"key": "quarter", "label": "Quarter"},
+      {"key": "funding", "label": "VC Funding"},
+      {"key": "deals", "label": "Deals"}
+    ],
+    "rows": [
+      {"quarter": "Q1", "funding": "$12.3B", "deals": 342},
+      {"quarter": "Q2", "funding": "$15.1B", "deals": 389}
+    ],
+    "sortable": true,
+    "striped": true
+  }
+}
+```
+
+**a2ui.MiniChart**
+```json
+{
+  "type": "a2ui.MiniChart",
+  "id": "chart-1",
+  "props": {
+    "data": [12, 19, 15, 25, 22, 30, 28],
+    "type": "line",
+    "color": "blue",
+    "showLabels": false,
+    "height": 60
+  }
+}
+```
+
+### List & Ranking Components
+
+**a2ui.RankedItem**
+```json
+{
+  "type": "a2ui.RankedItem",
+  "id": "rank-1",
+  "props": {
+    "rank": 1,
+    "title": "Cursor",
+    "description": "AI-first code editor with built-in chat",
+    "score": "4.8/5",
+    "imageUrl": "https://...",
+    "url": "https://cursor.sh"
+  }
+}
+```
+
+**a2ui.ChecklistItem**
+```json
+{
+  "type": "a2ui.ChecklistItem",
+  "id": "check-1",
+  "props": {
+    "text": "Install Python 3.11+",
+    "checked": true,
+    "category": "Prerequisites"
+  }
+}
+```
+
+**a2ui.ProConItem**
+```json
+{
+  "type": "a2ui.ProConItem",
+  "id": "procon-1",
+  "props": {
+    "type": "pro",
+    "text": "Excellent at long-form content and nuanced reasoning"
+  }
+}
+```
+
+**a2ui.BulletPoint**
+```json
+{
+  "type": "a2ui.BulletPoint",
+  "id": "bullet-1",
+  "props": {
+    "text": "Supports streaming responses",
+    "indent": 0,
+    "icon": "check"
+  }
+}
+```
+
+### Resource & Link Components
+
+**a2ui.LinkCard**
+```json
+{
+  "type": "a2ui.LinkCard",
+  "id": "link-1",
+  "props": {
+    "url": "https://docs.pydantic.dev/",
+    "title": "Pydantic Documentation",
+    "description": "Data validation using Python type annotations",
+    "favicon": "https://...",
+    "domain": "pydantic.dev"
+  }
+}
+```
+
+**a2ui.ToolCard**
+```json
+{
+  "type": "a2ui.ToolCard",
+  "id": "tool-1",
+  "props": {
+    "name": "Cursor",
+    "description": "AI-first code editor",
+    "url": "https://cursor.sh",
+    "pricing": "$20/month",
+    "rating": 4.8,
+    "category": "IDE",
+    "logoUrl": "https://..."
+  }
+}
+```
+
+**a2ui.BookCard**
+```json
+{
+  "type": "a2ui.BookCard",
+  "id": "book-1",
+  "props": {
+    "title": "Building LLM Applications",
+    "author": "Jane Smith",
+    "coverUrl": "https://...",
+    "summary": "A practical guide to building production LLM apps",
+    "rating": 4.5,
+    "url": "https://..."
+  }
+}
+```
+
+**a2ui.RepoCard**
+```json
+{
+  "type": "a2ui.RepoCard",
+  "id": "repo-1",
+  "props": {
+    "name": "pydantic/pydantic-ai",
+    "description": "Agent framework with type-safe tools",
+    "stars": 12500,
+    "language": "Python",
+    "url": "https://github.com/pydantic/pydantic-ai"
+  }
+}
+```
+
+### People & Entity Components
+
+**a2ui.ProfileCard**
+```json
+{
+  "type": "a2ui.ProfileCard",
+  "id": "profile-1",
+  "props": {
+    "name": "Andrej Karpathy",
+    "title": "AI Researcher & Educator",
+    "avatar": "https://...",
+    "bio": "Former Tesla AI Director, OpenAI founding member",
+    "links": {
+      "twitter": "https://twitter.com/karpathy",
+      "youtube": "https://youtube.com/@karpathy"
+    }
+  }
+}
+```
+
+**a2ui.CompanyCard**
+```json
+{
+  "type": "a2ui.CompanyCard",
+  "id": "company-1",
+  "props": {
+    "name": "Anthropic",
+    "logo": "https://...",
+    "description": "AI safety company building Claude",
+    "industry": "AI/ML",
+    "founded": "2021",
+    "url": "https://anthropic.com"
+  }
+}
+```
+
+**a2ui.QuoteCard**
+```json
+{
+  "type": "a2ui.QuoteCard",
+  "id": "quote-1",
+  "props": {
+    "quote": "The best way to predict the future is to invent it.",
+    "author": "Alan Kay",
+    "source": "1971 Xerox PARC meeting",
+    "avatar": "https://..."
+  }
+}
+```
+
+**a2ui.ExpertTip**
+```json
+{
+  "type": "a2ui.ExpertTip",
+  "id": "tip-1",
+  "props": {
+    "tip": "Always validate LLM outputs before using them in production",
+    "expertName": "Simon Willison",
+    "expertise": "LLM Engineering"
+  }
+}
+```
+
+### Summary & Overview Components
+
+**a2ui.TLDR**
+```json
+{
+  "type": "a2ui.TLDR",
+  "id": "tldr-1",
+  "props": {
+    "summary": "This week saw major releases from OpenAI and Anthropic...",
+    "bulletPoints": [
+      "GPT-5 released with reasoning",
+      "Claude context expanded to 1M tokens",
+      "AI regulation bill advances"
+    ]
+  }
+}
+```
+
+**a2ui.KeyTakeaways**
+```json
+{
+  "type": "a2ui.KeyTakeaways",
+  "id": "takeaways-1",
+  "props": {
+    "title": "Key Takeaways",
+    "takeaways": [
+      "Pydantic AI simplifies agent development",
+      "Type safety reduces runtime errors",
+      "AG-UI enables real-time streaming"
+    ],
+    "icon": "lightbulb"
+  }
+}
+```
+
+**a2ui.ExecutiveSummary**
+```json
+{
+  "type": "a2ui.ExecutiveSummary",
+  "id": "summary-1",
+  "props": {
+    "title": "Executive Summary",
+    "content": "The AI agent landscape is evolving rapidly...",
+    "highlights": [
+      {"label": "Market Growth", "value": "+23% YoY"},
+      {"label": "Adoption Rate", "value": "67%"},
+      {"label": "Top Trend", "value": "Agentic AI"}
+    ]
+  }
+}
+```
+
+**a2ui.TableOfContents**
+```json
+{
+  "type": "a2ui.TableOfContents",
+  "id": "toc-1",
+  "props": {
+    "sections": [
+      {"id": "intro", "title": "Introduction", "level": 1},
+      {"id": "setup", "title": "Setup", "level": 1},
+      {"id": "prereqs", "title": "Prerequisites", "level": 2}
+    ]
+  }
+}
+```
+
+### Comparison Components
+
+**a2ui.ComparisonTable**
+```json
+{
+  "type": "a2ui.ComparisonTable",
+  "id": "comparison-1",
+  "props": {
+    "items": ["Claude", "GPT-4", "Gemini"],
+    "features": [
+      {"name": "Context Window", "values": ["200K", "128K", "1M"]},
+      {"name": "Coding", "values": ["Excellent", "Good", "Good"]},
+      {"name": "Speed", "values": ["Fast", "Medium", "Fast"]}
+    ]
+  }
+}
+```
+
+**a2ui.VsCard**
+```json
+{
+  "type": "a2ui.VsCard",
+  "id": "vs-1",
+  "props": {
+    "itemA": {"name": "React", "icon": "https://..."},
+    "itemB": {"name": "Vue", "icon": "https://..."},
+    "winner": "A",
+    "criteria": "Enterprise adoption",
+    "summary": "React has larger ecosystem and job market"
+  }
+}
+```
+
+**a2ui.FeatureMatrix**
+```json
+{
+  "type": "a2ui.FeatureMatrix",
+  "id": "matrix-1",
+  "props": {
+    "products": ["Cursor", "Copilot", "Cody"],
+    "features": [
+      {"name": "Chat", "cursor": true, "copilot": true, "cody": true},
+      {"name": "Multi-file edit", "cursor": true, "copilot": false, "cody": true},
+      {"name": "Terminal", "cursor": true, "copilot": false, "cody": false}
+    ]
+  }
+}
+```
+
+**a2ui.PricingTable**
+```json
+{
+  "type": "a2ui.PricingTable",
+  "id": "pricing-1",
+  "props": {
+    "tiers": [
+      {"name": "Free", "price": "$0", "features": ["Basic chat", "10 requests/day"]},
+      {"name": "Pro", "price": "$20/mo", "features": ["Unlimited chat", "Priority support"]},
+      {"name": "Team", "price": "$40/seat", "features": ["All Pro features", "Admin dashboard"]}
+    ],
+    "recommended": "Pro"
+  }
+}
+```
+
+### Instructional Components
+
+**a2ui.StepCard**
+```json
+{
+  "type": "a2ui.StepCard",
+  "id": "step-1",
+  "props": {
+    "stepNumber": 1,
+    "title": "Install Dependencies",
+    "content": "First, install the required packages using uv",
+    "status": "completed"
+  }
+}
+```
+
+**a2ui.CodeBlock**
+```json
+{
+  "type": "a2ui.CodeBlock",
+  "id": "code-1",
+  "props": {
+    "code": "pip install pydantic-ai",
+    "language": "bash",
+    "filename": "terminal",
+    "showLineNumbers": true
+  }
+}
+```
+
+**a2ui.CalloutCard**
+```json
+{
+  "type": "a2ui.CalloutCard",
+  "id": "callout-1",
+  "props": {
+    "type": "warning",
+    "title": "Important",
+    "content": "Make sure to use a virtual environment"
+  }
+}
+```
+
+**a2ui.CommandCard**
+```json
+{
+  "type": "a2ui.CommandCard",
+  "id": "command-1",
+  "props": {
+    "command": "uv pip install pydantic-ai fastapi",
+    "description": "Install dependencies",
+    "output": "Successfully installed pydantic-ai-0.1.0"
+  }
+}
+```
+
+### Layout Components
+
+**a2ui.Section**
+```json
+{
+  "type": "a2ui.Section",
+  "id": "section-1",
+  "props": {
+    "title": "Getting Started",
+    "subtitle": "Everything you need to know",
+    "collapsible": false
+  },
+  "children": ["step-1", "step-2", "code-1"]
+}
+```
+
+**a2ui.Grid**
+```json
+{
+  "type": "a2ui.Grid",
+  "id": "grid-1",
+  "props": {
+    "columns": 3,
+    "gap": "md"
+  },
+  "children": ["stat-1", "stat-2", "stat-3"]
+}
+```
+
+**a2ui.Columns**
+```json
+{
+  "type": "a2ui.Columns",
+  "id": "columns-1",
+  "props": {
+    "widths": ["1fr", "2fr"]
+  },
+  "children": ["sidebar-content", "main-content"]
+}
+```
+
+**a2ui.Tabs**
+```json
+{
+  "type": "a2ui.Tabs",
+  "id": "tabs-1",
+  "props": {
+    "tabs": [
+      {"id": "overview", "label": "Overview"},
+      {"id": "details", "label": "Details"},
+      {"id": "code", "label": "Code"}
+    ],
+    "defaultTab": "overview"
+  },
+  "children": {
+    "overview": ["summary-1"],
+    "details": ["table-1"],
+    "code": ["code-1", "code-2"]
+  }
+}
+```
+
+**a2ui.Accordion**
+```json
+{
+  "type": "a2ui.Accordion",
+  "id": "accordion-1",
+  "props": {
+    "sections": [
+      {"id": "faq-1", "title": "What is Pydantic AI?"},
+      {"id": "faq-2", "title": "How does AG-UI work?"}
+    ],
+    "allowMultiple": false
+  },
+  "children": {
+    "faq-1": ["answer-1"],
+    "faq-2": ["answer-2"]
+  }
+}
+```
+
+**a2ui.Carousel**
+```json
+{
+  "type": "a2ui.Carousel",
+  "id": "carousel-1",
+  "props": {
+    "showArrows": true,
+    "showDots": true,
+    "autoPlay": false
+  },
+  "children": ["video-1", "video-2", "video-3"]
+}
+```
+
+**a2ui.Sidebar**
+```json
+{
+  "type": "a2ui.Sidebar",
+  "id": "sidebar-1",
+  "props": {
+    "position": "right",
+    "width": "300px",
+    "sticky": true
+  },
+  "children": ["toc-1", "related-links"]
+}
+```
+
+### Tag & Category Components
+
+**a2ui.TagCloud**
+```json
+{
+  "type": "a2ui.TagCloud",
+  "id": "tags-1",
+  "props": {
+    "tags": [
+      {"label": "AI", "count": 15},
+      {"label": "LLM", "count": 12},
+      {"label": "Python", "count": 8}
+    ]
+  }
+}
+```
+
+**a2ui.CategoryBadge**
+```json
+{
+  "type": "a2ui.CategoryBadge",
+  "id": "badge-1",
+  "props": {
+    "category": "Tutorial",
+    "color": "blue"
+  }
+}
+```
+
+**a2ui.DifficultyBadge**
+```json
+{
+  "type": "a2ui.DifficultyBadge",
+  "id": "difficulty-1",
+  "props": {
+    "level": "intermediate"
+  }
+}
+```
+
+---
+
+## Layout Strategy Definitions
+
+The agent must select one of these layout strategies based on content analysis:
+
+### Magazine Layout
+Best for: News, mixed content, weekly digests
+```
+┌─────────────────────────────────────┐
+│           Hero Headline             │
+│         (HeadlineCard large)        │
+├──────────┬──────────┬───────────────┤
+│  News 1  │  News 2  │   Sidebar     │
+│          │          │  - Trends     │
+├──────────┼──────────┤  - Links      │
+│  News 3  │  News 4  │               │
+└──────────┴──────────┴───────────────┘
+```
+
+### Dashboard Layout
+Best for: Statistics, metrics, KPIs
+```
+┌──────────┬──────────┬──────────┬──────────┐
+│  Stat 1  │  Stat 2  │  Stat 3  │  Stat 4  │
+├──────────┴──────────┼──────────┴──────────┤
+│     Chart/Table     │    Progress Rings   │
+├─────────────────────┴─────────────────────┤
+│              Data Table                    │
+└────────────────────────────────────────────┘
+```
+
+### Ranked List Layout
+Best for: Top 10s, leaderboards, rankings
+```
+┌────────────────────────────────────────────┐
+│  TLDR / Key Takeaways                      │
+├────────────────────────────────────────────┤
+│  #1  ████████████████████  Title, desc     │
+├────────────────────────────────────────────┤
+│  #2  ███████████████████   Title, desc     │
+├────────────────────────────────────────────┤
+│  #3  ██████████████████    Title, desc     │
+└────────────────────────────────────────────┘
+```
+
+### Timeline Layout
+Best for: Events, history, chronological content
+```
+     2025-01
+        │
+        ├──── Event Card 1
+        │
+     2025-02
+        │
+        ├──── Event Card 2
+        │
+        ├──── Event Card 3
+        │
+     2025-03
+        │
+        ├──── Event Card 4
+```
+
+### Comparison Layout
+Best for: A vs B, alternatives, decisions
+```
+┌────────────────────────────────────────────┐
+│             Comparison Table               │
+├───────────────────┬────────────────────────┤
+│    Option A       │      Option B          │
+│   - Pro 1         │      - Pro 1           │
+│   - Pro 2         │      - Pro 2           │
+│   - Con 1         │      - Con 1           │
+├───────────────────┴────────────────────────┤
+│              Recommendation                │
+└────────────────────────────────────────────┘
+```
+
+### Tutorial Layout
+Best for: How-tos, guides, instructions
+```
+┌──────────────────────────┬─────────────────┐
+│                          │  Sidebar        │
+│   Step 1                 │  - TOC          │
+│   └── Code Block         │  - Prerequisites│
+│                          │  - Resources    │
+│   Step 2                 │                 │
+│   └── Callout            │                 │
+│                          │                 │
+│   Step 3                 │                 │
+└──────────────────────────┴─────────────────┘
+```
+
+### Gallery Layout
+Best for: Videos, images, resources, tools
+```
+┌──────────┬──────────┬──────────┐
+│  Video   │  Video   │  Video   │
+│  Card    │  Card    │  Card    │
+├──────────┼──────────┼──────────┤
+│  Tool    │  Tool    │  Tool    │
+│  Card    │  Card    │  Card    │
+└──────────┴──────────┴──────────┘
+     ◀  ● ● ○ ○ ○  ▶  (carousel)
+```
+
+### Report Layout
+Best for: Data-heavy analysis, long-form research
+```
+┌─────────────────────────────────────────────┐
+│  Executive Summary                          │
+├────────────┬────────────────────────────────┤
+│    TOC     │  Section 1: Overview           │
+│  - Intro   │  ├── StatCards                 │
+│  - Data    │  └── DataTable                 │
+│  - Analysis│                                │
+│  - Recs    │  Section 2: Analysis           │
+│            │  ├── Charts                    │
+│            │  └── Insights                  │
+└────────────┴────────────────────────────────┘
+```
+
+### Brief Layout
+Best for: Quick summaries, digests, TL;DRs
+```
+┌─────────────────────────────────────────────┐
+│  TLDR Box                                   │
+│  • Point 1  • Point 2  • Point 3           │
+├─────────────────────────────────────────────┤
+│  Key Takeaways                              │
+│  ✓ Takeaway 1                               │
+│  ✓ Takeaway 2                               │
+├─────────────────────────────────────────────┤
+│  Links: [Link1] [Link2] [Link3]             │
+└─────────────────────────────────────────────┘
+```
+
+### Deep Dive Layout
+Best for: Long research, multi-topic documents
+```
+┌─────────────────────────────────────────────┐
+│  Tabs: [Overview] [Technical] [Resources]   │
+├─────────────────────────────────────────────┤
+│                                             │
+│  ▼ Section 1 (Accordion)                    │
+│    Content...                               │
+│                                             │
+│  ▶ Section 2 (Collapsed)                    │
+│                                             │
+│  ▶ Section 3 (Collapsed)                    │
+│                                             │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## Agent Prompting Strategy
+
+### Content Analysis Prompt
+
+```python
+CONTENT_ANALYSIS_PROMPT = """
+Analyze this Markdown document and classify it along these dimensions:
+
+DOCUMENT:
+{markdown_content}
+
+Respond with a JSON object:
+{{
+  "primary_type": "news" | "tutorial" | "comparison" | "data" | "resources" | "profiles" | "commentary",
+  "structure": "list_heavy" | "table_heavy" | "prose_heavy" | "mixed",
+  "media_types": ["youtube", "images", "code", "none"],
+  "quantitative_level": "data_rich" | "qualitative" | "mixed",
+  "temporal_nature": "time_sensitive" | "evergreen" | "historical",
+  "length": "brief" | "medium" | "long",
+  "user_goal": "learn" | "decide" | "reference" | "act",
+  "key_entities": ["entity1", "entity2"],
+  "main_topics": ["topic1", "topic2"]
+}}
+
+Be precise. This classification determines the entire dashboard layout.
+"""
+```
+
+### Layout Selection Prompt
+
+```python
+LAYOUT_SELECTION_PROMPT = """
+Based on this content analysis, select the optimal layout strategy:
+
+ANALYSIS:
+{content_analysis}
+
+LAYOUT RULES (STRICTLY FOLLOW):
+- primary_type="news" → Magazine layout
+- primary_type="tutorial" → Tutorial layout
+- primary_type="comparison" → Comparison layout
+- primary_type="data" AND quantitative_level="data_rich" → Dashboard layout
+- primary_type="resources" → Gallery layout
+- structure="list_heavy" AND numbered rankings → Ranked List layout
+- temporal_nature="historical" → Timeline layout
+- length="long" AND multiple topics → Deep Dive layout
+- length="brief" → Brief layout
+- Default for long data analysis → Report layout
+
+NEVER use a generic grid when a specialized layout applies.
+
+Respond with:
+{{
+  "layout": "magazine" | "dashboard" | "ranked_list" | "timeline" | "comparison" | "tutorial" | "gallery" | "report" | "brief" | "deep_dive",
+  "reasoning": "Why this layout fits the content"
+}}
+"""
+```
+
+### Component Selection Prompt
+
+```python
+COMPONENT_SELECTION_PROMPT = """
+Generate A2UI components for this Markdown content.
+
+CONTENT ANALYSIS: {content_analysis}
+SELECTED LAYOUT: {layout}
+MARKDOWN SECTIONS: {parsed_sections}
+
+CRITICAL RULES FOR VARIETY:
+1. Use AT LEAST 4 different component types
+2. NEVER use more than 3 of the same component consecutively
+3. Match components PRECISELY to content:
+   - YouTube URLs → VideoCard (ALWAYS, not LinkCard)
+   - GitHub repos → RepoCard (ALWAYS, not LinkCard)
+   - Statistics with numbers → StatCard
+   - Rankings/Top N → RankedItem
+   - Step-by-step instructions → StepCard
+   - Code snippets → CodeBlock
+   - Warnings/tips → CalloutCard
+   - Quotes with attribution → QuoteCard
+   - People mentions → ProfileCard
+   - Tool recommendations → ToolCard
+   - Book recommendations → BookCard
+   - Comparisons → ComparisonTable or VsCard
+   - Pros/Cons lists → ProConItem
+   - Checklists → ChecklistItem
+
+4. ALWAYS include summary components for documents > 500 words:
+   - Add TLDR at the top
+   - Add KeyTakeaways after introduction
+   - Add TableOfContents for documents > 1500 words
+
+5. Use layout components to structure:
+   - Section for grouping related content
+   - Grid for card collections (2-4 columns based on count)
+   - Tabs for multi-topic content
+   - Accordion for FAQ-style content
+   - Carousel for media galleries
+
+6. Visual hierarchy:
+   - Most important insight = largest/first
+   - Supporting details = smaller/nested
+   - Use Section titles to create scannable structure
+
+Generate a complete A2UI component tree as JSON.
+"""
+```
+
+---
+
+## File Structure
+
+```
+second-brain-dashboard/
+├── frontend/                    # React + Vite + Bun
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── a2ui-catalog/    # A2UI component implementations
+│   │   │   │   ├── news/
+│   │   │   │   │   ├── headline-card.tsx
+│   │   │   │   │   ├── trend-indicator.tsx
+│   │   │   │   │   ├── timeline-event.tsx
+│   │   │   │   │   └── news-ticker.tsx
+│   │   │   │   ├── media/
+│   │   │   │   │   ├── video-card.tsx
+│   │   │   │   │   ├── image-card.tsx
+│   │   │   │   │   ├── playlist-card.tsx
+│   │   │   │   │   └── podcast-card.tsx
+│   │   │   │   ├── data/
+│   │   │   │   │   ├── stat-card.tsx
+│   │   │   │   │   ├── metric-row.tsx
+│   │   │   │   │   ├── progress-ring.tsx
+│   │   │   │   │   ├── comparison-bar.tsx
+│   │   │   │   │   ├── data-table.tsx
+│   │   │   │   │   └── mini-chart.tsx
+│   │   │   │   ├── lists/
+│   │   │   │   │   ├── ranked-item.tsx
+│   │   │   │   │   ├── checklist-item.tsx
+│   │   │   │   │   ├── pro-con-item.tsx
+│   │   │   │   │   └── bullet-point.tsx
+│   │   │   │   ├── resources/
+│   │   │   │   │   ├── link-card.tsx
+│   │   │   │   │   ├── tool-card.tsx
+│   │   │   │   │   ├── book-card.tsx
+│   │   │   │   │   └── repo-card.tsx
+│   │   │   │   ├── people/
+│   │   │   │   │   ├── profile-card.tsx
+│   │   │   │   │   ├── company-card.tsx
+│   │   │   │   │   ├── quote-card.tsx
+│   │   │   │   │   └── expert-tip.tsx
+│   │   │   │   ├── summary/
+│   │   │   │   │   ├── tldr.tsx
+│   │   │   │   │   ├── key-takeaways.tsx
+│   │   │   │   │   ├── executive-summary.tsx
+│   │   │   │   │   └── table-of-contents.tsx
+│   │   │   │   ├── comparison/
+│   │   │   │   │   ├── comparison-table.tsx
+│   │   │   │   │   ├── vs-card.tsx
+│   │   │   │   │   ├── feature-matrix.tsx
+│   │   │   │   │   └── pricing-table.tsx
+│   │   │   │   ├── instructional/
+│   │   │   │   │   ├── step-card.tsx
+│   │   │   │   │   ├── code-block.tsx
+│   │   │   │   │   ├── callout-card.tsx
+│   │   │   │   │   └── command-card.tsx
+│   │   │   │   ├── layout/
+│   │   │   │   │   ├── section.tsx
+│   │   │   │   │   ├── grid.tsx
+│   │   │   │   │   ├── columns.tsx
+│   │   │   │   │   ├── tabs.tsx
+│   │   │   │   │   ├── accordion.tsx
+│   │   │   │   │   ├── carousel.tsx
+│   │   │   │   │   └── sidebar.tsx
+│   │   │   │   └── tags/
+│   │   │   │       ├── tag-cloud.tsx
+│   │   │   │       ├── category-badge.tsx
+│   │   │   │       └── difficulty-badge.tsx
+│   │   │   ├── ui/              # Shadcn base components
+│   │   │   └── markdown-input.tsx
+│   │   ├── lib/
+│   │   │   ├── a2ui-catalog.ts  # Catalog registration
+│   │   │   └── copilot-provider.tsx
+│   │   ├── App.tsx
+│   │   └── main.tsx
+│   ├── index.html
+│   ├── vite.config.ts
+│   ├── tailwind.config.js
+│   ├── package.json
+│   └── bun.lockb
+├── agent/                       # Python Pydantic AI agent
+│   ├── main.py                  # FastAPI + AG-UI adapter
+│   ├── agent.py                 # Pydantic AI agent definition
+│   ├── content_analyzer.py      # Markdown analysis pipeline
+│   ├── layout_selector.py       # Layout strategy selection
+│   ├── a2ui_generator.py        # A2UI JSON generators (40+ functions)
+│   ├── models.py                # Pydantic models
+│   ├── prompts.py               # All prompt templates
+│   └── pyproject.toml           # uv package config
+├── sample-documents/            # Demo Markdown files
+│   ├── ai-news-weekly.md
+│   ├── top-10-coding-tools.md
+│   ├── claude-vs-gpt-comparison.md
+│   ├── agentic-workflows-tutorial.md
+│   └── ai-industry-statistics.md
+├── .env
+└── README.md
+```
+
+---
+
+## Data Models
+
+### ContentAnalysis (Pydantic)
+```python
+class ContentAnalysis(BaseModel):
+    primary_type: Literal["news", "tutorial", "comparison", "data", "resources", "profiles", "commentary"]
+    structure: Literal["list_heavy", "table_heavy", "prose_heavy", "mixed"]
+    media_types: list[Literal["youtube", "images", "code", "none"]]
+    quantitative_level: Literal["data_rich", "qualitative", "mixed"]
+    temporal_nature: Literal["time_sensitive", "evergreen", "historical"]
+    length: Literal["brief", "medium", "long"]
+    user_goal: Literal["learn", "decide", "reference", "act"]
+    key_entities: list[str]
+    main_topics: list[str]
+    word_count: int
+    section_count: int
+    has_tables: bool
+    has_code_blocks: bool
+    youtube_links: list[str]
+    github_links: list[str]
+```
+
+### LayoutDecision (Pydantic)
+```python
+class LayoutDecision(BaseModel):
+    layout: Literal[
+        "magazine", "dashboard", "ranked_list", "timeline",
+        "comparison", "tutorial", "gallery", "report", "brief", "deep_dive"
+    ]
+    reasoning: str
+    primary_columns: int
+    has_sidebar: bool
+    has_hero: bool
+```
+
+### A2UIComponent (Pydantic)
+```python
+class A2UIComponent(BaseModel):
+    type: str  # e.g., "a2ui.StatCard"
+    id: str
+    props: dict[str, Any]
+    children: list[str] | dict[str, list[str]] | None = None
+```
+
+---
+
+## Sample Documents for Demo
+
+### 1. AI News Weekly (→ Magazine Layout)
+
+```markdown
+# This Week in AI - January 27, 2025
+
+## 🔥 Top Story
+
+### OpenAI Announces GPT-5 with Native Reasoning
+OpenAI revealed GPT-5 this week, featuring built-in chain-of-thought reasoning...
+
+**Source:** TechCrunch | **Date:** Jan 25, 2025
+
+## 📈 Trending Topics
+
+| Topic | Change | Discussion Volume |
+|-------|--------|-------------------|
+| Agentic AI | +340% | 45.2K posts |
+| AI Regulation | -12% | 23.1K posts |
+| Multimodal Models | +89% | 31.4K posts |
+
+## 📰 More Headlines
+
+- **Anthropic expands Claude context to 1M tokens** - Major upgrade for long-document processing
+- **Google DeepMind achieves protein folding breakthrough** - AlphaFold 3 predicts protein interactions
+- **EU AI Act enters enforcement phase** - Companies have 6 months to comply
+
+## 🎬 Videos of the Week
+
+- [AI Agents Explained in 10 Minutes](https://youtube.com/watch?v=abc123) - 125K views
+- [Building with Claude 3.5](https://youtube.com/watch?v=def456) - 89K views
+```
+
+### 2. Top 10 AI Coding Tools (→ Ranked List Layout)
+
+```markdown
+# Top 10 AI Coding Tools for 2025
+
+## TL;DR
+Cursor leads the pack with its AI-first approach, but GitHub Copilot remains the most widely adopted. New entrants like Cody and Continue are gaining traction with their open-source models.
+
+## The Rankings
+
+### 1. Cursor
+**Rating:** 4.8/5 | **Pricing:** $20/month | **Best for:** Full IDE replacement
+
+The AI-first code editor that's changing how developers write code. Features include multi-file editing, codebase-aware chat, and terminal integration.
+
+**Pros:**
+- Excellent multi-file editing
+- Built-in terminal with AI
+- Fast and responsive
+
+**Cons:**
+- Requires VS Code migration
+- Higher price point
+
+### 2. GitHub Copilot
+**Rating:** 4.5/5 | **Pricing:** $10/month | **Best for:** VS Code users
+
+The original AI coding assistant, now with chat and voice features...
+
+### 3. Cody by Sourcegraph
+**Rating:** 4.4/5 | **Pricing:** Free tier available | **Best for:** Large codebases
+...
+```
+
+### 3. Claude vs GPT Comparison (→ Comparison Layout)
+
+```markdown
+# Claude Sonnet 4 vs GPT-4o: Complete Comparison
+
+## Quick Stats
+
+| Metric | Claude Sonnet 4 | GPT-4o |
+|--------|-----------------|--------|
+| Context Window | 200K tokens | 128K tokens |
+| Speed | ~80 tokens/sec | ~60 tokens/sec |
+| Coding Benchmark | 92.3% | 89.1% |
+| Price (1M tokens) | $3 input / $15 output | $5 input / $15 output |
+
+## Head-to-Head: Coding
+
+**Winner: Claude Sonnet 4**
+
+Claude excels at understanding complex codebases and providing nuanced explanations. In our testing, Claude produced more idiomatic code with better error handling.
+
+## Head-to-Head: Creative Writing
+
+**Winner: GPT-4o**
+
+GPT-4o has a slight edge in creative tasks, with more varied vocabulary and stylistic range...
+
+## Recommendation
+
+For coding and technical work: **Claude Sonnet 4**
+For creative and general use: **GPT-4o**
+For budget-conscious teams: **Claude Sonnet 4** (better price/performance)
+```
+
+### 4. Agentic Workflows Tutorial (→ Tutorial Layout)
+
+```markdown
+# How to Set Up Agentic Coding Workflows
+
+## Prerequisites
+
+- [ ] Python 3.11 or higher
+- [ ] uv package manager installed
+- [ ] OpenRouter API key
+- [ ] Basic understanding of async Python
+
+## Step 1: Create Project Structure
+
+First, create a new directory and initialize the project:
+
+```bash
+mkdir my-agent && cd my-agent
+uv init
+uv add pydantic-ai fastapi uvicorn
+```
+
+> 💡 **Tip:** Using uv is much faster than pip for dependency resolution
+
+## Step 2: Define Your Agent
+
+Create `agent.py` with your agent definition:
+
+```python
+from pydantic_ai import Agent
+
+agent = Agent(
+    "openrouter:anthropic/claude-sonnet-4",
+    system_prompt="You are a helpful coding assistant."
+)
+```
+
+> ⚠️ **Warning:** Never commit your API keys to version control
+
+## Step 3: Add Tools
+
+Tools let your agent interact with the outside world...
+```
+
+### 5. AI Industry Statistics (→ Dashboard Layout)
+
+```markdown
+# AI Industry Statistics - Q4 2024
+
+## Key Metrics
+
+- **Total AI Market Size:** $196.6 billion (+23.1% YoY)
+- **Enterprise AI Adoption:** 67% of companies
+- **Average AI Project ROI:** 3.4x
+- **AI Startup Funding:** $42.5 billion in 2024
+
+## Market Breakdown
+
+| Segment | Size | Growth |
+|---------|------|--------|
+| Generative AI | $67.2B | +52% |
+| ML Platforms | $45.1B | +18% |
+| Computer Vision | $32.8B | +15% |
+| NLP | $28.5B | +21% |
+
+## Investment Trends
+
+| Quarter | VC Funding | Deals | Avg Deal Size |
+|---------|------------|-------|---------------|
+| Q1 2024 | $12.3B | 342 | $36M |
+| Q2 2024 | $15.1B | 389 | $39M |
+| Q3 2024 | $11.8B | 315 | $37M |
+| Q4 2024 | $13.3B | 356 | $37M |
+
+## Top Funded Companies 2024
+
+1. **Anthropic** - $4.0B (Series D)
+2. **xAI** - $3.0B (Series B)
+3. **Mistral** - $640M (Series B)
+```
+
+---
+
+## UI/UX Requirements
+
+### Design System
+- Dark theme (primary) with blue accent colors (#3B82F6)
+- Modern, clean aesthetic
+- Shadcn/ui components for consistency
+- Smooth animations for state transitions (framer-motion)
+- Responsive design (mobile-friendly)
+
+### Key Screens
+
+**1. Input Page (Left Panel)**
+- Large textarea for Markdown input
+- Drag-and-drop file upload
+- Sample document buttons
+- "Generate Dashboard" button
+- Character/word count display
+
+**2. Dashboard (Right Panel)**
+- Generated A2UI components
+- Layout adapts to content type
+- Smooth loading transitions
+- Empty state with instructions
+
+### Interactions
+- Real-time component streaming via SSE
+- Smooth fade-in for new components
+- Collapsible sections with animation
+- Copy button on code blocks
+- Video thumbnail click to expand
+
+---
+
+## Task List
+
+```json
+[
+  {
+    "category": "setup",
+    "description": "Initialize React project with Vite and Bun",
+    "steps": [
+      "Run bun create vite frontend --template react-ts",
+      "Install dependencies: bun add react react-dom",
+      "Install CopilotKit: bun add @copilotkit/react-core @copilotkit/react-ui",
+      "Configure Vite for port 3010",
+      "Verify project runs with bun dev"
+    ],
+    "passes": false
+  },
+  {
+    "category": "setup",
+    "description": "Install and configure Tailwind CSS + Shadcn",
+    "steps": [
+      "Install Tailwind: bun add -d tailwindcss postcss autoprefixer",
+      "Initialize Tailwind config",
+      "Initialize shadcn/ui with bunx shadcn@latest init",
+      "Install core components: button, card, input, textarea, badge, tabs, accordion",
+      "Configure dark theme as default",
+      "Verify components render correctly"
+    ],
+    "passes": false
+  },
+  {
+    "category": "setup",
+    "description": "Initialize Python agent with uv",
+    "steps": [
+      "Create agent/ directory",
+      "Run uv init in agent directory",
+      "Add dependencies: uv add pydantic-ai fastapi uvicorn ag-ui-protocol httpx",
+      "Create main.py with FastAPI app",
+      "Verify server runs with uv run uvicorn main:app"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Configure Pydantic AI agent with OpenRouter",
+    "steps": [
+      "Create agent.py with Pydantic AI agent definition",
+      "Configure OpenRouterModel with Claude Sonnet 4",
+      "Set up environment variable loading for OPENROUTER_API_KEY",
+      "Create AgentState Pydantic model",
+      "Test agent initialization and basic completion"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Implement AG-UI adapter for CopilotKit",
+    "steps": [
+      "Import AGUIAdapter from ag-ui-protocol",
+      "Create FastAPI endpoint at /ag-ui/stream",
+      "Configure AGUIAdapter.run_stream() for SSE responses",
+      "Set up CORS for frontend (port 3010)",
+      "Test SSE connection from browser"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Build content analysis pipeline",
+    "steps": [
+      "Create content_analyzer.py module",
+      "Implement parse_markdown() to extract sections, links, tables",
+      "Implement analyze_content() with LLM classification",
+      "Create ContentAnalysis Pydantic model",
+      "Add YouTube link extraction regex",
+      "Add GitHub link extraction regex",
+      "Add code block detection",
+      "Test with sample documents"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Build layout selector",
+    "steps": [
+      "Create layout_selector.py module",
+      "Implement select_layout() with rule-based + LLM logic",
+      "Create LayoutDecision Pydantic model",
+      "Map content types to layouts per specification",
+      "Add fallback logic for edge cases",
+      "Test layout selection with different content types"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Create A2UI generator module with base functions",
+    "steps": [
+      "Create a2ui_generator.py module",
+      "Implement A2UIComponent Pydantic model",
+      "Create generate_component() base function",
+      "Implement generate_id() for unique IDs",
+      "Create emit_components() for AG-UI streaming",
+      "Test basic component generation"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Implement news component generators",
+    "steps": [
+      "Add generate_headline_card() function",
+      "Add generate_trend_indicator() function",
+      "Add generate_timeline_event() function",
+      "Add generate_news_ticker() function",
+      "Validate JSON matches A2UI spec",
+      "Test with news content"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Implement media component generators",
+    "steps": [
+      "Add generate_video_card() function with YouTube parsing",
+      "Add generate_image_card() function",
+      "Add generate_playlist_card() function",
+      "Add generate_podcast_card() function",
+      "Handle YouTube URL to videoId conversion",
+      "Test with media-rich content"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Implement data component generators",
+    "steps": [
+      "Add generate_stat_card() function",
+      "Add generate_metric_row() function",
+      "Add generate_progress_ring() function",
+      "Add generate_comparison_bar() function",
+      "Add generate_data_table() function",
+      "Add generate_mini_chart() function",
+      "Test with statistics content"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Implement list component generators",
+    "steps": [
+      "Add generate_ranked_item() function",
+      "Add generate_checklist_item() function",
+      "Add generate_pro_con_item() function",
+      "Add generate_bullet_point() function",
+      "Test with ranked list content"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Implement resource component generators",
+    "steps": [
+      "Add generate_link_card() function",
+      "Add generate_tool_card() function",
+      "Add generate_book_card() function",
+      "Add generate_repo_card() function with GitHub parsing",
+      "Test with resource collection content"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Implement people component generators",
+    "steps": [
+      "Add generate_profile_card() function",
+      "Add generate_company_card() function",
+      "Add generate_quote_card() function",
+      "Add generate_expert_tip() function",
+      "Test with profile/quote content"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Implement summary component generators",
+    "steps": [
+      "Add generate_tldr() function",
+      "Add generate_key_takeaways() function",
+      "Add generate_executive_summary() function",
+      "Add generate_table_of_contents() function",
+      "Test with long-form content"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Implement comparison component generators",
+    "steps": [
+      "Add generate_comparison_table() function",
+      "Add generate_vs_card() function",
+      "Add generate_feature_matrix() function",
+      "Add generate_pricing_table() function",
+      "Test with comparison content"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Implement instructional component generators",
+    "steps": [
+      "Add generate_step_card() function",
+      "Add generate_code_block() function with language detection",
+      "Add generate_callout_card() function",
+      "Add generate_command_card() function",
+      "Test with tutorial content"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Implement layout component generators",
+    "steps": [
+      "Add generate_section() function",
+      "Add generate_grid() function",
+      "Add generate_columns() function",
+      "Add generate_tabs() function",
+      "Add generate_accordion() function",
+      "Add generate_carousel() function",
+      "Add generate_sidebar() function",
+      "Test layout nesting"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Implement tag component generators",
+    "steps": [
+      "Add generate_tag_cloud() function",
+      "Add generate_category_badge() function",
+      "Add generate_difficulty_badge() function",
+      "Test with tagged content"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Build main orchestrator flow",
+    "steps": [
+      "Create orchestrate_dashboard() main function",
+      "Wire up: parse markdown → analyze → select layout → generate components",
+      "Implement component tree builder based on layout",
+      "Add variety enforcement (min 4 types, no 3+ consecutive)",
+      "Stream components via AG-UI",
+      "Test full flow with sample document"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Create prompt templates module",
+    "steps": [
+      "Create prompts.py with CONTENT_ANALYSIS_PROMPT",
+      "Add LAYOUT_SELECTION_PROMPT",
+      "Add COMPONENT_SELECTION_PROMPT",
+      "Add variety enforcement instructions to all prompts",
+      "Test prompts produce expected outputs"
+    ],
+    "passes": false
+  },
+  {
+    "category": "frontend",
+    "description": "Create markdown input component",
+    "steps": [
+      "Create components/markdown-input.tsx",
+      "Add large textarea with placeholder",
+      "Add file upload drag-and-drop support",
+      "Add character/word count display",
+      "Add Generate button",
+      "Style with Tailwind dark theme"
+    ],
+    "passes": false
+  },
+  {
+    "category": "frontend",
+    "description": "Set up CopilotKit provider",
+    "steps": [
+      "Create lib/copilot-provider.tsx",
+      "Configure CopilotKit with AG-UI runtime URL (port 8000)",
+      "Wrap App in CopilotProvider",
+      "Test connection to backend"
+    ],
+    "passes": false
+  },
+  {
+    "category": "frontend",
+    "description": "Create A2UI catalog registration",
+    "steps": [
+      "Create lib/a2ui-catalog.ts",
+      "Set up catalog object mapping a2ui.* to components",
+      "Create A2UIRenderer with catalog",
+      "Export for use in App"
+    ],
+    "passes": false
+  },
+  {
+    "category": "frontend",
+    "description": "Build main App layout",
+    "steps": [
+      "Create split-panel layout (input left, dashboard right)",
+      "Add header with title",
+      "Add CopilotKit A2UI renderer in right panel",
+      "Add empty state for dashboard",
+      "Style with dark theme"
+    ],
+    "passes": false
+  },
+  {
+    "category": "a2ui-components",
+    "description": "Implement news components",
+    "steps": [
+      "Create components/a2ui-catalog/news/headline-card.tsx",
+      "Create trend-indicator.tsx with up/down arrows",
+      "Create timeline-event.tsx with timeline styling",
+      "Create news-ticker.tsx with scroll animation",
+      "Register all in catalog"
+    ],
+    "passes": false
+  },
+  {
+    "category": "a2ui-components",
+    "description": "Implement media components",
+    "steps": [
+      "Create components/a2ui-catalog/media/video-card.tsx with YouTube embed",
+      "Create image-card.tsx with lazy loading",
+      "Create playlist-card.tsx",
+      "Create podcast-card.tsx",
+      "Register all in catalog"
+    ],
+    "passes": false
+  },
+  {
+    "category": "a2ui-components",
+    "description": "Implement data components",
+    "steps": [
+      "Create components/a2ui-catalog/data/stat-card.tsx",
+      "Create metric-row.tsx",
+      "Create progress-ring.tsx with SVG circle",
+      "Create comparison-bar.tsx",
+      "Create data-table.tsx with sorting",
+      "Create mini-chart.tsx with simple SVG",
+      "Register all in catalog"
+    ],
+    "passes": false
+  },
+  {
+    "category": "a2ui-components",
+    "description": "Implement list components",
+    "steps": [
+      "Create components/a2ui-catalog/lists/ranked-item.tsx",
+      "Create checklist-item.tsx with checkbox",
+      "Create pro-con-item.tsx with icons",
+      "Create bullet-point.tsx",
+      "Register all in catalog"
+    ],
+    "passes": false
+  },
+  {
+    "category": "a2ui-components",
+    "description": "Implement resource components",
+    "steps": [
+      "Create components/a2ui-catalog/resources/link-card.tsx",
+      "Create tool-card.tsx with rating stars",
+      "Create book-card.tsx with cover image",
+      "Create repo-card.tsx with GitHub styling",
+      "Register all in catalog"
+    ],
+    "passes": false
+  },
+  {
+    "category": "a2ui-components",
+    "description": "Implement people components",
+    "steps": [
+      "Create components/a2ui-catalog/people/profile-card.tsx",
+      "Create company-card.tsx",
+      "Create quote-card.tsx with quotation styling",
+      "Create expert-tip.tsx",
+      "Register all in catalog"
+    ],
+    "passes": false
+  },
+  {
+    "category": "a2ui-components",
+    "description": "Implement summary components",
+    "steps": [
+      "Create components/a2ui-catalog/summary/tldr.tsx",
+      "Create key-takeaways.tsx with checkmarks",
+      "Create executive-summary.tsx",
+      "Create table-of-contents.tsx with links",
+      "Register all in catalog"
+    ],
+    "passes": false
+  },
+  {
+    "category": "a2ui-components",
+    "description": "Implement comparison components",
+    "steps": [
+      "Create components/a2ui-catalog/comparison/comparison-table.tsx",
+      "Create vs-card.tsx with VS styling",
+      "Create feature-matrix.tsx with checkmarks",
+      "Create pricing-table.tsx with tiers",
+      "Register all in catalog"
+    ],
+    "passes": false
+  },
+  {
+    "category": "a2ui-components",
+    "description": "Implement instructional components",
+    "steps": [
+      "Create components/a2ui-catalog/instructional/step-card.tsx",
+      "Create code-block.tsx with syntax highlighting (Prism or Shiki)",
+      "Create callout-card.tsx with tip/warning/info variants",
+      "Create command-card.tsx with copy button",
+      "Register all in catalog"
+    ],
+    "passes": false
+  },
+  {
+    "category": "a2ui-components",
+    "description": "Implement layout components",
+    "steps": [
+      "Create components/a2ui-catalog/layout/section.tsx",
+      "Create grid.tsx with responsive columns",
+      "Create columns.tsx with flex widths",
+      "Create tabs.tsx using Shadcn Tabs",
+      "Create accordion.tsx using Shadcn Accordion",
+      "Create carousel.tsx with scroll snap",
+      "Create sidebar.tsx with sticky positioning",
+      "Register all in catalog"
+    ],
+    "passes": false
+  },
+  {
+    "category": "a2ui-components",
+    "description": "Implement tag components",
+    "steps": [
+      "Create components/a2ui-catalog/tags/tag-cloud.tsx",
+      "Create category-badge.tsx with colors",
+      "Create difficulty-badge.tsx with levels",
+      "Register all in catalog"
+    ],
+    "passes": false
+  },
+  {
+    "category": "frontend",
+    "description": "Add loading and empty states",
+    "steps": [
+      "Create loading skeleton components",
+      "Add loading state during generation",
+      "Create empty state with instructions",
+      "Add smooth fade-in animations",
+      "Test loading experience"
+    ],
+    "passes": false
+  },
+  {
+    "category": "frontend",
+    "description": "Add sample document buttons",
+    "steps": [
+      "Create sample document data",
+      "Add 5 sample document buttons to input panel",
+      "Load sample content on button click",
+      "Style buttons with document type icons"
+    ],
+    "passes": false
+  },
+  {
+    "category": "demo",
+    "description": "Create sample Markdown documents",
+    "steps": [
+      "Create sample-documents/ai-news-weekly.md",
+      "Create sample-documents/top-10-coding-tools.md",
+      "Create sample-documents/claude-vs-gpt-comparison.md",
+      "Create sample-documents/agentic-workflows-tutorial.md",
+      "Create sample-documents/ai-industry-statistics.md",
+      "Ensure each document has unique structure and content types"
+    ],
+    "passes": false
+  },
+  {
+    "category": "styling",
+    "description": "Polish UI with dark theme and animations",
+    "steps": [
+      "Ensure all components use dark theme colors",
+      "Add framer-motion for component entrance animations",
+      "Add hover states on interactive cards",
+      "Ensure consistent spacing and typography",
+      "Add subtle shadows and borders",
+      "Test on different screen sizes"
+    ],
+    "passes": false
+  },
+  {
+    "category": "testing",
+    "description": "Validate A2UI protocol compliance",
+    "steps": [
+      "Create test script to validate A2UI JSON output",
+      "Verify all emitted components match A2UI v0.8 spec",
+      "Check required fields: type, id, props",
+      "Validate component types are in registered catalog",
+      "Test that unknown types are rejected",
+      "Log validation results"
+    ],
+    "passes": false
+  },
+  {
+    "category": "testing",
+    "description": "Test variety enforcement",
+    "steps": [
+      "Test each sample document generates unique layout",
+      "Verify minimum 4 component types per dashboard",
+      "Verify no more than 3 consecutive identical components",
+      "Test news → Magazine layout",
+      "Test tutorial → Tutorial layout",
+      "Test comparison → Comparison layout",
+      "Test statistics → Dashboard layout",
+      "Test rankings → Ranked List layout"
+    ],
+    "passes": false
+  },
+  {
+    "category": "testing",
+    "description": "End-to-end testing",
+    "steps": [
+      "Test full flow: paste markdown → generate → view dashboard",
+      "Test all 5 sample documents render correctly",
+      "Verify YouTube links become VideoCards",
+      "Verify GitHub links become RepoCards",
+      "Verify code blocks have syntax highlighting",
+      "Test collapsible sections work",
+      "Test tabs switch content",
+      "Verify responsive layout on mobile"
+    ],
+    "passes": false
+  },
+  {
+    "category": "testing",
+    "description": "YouTube demo preparation",
+    "steps": [
+      "Run through all 5 sample documents",
+      "Verify each produces visually distinct dashboard",
+      "Prepare talking points for each layout type",
+      "Test smooth transitions between documents",
+      "Ensure no console errors",
+      "Record demo run with no errors"
+    ],
+    "passes": false
+  }
+]
+```
+
+---
+
+## Success Criteria
+
+1. **Content Analysis**: System correctly classifies document type, structure, and media
+2. **Layout Selection**: Each content type maps to appropriate layout (news→magazine, tutorial→tutorial, etc.)
+3. **Component Variety**: Minimum 4 different component types per dashboard
+4. **No Repetition**: No more than 3 consecutive identical components
+5. **Media Detection**: YouTube links → VideoCards, GitHub links → RepoCards
+6. **Summary Generation**: Documents >500 words include TLDR/KeyTakeaways
+7. **A2UI Compliance**: All components match A2UI v0.8 specification
+8. **Visual Distinction**: 5 sample documents produce 5 visually distinct dashboards
+9. **Real-time Streaming**: Components stream via AG-UI with smooth loading
+10. **CopilotKit Integration**: A2UI renderer correctly maps JSON to React components
+
+---
+
+## YouTube Demo Flow
+
+1. **Introduction (0:00-0:30)**
+   - Show problem: Markdown documents are hard to scan
+   - Introduce solution: AI-powered dashboard generation
+   - Mention CopilotKit + A2UI sponsorship
+
+2. **Demo 1: AI News (0:30-2:00)**
+   - Paste AI news weekly markdown
+   - Watch Magazine layout generate
+   - Point out: HeadlineCards, TrendIndicators, VideoCards
+   - "Notice how it automatically chose a magazine layout for news"
+
+3. **Demo 2: Top 10 List (2:00-3:30)**
+   - Load top 10 coding tools
+   - Watch Ranked List layout generate
+   - Point out: RankedItems, ToolCards, ProConItems
+   - "Completely different layout - vertical ranked list"
+
+4. **Demo 3: Comparison (3:30-5:00)**
+   - Load Claude vs GPT comparison
+   - Watch Comparison layout generate
+   - Point out: ComparisonTable, VsCards, StatCards
+   - "Side-by-side comparison automatically detected"
+
+5. **Demo 4: Tutorial (5:00-6:30)**
+   - Load agentic workflows tutorial
+   - Watch Tutorial layout generate
+   - Point out: StepCards, CodeBlocks, CalloutCards, Sidebar
+   - "Step-by-step layout with sidebar navigation"
+
+6. **Demo 5: Statistics (6:30-8:00)**
+   - Load AI industry statistics
+   - Watch Dashboard layout generate
+   - Point out: StatCards, DataTables, ProgressRings
+   - "Data dashboard with visual metrics"
+
+7. **Technical Deep Dive (8:00-9:30)**
+   - Show A2UI component catalog
+   - Explain AG-UI streaming
+   - Show content analysis in action
+
+8. **Wrap-up (9:30-10:00)**
+   - Recap: 5 documents, 5 unique dashboards
+   - CopilotKit + A2UI makes this possible
+   - Link to GitHub repo
+
+---
+
+## Agent Instructions
+
+1. Read `activity.md` first to understand current state
+2. Find next task with `"passes": false`
+3. Complete all steps for that task
+4. Update task to `"passes": true`
+5. Log completion in `activity.md`
+6. Repeat until all tasks pass
+
+**Important:** Only modify the `passes` field. Do not remove or rewrite tasks.
+
+---
+
+## Completion Criteria
+
+All tasks marked with `"passes": true`
