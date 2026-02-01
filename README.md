@@ -26,6 +26,8 @@ The multi-agent architecture uses specialized agents (Linear, Coding, GitHub, Sl
 
 ## Prerequisites
 
+> Note that this doesn't work on Windows because of limitations with the Claude Agent SDK and subagents. Use WSL or a Linux VM to run it!
+
 ### 0. Set Up Python Virtual Environment (Recommended)
 
 ```bash
