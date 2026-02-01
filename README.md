@@ -221,7 +221,7 @@ Edit `prompts/app_spec.txt` to specify a different application to build.
 
 ### Adjusting Issue Count
 
-Edit `prompts/initializer_prompt.md` and change "50 issues" to your desired count.
+Edit `prompts/initializer_task.md` to change how many issues are created during initialization.
 
 ### Modifying Allowed Commands
 
@@ -243,12 +243,14 @@ linear-agent-harness/
 │   ├── definitions.py        # Agent definitions with model config
 │   └── orchestrator.py       # Orchestrator session runner
 ├── prompts/
-│   ├── app_spec.txt          # Application specification
-│   ├── orchestrator_prompt.md    # Orchestrator agent prompt
-│   ├── linear_agent_prompt.md    # Linear agent prompt
-│   ├── coding_agent_prompt.md    # Coding agent prompt
-│   ├── github_agent_prompt.md    # GitHub agent prompt
-│   └── slack_agent_prompt.md     # Slack agent prompt
+│   ├── app_spec.txt              # Application specification
+│   ├── orchestrator_prompt.md    # Orchestrator system prompt
+│   ├── initializer_task.md       # Task message for first session
+│   ├── continuation_task.md      # Task message for continuation sessions
+│   ├── linear_agent_prompt.md    # Linear subagent prompt
+│   ├── coding_agent_prompt.md    # Coding subagent prompt
+│   ├── github_agent_prompt.md    # GitHub subagent prompt
+│   └── slack_agent_prompt.md     # Slack subagent prompt
 └── requirements.txt          # Python dependencies
 ```
 
