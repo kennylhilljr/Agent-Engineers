@@ -14,6 +14,12 @@ export default defineConfig({
       include: ['app/**/*.{ts,tsx}', 'components/**/*.{ts,tsx}', 'lib/**/*.{ts,tsx}'],
       exclude: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}'],
     },
+    // Mock CSS imports to avoid errors
+    css: {
+      modules: {
+        classNameStrategy: 'non-scoped',
+      },
+    },
   },
   resolve: {
     alias: {
