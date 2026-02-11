@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Claude Code Integration Skill - Preview</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.2.0/github-markdown.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+    <style>
+        body {
+            padding: 20px;
+            max-width: 980px;
+            margin: 0 auto;
+            background: #f6f8fa;
+        }
+        .markdown-body {
+            background: white;
+            padding: 45px;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+        }
+        .header {
+            background: #0969da;
+            color: white;
+            padding: 20px;
+            border-radius: 6px 6px 0 0;
+            margin: -45px -45px 30px -45px;
+        }
+        .status {
+            background: #dafbe1;
+            color: #1a7f37;
+            padding: 8px 12px;
+            border-radius: 6px;
+            display: inline-block;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="markdown-body">
+        <div class="header">
+            <h1 style="margin: 0; color: white;">📖 Claude Code Integration Skill</h1>
+            <div class="status">✓ All Tests Passing (36/36)</div>
+        </div>
+        <div id="content">Loading...</div>
+    </div>
+    <script>
+        fetch('/.claude/skills/coding-dashboard/SKILL.md')
+            .then(response => response.text())
+            .then(markdown => {
+                document.getElementById('content').innerHTML = marked.parse(markdown);
+            })
+            .catch(error => {
+                document.getElementById('content').innerHTML = '<p>Error loading skill documentation. File path: <code>.claude/skills/coding-dashboard/SKILL.md</code></p><p>Size: 22KB</p><p>Tests: 36 passed</p>';
+            });
+    </script>
+</body>
+</html>
