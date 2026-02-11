@@ -1,0 +1,25 @@
+# AI Agent Core Dependencies
+pydantic-ai>=0.0.1
+pydantic>=2.0.0
+
+# Web Framework
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+
+# Environment & Configuration
+python-dotenv>=1.0.0
+
+# CORS Support
+python-multipart>=0.0.9
+
+# AI Provider Support (optional - uncomment as needed)
+# openai>=1.0.0
+# anthropic>=0.18.0
+
+# AG-UI Protocol Support (for later integration)
+# ag-ui-protocol>=0.1.0
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+httpx>=0.24.0
