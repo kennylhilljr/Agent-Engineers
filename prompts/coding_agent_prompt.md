@@ -184,12 +184,51 @@ npm install && npm run dev
 
 ---
 
-### Code Quality
+### Code Quality & Test Coverage (MANDATORY)
 
 - Zero console errors
 - Clean, readable code
 - Follow existing patterns in the codebase
 - Test edge cases, not just happy path
+
+**ROBUST TEST COVERAGE IS REQUIRED FOR EVERY FEATURE:**
+
+You MUST write tests for every feature you implement. The orchestrator will reject results without test coverage.
+
+**Test Requirements:**
+1. **Unit tests** — Test individual functions, components, and utilities in isolation
+2. **Integration tests** — Test that components work together (API routes, database queries, etc.)
+3. **Browser tests** — Playwright-based E2E tests (already required via screenshot evidence)
+
+**Frontend (React/Next.js):**
+- Use the project's test runner (Jest, Vitest, or whatever is configured)
+- Test component rendering, user interactions, state changes
+- Test edge cases: empty states, error states, loading states
+- Test accessibility where applicable
+- Place tests next to source files (`component.test.tsx`) or in `__tests__/` directory
+
+**Backend (Python/FastAPI):**
+- Use pytest for all Python tests
+- Test API endpoints with httpx/TestClient
+- Test data models and validation (Pydantic schemas)
+- Test error handling and edge cases
+- Place tests in `tests/` directory or alongside modules
+
+**Test Coverage Targets:**
+- Aim for 80%+ code coverage on new code
+- Every public function/component should have at least one test
+- Critical paths (auth, data processing, state transitions) need thorough coverage
+
+**Report test results in this format:**
+```
+test_coverage:
+  unit_tests: X passed, Y failed
+  integration_tests: X passed, Y failed
+  browser_tests: X passed, Y failed (with screenshots)
+  files_with_tests:
+    - src/components/Timer.test.tsx
+    - tests/test_api.py
+```
 
 ---
 
@@ -226,7 +265,9 @@ Before reporting back to orchestrator, verify you have:
 - [ ] `feature_working`: true/false
 - [ ] `files_changed`: list of files
 - [ ] `screenshot_evidence`: list of screenshot paths (REQUIRED)
-- [ ] `test_results`: what was tested and outcomes
+- [ ] `test_results`: what was tested and outcomes (REQUIRED)
+- [ ] `test_coverage`: unit/integration/browser test counts (REQUIRED)
+- [ ] `files_with_tests`: list of test files created/modified (REQUIRED)
 - [ ] `issues_found`: any problems (or "none")
 
-**The orchestrator will reject results without screenshot_evidence.**
+**The orchestrator will reject results without screenshot_evidence AND test_coverage.**
