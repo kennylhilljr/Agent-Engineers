@@ -1,203 +1,157 @@
 # AI Coding Dashboard
 
-## Overview
-
-AI Coding Dashboard is a proof-of-concept generative UI application that demonstrates the power of Google's A2UI specification with CopilotKit's AG-UI protocol and Pydantic AI agents. Users upload an app specification (similar to app_spec.txt), and an autonomous coding agent executes the tasks while dynamically generating a custom dashboard using A2UI components. The agent emits declarative A2UI JSON describing UI components, AG-UI transports these specifications to the frontend, and CopilotKit renders them from a pre-approved component catalog - creating a unique, secure visualization tailored to each project.
-
-## Target Audience
-
-**Primary Users:** Developers building autonomous coding agents who want to visualize agent progress with dynamic, AI-generated dashboards.
-
-**Key Pain Points:**
-- Static dashboards don't adapt to different project types
-- Hard to visualize what coding agents are doing in real-time
-- No good way to approve high-risk changes mid-execution
-- Progress tracking UIs require manual design for each project type
+A full-stack application integrating AI-powered development workflows with project management tools (Jira) and real-time collaboration features.
 
 ## Tech Stack
 
-- **Frontend:** Next.js 14+ (App Router)
-- **Styling:** Tailwind CSS + Shadcn/ui
-- **UI Framework:** CopilotKit with A2UI renderer
-- **UI Specification:** A2UI v0.8 (Google's declarative UI format)
-- **Transport Protocol:** AG-UI (CopilotKit's agent-user interaction protocol)
-- **Backend:** FastAPI (Python)
-- **Agent Framework:** Pydantic AI with AG-UI integration
-- **LLM:** Claude Sonnet 4.5 via OpenRouter
-- **Database:** PostgreSQL (Neon)
-- **Real-time:** Server-Sent Events (SSE) via AG-UI
-- **Hosting:** Vercel (frontend) + Render/Railway (backend)
+### Frontend
+- React 18+ with TypeScript
+- Vite for build tooling
+- A2UI component library
+- TailwindCSS for styling
+- Socket.io for real-time updates
+
+### Backend
+- Python 3.11+
+- FastAPI for REST API
+- WebSocket support for real-time features
+- Jira API integration
+- Slack bot integration
+
+### Infrastructure
+- Docker containerization
+- Docker Compose for local development
+- GitHub Actions for CI/CD
+
+## Features
+
+- AI-powered code generation and analysis
+- Jira ticket management and synchronization
+- Slack integration for notifications
+- Real-time collaboration dashboard
+- Agent-based task automation
+- Code review assistance
+
+## Project Structure
+
+```
+ai-coding-dashboard/
+├── frontend/              # React TypeScript application
+│   ├── src/
+│   ├── public/
+│   └── vite.config.ts
+├── backend/              # Python FastAPI server
+│   ├── app/
+│   ├── config/
+│   └── main.py
+├── agents/               # AI agents for automation
+├── docker-compose.yml    # Local dev environment
+├── README.md
+└── init.sh              # Development setup script
+```
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 18+ and npm
-- Python 3.10+
-- PostgreSQL database (or Neon serverless)
-- OpenRouter API key
+- Node.js 18+
+- Python 3.11+
+- Docker & Docker Compose (optional, for containerized setup)
 
-### Environment Setup
+### Installation
 
-The `init.sh` script handles the setup process:
+Run the initialization script to set up both frontend and backend:
 
 ```bash
+chmod +x init.sh
 ./init.sh
 ```
 
 This will:
-1. Set NODE_ENV to development
-2. Copy .env from the parent directory (contains OPENROUTER_API_KEY and POSTGRES_URL)
-3. Install dependencies
-4. Start the Next.js dev server on port 3010
+1. Install frontend dependencies (runs `npm install` in frontend/)
+2. Set up Python virtual environment and install backend dependencies
+3. Configure environment variables from templates
 
-### Manual Setup
+### Development Servers
 
-If you prefer to set up manually:
+Once initialized, the dev servers run on:
 
-1. Install dependencies:
+- **Frontend**: http://localhost:3010
+- **Backend**: http://localhost:8000
+
+For API documentation, visit: http://localhost:8000/docs
+
+### Environment Configuration
+
+Create a `.env` file in the project root:
+
+```env
+JIRA_API_TOKEN=your-token
+JIRA_BASE_URL=your-jira-instance
+SLACK_BOT_TOKEN=your-bot-token
+SLACK_SIGNING_SECRET=your-signing-secret
+AI_API_KEY=your-ai-api-key
+```
+
+## A2UI Components
+
+The frontend uses A2UI component library for consistent UI patterns:
+
+- Button, Input, Select components
+- Form validation helpers
+- Modal and Dialog components
+- Table and List components
+- Notification system
+- Theme provider
+
+See `/frontend/src/components` for implemented components.
+
+## Jira Integration
+
+The dashboard tracks development tasks in Jira with:
+
+- Automatic ticket creation from AI suggestions
+- Status synchronization
+- Sprint planning support
+- Link to Linear issues via custom fields
+
+## Running Tests
+
+### Frontend Tests
 ```bash
-npm install
-cd agent && pip install -r requirements.txt && cd ..
+cd frontend && npm test
 ```
 
-2. Copy environment variables:
+### Backend Tests
 ```bash
-cp ../../.env .env
+cd backend && pytest
 ```
 
-3. Start the frontend (port 3010):
-```bash
-npm run dev
-```
+## Docker Setup
 
-4. Start the backend in another terminal (port 8000):
-```bash
-cd agent && uvicorn main:app --reload --port 8000
-```
-
-## Configuration
-
-### Frontend
-- Dev server: `http://localhost:3010`
-- Build: `npm run build`
-- Production: `npm start`
-
-### Backend
-- Dev server: `http://localhost:8000`
-- API docs: `http://localhost:8000/docs`
-- AG-UI endpoint: `http://localhost:8000/ag-ui/stream`
-
-### Environment Variables
-
-Required:
-- `OPENROUTER_API_KEY` - Your OpenRouter API key for Claude Sonnet 4.5
-- `POSTGRES_URL` - PostgreSQL connection string
-
-Optional:
-- `NODE_ENV` - Set to "development" or "production" (default: development)
-- `BACKEND_PORT` - Port for FastAPI server (default: 8000)
-
-## Project Structure
-
-```
-.
-├── app/                    # Next.js frontend
-│   ├── (dashboard)/        # Main dashboard routes
-│   ├── api/                # API routes and proxies
-│   └── layout.tsx          # Root layout with CopilotKit provider
-├── components/             # React components
-│   ├── a2ui-catalog/       # A2UI component implementations
-│   └── ui/                 # Shadcn/ui base components
-├── lib/                    # Utilities and configuration
-│   ├── a2ui-catalog.ts     # A2UI catalog registration
-│   └── copilot-provider.tsx # CopilotKit setup
-├── agent/                  # Python backend
-│   ├── main.py             # FastAPI app with AG-UI adapter
-│   ├── agent.py            # Pydantic AI agent definition
-│   ├── tools.py            # Agent tools for task execution
-│   ├── models.py           # Pydantic data models
-│   ├── a2ui_generator.py   # A2UI JSON component generation
-│   └── requirements.txt     # Python dependencies
-├── init.sh                 # Setup script
-├── .env                    # Environment variables (git-ignored)
-├── .gitignore              # Git ignore rules
-└── README.md               # This file
-```
-
-## Features
-
-### 1. Spec Upload & Parsing
-Upload app_spec.txt files and the agent parses tasks, categories, and dependencies.
-
-### 2. Dynamic Dashboard Generation
-Agent analyzes project type and generates optimal A2UI layout:
-- Kanban board for feature-based projects
-- Timeline view for sequential projects
-- Dependency graph for complex tasks
-
-### 3. Real-time Task Execution Visualization
-Watch tasks progress with live updates, file modifications, test results, and command logs.
-
-### 4. A2UI Component Catalog
-Pre-approved components for secure, deterministic UI rendering:
-- TaskCard, ProgressRing, FileTree, TestResults
-- ApprovalCard, ActivityItem, DecisionCard, ErrorCard
-- MilestoneCard, DiffViewer
-
-### 5. Human-in-the-Loop Workflows
-Approve/reject high-risk actions, modify priorities, and interact via CopilotKit chat.
-
-### 6. External Agent Integration
-Claude Code and other external agents can push events to the dashboard API and receive human decisions.
-
-## Development
-
-### Running Tests
+For containerized local development:
 
 ```bash
-npm run test           # Frontend tests
-cd agent && pytest     # Backend tests
+docker-compose up -d
 ```
 
-### Building
-
-```bash
-npm run build
-cd agent && python -m py_compile agent/
-```
-
-### Code Quality
-
-```bash
-npm run lint
-```
-
-## Deployment
-
-### Frontend (Vercel)
-```bash
-vercel deploy
-```
-
-### Backend (Render/Railway)
-See backend documentation for deployment instructions.
-
-## Documentation
-
-- [A2UI Specification](https://a2ui.io)
-- [CopilotKit AG-UI Protocol](https://docs.copilotkit.ai)
-- [Pydantic AI Documentation](https://docs.pydantic.dev/latest/concepts/ai/)
-- [FastAPI Documentation](https://fastapi.tiangolo.com)
+This starts:
+- Frontend dev server on port 3010
+- Backend API on port 8000
+- PostgreSQL database (if configured)
+- Redis cache (if configured)
 
 ## Contributing
 
-This is a sponsored YouTube demonstration project. For bug reports or feature requests, please open an issue on GitHub.
+1. Create a feature branch: `git checkout -b feature/your-feature`
+2. Make changes and commit with descriptive messages
+3. Push and create a pull request
+4. Reference Jira issues in commit messages and PR descriptions
+
+## Support
+
+For issues or questions, please create a GitHub issue or contact the development team.
 
 ## License
 
 MIT
-
-## Credits
-
-Built with [CopilotKit](https://copilotkit.ai), [Pydantic AI](https://docs.pydantic.dev/latest/concepts/ai/), and [Google A2UI](https://a2ui.io).

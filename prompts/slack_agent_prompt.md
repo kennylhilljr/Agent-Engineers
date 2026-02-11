@@ -137,10 +137,10 @@ Prefer `channel_name` for simplicity. Use `conversation_id` if you've cached it 
 
 ### Default Channel
 
-The default notification channel is **`new-channel`**. The orchestrator will specify this when delegating.
+The default notification channel is **`ai-cli-macz`**. The orchestrator will specify this when delegating.
 
 ```
 SendMessage:
-  channel_name: "new-channel"
+  channel_name: "ai-cli-macz"
   message: ":white_check_mark: Completed: Timer Display"
 ```

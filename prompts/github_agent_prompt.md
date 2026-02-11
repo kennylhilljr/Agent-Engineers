@@ -227,12 +227,72 @@ files_committed:
 
 ### Common Tasks
 
-**Commit implementation work:**
-1. Check `git status` for changed files
-2. Stage relevant files (be specific, not `git add .`)
-3. Write descriptive commit message with Linear reference
-4. If remote configured, push: `git push origin main`
-5. Report commit hash (PR is created at session end, not per commit)
+**Commit and create PR for a story (standard flow):**
+
+PRs are created **per Jira story**, not per session. When the orchestrator asks to commit and create a PR for a story:
+
+1. Check env: `echo $GITHUB_REPO`
+2. If empty: commit locally, report `remote_configured: false`
+3. If set, create a feature branch, commit, push, and create PR:
+
+```bash
+# Create feature branch from main
+git checkout main
+git pull origin main 2>/dev/null || true
+git checkout -b feature/<ISSUE_KEY>-<short-name>
+
+# Stage and commit specific files
+git add <file1> <file2> ...
+git commit -m "feat: <description>
+
+- <detail 1>
+- <detail 2>
+
+Jira issue: <ISSUE_KEY>"
+
+# Push feature branch
+git push -u origin feature/<ISSUE_KEY>-<short-name>
+```
+
+4. Create PR via GitHub API:
+```
+CreatePullRequest:
+  owner: "<parsed from GITHUB_REPO>"
+  repo: "<parsed from GITHUB_REPO>"
+  title: "feat(<ISSUE_KEY>): <short description>"
+  head: "feature/<ISSUE_KEY>-<short-name>"
+  base: "main"
+  body: |
+    ## Summary
+    <what was implemented>
+
+    ## Changes
+    - <file changes>
+
+    ## Testing
+    - <test results from coding agent>
+
+    ## Jira Issue
+    Resolves <ISSUE_KEY>
+```
+
+5. Report back:
+```
+action: commit+pr
+branch: feature/<ISSUE_KEY>-<short-name>
+commit_hash: abc1234
+remote_configured: true
+pr_url: https://github.com/owner/repo/pull/42
+pr_number: 42
+files_committed:
+  - src/components/Timer.tsx
+  - src/App.tsx
+```
+
+6. After PR is created, switch back to main:
+```bash
+git checkout main
+```
 
 **Push to remote (if GITHUB_REPO configured):**
 1. Check env: `echo $GITHUB_REPO`
@@ -240,24 +300,11 @@ files_committed:
 3. If set, ensure remote exists and push:
    ```bash
    git remote -v || git remote add origin https://github.com/$GITHUB_REPO.git
-   git push origin main
+   git push origin <branch>
    ```
 4. Report: "pushed to remote" or "local only"
 
-**Create PR (only when explicitly asked at session end):**
-When orchestrator asks to "create PR for session work":
-1. Get GITHUB_REPO value: `echo $GITHUB_REPO`
-2. Parse into owner/repo: split on "/" (e.g., "owner/repo-name" → owner="owner", repo="repo-name")
-3. Call `mcp__arcade__Github_CreatePullRequest`:
-   - owner: <parsed owner>
-   - repo: <parsed repo>
-   - title: "feat: Session work - [summary]"
-   - head: "main"
-   - base: "main"
-   - body: List of features completed with Linear issue IDs
-4. Report PR URL
-
 **Create feature branch:**
-1. Local: `git checkout -b feature/<name>`
+1. Local: `git checkout -b feature/<ISSUE_KEY>-<name>`
 2. Or remote via API: `CreateBranch`
 3. Report new branch name

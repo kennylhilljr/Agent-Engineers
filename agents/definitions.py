@@ -33,9 +33,11 @@ _VALID_MODELS: Final[tuple[str, ...]] = ("haiku", "sonnet", "opus", "inherit")
 # Default models for each agent (immutable)
 DEFAULT_MODELS: Final[dict[str, ModelOption]] = {
     "linear": "haiku",
+    "jira": "haiku",
     "coding": "sonnet",
     "github": "haiku",
     "slack": "haiku",
+    "pr_reviewer": "sonnet",
 }
 
 
@@ -123,11 +125,23 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
             tools=get_slack_tools() + FILE_TOOLS,
             model=_get_model("slack"),
         ),
+        "jira": AgentDefinition(
+            description="Manages Jira issues, project status, and session handoff. Use for any Jira operations.",
+            prompt=_load_prompt("jira_agent_prompt"),
+            tools=FILE_TOOLS + ["Bash"],
+            model=_get_model("jira"),
+        ),
         "coding": AgentDefinition(
             description="Writes and tests code. Use when implementing features or fixing bugs.",
             prompt=_load_prompt("coding_agent_prompt"),
             tools=get_coding_tools(),
             model=_get_model("coding"),
+        ),
+        "pr_reviewer": AgentDefinition(
+            description="Reviews GitHub PRs for quality and correctness. Use for code review before merging.",
+            prompt=_load_prompt("pr_reviewer_agent_prompt"),
+            tools=get_github_tools() + FILE_TOOLS + ["Bash"],
+            model=_get_model("pr_reviewer"),
         ),
     }
 
@@ -137,6 +151,8 @@ AGENT_DEFINITIONS: dict[str, AgentDefinition] = create_agent_definitions()
 
 # Export individual agents for convenience
 LINEAR_AGENT = AGENT_DEFINITIONS["linear"]
+JIRA_AGENT = AGENT_DEFINITIONS["jira"]
 GITHUB_AGENT = AGENT_DEFINITIONS["github"]
 SLACK_AGENT = AGENT_DEFINITIONS["slack"]
 CODING_AGENT = AGENT_DEFINITIONS["coding"]
+PR_REVIEWER_AGENT = AGENT_DEFINITIONS["pr_reviewer"]
