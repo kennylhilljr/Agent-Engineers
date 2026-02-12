@@ -81,27 +81,73 @@ Requirements:
 4. Take screenshot evidence
 5. Report: files_changed, screenshot_path, test_results, test_coverage"
 
-### Step 5: Commit
+### Step 5: Commit, Push & Create PR (per story)
 
 Delegate to `github` agent:
-"Commit changes for [issue title]. Include issue key in commit message."
+"Commit and create PR for issue [key]:
 
-### Step 6: Mark Done (only with screenshot evidence AND test results)
+- Files changed: [file list from coding agent]
+- Issue title: [title]
+- Branch: feature/[KEY]-[short-name]
+- Push to remote if GITHUB_REPO is configured
+- Create PR with issue reference in body
+- Return: pr_url, pr_number, branch name"
 
-Delegate to the tracker agent (`jira` or `linear`):
-"Mark issue [key] as Done. Add comment with:
+### Step 6: Move to Review (tracker + Slack)
 
-- Files changed
-- Screenshot evidence path
-- Test results and test coverage summary"
+**Step 6a:** Delegate to the tracker agent (`jira` or `linear`):
+"Move issue [key] to Review status. Add comment with:
 
-### Step 7: Slack — Notify Task Completed (MANDATORY)
+- PR URL: [from github agent]
+- Branch name: [from github agent]
+- Files changed: [from coding agent]
+- Test results: [from coding agent]
+- Screenshot evidence: [paths from coding agent]"
 
-Delegate to `slack` agent:
-"Send to #ai-cli-macz: :white_check_mark: Completed: [issue title] ([issue key]) — Tests: [pass/fail count]"
-This MUST happen AFTER the Jira issue is marked Done.
+**Step 6b:** Delegate to `slack` agent:
+"Send to #ai-cli-macz: :mag: PR ready for review: [issue title] ([issue key]) — PR: [url]"
 
-### Step 8: Session Handoff (if ending session)
+### Step 7: PR Review
+
+Delegate to `pr_reviewer` agent:
+"Review PR for issue:
+
+- Issue Key: [key]
+- Title: [issue title]
+- PR Number: [number from github agent]
+- Files Changed: [list from coding agent]
+- Description: [what was implemented]
+- Test Steps: [from tracker agent]"
+
+The pr_reviewer agent will return one of:
+- **APPROVED**: PR passes review — agent merges the PR automatically
+- **CHANGES_REQUESTED**: PR needs work — blocking issues listed
+
+### Step 8: Handle Review Outcome
+
+**If APPROVED:**
+1. PR is already merged by pr_reviewer agent
+2. Delegate to the tracker agent (`jira` or `linear`):
+   "Mark issue [key] as Done. Add detailed completion comment with:
+
+   - Summary of what was implemented
+   - Files changed (ALL files created, modified, or deleted)
+   - Test results (commands run, exit codes, coverage)
+   - Verification steps (how to confirm this works)
+   - Screenshot evidence paths
+   - Known limitations (if any)"
+3. Delegate to `slack` agent:
+   "Send to #ai-cli-macz: :white_check_mark: Completed: [issue title] ([issue key]) — PR merged, Tests: [pass/fail count]"
+
+**If CHANGES_REQUESTED:**
+1. Delegate to the tracker agent (`jira` or `linear`):
+   "Move issue [key] back to To Do. Add comment listing the blocking issues from the PR review."
+2. Delegate to `slack` agent:
+   "Send to #ai-cli-macz: :warning: PR changes requested: [issue title] ([issue key]) — [summary of issues]"
+3. The issue will be picked up again in the next iteration with the review feedback as additional context.
+4. When re-implementing, pass the blocking issues to the coding agent as additional context.
+
+### Step 9: Session Handoff (if ending session)
 
 If ending the session:
 1. Delegate to the tracker agent: "Add session summary comment to META issue with: what was completed, current progress counts, notes for next session"
@@ -112,8 +158,11 @@ If ending the session:
 - Do NOT skip the verification test in Step 3
 - Do NOT mark Done without screenshot evidence AND test results from coding agent
 - Do NOT start Step 4c if Step 3 fails
+- Do NOT skip the Review stage — issues MUST go through Review before Done
+- Do NOT mark Done directly after commit — always create PR, move to Review, and get PR review first
 - Pass FULL issue context to coding agent (don't make it query the tracker)
 - Every task MUST have Slack begin + close notifications — no exceptions
 - Coding agent must write tests with robust coverage for every feature
+- Every task lifecycle: Started → In Progress → Review → Done (or back to To Do if rejected)
 
 Remember: You are the orchestrator. Delegate tasks to specialized agents, don't do the work yourself.

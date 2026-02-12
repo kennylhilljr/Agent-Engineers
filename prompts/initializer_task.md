@@ -72,15 +72,49 @@ Requirements:
 4. Take screenshot evidence
 5. Report: files_changed, screenshot_path, test_results, test_coverage"
 
-### Step 4: Commit Progress
+### Step 4: Commit, Push & Create PR
 
-If coding was done, delegate to `github` agent to commit.
-Then delegate to the tracker agent to mark issue Done and add session summary comment to META issue.
+If coding was done, delegate to `github` agent:
+"Commit and create PR for issue [key]:
 
-### Step 4b: Slack — Notify Task Completed (MANDATORY)
+- Files changed: [file list from coding agent]
+- Issue title: [title]
+- Branch: feature/[KEY]-[short-name]
+- Push to remote if GITHUB_REPO is configured
+- Create PR with issue reference in body
+- Return: pr_url, pr_number, branch name"
 
-If a task was completed, delegate to `slack` agent:
-"Send to #ai-cli-macz: :white_check_mark: Completed: [issue title] ([issue key]) — Tests: [pass/fail count]"
+### Step 4b: Move to Review
+
+Delegate to the tracker agent (`jira` or `linear`):
+"Move issue [key] to Review status. Add comment with:
+
+- PR URL: [from github agent]
+- Branch name: [from github agent]
+- Files changed: [from coding agent]
+- Test results: [from coding agent]
+- Screenshot evidence: [paths from coding agent]"
+
+Delegate to `slack` agent:
+"Send to #ai-cli-macz: :mag: PR ready for review: [issue title] ([issue key]) — PR: [url]"
+
+### Step 4c: PR Review
+
+Delegate to `pr_reviewer` agent to review the PR. Then handle the outcome:
+
+**If APPROVED:**
+1. Delegate to the tracker agent to mark issue Done with detailed completion notes
+2. Delegate to `slack` agent:
+   "Send to #ai-cli-macz: :white_check_mark: Completed: [issue title] ([issue key]) — PR merged, Tests: [pass/fail count]"
+
+**If CHANGES_REQUESTED:**
+1. Delegate to the tracker agent to move issue back to To Do with review feedback
+2. Delegate to `slack` agent:
+   "Send to #ai-cli-macz: :warning: PR changes requested: [issue title] ([issue key]) — [summary]"
+
+### Step 4d: Session Handoff
+
+Delegate to the tracker agent to add session summary comment to META issue.
 
 ## OUTPUT FILES TO CREATE
 
@@ -94,5 +128,7 @@ If a task was completed, delegate to `slack` agent:
 - Every task gets Slack begin + close notifications — no exceptions
 - Coding agent must write tests with robust coverage for every feature
 - No shortcuts on test evidence — screenshots + test results required
+- Issues MUST go through Review stage before Done — never skip PR creation and review
+- Every task lifecycle: Started → In Progress → Review → Done (or back to To Do if rejected)
 
 Remember: You are the orchestrator. Delegate tasks to specialized agents, don't do the work yourself.
