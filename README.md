@@ -286,19 +286,19 @@ The Gemini agent provides access to Google's Gemini model family, particularly s
 
 #### Strengths
 
-- Massive 1M token context window — can analyze entire codebases in one pass
-- Search grounding for research-heavy tasks
-- Strong multimodal reasoning (images, code, text)
-- CLI OAuth mode is completely free with generous rate limits
-- Excellent Google ecosystem knowledge (Android, GCP, Firebase, Flutter)
-- Three auth paths cover hobbyist (free) to enterprise (Vertex AI) use cases
+Massive 1M token context window — can analyze entire codebases in one pass
+Search grounding for research-heavy tasks
+Strong multimodal reasoning (images, code, text)
+CLI OAuth mode is completely free with generous rate limits
+Excellent Google ecosystem knowledge (Android, GCP, Firebase, Flutter)
+Three auth paths cover hobbyist (free) to enterprise (Vertex AI) use cases
 
 #### Considerations
 
-- CLI OAuth mode uses subprocess calls (slower than SDK)
-- No native tool use in bridge mode — responses are text-only
-- Free tier has rate limits (60 req/min, 1000 req/day)
-- Vertex AI requires Google Cloud project setup
+CLI OAuth mode uses subprocess calls (slower than SDK)
+No native tool use in bridge mode — responses are text-only
+Free tier has rate limits (60 req/min, 1000 req/day)
+Vertex AI requires Google Cloud project setup
 
 #### Setup
 
@@ -384,17 +384,17 @@ python scripts/gemini_cli.py --status                  # Check auth status
 
 #### Strengths
 
-- 10-20x faster inference than GPU-based providers
-- Open-source models (no vendor lock-in)
-- Generous free tier for development
-- Full streaming support
-- OpenAI-compatible API (uses `openai` Python SDK)
+10-20x faster inference than GPU-based providers
+Open-source models (no vendor lock-in)
+Generous free tier for development
+Full streaming support
+OpenAI-compatible API (uses `openai` Python SDK)
 
 #### Considerations
 
-- Open-source models may be less capable than proprietary models on complex tasks
-- No proprietary models available (only open-source)
-- Rate limits on free tier
+Open-source models may be less capable than proprietary models on complex tasks
+No proprietary models available (only open-source)
+Rate limits on free tier
 
 #### Setup
 
@@ -423,17 +423,17 @@ GROQ_MODEL=llama-3.3-70b-versatile  # optional, this is the default
 
 #### Strengths
 
-- Massive context windows (up to 2M tokens) — analyze entire codebases at once
-- Strong Chinese/English bilingual capabilities
-- Good code understanding and generation
-- OpenAI-compatible API (uses `openai` Python SDK)
-- Auto context mode optimizes cost
+Massive context windows (up to 2M tokens) — analyze entire codebases at once
+Strong Chinese/English bilingual capabilities
+Good code understanding and generation
+OpenAI-compatible API (uses `openai` Python SDK)
+Auto context mode optimizes cost
 
 #### Considerations
 
-- API key required (no free tier)
-- Higher latency than Groq on simple tasks
-- Primarily optimized for Chinese/English
+API key required (no free tier)
+Higher latency than Groq on simple tasks
+Primarily optimized for Chinese/English
 
 #### Setup
 
