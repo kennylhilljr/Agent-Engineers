@@ -129,36 +129,83 @@ class CodexOAuthClient:
 
 
 class SessionTokenClient:
-    """Alternative path: Uses ChatGPT web session token for zero API cost."""
+    """Alternative path: Uses ChatGPT web session token for zero API cost.
+
+    Uses curl_cffi to impersonate Chrome's TLS fingerprint, bypassing
+    Cloudflare's bot detection on chatgpt.com.
+    """
     CHATGPT_BASE_URL = "https://chatgpt.com"
     BACKEND_API_URL = f"{CHATGPT_BASE_URL}/backend-api"
 
+    # Browser-like headers that match a real Chrome session
+    _BROWSER_HEADERS = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                      "AppleWebKit/537.36 (KHTML, like Gecko) "
+                      "Chrome/131.0.0.0 Safari/537.36",
+        "Accept": "*/*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Sec-Ch-Ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"macOS"',
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+        "Origin": "https://chatgpt.com",
+        "Referer": "https://chatgpt.com/",
+    }
+
     def __init__(self, session_token: Optional[str] = None):
-        if httpx is None:
-            raise ImportError("httpx package not installed. Run: pip install httpx")
+        try:
+            from curl_cffi.requests import Session as CffiSession
+            self._CffiSession = CffiSession
+        except ImportError:
+            raise ImportError(
+                "curl_cffi package not installed. Run: pip install curl_cffi\n"
+                "This is needed to bypass Cloudflare's TLS fingerprinting."
+            )
         self.session_token = session_token or os.environ.get("CHATGPT_SESSION_TOKEN", "")
         if not self.session_token:
             raise ValueError("CHATGPT_SESSION_TOKEN not set.")
         self._access_token: Optional[str] = None
+        # Persistent session preserves Cloudflare cookies across requests
+        self._http: Optional[object] = None
+
+    def _get_http(self):
+        """Get or create a persistent HTTP session with Chrome impersonation."""
+        if self._http is None:
+            self._http = self._CffiSession(impersonate="chrome")
+            # Seed the session cookie
+            self._http.cookies.set(
+                "__Secure-next-auth.session-token",
+                self.session_token,
+                domain="chatgpt.com",
+            )
+        return self._http
 
     def _get_headers(self) -> dict[str, str]:
         if not self._access_token:
             self._refresh_access_token()
-        return {"Authorization": f"Bearer {self._access_token}",
-                "Content-Type": "application/json",
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
+        return {
+            **self._BROWSER_HEADERS,
+            "Authorization": f"Bearer {self._access_token}",
+            "Content-Type": "application/json",
+        }
 
     def _refresh_access_token(self) -> None:
-        with httpx.Client() as client:
-            response = client.get(
-                f"{self.CHATGPT_BASE_URL}/api/auth/session",
-                cookies={"__Secure-next-auth.session-token": self.session_token},
-                headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"})
-            response.raise_for_status()
-            data = response.json()
-            self._access_token = data.get("accessToken")
-            if not self._access_token:
-                raise ValueError("Failed to get access token. Session token may be expired.")
+        s = self._get_http()
+        # First, hit the main page to get Cloudflare clearance cookies
+        s.get(self.CHATGPT_BASE_URL, headers=self._BROWSER_HEADERS)
+        # Then exchange session token for access token
+        response = s.get(
+            f"{self.CHATGPT_BASE_URL}/api/auth/session",
+            headers=self._BROWSER_HEADERS,
+        )
+        response.raise_for_status()
+        data = response.json()
+        self._access_token = data.get("accessToken")
+        if not self._access_token:
+            raise ValueError("Failed to get access token. Session token may be expired.")
 
     def send_message(self, session: ChatSession, message: str, stream: bool = False) -> ChatResponse:
         session.add_message("user", message)
@@ -168,14 +215,14 @@ class SessionTokenClient:
             "model": session.model.value, "parent_message_id": str(uuid.uuid4())}
         if session.session_id:
             payload["conversation_id"] = session.session_id
-        with httpx.Client(timeout=120.0) as client:
-            response = client.post(f"{self.BACKEND_API_URL}/conversation",
+        s = self._get_http()
+        response = s.post(f"{self.BACKEND_API_URL}/conversation",
+            headers=self._get_headers(), json=payload)
+        if response.status_code == 401:
+            self._refresh_access_token()
+            response = s.post(f"{self.BACKEND_API_URL}/conversation",
                 headers=self._get_headers(), json=payload)
-            if response.status_code == 401:
-                self._refresh_access_token()
-                response = client.post(f"{self.BACKEND_API_URL}/conversation",
-                    headers=self._get_headers(), json=payload)
-            response.raise_for_status()
+        response.raise_for_status()
         content = ""
         for line in response.text.split("\n"):
             if line.startswith("data: ") and line != "data: [DONE]":

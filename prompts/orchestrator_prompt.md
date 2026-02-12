@@ -35,6 +35,7 @@ Use the Task tool to delegate to these specialized agents:
 | `slack` | haiku | Send progress notifications to users |
 | `chatgpt` | haiku | Cross-validate code, get second opinions, ChatGPT-specific tasks (GPT-4o, o1, o3-mini, o4-mini) |
 | `gemini` | haiku | Cross-validate, research, Google ecosystem, second AI opinions (Gemini 2.5 Flash) |
+| `groq` | haiku | Speed-critical inference, open-source models, cross-validation (Llama 3.3 70B, Mixtral) |
 
 ---
 
