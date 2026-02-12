@@ -75,6 +75,12 @@ ALLOWED_COMMANDS: set[str] = {
 # Commands that need additional validation even when in the allowlist
 COMMANDS_NEEDING_EXTRA_VALIDATION: set[str] = {"pkill", "chmod", "init.sh", "rm"}
 
+# Regex patterns for command string splitting
+# Splits on && or || operators (not inside quotes - simple heuristic)
+COMMAND_CHAIN_PATTERN: str = r"\s*(?:&&|\|\|)\s*"
+# Splits on semicolons that aren't inside quotes (simple heuristic)
+SEMICOLON_SPLIT_PATTERN: str = r'(?<!["\'])\s*;\s*(?!["\'])'
+
 
 def split_command_segments(command_string: str) -> list[str]:
     """
@@ -95,13 +101,12 @@ def split_command_segments(command_string: str) -> list[str]:
         List of individual command segments
     """
     # Split on && and || while preserving the ability to handle each segment
-    # This regex splits on && or || that aren't inside quotes
-    segments: list[str] = re.split(r"\s*(?:&&|\|\|)\s*", command_string)
+    segments: list[str] = re.split(COMMAND_CHAIN_PATTERN, command_string)
 
     # Further split on semicolons
     result: list[str] = []
     for segment in segments:
-        sub_segments: list[str] = re.split(r'(?<!["\'])\s*;\s*(?!["\'])', segment)
+        sub_segments: list[str] = re.split(SEMICOLON_SPLIT_PATTERN, segment)
         for sub in sub_segments:
             sub = sub.strip()
             if sub:
@@ -126,9 +131,8 @@ def extract_commands(command_string: str) -> list[str]:
     commands: list[str] = []
 
     # shlex doesn't treat ; as a separator, so we need to pre-process
-    # Split on semicolons that aren't inside quotes (simple heuristic)
     # This handles common cases like "echo hello; ls"
-    segments: list[str] = re.split(r'(?<!["\'])\s*;\s*(?!["\'])', command_string)
+    segments: list[str] = re.split(SEMICOLON_SPLIT_PATTERN, command_string)
 
     for segment in segments:
         segment = segment.strip()
@@ -464,8 +468,11 @@ async def bash_security_hook(
         return {}
 
     command: str = input_data.get("tool_input", {}).get("command", "")
-    if not command:
-        return {}
+    if not command or not command.strip():
+        return SyncHookJSONOutput(
+            decision="block",
+            reason="Empty bash command is not allowed",
+        )
 
     # Extract all commands from the command string
     commands: list[str] = extract_commands(command)

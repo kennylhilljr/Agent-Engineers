@@ -77,6 +77,9 @@ BUILTIN_TOOLS: list[str] = [
 # Prompts directory
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
+# Maximum number of agent turns per session
+MAX_AGENT_TURNS: int = 1000
+
 
 def load_orchestrator_prompt() -> str:
     """Load the orchestrator system prompt."""
@@ -212,7 +215,7 @@ def create_client(project_dir: Path, model: str) -> ClaudeSDKClient:
                 ],
             },
             agents=AGENT_DEFINITIONS,
-            max_turns=1000,
+            max_turns=MAX_AGENT_TURNS,
             cwd=str(project_dir.resolve()),
             settings=str(settings_file.resolve()),
         )
