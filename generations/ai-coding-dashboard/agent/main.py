@@ -13,8 +13,14 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
+# A2UI Validator import
+from a2ui_validator import A2UIValidator
+
 # Load environment variables
 load_dotenv()
+
+# Initialize A2UI Validator (global instance)
+a2ui_validator = A2UIValidator()
 
 
 # Application lifespan manager for startup/shutdown events
@@ -72,6 +78,19 @@ class AGUIStreamRequest(BaseModel):
     stream: bool = True
 
 
+class A2UIValidationRequest(BaseModel):
+    """A2UI validation request model"""
+    message: Dict[str, Any]
+
+
+class A2UIValidationResponse(BaseModel):
+    """A2UI validation response model"""
+    valid: bool
+    errors: list[str] = []
+    warnings: list[str] | None = None
+    message: Dict[str, Any] | None = None
+
+
 # Health check endpoint
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
@@ -105,10 +124,53 @@ async def root():
         "endpoints": {
             "health": "/health",
             "docs": "/docs",
+            "a2ui_validate": "/a2ui/validate",
             "ag_ui_stream": "/ag-ui/stream (coming soon)",
         },
         "documentation": "/docs",
+        "a2ui": {
+            "version": "0.8",
+            "validator_active": True,
+        },
     }
+
+
+# A2UI Validation endpoint
+@app.post("/a2ui/validate", response_model=A2UIValidationResponse)
+async def validate_a2ui(request: A2UIValidationRequest):
+    """
+    Validate A2UI message against v0.8 specification
+
+    Args:
+        request: A2UI validation request with message to validate
+
+    Returns:
+        A2UIValidationResponse: Validation result with errors/warnings
+
+    Example:
+        ```json
+        {
+          "message": {
+            "messageType": "beginRendering",
+            "components": [
+              {
+                "type": "a2ui.Button",
+                "id": "btn-1",
+                "props": {"text": "Click me"}
+              }
+            ]
+          }
+        }
+        ```
+    """
+    result = a2ui_validator.validate_message(request.message)
+
+    return A2UIValidationResponse(
+        valid=result.valid,
+        errors=result.errors,
+        warnings=result.warnings if result.warnings else None,
+        message=result.message if result.valid else None,
+    )
 
 
 # AG-UI Stream endpoint (placeholder for future implementation)
@@ -121,6 +183,8 @@ async def ag_ui_stream(request: AGUIStreamRequest):
     streaming AI responses using the AG-UI protocol for integration with
     the frontend CopilotKit components.
 
+    SECURITY: All emitted A2UI messages will be validated before sending to frontend.
+
     Args:
         request: AG-UI stream request with prompt and context
 
@@ -131,7 +195,13 @@ async def ag_ui_stream(request: AGUIStreamRequest):
         HTTPException: 501 Not Implemented (placeholder)
     """
     # TODO: Implement AG-UI protocol streaming in KAN-52+
-    # This is a placeholder that returns a proper HTTP 501 response
+    # TODO: Integrate A2UI validator to validate all emitted messages
+    # Example validation:
+    #   result = a2ui_validator.validate_message(agent_output)
+    #   if not result.valid:
+    #       logger.error(f"Invalid A2UI: {result.errors}")
+    #       # Reject or sanitize the message
+
     raise HTTPException(
         status_code=501,
         detail={

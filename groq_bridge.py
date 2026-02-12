@@ -1,10 +1,9 @@
 """
 Groq Bridge Module
-===================
+==================
 
-Wraps Groq API interaction to provide a unified interface for the
-multi-AI orchestrator. Groq uses custom LPU hardware for ultra-fast
-inference on open-source models.
+Unified interface for Groq's LPU-powered inference API.
+Supports both the native Groq SDK and OpenAI-compatible mode.
 
 Uses the OpenAI-compatible API at https://api.groq.com/openai/v1,
 so the openai Python SDK works directly with a different base_url.
@@ -29,34 +28,46 @@ GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
 
 class GroqModel(str, Enum):
-    LLAMA_33_70B = "llama-3.3-70b-versatile"
-    LLAMA_31_8B = "llama-3.1-8b-instant"
+    """Available Groq models organized by category."""
+
+    # Production models
+    LLAMA_3_3_70B = "llama-3.3-70b-versatile"
+    LLAMA_3_1_8B = "llama-3.1-8b-instant"
     MIXTRAL_8X7B = "mixtral-8x7b-32768"
     GEMMA2_9B = "gemma2-9b-it"
 
     @classmethod
     def from_string(cls, value: str) -> "GroqModel":
+        """Resolve a model string to a GroqModel enum, supporting aliases."""
         mapping = {m.value: m for m in cls}
         aliases = {
-            "llama-70b": cls.LLAMA_33_70B,
-            "llama-8b": cls.LLAMA_31_8B,
+            "llama-70b": cls.LLAMA_3_3_70B,
+            "llama-8b": cls.LLAMA_3_1_8B,
             "mixtral": cls.MIXTRAL_8X7B,
             "gemma": cls.GEMMA2_9B,
         }
         key = value.lower().strip()
-        return mapping.get(key, aliases.get(key, cls.LLAMA_33_70B))
+        return mapping.get(key, aliases.get(key, cls.LLAMA_3_3_70B))
+
+
+# Default model
+DEFAULT_MODEL = GroqModel.LLAMA_3_3_70B
 
 
 @dataclass
 class GroqMessage:
+    """A message in a Groq conversation."""
     role: str
     content: str
 
 
 @dataclass
 class GroqSession:
+    """Manages a conversation session with Groq."""
     model: GroqModel
     messages: list[GroqMessage] = field(default_factory=list)
+    temperature: float = 0.7
+    max_tokens: int = 4096
 
     def add_message(self, role: str, content: str) -> None:
         self.messages.append(GroqMessage(role=role, content=content))
@@ -67,6 +78,7 @@ class GroqSession:
 
 @dataclass
 class GroqResponse:
+    """Response from the Groq API."""
     content: str
     model: str
     usage: Optional[dict] = None
@@ -92,6 +104,8 @@ class GroqClient:
         response = self._client.chat.completions.create(
             model=session.model.value,
             messages=session.to_openai_messages(),
+            temperature=session.temperature,
+            max_tokens=session.max_tokens,
             stream=False,
         )
         content = response.choices[0].message.content or ""
@@ -112,6 +126,8 @@ class GroqClient:
         response = await self._async_client.chat.completions.create(
             model=session.model.value,
             messages=session.to_openai_messages(),
+            temperature=session.temperature,
+            max_tokens=session.max_tokens,
             stream=False,
         )
         content = response.choices[0].message.content or ""
@@ -154,11 +170,14 @@ class GroqBridge:
         return cls(client=GroqClient())
 
     def create_session(
-        self, model: Optional[str] = None, system_prompt: Optional[str] = None
+        self, model: Optional[str] = None, system_prompt: Optional[str] = None,
+        temperature: float = 0.7, max_tokens: int = 4096,
     ) -> GroqSession:
-        model_str = model or os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+        model_str = model or os.environ.get("GROQ_MODEL", DEFAULT_MODEL.value)
         groq_model = GroqModel.from_string(model_str)
-        session = GroqSession(model=groq_model)
+        session = GroqSession(
+            model=groq_model, temperature=temperature, max_tokens=max_tokens,
+        )
         if system_prompt:
             session.add_message("system", system_prompt)
         return session
@@ -177,7 +196,7 @@ class GroqBridge:
         key = os.environ.get("GROQ_API_KEY", "")
         return {
             "auth_type": "api-key",
-            "model_default": os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile"),
+            "model_default": os.environ.get("GROQ_MODEL", DEFAULT_MODEL.value),
             "api_key_set": "yes" if key else "no",
             "api_key_prefix": key[:8] + "..." if len(key) > 8 else "(short)",
             "cost_note": "Free tier available. Ultra-fast LPU inference.",

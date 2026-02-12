@@ -66,9 +66,9 @@ python export_all_issues.py
 
 Output goes to `downloaded_issues/`.
 
-## Integration with your-claude-engineer
+## Integration with Agent-Engineers
 
-The Slack-Jira bridge creates issues in the KAN project. The `jira` agent in your-claude-engineer picks up these issues and processes them through the orchestrator workflow:
+The Slack-Jira bridge creates issues in the KAN project. The `jira` agent in Agent-Engineers picks up these issues and processes them through the orchestrator workflow:
 
 1. User runs `/jira-story` in Slack -> creates Jira issue
 2. Orchestrator asks `jira` agent for next issue -> picks up the new story
