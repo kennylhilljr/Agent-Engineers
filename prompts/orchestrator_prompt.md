@@ -128,8 +128,17 @@ Ask coding agent:
 Ask slack agent: ":construction: Starting: [issue title] ([issue key])"
 This MUST happen BEFORE the coding agent begins work.
 
-**Step 4b: Jira — Transition to In Progress**
-Ask jira agent to transition the issue to "In Progress".
+**Step 4b: Transition to In Progress (MANDATORY — do NOT skip)**
+Ask tracker agent (`jira` or `linear`) to transition the issue to "In Progress":
+```
+Transition issue <KEY> to In Progress:
+1. GET available transitions for this issue
+2. Find the transition ID for "In Progress"
+3. POST to execute the transition
+4. Add comment: "Work started on this issue."
+Return: confirmation that issue is now In Progress.
+```
+**This MUST happen BEFORE Step 4c. The board must reflect that work has begun.**
 
 **Step 4c: Implement Feature**
 Pass FULL context to coding agent:
@@ -166,17 +175,20 @@ The github agent will:
 4. Create PR linking to the Jira issue
 5. Return: pr_url, pr_number, branch name
 
-**Step 6: Move to Review in Jira**
-Ask jira agent to:
-- Add comment with PR URL and implementation details (files changed, test results, screenshots)
-- Transition issue to "Review" status
-
+**Step 6: Transition to Review (MANDATORY)**
+Ask tracker agent (`jira` or `linear`) to transition and add PR details:
 ```
-Move issue KAN-123 to Review.
-PR: https://github.com/owner/repo/pull/42
-Files changed: [list]
-Test results: [from coding agent]
-Screenshot evidence: [paths]
+Transition issue <KEY> to Review:
+1. GET available transitions for this issue
+2. Find the transition ID for "Review"
+3. Add comment with PR details:
+   - PR URL: [from github agent]
+   - Branch: [from github agent]
+   - Files changed: [from coding agent]
+   - Test results: [from coding agent]
+   - Screenshot evidence: [paths from coding agent]
+4. POST to execute the Review transition
+Return: confirmation that issue is now in Review.
 ```
 
 **Step 7: Slack — Notify PR Ready for Review**
@@ -202,7 +214,15 @@ The pr_reviewer agent will return one of:
 
 **If APPROVED:**
 1. PR is already merged by pr_reviewer agent
-2. Ask jira agent to mark issue Done with full completion notes
+2. Ask tracker agent to transition issue to Done:
+   ```
+   Transition issue <KEY> to Done:
+   1. GET available transitions for this issue
+   2. Find the transition ID for "Done"
+   3. Add detailed completion comment (files changed, test results, screenshots)
+   4. POST to execute the Done transition
+   Return: confirmation that issue is now Done.
+   ```
 3. Ask slack agent: ":white_check_mark: Completed: [issue title] ([issue key]) — PR merged, Tests: [pass/fail count]"
 
 **If CHANGES_REQUESTED:**
