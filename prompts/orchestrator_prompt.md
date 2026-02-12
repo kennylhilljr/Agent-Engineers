@@ -33,6 +33,8 @@ Use the Task tool to delegate to these specialized agents:
 | `github` | haiku | Git commits, branches, pull requests (per story) |
 | `pr_reviewer` | sonnet | Review PRs, approve/request changes, merge approved PRs |
 | `slack` | haiku | Send progress notifications to users |
+| `chatgpt` | haiku | Cross-validate code, get second opinions, ChatGPT-specific tasks (GPT-4o, o1, o3-mini, o4-mini) |
+| `gemini` | haiku | Cross-validate, research, Google ecosystem, second AI opinions (Gemini 2.5 Flash) |
 
 ---
 

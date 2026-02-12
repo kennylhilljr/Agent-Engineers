@@ -1,9 +1,5 @@
 """
-Agent Definitions
-=================
-
-Specialized agent configurations using Claude Agent SDK's AgentDefinition.
-Model selection is configurable via environment variables.
+Agent Definitions - Includes ChatGPT agent for multi-AI orchestration (KAN-196).
 """
 
 import os
@@ -13,146 +9,94 @@ from typing import Final, Literal, TypeGuard
 from claude_agent_sdk.types import AgentDefinition
 
 from arcade_config import (
-    get_linear_tools,
-    get_github_tools,
-    get_slack_tools,
-    get_coding_tools,
+    get_linear_tools, get_github_tools, get_slack_tools, get_coding_tools,
 )
 
-# File tools needed by multiple agents
 FILE_TOOLS: list[str] = ["Read", "Write", "Edit", "Glob"]
-
 PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
-
-# Valid model options for AgentDefinition
 ModelOption = Literal["haiku", "sonnet", "opus", "inherit"]
-
-# Valid model values as a tuple for runtime validation
 _VALID_MODELS: Final[tuple[str, ...]] = ("haiku", "sonnet", "opus", "inherit")
 
-# Default models for each agent (immutable)
 DEFAULT_MODELS: Final[dict[str, ModelOption]] = {
-    "linear": "haiku",
-    "jira": "haiku",
-    "coding": "sonnet",
-    "github": "haiku",
-    "slack": "haiku",
-    "pr_reviewer": "sonnet",
+    "linear": "haiku", "coding": "sonnet", "github": "haiku",
+    "slack": "haiku", "chatgpt": "haiku",
 }
 
 
 def _is_valid_model(value: str) -> TypeGuard[ModelOption]:
-    """Type guard to validate model option values."""
     return value in _VALID_MODELS
 
 
 def _get_model(agent_name: str) -> ModelOption:
-    """
-    Get the model for an agent from environment variable or default.
-
-    Environment variables:
-        LINEAR_AGENT_MODEL, CODING_AGENT_MODEL, GITHUB_AGENT_MODEL, SLACK_AGENT_MODEL
-
-    Valid values: haiku, sonnet, opus, inherit
-    """
     env_var = f"{agent_name.upper()}_AGENT_MODEL"
     value = os.environ.get(env_var, "").lower().strip()
-
     if _is_valid_model(value):
-        return value  # Type checker knows this is ModelOption via TypeGuard
-
+        return value
     default = DEFAULT_MODELS.get(agent_name)
     if default is not None:
-        return default  # DEFAULT_MODELS is typed as dict[str, ModelOption]
-
-    # Fallback for unknown agent names
+        return default
     return "haiku"
 
 
 def _load_prompt(name: str) -> str:
-    """Load a prompt file."""
     return (PROMPTS_DIR / f"{name}.md").read_text()
 
 
 OrchestratorModelOption = Literal["haiku", "sonnet", "opus"]
-
-# Valid orchestrator model values (no "inherit" option since orchestrator is root)
 _VALID_ORCHESTRATOR_MODELS: Final[tuple[str, ...]] = ("haiku", "sonnet", "opus")
 
 
 def _is_valid_orchestrator_model(value: str) -> TypeGuard[OrchestratorModelOption]:
-    """Type guard to validate orchestrator model option values."""
     return value in _VALID_ORCHESTRATOR_MODELS
 
 
 def get_orchestrator_model() -> OrchestratorModelOption:
-    """
-    Get the orchestrator model from environment variable or default.
-
-    Environment variable: ORCHESTRATOR_MODEL
-    Valid values: haiku, sonnet, opus (no "inherit" since orchestrator is root)
-    Default: haiku
-    """
     value = os.environ.get("ORCHESTRATOR_MODEL", "").lower().strip()
     if _is_valid_orchestrator_model(value):
-        return value  # Type checker knows this is OrchestratorModelOption via TypeGuard
+        return value
     return "haiku"
 
 
-def create_agent_definitions() -> dict[str, AgentDefinition]:
-    """
-    Create agent definitions with models from environment configuration.
+def _get_chatgpt_tools() -> list[str]:
+    return FILE_TOOLS + ["Bash"]
 
-    This is called at import time but reads env vars, so changes to
-    environment require reimporting or restarting.
-    """
+
+def create_agent_definitions() -> dict[str, AgentDefinition]:
     return {
         "linear": AgentDefinition(
-            description="Manages Linear issues, project status, and session handoff. Use for any Linear operations.",
+            description="Manages Linear issues, project status, and session handoff.",
             prompt=_load_prompt("linear_agent_prompt"),
             tools=get_linear_tools() + FILE_TOOLS,
-            model=_get_model("linear"),
-        ),
+            model=_get_model("linear")),
         "github": AgentDefinition(
-            description="Handles Git commits, branches, and GitHub PRs. Use for version control operations.",
+            description="Handles Git commits, branches, and GitHub PRs.",
             prompt=_load_prompt("github_agent_prompt"),
             tools=get_github_tools() + FILE_TOOLS + ["Bash"],
-            model=_get_model("github"),
-        ),
+            model=_get_model("github")),
         "slack": AgentDefinition(
-            description="Sends Slack notifications to keep users informed. Use for progress updates.",
+            description="Sends Slack notifications to keep users informed.",
             prompt=_load_prompt("slack_agent_prompt"),
             tools=get_slack_tools() + FILE_TOOLS,
-            model=_get_model("slack"),
-        ),
-        "jira": AgentDefinition(
-            description="Manages Jira issues, project status, and session handoff. Use for any Jira operations.",
-            prompt=_load_prompt("jira_agent_prompt"),
-            tools=FILE_TOOLS + ["Bash"],
-            model=_get_model("jira"),
-        ),
+            model=_get_model("slack")),
         "coding": AgentDefinition(
-            description="Writes and tests code. Use when implementing features or fixing bugs.",
+            description="Writes and tests code.",
             prompt=_load_prompt("coding_agent_prompt"),
             tools=get_coding_tools(),
-            model=_get_model("coding"),
-        ),
-        "pr_reviewer": AgentDefinition(
-            description="Reviews GitHub PRs for quality and correctness. Use for code review before merging.",
-            prompt=_load_prompt("pr_reviewer_agent_prompt"),
-            tools=get_github_tools() + FILE_TOOLS + ["Bash"],
-            model=_get_model("pr_reviewer"),
-        ),
+            model=_get_model("coding")),
+        "chatgpt": AgentDefinition(
+            description=(
+                "Provides access to OpenAI ChatGPT models (GPT-4o, o1, o3-mini, o4-mini). "
+                "Use for cross-validation, ChatGPT-specific tasks, second opinions on code, "
+                "or when the user explicitly requests ChatGPT."),
+            prompt=_load_prompt("chatgpt_agent_prompt"),
+            tools=_get_chatgpt_tools(),
+            model=_get_model("chatgpt")),
     }
 
 
-# Create definitions at import time (reads env vars)
 AGENT_DEFINITIONS: dict[str, AgentDefinition] = create_agent_definitions()
-
-# Export individual agents for convenience
 LINEAR_AGENT = AGENT_DEFINITIONS["linear"]
-JIRA_AGENT = AGENT_DEFINITIONS["jira"]
 GITHUB_AGENT = AGENT_DEFINITIONS["github"]
 SLACK_AGENT = AGENT_DEFINITIONS["slack"]
 CODING_AGENT = AGENT_DEFINITIONS["coding"]
-PR_REVIEWER_AGENT = AGENT_DEFINITIONS["pr_reviewer"]
+CHATGPT_AGENT = AGENT_DEFINITIONS["chatgpt"]
