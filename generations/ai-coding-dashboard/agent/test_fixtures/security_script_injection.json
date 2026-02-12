@@ -1,0 +1,10 @@
+{
+  "messageType": "beginRendering",
+  "components": [
+    {
+      "type": "<script>alert('xss')</script>",
+      "id": "evil-1",
+      "props": {}
+    }
+  ]
+}

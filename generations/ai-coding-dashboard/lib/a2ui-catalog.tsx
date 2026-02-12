@@ -5,6 +5,17 @@ import React from 'react';
  * Maps a2ui.* component names to actual React components
  */
 
+// Domain A2UI components
+import { TaskCard } from './a2ui/components/TaskCard';
+import { ProgressRing } from './a2ui/components/ProgressRing';
+import { ActivityItem } from './a2ui/components/ActivityItem';
+import { FileTree } from './a2ui/components/FileTree';
+import { TestResults } from './a2ui/components/TestResults';
+import { ApprovalCard } from './a2ui/components/ApprovalCard';
+import { DecisionCard } from './a2ui/components/DecisionCard';
+import { MilestoneCard } from './a2ui/components/MilestoneCard';
+import { ErrorCard } from './a2ui/components/ErrorCard';
+
 // Base component types
 export type A2UIComponentProps = Record<string, any>;
 export type A2UIComponent = React.ComponentType<A2UIComponentProps>;
@@ -186,6 +197,7 @@ const Divider: React.FC<A2UIComponentProps> = ({
 
 // A2UI Component Catalog
 export const a2uiCatalog: A2UICatalog = {
+  // Primitive UI components
   'a2ui.Button': Button,
   'a2ui.Card': Card,
   'a2ui.Text': Text,
@@ -194,6 +206,16 @@ export const a2uiCatalog: A2UICatalog = {
   'a2ui.Grid': Grid,
   'a2ui.Badge': Badge,
   'a2ui.Divider': Divider,
+  // Domain A2UI components
+  'a2ui.TaskCard': TaskCard as A2UIComponent,
+  'a2ui.ProgressRing': ProgressRing as A2UIComponent,
+  'a2ui.ActivityItem': ActivityItem as A2UIComponent,
+  'a2ui.FileTree': FileTree as A2UIComponent,
+  'a2ui.TestResults': TestResults as A2UIComponent,
+  'a2ui.ApprovalCard': ApprovalCard as A2UIComponent,
+  'a2ui.DecisionCard': DecisionCard as A2UIComponent,
+  'a2ui.MilestoneCard': MilestoneCard as A2UIComponent,
+  'a2ui.ErrorCard': ErrorCard as A2UIComponent,
 };
 
 // A2UIRenderer Props
@@ -242,3 +264,4 @@ export const getA2UIComponentNames = (): string[] => {
 
 // Export individual components for direct use if needed
 export { Button, Card, Text, Input, Container, Grid, Badge, Divider };
+export { TaskCard, ProgressRing, ActivityItem, FileTree, TestResults, ApprovalCard, DecisionCard, MilestoneCard, ErrorCard };

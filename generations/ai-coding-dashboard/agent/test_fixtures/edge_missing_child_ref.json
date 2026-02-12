@@ -1,0 +1,16 @@
+{
+  "messageType": "beginRendering",
+  "components": [
+    {
+      "type": "a2ui.Container",
+      "id": "container-1",
+      "props": {},
+      "children": ["btn-1", "nonexistent-id"]
+    },
+    {
+      "type": "a2ui.Button",
+      "id": "btn-1",
+      "props": {}
+    }
+  ]
+}
