@@ -208,7 +208,7 @@ The pr_reviewer agent will return one of:
 **If CHANGES_REQUESTED:**
 1. Ask jira agent to move issue back to "To Do" with comment listing the blocking issues
 2. Ask slack agent: ":warning: PR changes requested: [issue title] ([issue key]) — [summary of issues]"
-3. The issue will be picked up again in the next iteration with the review feedback as additional context
+3. Do NOT wait for the next session — pick up this issue (or the next one) immediately in Step 9b below.
 4. When re-implementing, pass the blocking issues to the coding agent:
    ```
    Re-implement issue KAN-123 (PR review feedback):
@@ -218,6 +218,17 @@ The pr_reviewer agent will return one of:
      2. [issue 2]
    Fix these issues and provide updated implementation.
    ```
+
+**Step 9b: Pick Up Next Ticket (CONTINUOUS LOOP)**
+
+After completing Step 9 (whether APPROVED or CHANGES_REQUESTED), do NOT end the session. Instead, loop back and pick up the next ticket immediately:
+
+1. Ask tracker agent for updated status: issue counts (Done/In Progress/Todo), and FULL details of the next highest-priority Todo issue
+2. If all issues are Done → go to Project Complete Detection (output `PROJECT_COMPLETE:`)
+3. If there are remaining Todo issues → go back to **Step 3** (Verification Test) with the new issue
+4. Keep looping through tickets until all issues are Done or context is critically low
+
+**Each session should complete as many tickets as possible, not just one.**
 
 ---
 
@@ -253,7 +264,8 @@ You MUST send Slack notifications to `#ai-cli-macz` for **every task lifecycle e
 8b. If CHANGES_REQUESTED:
     → Jira agent: Move KAN-5 back to To Do with review feedback
     → Slack: ":warning: PR changes requested: Timer Display (KAN-5)"
-    → Issue gets re-prioritized for next iteration
+9. Check for next ticket → Loop back to step 1 with the next issue
+   (Do NOT end the session — keep picking up tickets)
 ```
 
 ---
@@ -280,7 +292,7 @@ You MUST send Slack notifications to `#ai-cli-macz` for **every task lifecycle e
 2. **Never mark Done without screenshots** - Reject if missing
 3. **Always pass full context** - Don't make agents re-fetch
 4. **Fix regressions first** - Never proceed if verification fails
-5. **One issue at a time** - Complete fully before starting another
+5. **One issue at a time, then pick up the next** - Complete one fully, then loop back for the next
 6. **Keep project root clean** - No temp files (see below)
 7. **Every task gets a Jira ticket** - No work happens without a tracked issue
 8. **Every task gets Slack begin + close notifications** - No exceptions
@@ -340,12 +352,14 @@ Linear agent returns: done=5, in_progress=0, todo=1 (META only)
 
 ### Context Management
 
-You have finite context. Prioritize:
-- Completing 1-2 issues thoroughly
-- Clean session handoffs
-- Verification over speed
+You have finite context but should maximize tickets completed per session. Prioritize:
+- **Completing as many issues as possible** by looping through Step 3→9b continuously
+- Verification over speed (never skip verification)
+- Clean session handoffs only when context is critically low
 
-When context is filling up or session is ending:
+**Do NOT stop after one ticket.** After each ticket is done (or sent back to To Do), immediately check for the next one via Step 9b.
+
+When context is critically low and you cannot complete another full ticket cycle:
 1. Commit any work in progress (create PR if there are uncommitted changes for a story)
 2. Ask jira/linear agent to add session summary comment to META issue
 3. Any in-progress stories with open PRs should remain in "Review" status for next session
