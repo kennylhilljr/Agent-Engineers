@@ -1,334 +1,341 @@
-# Your Claude Engineer
+<div align="center">
 
-**Your own AI software engineer that manages projects, writes code, and communicates progress — autonomously.**
+# 🤖 Agent Engineers
 
-Ever wished you could hand off a feature request and have it come back fully implemented, tested, and documented? Your Claude Engineer is a harness built on top of the Anthropic Harness for long running tasks and using the [Claude Agent SDK](https://github.com/anthropics/claude-code/tree/main/agent-sdk-python) that turns Claude into a long-running software engineer capable of tackling complex, multi-step tasks that go far beyond a single prompt.
+### _Autonomous Multi-Model AI Engineering Teams_
 
-It's a complete engineering workflow leveraging subagents to handle distinct concerns:
+**Deploy a team of specialized AI agents that plan, code, review, and ship software — across Claude, Gemini, and beyond.**
 
-- **Project Management**: Creates and tracks work in Linear, breaking down features into issues and updating status as work progresses
-- **Code Implementation**: Writes, tests, and iterates on code with browser-based UI verification via Playwright
-- **Version Control**: Commits changes, creates branches, and opens pull requests on GitHub
-- **Communication**: Keeps you informed with progress updates in Slack
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![Claude Agent SDK](https://img.shields.io/badge/Claude_Agent_SDK-0.1.25-D4A574?style=for-the-badge&logo=anthropic&logoColor=white)](https://github.com/anthropics/claude-code/tree/main/agent-sdk-python)
+[![Arcade MCP](https://img.shields.io/badge/Arcade_MCP-Gateway-7C3AED?style=for-the-badge)](https://arcade.dev)
+[![License: MIT](https://img.shields.io/badge/License-MIT-22C55E?style=for-the-badge)](LICENSE)
 
-The multi-agent architecture uses specialized agents (Linear, Coding, GitHub, Slack) coordinated by an orchestrator, enabling longer autonomous sessions without context window exhaustion. All external service integrations are powered by the [Arcade MCP server](https://arcade.dev), providing seamless OAuth authentication across Linear, GitHub, and Slack through a single gateway. The system also leverages Claude's tool discovery for context-optimized MCP interactions.
+<br/>
 
-## Key Features
+<img src="https://img.shields.io/badge/Claude-Orchestrator-D4A574?style=flat-square" alt="Claude" />
+<img src="https://img.shields.io/badge/Gemini-Research-4285F4?style=flat-square" alt="Gemini" />
+<img src="https://img.shields.io/badge/Jira-Tracking-0052CC?style=flat-square" alt="Jira" />
+<img src="https://img.shields.io/badge/GitHub-Version_Control-181717?style=flat-square" alt="GitHub" />
+<img src="https://img.shields.io/badge/Slack-Notifications-4A154B?style=flat-square" alt="Slack" />
+<img src="https://img.shields.io/badge/Playwright-Browser_Testing-2EAD33?style=flat-square" alt="Playwright" />
 
-- **Long-Running Autonomy**: Harness architecture enables extended coding sessions across multiple iterations
-- **Multi-Agent Orchestration**: Specialized agents handle distinct concerns (project management, coding, version control, communication)
-- **Linear Integration**: Automatic issue tracking with real-time status updates and session handoff
-- **GitHub Integration**: Automatic commits, branches, and PR creation
-- **Slack Notifications**: Progress updates delivered to your team
-- **Arcade MCP Gateway**: Single authentication flow for all external services (Linear, GitHub, Slack)
-- **Browser Testing**: Playwright MCP for automated UI verification
-- **Model Configuration**: Per-agent model selection (Haiku, Sonnet, or Opus)
+---
 
-## Prerequisites
+*Hand off a feature request. Get back a PR with tests, screenshots, and a Slack notification.*
 
-> Note that this doesn't work on Windows because of limitations with the Claude Agent SDK and subagents. Use WSL or a Linux VM to run it!
+</div>
 
-### 0. Set Up Python Virtual Environment (Recommended)
+<br/>
+
+## 🧬 What Is This?
+
+Agent Engineers is a **multi-agent harness** built on the [Claude Agent SDK](https://github.com/anthropics/claude-code/tree/main/agent-sdk-python) that orchestrates a team of specialized AI agents to autonomously build software — end to end.
+
+It doesn't just write code. It **manages a project board**, **creates feature branches**, **writes tests**, **takes browser screenshots for verification**, **opens PRs**, **runs code reviews**, and **posts progress updates to Slack** — all without human intervention.
+
+The multi-model architecture means the right AI handles the right job: Claude Sonnet writes code, Claude Haiku manages lightweight coordination, and Google Gemini handles research with Google Search grounding — no single model bottleneck.
+
+<br/>
+
+## ⚡ The Agent Team
+
+```
+                          ┌─────────────────────┐
+                          │    ORCHESTRATOR      │
+                          │    Claude Haiku      │
+                          │  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄  │
+                          │  Plans · Delegates   │
+                          │  Passes Context      │
+                          └──────────┬──────────┘
+                                     │
+            ┌────────────┬───────────┼───────────┬────────────┐
+            │            │           │           │            │
+    ┌───────▼──────┐ ┌───▼────┐ ┌───▼────┐ ┌───▼─────┐ ┌───▼──────┐
+    │   TRACKER    │ │ CODER  │ │ GITHUB │ │  SLACK  │ │ GEMINI   │
+    │  Jira/Linear │ │ Sonnet │ │ Haiku  │ │  Haiku  │ │  Haiku   │
+    │    Haiku     │ │        │ │        │ │         │ │    ↓     │
+    ├──────────────┤ ├────────┤ ├────────┤ ├─────────┤ │ gemini   │
+    │ Create issues│ │ Write  │ │ Branch │ │ Notify  │ │  -cli    │
+    │ Track status │ │ Test   │ │ Commit │ │ on start│ │    ↓     │
+    │ Transition   │ │ Verify │ │ PR     │ │ on done │ │ Google   │
+    │ Comment      │ │ Screen │ │ Push   │ │ on block│ │ Gemini   │
+    └──────────────┘ └────────┘ └────────┘ └─────────┘ │ 2.5 Pro  │
+                                                        └──────────┘
+                          ┌─────────────────────┐
+                          │   PR REVIEWER        │
+                          │   Claude Sonnet      │
+                          │  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄  │
+                          │  Review · Approve    │
+                          │  Request Changes     │
+                          │  Auto-Merge          │
+                          └─────────────────────┘
+```
+
+| Agent | Model | Role |
+|:------|:------|:-----|
+| **Orchestrator** | Claude Haiku | Coordinates all agents, passes context between them, enforces quality gates |
+| **Tracker** (Jira) | Claude Haiku | Creates/updates Jira issues, manages sprint status, session handoff via META issue |
+| **Tracker** (Linear) | Claude Haiku | Alternative tracker — same capabilities for Linear workspaces |
+| **Coder** | Claude Sonnet | Implements features, writes tests, browser-tests with Playwright, provides screenshot evidence |
+| **GitHub** | Claude Haiku | Creates branches, commits code, pushes to remote, opens pull requests |
+| **PR Reviewer** | Claude Sonnet | Reviews PRs for quality, approves or requests changes, auto-merges approved PRs |
+| **Slack** | Claude Haiku | Sends real-time notifications — task started, PR ready, completed, blocked |
+| **Gemini** | Claude Haiku → gemini-cli | Research with Google Search grounding, long-context analysis, second opinions. Uses OAuth — no API key, no per-token billing |
+
+<br/>
+
+## 🔄 How It Works
+
+Every feature follows a rigorous lifecycle — automatically:
+
+```
+ ┌──────────────────────────────────────────────────────────────────────┐
+ │                                                                      │
+ │   📋 Jira: Create issue         🔔 Slack: "Starting KAN-42..."      │
+ │          │                              │                            │
+ │          ▼                              ▼                            │
+ │   🔍 Verification Gate ◄── FAIL ── Fix regressions first            │
+ │          │                                                           │
+ │        PASS                                                          │
+ │          │                                                           │
+ │          ▼                                                           │
+ │   💻 Code: Implement + Test + Screenshot                             │
+ │          │                                                           │
+ │          ▼                                                           │
+ │   🌿 GitHub: Branch → Commit → Push → PR                            │
+ │          │                                                           │
+ │          ▼                                                           │
+ │   🔔 Slack: "PR ready for review..."                                │
+ │          │                                                           │
+ │          ▼                                                           │
+ │   👀 PR Review ──── CHANGES REQUESTED ──► Back to Todo + Slack      │
+ │          │                                                           │
+ │       APPROVED                                                       │
+ │          │                                                           │
+ │          ▼                                                           │
+ │   ✅ Merge → Jira: Done → Slack: "Completed!"                       │
+ │                                                                      │
+ └──────────────────────────────────────────────────────────────────────┘
+```
+
+**Quality gates enforced automatically:**
+- 🚫 No new work until verification tests pass on existing features
+- 📸 No issue marked "Done" without screenshot evidence
+- 🧪 Every feature requires test coverage — no exceptions
+- 🔁 Rejected PRs cycle back with reviewer feedback attached
+
+<br/>
+
+## 🔀 Multi-Model Strategy
+
+Agent Engineers isn't locked to one AI provider. The orchestrator dispatches to the best model for each job:
+
+| Task | Model | Why |
+|:-----|:------|:----|
+| Coordination & lightweight ops | **Claude Haiku** | Fast, cheap, great at following structured workflows |
+| Code implementation & review | **Claude Sonnet** | Strong reasoning, excellent code quality |
+| Research & web grounding | **Google Gemini 2.5 Pro** | Native Google Search integration, massive context window |
+| Complex orchestration (optional) | **Claude Opus** | Deepest reasoning for complex multi-step planning |
+
+Gemini integration uses Google's official `gemini-cli` with **OAuth authentication** — if you have a Google AI Pro/Ultra subscription, you get higher rate limits and Gemini 2.5 Pro access with zero API costs.
+
+<br/>
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- **Python 3.11+** and **Node.js 18+**
+- **Claude Code CLI**: `npm install -g @anthropic-ai/claude-code`
+- **Arcade API Key**: [Get one here](https://api.arcade.dev/dashboard/api-keys)
+
+> ⚠️ Linux/macOS only — Claude Agent SDK subagents don't work on Windows. Use WSL.
+
+### Setup
 
 ```bash
+# Clone the repo
+git clone https://github.com/kennylhilljr/Agent-Engineers.git
+cd Agent-Engineers
+
 # Create virtual environment
-python3 -m venv venv
+python3 -m venv venv && source venv/bin/activate
 
-# Activate it
-source venv/bin/activate  # On macOS/Linux
-# or
-venv\Scripts\activate  # On Windows
-```
-
-### 1. Install Claude Code CLI and Python SDK
-
-```bash
-# Install Claude Code CLI (latest version required)
-npm install -g @anthropic-ai/claude-code
-
-# Install Python dependencies
+# Install dependencies
 pip install -r requirements.txt
-```
 
-### 2. Set Up Authentication
-
-```bash
-# Copy the example environment file
+# Configure environment
 cp .env.example .env
+# Edit .env with your Arcade API key and gateway slug
 
-# Edit .env with your credentials:
-# - ARCADE_API_KEY: Get from https://api.arcade.dev/dashboard/api-keys
-# - ARCADE_GATEWAY_SLUG: Create at https://api.arcade.dev/dashboard/mcp-gateways
-# - ARCADE_USER_ID: Your email for user tracking
-
-# Authorize Arcade tools (run once)
+# Authorize Arcade tools (one-time OAuth flow)
 python authorize_arcade.py
+
+# (Optional) Set up Gemini CLI for research agent
+chmod +x setup_gemini.sh && ./setup_gemini.sh
 ```
 
-<details>
-<summary><strong>Environment Variables Reference</strong></summary>
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `ARCADE_API_KEY` | Arcade API key from https://api.arcade.dev/dashboard/api-keys | Yes |
-| `ARCADE_GATEWAY_SLUG` | Your Arcade MCP gateway slug | Yes |
-| `ARCADE_USER_ID` | Your email for user tracking | Recommended |
-| `GENERATIONS_BASE_PATH` | Base directory for generated projects (default: ./generations) | No |
-| `GITHUB_REPO` | GitHub repo in format `owner/repo` for auto-push | No |
-| `SLACK_CHANNEL` | Slack channel name (without #) for notifications | No |
-| `ORCHESTRATOR_MODEL` | Model for orchestrator: haiku, sonnet, opus (default: haiku) | No |
-| `LINEAR_AGENT_MODEL` | Model for Linear agent (default: haiku) | No |
-| `CODING_AGENT_MODEL` | Model for coding agent (default: sonnet) | No |
-| `GITHUB_AGENT_MODEL` | Model for GitHub agent (default: haiku) | No |
-| `SLACK_AGENT_MODEL` | Model for Slack agent (default: haiku) | No |
-
-</details>
-
-### 3. Verify Installation
+### Run
 
 ```bash
-claude --version  # Should be latest version
-pip show claude-agent-sdk  # Check SDK is installed
-```
-
-## Quick Start
-
-```bash
-# Basic usage - creates project in ./generations/my-app/
+# Start an autonomous engineering session
 uv run python autonomous_agent_demo.py --project-dir my-app
 
-# Specify custom output location
-uv run python autonomous_agent_demo.py --generations-base ~/projects/ai --project-dir my-app
+# Use Sonnet for orchestration (more capable, higher cost)
+uv run python autonomous_agent_demo.py --project-dir my-app --model sonnet
 
 # Limit iterations for testing
 uv run python autonomous_agent_demo.py --project-dir my-app --max-iterations 3
-
-# Use Opus for orchestrator (more capable but higher cost)
-uv run python autonomous_agent_demo.py --project-dir my-app --model opus
 ```
 
-## How It Works
+<br/>
 
-### Multi-Agent Orchestration
+## ⚙️ Configuration
 
-```
-┌───────────────────────────────────────────────────────────────┐
-│                   MULTI-AGENT ARCHITECTURE                    │
-├───────────────────────────────────────────────────────────────┤
-│                                                               │
-│                    ┌─────────────────┐                        │
-│                    │  ORCHESTRATOR   │  (Haiku by default)    │
-│                    │   Coordinates   │                        │
-│                    └────────┬────────┘                        │
-│                             │                                 │
-│           ┌─────────────────┼─────────────────┐               │
-│           │                 │                 │               │
-│      ┌────▼─────┐    ┌─────▼──────┐   ┌─────▼──────┐          │
-│      │  LINEAR  │    │   CODING   │   │   GITHUB   │          │
-│      │  (Haiku) │    │  (Sonnet)  │   │  (Haiku)   │          │
-│      └──────────┘    └────────────┘   └────────────┘          │
-│           │                │                 │                │
-│      ┌────▼─────┐          │                 │                │
-│      │  SLACK   │          │                 │                │
-│      │ (Haiku)  │          │                 │                │
-│      └──────────┘          │                 │                │
-│                            │                 │                │
-│     ┌──────────────────────▼─────────────────▼──────┐         │
-│     │         PROJECT OUTPUT (Isolated Git)         │         │
-│     │      GENERATIONS_BASE_PATH/project-name/      │         │
-│     └───────────────────────────────────────────────┘         │
-└───────────────────────────────────────────────────────────────┘
-```
+### Environment Variables
 
-### Agent Responsibilities
+#### Core (Required)
 
-1. **Orchestrator Agent:**
-   - Reads project state from `.linear_project.json`
-   - Queries Linear for current status
-   - Decides what to work on next
-   - Delegates to specialized agents via Task tool
-   - Coordinates handoff between agents
+| Variable | Description |
+|:---------|:------------|
+| `ARCADE_API_KEY` | Arcade API key ([get one](https://api.arcade.dev/dashboard/api-keys)) |
+| `ARCADE_GATEWAY_SLUG` | Your Arcade MCP gateway slug |
+| `ARCADE_USER_ID` | Your email for user tracking |
 
-2. **Linear Agent:**
-   - Creates and updates Linear projects and issues
-   - Manages issue status transitions (Todo → In Progress → Done)
-   - Adds comments with implementation details
-   - Maintains META issue for session tracking
+#### Integrations (Optional)
 
-3. **Coding Agent:**
-   - Implements features based on Linear issues
-   - Writes and tests application code
-   - Uses Playwright for browser-based UI testing
-   - Validates previously completed features
+| Variable | Description |
+|:---------|:------------|
+| `GITHUB_REPO` | GitHub repo in `owner/repo` format for auto-push |
+| `SLACK_CHANNEL` | Slack channel name (without `#`) for notifications |
+| `JIRA_SERVER` | Jira server URL (enables Jira tracker instead of Linear) |
+| `GEMINI_AUTH_TYPE` | `oauth` (default) or `api-key` |
+| `GEMINI_MODEL` | `gemini-2.5-flash` (default), `gemini-2.5-pro`, `gemini-2.0-flash` |
+| `GEMINI_ENABLED` | `true` (default) or `false` |
 
-4. **GitHub Agent (Optional):**
-   - Commits code changes to git
-   - Creates branches and pushes to remote
-   - Creates pull requests when features are ready
-   - Requires `GITHUB_REPO` env var
+#### Model Selection (Optional)
 
-5. **Slack Agent (Optional):**
-   - Posts progress updates to Slack channels
-   - Notifies on feature completion
-   - Requires existing Slack channel (cannot create channels)
+| Variable | Default | Options |
+|:---------|:--------|:--------|
+| `ORCHESTRATOR_MODEL` | `haiku` | `haiku`, `sonnet`, `opus` |
+| `LINEAR_AGENT_MODEL` | `haiku` | `haiku`, `sonnet`, `opus`, `inherit` |
+| `JIRA_AGENT_MODEL` | `haiku` | `haiku`, `sonnet`, `opus`, `inherit` |
+| `CODING_AGENT_MODEL` | `sonnet` | `haiku`, `sonnet`, `opus`, `inherit` |
+| `GITHUB_AGENT_MODEL` | `haiku` | `haiku`, `sonnet`, `opus`, `inherit` |
+| `SLACK_AGENT_MODEL` | `haiku` | `haiku`, `sonnet`, `opus`, `inherit` |
+| `PR_REVIEWER_AGENT_MODEL` | `sonnet` | `haiku`, `sonnet`, `opus`, `inherit` |
+| `GEMINI_AGENT_MODEL` | `haiku` | `haiku`, `sonnet`, `opus`, `inherit` |
 
-## Command Line Options
+#### Output Configuration
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--project-dir` | Project name or path (relative paths go in generations base) | `./autonomous_demo_project` |
-| `--generations-base` | Base directory for all generated projects | `./generations` or `GENERATIONS_BASE_PATH` |
-| `--max-iterations` | Max agent iterations | Unlimited |
-| `--model` | Orchestrator model: haiku, sonnet, or opus | `haiku` or `ORCHESTRATOR_MODEL` |
+| Variable | Description | Default |
+|:---------|:------------|:--------|
+| `GENERATIONS_BASE_PATH` | Base directory for generated projects | `./generations` |
 
-## Setup Guide
+<br/>
 
-### 1. Arcade Gateway Setup
-
-1. Get API key from https://api.arcade.dev/dashboard/api-keys
-2. Create MCP gateway at https://api.arcade.dev/dashboard/mcp-gateways
-3. Add Linear tools to your gateway (required)
-4. Optionally add GitHub and Slack tools
-5. Run `python authorize_arcade.py` to authorize
-
-### 2. Linear Workspace
-
-Ensure you have:
-- A Linear workspace with at least one team
-- Linear tools added to your Arcade gateway
-- The orchestrator will automatically detect your team and create projects
-
-### 3. GitHub Integration (Optional)
-
-To enable GitHub integration:
-1. Create a GitHub repository
-2. Add GitHub tools to your Arcade gateway
-3. Set `GITHUB_REPO=owner/repo-name` in `.env`
-4. The GitHub agent will commit and push code automatically
-
-### 4. Slack Integration (Optional)
-
-To enable Slack notifications:
-1. Create a Slack channel (agents cannot create channels)
-2. Add Slack tools to your Arcade gateway
-3. Set `SLACK_CHANNEL=channel-name` in `.env`
-
-## Customization
-
-### Changing the Application
-
-Edit `prompts/app_spec.txt` to specify a different application to build.
-
-### Adjusting Issue Count
-
-Edit `prompts/initializer_task.md` to change how many issues are created during initialization.
-
-### Modifying Allowed Commands
-
-Edit `security.py` to add or remove commands from `ALLOWED_COMMANDS`.
-
-## Project Structure
+## 📁 Project Structure
 
 ```
-linear-agent-harness/
-├── autonomous_agent_demo.py  # Main entry point
-├── agent.py                  # Agent session logic
-├── client.py                 # Claude SDK + MCP client configuration
-├── security.py               # Bash command allowlist and validation
-├── progress.py               # Progress tracking utilities
-├── prompts.py                # Prompt loading utilities
-├── arcade_config.py          # Arcade MCP gateway configuration
-├── authorize_arcade.py       # Arcade authorization flow
+Agent-Engineers/
+├── autonomous_agent_demo.py    # Main entry point
+├── agent.py                    # Agent session logic
+├── client.py                   # Claude SDK + MCP client configuration
+├── security.py                 # Bash command allowlist & validation
+├── progress.py                 # Progress tracking utilities
+├── prompts.py                  # Prompt loading utilities
+├── arcade_config.py            # Arcade MCP gateway configuration
+├── authorize_arcade.py         # Arcade authorization flow
+├── gemini_bridge.py            # Gemini CLI Python wrapper
+├── gemini_config.py            # Gemini configuration & tools
+├── setup_gemini.sh             # Gemini CLI first-run setup
 ├── agents/
-│   ├── definitions.py        # Agent definitions with model config
-│   └── orchestrator.py       # Orchestrator session runner
+│   ├── definitions.py          # All agent definitions & model config
+│   └── orchestrator.py         # Orchestrator session runner
 ├── prompts/
-│   ├── app_spec.txt              # Application specification
-│   ├── orchestrator_prompt.md    # Orchestrator system prompt
-│   ├── initializer_task.md       # Task message for first session
-│   ├── continuation_task.md      # Task message for continuation sessions
-│   ├── linear_agent_prompt.md    # Linear subagent prompt
-│   ├── coding_agent_prompt.md    # Coding subagent prompt
-│   ├── github_agent_prompt.md    # GitHub subagent prompt
-│   └── slack_agent_prompt.md     # Slack subagent prompt
-└── requirements.txt          # Python dependencies
+│   ├── app_spec.txt            # Application specification
+│   ├── orchestrator_prompt.md  # Orchestrator system prompt
+│   ├── initializer_task.md     # First-run task message
+│   ├── continuation_task.md    # Continuation session message
+│   ├── linear_agent_prompt.md  # Linear sub-agent prompt
+│   ├── jira_agent_prompt.md    # Jira sub-agent prompt
+│   ├── coding_agent_prompt.md  # Coding sub-agent prompt
+│   ├── github_agent_prompt.md  # GitHub sub-agent prompt
+│   ├── slack_agent_prompt.md   # Slack sub-agent prompt
+│   ├── pr_reviewer_agent_prompt.md  # PR reviewer prompt
+│   └── gemini_agent_prompt.md  # Gemini sub-agent prompt
+├── scripts/
+│   └── gemini                  # Gemini CLI wrapper script
+└── requirements.txt            # Python dependencies
 ```
 
-## Generated Project Structure
+<br/>
 
-Projects are created in isolated directories with their own git repos:
+## 🛡️ Security Model
 
-```
-generations/my-app/           # Or GENERATIONS_BASE_PATH/my-app/
-├── .linear_project.json      # Linear project state (marker file)
-├── app_spec.txt              # Copied specification
-├── init.sh                   # Environment setup script
-├── .claude_settings.json     # Security settings
-├── .git/                     # Separate git repository
-└── [application files]       # Generated application code
-```
+Defense-in-depth — multiple layers protect against unintended operations:
 
-## MCP Servers Used
+| Layer | What It Does |
+|:------|:-------------|
+| **OS Sandbox** | Bash commands run in an isolated bwrap/Docker-style sandbox |
+| **Filesystem Restrictions** | File operations restricted to the project directory only |
+| **Bash Allowlist** | Only explicitly permitted commands can execute (see `security.py`) |
+| **Command Validation** | Sensitive commands (`rm`, `pkill`, `chmod`) get extra validation |
+| **MCP Permissions** | Tools explicitly allowlisted in security settings |
+
+<br/>
+
+## 🔌 MCP Servers
 
 | Server | Transport | Purpose |
-|--------|-----------|---------|
-| **Arcade Gateway** | HTTP | Unified access to Linear, GitHub, and Slack via Arcade MCP |
-| **Playwright** | stdio | Browser automation for UI testing |
+|:-------|:----------|:--------|
+| **Arcade Gateway** | HTTP | Unified OAuth access to Linear, Jira, GitHub, Slack (93+ tools) |
+| **Playwright** | stdio | Browser automation for UI testing & screenshot evidence |
+| **gemini-cli** | subprocess | Google Gemini models for research & web search grounding |
 
-The Arcade Gateway provides access to:
-- **Linear**: Project management, issues, status, comments (39 tools)
-- **GitHub**: Repository operations, commits, PRs, branches (46 tools, optional)
-- **Slack**: Messaging and notifications (8 tools, optional)
+<br/>
 
-## Security Model
+## 📖 Customization
 
-This demo uses defense-in-depth security (see `security.py` and `client.py`):
+**Change what gets built:** Edit `prompts/app_spec.txt` with your application specification.
 
-1. **OS-level Sandbox:** Bash commands run in an isolated environment
-2. **Filesystem Restrictions:** File operations restricted to project directory
-3. **Bash Allowlist:** Only specific commands permitted (npm, node, git, curl, rm with validation, etc.)
-4. **MCP Permissions:** Tools explicitly allowed in security settings
-5. **Dangerous Command Validation:** Commands like `rm` are validated to prevent system directory deletion
+**Adjust issue count:** Edit `prompts/initializer_task.md` to control how many issues are created during initialization.
 
-## Troubleshooting
+**Add allowed commands:** Edit `security.py` to add commands to `ALLOWED_COMMANDS`.
 
-**"ARCADE_API_KEY not set"**
-Get your API key from https://api.arcade.dev/dashboard/api-keys and set it in `.env`
+**Switch trackers:** Set `JIRA_SERVER` in `.env` for Jira, or leave it unset for Linear. The orchestrator auto-detects based on `.jira_project.json` or `.linear_project.json`.
 
-**"ARCADE_GATEWAY_SLUG not set"**
-Create a gateway at https://api.arcade.dev/dashboard/mcp-gateways and add Linear tools
+<br/>
 
-**"Authorization required"**
-Run `python authorize_arcade.py` to complete the OAuth flow
+## 🐛 Troubleshooting
 
-**"Command blocked by security hook"**
-The agent tried to run a disallowed command. Add it to `ALLOWED_COMMANDS` in `security.py` if needed.
+| Error | Fix |
+|:------|:----|
+| `ARCADE_API_KEY not set` | Get your key from [Arcade Dashboard](https://api.arcade.dev/dashboard/api-keys) |
+| `ARCADE_GATEWAY_SLUG not set` | Create a gateway at [Arcade MCP Gateways](https://api.arcade.dev/dashboard/mcp-gateways) |
+| `Authorization required` | Run `python authorize_arcade.py` |
+| `Command blocked by security hook` | Add command to `ALLOWED_COMMANDS` in `security.py` |
+| `MCP server connection failed` | Verify Arcade API key and gateway configuration |
+| `GitHub agent requires GITHUB_REPO` | Set `GITHUB_REPO=owner/repo` in `.env` |
+| `Slack channel not found` | Create the channel manually first — agents can't create channels |
+| `gemini-cli not found` | Run `./setup_gemini.sh` or `npm install -g @google/gemini-cli` |
 
-**"MCP server connection failed"**
-Verify your Arcade API key is valid and your gateway has the required tools configured.
+<br/>
 
-**"GitHub agent requires GITHUB_REPO"**
-If you want GitHub integration, set `GITHUB_REPO=owner/repo-name` in `.env`
+## 📊 Monitoring Progress
 
-**"Slack channel not found"**
-Agents cannot create Slack channels. Create the channel manually and set `SLACK_CHANNEL` to the channel name (without #).
+| Where | What You See |
+|:------|:-------------|
+| **Jira/Linear** | Real-time issue transitions, implementation comments, session summaries on META issue |
+| **GitHub** | Feature branches, commits, pull requests with linked issues |
+| **Slack** | Live notifications for every task lifecycle event (start → PR → review → done) |
+| **Terminal** | Agent coordination logs, tool calls, iteration progress |
 
-## Viewing Progress
+<br/>
 
-**Linear Workspace:**
-- View the project created by the orchestrator
-- Watch real-time status changes (Todo → In Progress → Done)
-- Read implementation comments on each issue
-- Check session summaries on the META issue
+---
 
-**GitHub (if configured):**
-- View commits pushed to your repository
-- Review pull requests created by the GitHub agent
+**Built with the [Claude Agent SDK](https://github.com/anthropics/claude-code/tree/main/agent-sdk-python) · Powered by [Arcade MCP](https://arcade.dev)**
 
-**Slack (if configured):**
-- Receive progress updates in your configured channel
-- Get notifications when features are completed
-
-## License
-
-MIT License - see [LICENSE](LICENSE) for details.
+*From feature request to merged PR — autonomously.*
