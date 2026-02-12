@@ -26,7 +26,15 @@ def load_prompt(name: str) -> str:
         FileNotFoundError: If prompt file doesn't exist
         IOError: If prompt file cannot be read
     """
+    # Reject names with path traversal sequences or absolute paths
+    if ".." in name or name.startswith("/") or name.startswith("\\"):
+        raise ValueError(f"Invalid prompt name: {name!r} (path traversal not allowed)")
+
     prompt_path: Path = PROMPTS_DIR / f"{name}.md"
+
+    # Verify the resolved path is still within PROMPTS_DIR
+    if not prompt_path.resolve().is_relative_to(PROMPTS_DIR.resolve()):
+        raise ValueError(f"Invalid prompt name: {name!r} (resolves outside prompts directory)")
 
     if not prompt_path.exists():
         raise FileNotFoundError(
