@@ -144,12 +144,38 @@ The pr_reviewer agent will return one of:
    "Move issue [key] back to To Do. Add comment listing the blocking issues from the PR review."
 2. Delegate to `slack` agent:
    "Send to #ai-cli-macz: :warning: PR changes requested: [issue title] ([issue key]) — [summary of issues]"
-3. The issue will be picked up again in the next iteration with the review feedback as additional context.
+3. Do NOT wait for the next session — pick up this issue (or the next one) immediately in Step 8b below.
 4. When re-implementing, pass the blocking issues to the coding agent as additional context.
 
-### Step 9: Session Handoff (if ending session)
+### Step 8b: Pick Up Next Ticket (CONTINUOUS LOOP)
 
-If ending the session:
+**After completing Step 8 (whether APPROVED or CHANGES_REQUESTED), do NOT end the session.**
+**Instead, loop back and pick up the next ticket immediately:**
+
+1. Delegate to the tracker agent (`jira` or `linear`):
+   "List all issues and count by status (Done/In Progress/Todo) - EXCLUDE META issue from counts.
+   Compare done count to total_issues from the project state file.
+   Return: all_complete flag, status counts, and FULL DETAILS of the highest-priority Todo issue if not complete."
+
+2. **If all_complete is true:** Go to Step 9 (Project Complete).
+
+3. **If there are remaining Todo issues:** Go back to **Step 3** (Verification Test) with the new issue and continue the full workflow (Steps 3 → 4a → 4b → 4c → 5 → 6 → 7 → 8 → 8b).
+
+**Keep looping through tickets until either:**
+- All issues are Done (→ trigger PROJECT_COMPLETE)
+- Context is critically low and you cannot complete another full ticket cycle
+
+**This is the core work loop. Each session should complete as many tickets as possible, not just one.**
+
+### Step 9: Session End
+
+**9a: If all issues are complete (PROJECT_COMPLETE):**
+1. Delegate to the tracker agent: "Add 'PROJECT COMPLETE' comment to META issue"
+2. Delegate to github agent: Create final PR (if GITHUB_REPO configured)
+3. Delegate to slack agent: ":tada: Project complete! All X features implemented and tested."
+4. Output: `PROJECT_COMPLETE: All features implemented and verified.`
+
+**9b: If ending session early (context running low):**
 1. Delegate to the tracker agent: "Add session summary comment to META issue with: what was completed, current progress counts, notes for next session"
 2. Delegate to `slack` agent: ":memo: Session complete — X issues done, Y remaining"
 
