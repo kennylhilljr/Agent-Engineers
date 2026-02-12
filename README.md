@@ -18,8 +18,8 @@ The multi-agent architecture uses specialized agents (Linear/Jira, Coding, GitHu
 ## Key Features
 
 - **Long-Running Autonomy**: Harness architecture enables extended coding sessions across multiple iterations
-- **Multi-Agent Orchestration**: 8 specialized agents handle distinct concerns coordinated by an orchestrator
-- **Multi-AI Providers**: Claude (primary), ChatGPT, and Gemini agents for cross-validation and specialized tasks
+- **Multi-Agent Orchestration**: 11 specialized agents handle distinct concerns coordinated by an orchestrator
+- **Multi-AI Providers**: Claude (primary), ChatGPT, Gemini, Groq, KIMI, and Windsurf agents for cross-validation, parallel coding, and specialized tasks
 - **Linear + Jira Integration**: Automatic issue tracking with real-time status updates and session handoff (choose your tracker)
 - **GitHub Integration**: Automatic commits, branches, PR creation, and automated PR review with merge
 - **Slack Notifications**: Mandatory progress updates at every task lifecycle event
@@ -51,9 +51,12 @@ flowchart TB
         SLACK["Slack Agent<br/>(Haiku)<br/>Team notifications"]
     end
 
-    subgraph AIProviders["AI Provider Agents (Cross-Validation)"]
+    subgraph AIProviders["AI Provider Agents (Cross-Validation & Parallel Coding)"]
         CHATGPT["ChatGPT Agent<br/>(Haiku → OpenAI Bridge)<br/>GPT-4o, o1, o3-mini, o4-mini"]
         GEMINI["Gemini Agent<br/>(Haiku → Gemini Bridge)<br/>2.5 Flash, 2.5 Pro, 2.0 Flash"]
+        GROQ["Groq Agent<br/>(Haiku → Groq Bridge)<br/>Llama 70B, Mixtral, Gemma"]
+        KIMI["KIMI Agent<br/>(Haiku → KIMI Bridge)<br/>Moonshot v1, Kimi k2"]
+        WINDSURF["Windsurf Agent<br/>(Haiku → Windsurf Bridge)<br/>Cascade (CLI/Docker)"]
     end
 
     subgraph ExternalServices["External Services (Arcade MCP Gateway)"]
@@ -71,7 +74,7 @@ flowchart TB
 
     SPEC --> ORCH
     ORCH --> LINEAR & JIRA & CODING & GITHUB & PR_REVIEW & SLACK
-    ORCH --> CHATGPT & GEMINI
+    ORCH --> CHATGPT & GEMINI & GROQ & KIMI & WINDSURF
     LINEAR --> LINEAR_API
     GITHUB --> GITHUB_API
     SLACK --> SLACK_API
@@ -111,7 +114,7 @@ Session 1 (Initialization)              Sessions 2-N (Implementation Loop)
 
 ## Agents
 
-The system uses 8 specialized agents plus an orchestrator. Each agent has a focused responsibility, its own system prompt, and a configurable Claude model. Agents do not share memory — the orchestrator passes context between them.
+The system uses 11 specialized agents plus an orchestrator. Each agent has a focused responsibility, its own system prompt, and a configurable Claude model. Agents do not share memory — the orchestrator passes context between them.
 
 ### Orchestrator
 
@@ -134,7 +137,7 @@ The central coordinator that reads project state, decides what to work on, and d
 | **PR Reviewer** | Sonnet | Automated code review against a 5-point checklist; approves and merges or requests changes | GitHub MCP tools + file ops + Bash | `pr_reviewer_agent_prompt.md` |
 | **Slack** | Haiku | Mandatory notifications at every task lifecycle event (start, PR ready, complete, blocked) | 8 Slack MCP tools + file ops | `slack_agent_prompt.md` |
 
-### AI Provider Agents (Cross-Validation)
+### AI Provider Agents (Cross-Validation & Parallel Coding)
 
 These agents bridge to external AI providers, enabling the orchestrator to get second opinions, leverage provider-specific strengths, or fulfill explicit user requests for a particular model.
 
@@ -142,12 +145,15 @@ These agents bridge to external AI providers, enabling the orchestrator to get s
 |-------|---------------|---------|---------------|--------|
 | **ChatGPT** | Haiku (host) | Cross-validation, OpenAI-specific tasks, second opinions | `openai_bridge.py` | `chatgpt_agent_prompt.md` |
 | **Gemini** | Haiku (host) | Cross-validation, research, Google ecosystem, large-context tasks | `gemini_bridge.py` | `gemini_agent_prompt.md` |
+| **Groq** | Haiku (host) | Ultra-fast inference on open-source models (Llama, Mixtral, Gemma) | `groq_bridge.py` | `groq_agent_prompt.md` |
+| **KIMI** | Haiku (host) | Ultra-long context (2M tokens), bilingual Chinese/English analysis | `kimi_bridge.py` | `kimi_agent_prompt.md` |
+| **Windsurf** | Haiku (host) | Parallel coding via Codeium Windsurf IDE headless/Docker mode | `windsurf_bridge.py` | `windsurf_agent_prompt.md` |
 
 ---
 
 ## AI Providers — Deep Dive
 
-Your Claude Engineer orchestrates across three AI providers today, with more planned. Each provider has distinct models, authentication methods, strengths, and trade-offs.
+Your Claude Engineer orchestrates across six AI providers. Each provider has distinct models, authentication methods, strengths, and trade-offs.
 
 ### Claude (Anthropic) — Primary Provider
 
@@ -326,21 +332,17 @@ python scripts/gemini_cli.py --status                  # Check auth status
 
 ### Provider Comparison
 
-| Capability | Claude (Anthropic) | ChatGPT (OpenAI) | Gemini (Google) |
-|------------|-------------------|-------------------|-----------------|
-| **Role in system** | Primary (all agents) | Cross-validation | Cross-validation |
-| **Tool use** | Native (SDK) | Text bridge only | Text bridge only |
-| **Max context** | 200K tokens | 128K tokens (GPT-4o) | 1M tokens |
-| **Reasoning models** | Opus (extended thinking) | o1, o3-mini, o4-mini | 2.5 Pro |
-| **Fast models** | Haiku | GPT-4o, o4-mini | 2.5 Flash, 2.0 Flash |
-| **Free tier** | No | Session token (web sub) | CLI OAuth + API key |
-| **Auth methods** | 1 (SDK token) | 2 (Codex OAuth, Session Token) | 3 (CLI OAuth, API Key, Vertex AI) |
-| **Streaming** | Yes | Yes (Codex OAuth only) | Yes (API Key/Vertex only) |
-| **Code generation** | Excellent | Excellent | Good |
-| **Instruction following** | Excellent | Good | Good |
-| **Google ecosystem** | Good | Good | Excellent |
-| **Math/logic** | Good | Excellent (o1) | Good |
-| **Research grounding** | No | No | Yes (search) |
+| Capability | Claude | ChatGPT | Gemini | Groq | KIMI | Windsurf |
+|------------|--------|---------|--------|------|------|----------|
+| **Role** | Primary | Cross-validation | Cross-validation | Cross-validation | Cross-validation | Parallel coding |
+| **Tool use** | Native (SDK) | Text bridge | Text bridge | Text bridge | Text bridge | File-based I/O |
+| **Max context** | 200K | 128K (GPT-4o) | 1M | 128K (Llama) | 2M | IDE-managed |
+| **Speed** | Fast | Fast | Fast | Ultra-fast (LPU) | Medium | Varies |
+| **Free tier** | No | Session token | CLI OAuth + API key | Yes (generous) | No | Free tier |
+| **Auth methods** | 1 | 2 | 3 | 1 (API key) | 1 (API key) | 1 (CLI/Docker) |
+| **Streaming** | Yes | Yes (Codex OAuth) | Yes (API/Vertex) | Yes | Yes | N/A |
+| **Code generation** | Excellent | Excellent | Good | Good (Llama 70B) | Good | IDE-level |
+| **Unique strength** | Agentic workflow | Reasoning (o1) | Search grounding | 10-20x speed | 2M context | IDE autonomy |
 
 ### When to Use Each Provider
 
@@ -351,58 +353,137 @@ python scripts/gemini_cli.py --status                  # Check auth status
 | Complex architecture | **Claude Opus** | Deepest reasoning for high-stakes decisions |
 | Code review second opinion | **ChatGPT GPT-4o** | Different perspective catches different bugs |
 | Mathematical reasoning | **ChatGPT o1** | Best-in-class formal reasoning |
-| Large codebase analysis | **Gemini 2.5 Pro** | 1M token context fits entire projects |
+| Large codebase analysis | **Gemini 2.5 Pro** or **KIMI** | 1M-2M token context fits entire projects |
 | Research-grounded tasks | **Gemini 2.5 Flash** | Search grounding for up-to-date information |
 | Google/Android/GCP tasks | **Gemini** | Native ecosystem knowledge |
-| Budget-conscious cross-validation | **Gemini CLI OAuth** | Completely free |
+| Ultra-fast cross-validation | **Groq Llama 3.3 70B** | 10-20x faster inference on LPU hardware |
+| Rapid batch code review | **Groq Llama 3.1 8B** | Instant responses, generous free tier |
+| Massive codebase in one pass | **KIMI moonshot-v1-128k** | Up to 2M token context window |
+| Chinese/English bilingual | **KIMI** | Native bilingual capabilities |
+| Parallel implementation | **Windsurf** | Independent IDE-level coding for comparison |
+| Cross-IDE validation | **Windsurf** | Different agent (Cascade) may catch different issues |
+| Budget-conscious validation | **Gemini CLI OAuth** or **Groq** | Both have generous free tiers |
 
 ---
 
-### Future Providers (Not Yet Integrated)
+### Groq — Ultra-Fast Inference Provider
 
-The architecture supports adding new AI providers by creating a bridge module (similar to `openai_bridge.py` or `gemini_bridge.py`), a system prompt, and an agent definition. The following providers are candidates for future integration:
+[Groq](https://groq.com) runs open-source models on custom LPU hardware for 10-20x faster inference than GPU-based providers.
 
-#### Groq
+#### Available Models
 
-[Groq](https://groq.com) specializes in ultra-fast inference using custom LPU (Language Processing Unit) hardware.
+| Model | Best For | Speed | Context |
+|-------|----------|-------|---------|
+| **Llama 3.3 70B** (default) | General tasks, code gen, reasoning | Fast | 128K tokens |
+| **Llama 3.1 8B** | Quick tasks, classification | Ultra-fast | 128K tokens |
+| **Mixtral 8x7B** | Code generation, multilingual | Fast | 32K tokens |
+| **Gemma 2 9B** | Instruction following, structured output | Fast | 8K tokens |
 
-| Property | Details |
-|----------|---------|
-| **Key Models** | Llama 3.3 70B, Llama 3.1 405B, Mixtral 8x7B, Gemma 2 9B |
-| **Primary Strength** | Inference speed — often 10-20x faster than GPU-based providers |
-| **Context Window** | Up to 128K tokens (model-dependent) |
-| **Potential Use Cases** | Rapid iteration loops, bulk code review, fast cross-validation |
-| **Auth** | API key from console.groq.com |
-| **Cost** | Free tier available; pay-as-you-go for higher volume |
-| **Integration Status** | Not yet integrated — would require a `groq_bridge.py` module |
+#### Strengths
 
-#### KIMI (Moonshot AI)
+- 10-20x faster inference than GPU-based providers
+- Open-source models (no vendor lock-in)
+- Generous free tier for development
+- Full streaming support
+- OpenAI-compatible API (uses `openai` Python SDK)
 
-[KIMI](https://kimi.moonshot.cn) by Moonshot AI is known for extremely long context windows and strong multilingual capabilities.
+#### Considerations
 
-| Property | Details |
-|----------|---------|
-| **Key Models** | Kimi k2 (latest), Moonshot v1 |
-| **Primary Strength** | Ultra-long context (up to 2M tokens), strong Chinese/English bilingual |
-| **Context Window** | Up to 2M tokens |
-| **Potential Use Cases** | Analyzing very large codebases in one pass, multilingual documentation, cross-lingual code review |
-| **Auth** | API key from platform.moonshot.cn |
-| **Cost** | Pay-as-you-go |
-| **Integration Status** | Not yet integrated — would require a `kimi_bridge.py` module |
+- Open-source models may be less capable than proprietary models on complex tasks
+- No proprietary models available (only open-source)
+- Rate limits on free tier
 
-#### Windsurf (Codeium)
+#### Setup
 
-[Windsurf](https://codeium.com/windsurf) by Codeium is an AI-powered IDE with its own agentic coding capabilities.
+```bash
+# Get API key from https://console.groq.com/keys
+# .env:
+GROQ_API_KEY=gsk_xxxxxxxxxx
+GROQ_MODEL=llama-3.3-70b-versatile  # optional, this is the default
+```
 
-| Property | Details |
-|----------|---------|
-| **Key Models** | Cascade (Windsurf's proprietary agentic model), GPT-4o, Claude Sonnet (via Windsurf) |
-| **Primary Strength** | Full IDE agentic flows — can browse, edit, run terminal, and iterate autonomously |
-| **Context Window** | Large (IDE-managed, varies by backing model) |
-| **Potential Use Cases** | Parallel coding agent alongside Claude, cross-IDE validation, alternative implementation approach |
-| **Auth** | Windsurf account + CLI or Docker headless mode |
-| **Cost** | Free tier available; Pro subscription for advanced features |
-| **Integration Status** | Not yet integrated — would require a CLI/Docker worker module |
+---
+
+### KIMI (Moonshot AI) — Ultra-Long Context Provider
+
+[KIMI](https://kimi.moonshot.cn) by Moonshot AI offers up to 2M token context windows and strong Chinese/English bilingual capabilities.
+
+#### Available Models
+
+| Model | Best For | Context |
+|-------|----------|---------|
+| **moonshot-v1-auto** (default) | Auto-selects optimal context size | Auto |
+| **moonshot-v1-8k** | Short tasks, quick responses | 8K tokens |
+| **moonshot-v1-32k** | Medium documents, typical code tasks | 32K tokens |
+| **moonshot-v1-128k** | Large files, extensive analysis | 128K tokens |
+| **kimi-k2** | Latest model, complex reasoning | Large |
+
+#### Strengths
+
+- Massive context windows (up to 2M tokens) — analyze entire codebases at once
+- Strong Chinese/English bilingual capabilities
+- Good code understanding and generation
+- OpenAI-compatible API (uses `openai` Python SDK)
+- Auto context mode optimizes cost
+
+#### Considerations
+
+- API key required (no free tier)
+- Higher latency than Groq on simple tasks
+- Primarily optimized for Chinese/English
+
+#### Setup
+
+```bash
+# Get API key from https://platform.moonshot.cn/console/api-keys
+# .env:
+KIMI_API_KEY=sk-xxxxxxxxxx  # or MOONSHOT_API_KEY
+KIMI_MODEL=moonshot-v1-auto  # optional, this is the default
+```
+
+---
+
+### Windsurf (Codeium) — Parallel Coding Agent
+
+[Windsurf](https://codeium.com/windsurf) is an AI-powered IDE with its own agentic model (Cascade) that can code autonomously.
+
+#### Execution Modes
+
+| Mode | How It Works | Requirements |
+|------|--------------|--------------|
+| **CLI** (default) | Runs Windsurf locally in headless mode | Windsurf CLI installed |
+| **Docker** | Runs Windsurf in an isolated container | Docker running |
+
+#### Strengths
+
+- Full IDE-level coding: file creation, editing, terminal execution
+- Cascade model provides independent coding perspective
+- Docker mode for complete isolation
+- File-based I/O for reliable task communication
+- Git integration detects changed files automatically
+
+#### Considerations
+
+- Slower than API-based bridges (IDE startup overhead)
+- Requires Windsurf installation or Docker
+- Output quality depends on task clarity (instructions via file)
+- Not suited for quick cross-validation (use Groq/ChatGPT for that)
+
+#### Setup
+
+```bash
+# Path 1: CLI mode (default)
+# Install Windsurf from https://codeium.com/windsurf
+# .env:
+WINDSURF_MODE=cli
+WINDSURF_TIMEOUT=300  # max seconds per task
+
+# Path 2: Docker mode
+# .env:
+WINDSURF_MODE=docker
+WINDSURF_DOCKER_IMAGE=windsurfinabox:latest
+WINDSURF_TIMEOUT=300
+```
 
 ---
 
@@ -484,6 +565,16 @@ python authorize_arcade.py
 | `GOOGLE_CLOUD_PROJECT` | GCP project ID | If vertex-ai auth |
 | `GOOGLE_CLOUD_LOCATION` | GCP region (default: us-central1) | If vertex-ai auth |
 | `GEMINI_MODEL` | Default Gemini model (default: gemini-2.5-flash) | No |
+| **Groq** | | |
+| `GROQ_API_KEY` | Groq API key from https://console.groq.com/keys | If using Groq |
+| `GROQ_MODEL` | Default Groq model (default: llama-3.3-70b-versatile) | No |
+| **KIMI** | | |
+| `KIMI_API_KEY` / `MOONSHOT_API_KEY` | Moonshot API key from https://platform.moonshot.cn | If using KIMI |
+| `KIMI_MODEL` | Default KIMI model (default: moonshot-v1-auto) | No |
+| **Windsurf** | | |
+| `WINDSURF_MODE` | `cli` (default) or `docker` | No |
+| `WINDSURF_DOCKER_IMAGE` | Docker image for Windsurf (default: windsurfinabox:latest) | If docker mode |
+| `WINDSURF_TIMEOUT` | Max seconds per Windsurf task (default: 300) | No |
 
 </details>
 
@@ -596,6 +687,9 @@ your-claude-engineer/
 ├── model_router.py              # Multi-AI provider routing (Claude ↔ ChatGPT)
 ├── openai_bridge.py             # ChatGPT integration (dual auth)
 ├── gemini_bridge.py             # Gemini integration (triple auth)
+├── groq_bridge.py               # Groq integration (OpenAI-compatible API)
+├── kimi_bridge.py               # KIMI/Moonshot integration (OpenAI-compatible API)
+├── windsurf_bridge.py           # Windsurf integration (CLI/Docker)
 ├── agents/
 │   ├── definitions.py           # Agent definitions with model config
 │   └── orchestrator.py          # Orchestrator session runner
@@ -611,7 +705,10 @@ your-claude-engineer/
 │   ├── pr_reviewer_agent_prompt.md  # PR review subagent prompt
 │   ├── slack_agent_prompt.md        # Slack subagent prompt
 │   ├── chatgpt_agent_prompt.md      # ChatGPT bridge subagent prompt
-│   └── gemini_agent_prompt.md       # Gemini bridge subagent prompt
+│   ├── gemini_agent_prompt.md       # Gemini bridge subagent prompt
+│   ├── groq_agent_prompt.md         # Groq bridge subagent prompt
+│   ├── kimi_agent_prompt.md         # KIMI bridge subagent prompt
+│   └── windsurf_agent_prompt.md     # Windsurf bridge subagent prompt
 ├── scripts/
 │   ├── chatgpt_cli.py           # Standalone ChatGPT CLI
 │   ├── gemini_cli.py            # Standalone Gemini CLI

@@ -1,6 +1,6 @@
 """
 Agent Definitions - All orchestrator sub-agents including Jira, PR Reviewer,
-ChatGPT, and Gemini for multi-AI orchestration.
+ChatGPT, Gemini, Groq, KIMI, and Windsurf for multi-AI orchestration.
 """
 
 import os
@@ -21,7 +21,8 @@ _VALID_MODELS: Final[tuple[str, ...]] = ("haiku", "sonnet", "opus", "inherit")
 DEFAULT_MODELS: Final[dict[str, ModelOption]] = {
     "linear": "haiku", "jira": "haiku", "coding": "sonnet",
     "github": "haiku", "slack": "haiku", "pr_reviewer": "sonnet",
-    "chatgpt": "haiku", "gemini": "haiku",
+    "chatgpt": "haiku", "gemini": "haiku", "groq": "haiku",
+    "kimi": "haiku", "windsurf": "haiku",
 }
 
 
@@ -126,6 +127,30 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
             prompt=_load_prompt("gemini_agent_prompt"),
             tools=_get_bridge_agent_tools(),
             model=_get_model("gemini")),
+        "groq": AgentDefinition(
+            description=(
+                "Provides ultra-fast inference on open-source models (Llama 3.3 70B, "
+                "Mixtral 8x7B, Gemma 2 9B) via Groq LPU hardware. Use for rapid "
+                "cross-validation, bulk code review, or speed-critical tasks."),
+            prompt=_load_prompt("groq_agent_prompt"),
+            tools=_get_bridge_agent_tools(),
+            model=_get_model("groq")),
+        "kimi": AgentDefinition(
+            description=(
+                "Provides access to Moonshot AI KIMI models with ultra-long context "
+                "(up to 2M tokens). Use for analyzing entire codebases in one pass, "
+                "bilingual Chinese/English tasks, or large-scale code analysis."),
+            prompt=_load_prompt("kimi_agent_prompt"),
+            tools=_get_bridge_agent_tools(),
+            model=_get_model("kimi")),
+        "windsurf": AgentDefinition(
+            description=(
+                "Runs Codeium Windsurf IDE in headless mode for parallel coding tasks. "
+                "Use for cross-IDE validation, alternative implementations, or when "
+                "Windsurf's Cascade model adds unique value to a coding task."),
+            prompt=_load_prompt("windsurf_agent_prompt"),
+            tools=_get_bridge_agent_tools(),
+            model=_get_model("windsurf")),
     }
 
 
@@ -138,3 +163,6 @@ CODING_AGENT = AGENT_DEFINITIONS["coding"]
 PR_REVIEWER_AGENT = AGENT_DEFINITIONS["pr_reviewer"]
 CHATGPT_AGENT = AGENT_DEFINITIONS["chatgpt"]
 GEMINI_AGENT = AGENT_DEFINITIONS["gemini"]
+GROQ_AGENT = AGENT_DEFINITIONS["groq"]
+KIMI_AGENT = AGENT_DEFINITIONS["kimi"]
+WINDSURF_AGENT = AGENT_DEFINITIONS["windsurf"]
