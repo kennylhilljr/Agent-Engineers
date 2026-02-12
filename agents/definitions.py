@@ -19,10 +19,17 @@ ModelOption = Literal["haiku", "sonnet", "opus", "inherit"]
 _VALID_MODELS: Final[tuple[str, ...]] = ("haiku", "sonnet", "opus", "inherit")
 
 DEFAULT_MODELS: Final[dict[str, ModelOption]] = {
-    "linear": "haiku", "jira": "haiku", "coding": "sonnet",
-    "github": "haiku", "slack": "haiku", "pr_reviewer": "sonnet",
-    "chatgpt": "haiku", "gemini": "haiku", "groq": "haiku",
-    "kimi": "haiku", "windsurf": "haiku",
+    "linear": "haiku",
+    "jira": "haiku",
+    "coding": "sonnet",
+    "github": "haiku",
+    "slack": "haiku",
+    "pr_reviewer": "sonnet",
+    "chatgpt": "haiku",
+    "gemini": "haiku",
+    "groq": "haiku",
+    "kimi": "haiku",
+    "windsurf": "haiku",
 }
 
 
@@ -61,7 +68,7 @@ def get_orchestrator_model() -> OrchestratorModelOption:
 
 
 def _get_bridge_agent_tools() -> list[str]:
-    """Tools for bridge agents (ChatGPT, Gemini) — file ops + bash."""
+    """Tools for bridge agents (ChatGPT, Gemini, Groq, KIMI, Windsurf) — file ops + bash."""
     return FILE_TOOLS + ["Bash"]
 
 

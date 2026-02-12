@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Trigger script for your-claude-engineer from LibreChat.
+Trigger script for Agent-Engineers from LibreChat.
 Usage: python trigger_engineer.py --project-name "my-project" --task "Build a todo app"
 """
 
@@ -10,7 +10,7 @@ import os
 import sys
 
 def main():
-    parser = argparse.ArgumentParser(description='Trigger your-claude-engineer')
+    parser = argparse.ArgumentParser(description='Trigger Agent-Engineers')
     parser.add_argument('--project-name', required=True, help='Name for the project')
     parser.add_argument('--task', required=True, help='Task description for the engineer')
     parser.add_argument('--max-iterations', type=int, default=10, help='Max iterations')
@@ -26,7 +26,7 @@ def main():
     with open(app_spec_path, 'w') as f:
         f.write(args.task)
 
-    print(f"🚀 Starting your-claude-engineer")
+    print(f"🚀 Starting Agent-Engineers")
     print(f"   Project: {args.project_name}")
     print(f"   Task: {args.task[:100]}...")
     print(f"   Model: {args.model}")
