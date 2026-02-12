@@ -26,7 +26,7 @@ class RoutingDecision:
 
 
 class ModelRouter:
-    def __init__(self):
+    def __init__(self) -> None:
         self._chatgpt_bridge: Optional[OpenAIBridge] = None
         self._chatgpt_available: Optional[bool] = None
 
@@ -73,10 +73,10 @@ class ModelRouter:
             self._chatgpt_bridge = OpenAIBridge.from_env()
         return self._chatgpt_bridge
 
-    def get_provider_status(self) -> dict[str, dict]:
-        status: dict[str, dict] = {
+    def get_provider_status(self) -> dict[str, dict[str, object]]:
+        status: dict[str, dict[str, object]] = {
             "claude": {"available": True, "models": ["haiku", "sonnet", "opus"]}}
-        chatgpt_status: dict = {"available": False, "models": [], "auth_type": None}
+        chatgpt_status: dict[str, object] = {"available": False, "models": [], "auth_type": None}
         try:
             bridge = self.get_chatgpt_bridge()
             info = bridge.get_auth_info()
