@@ -59,9 +59,17 @@ Delegate to `slack` agent:
 "Send to #ai-cli-macz: :construction: Starting: [issue title] ([issue key])"
 This MUST happen BEFORE the coding agent begins work.
 
-### Step 4b: Jira — Transition to In Progress
+### Step 4b: Transition to In Progress (MANDATORY — do NOT skip)
 
-Delegate to tracker agent to transition the issue to "In Progress".
+Delegate to the tracker agent (`jira` or `linear`):
+"Transition issue [key from Step 2] to In Progress. Steps:
+1. GET available transitions for the issue
+2. Find the transition ID for 'In Progress'
+3. POST to execute the transition
+4. Add comment: 'Work started on this issue.'
+Return: confirmation that issue is now In Progress."
+
+**This MUST happen BEFORE Step 4c. The Jira/Linear board must reflect that work has begun.**
 
 ### Step 4c: Implement Feature (only after Step 3 passes)
 
@@ -96,13 +104,17 @@ Delegate to `github` agent:
 ### Step 6: Move to Review (tracker + Slack)
 
 **Step 6a:** Delegate to the tracker agent (`jira` or `linear`):
-"Move issue [key] to Review status. Add comment with:
-
-- PR URL: [from github agent]
-- Branch name: [from github agent]
-- Files changed: [from coding agent]
-- Test results: [from coding agent]
-- Screenshot evidence: [paths from coding agent]"
+"Transition issue [key] to Review status. Steps:
+1. GET available transitions for issue [key]
+2. Find the transition ID for 'Review'
+3. POST to execute the transition
+4. Add comment with implementation details:
+   - PR URL: [from github agent]
+   - Branch name: [from github agent]
+   - Files changed: [from coding agent]
+   - Test results: [from coding agent]
+   - Screenshot evidence: [paths from coding agent]
+Return: confirmation that issue is now in Review."
 
 **Step 6b:** Delegate to `slack` agent:
 "Send to #ai-cli-macz: :mag: PR ready for review: [issue title] ([issue key]) — PR: [url]"
@@ -128,14 +140,18 @@ The pr_reviewer agent will return one of:
 **If APPROVED:**
 1. PR is already merged by pr_reviewer agent
 2. Delegate to the tracker agent (`jira` or `linear`):
-   "Mark issue [key] as Done. Add detailed completion comment with:
-
-   - Summary of what was implemented
-   - Files changed (ALL files created, modified, or deleted)
-   - Test results (commands run, exit codes, coverage)
-   - Verification steps (how to confirm this works)
-   - Screenshot evidence paths
-   - Known limitations (if any)"
+   "Transition issue [key] to Done. Steps:
+   1. GET available transitions for issue [key]
+   2. Find the transition ID for 'Done'
+   3. Add detailed completion comment BEFORE transitioning:
+      - Summary of what was implemented
+      - Files changed (ALL files created, modified, or deleted)
+      - Test results (commands run, exit codes, coverage)
+      - Verification steps (how to confirm this works)
+      - Screenshot evidence paths
+      - Known limitations (if any)
+   4. POST to execute the Done transition
+   Return: confirmation that issue is now Done."
 3. Delegate to `slack` agent:
    "Send to #ai-cli-macz: :white_check_mark: Completed: [issue title] ([issue key]) — PR merged, Tests: [pass/fail count]"
 
