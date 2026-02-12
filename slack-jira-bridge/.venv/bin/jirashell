@@ -1,6 +1,7 @@
-#!/Users/bkh223/Documents/GitHub/your-claude-engineer/slack-jira-bridge/.venv/bin/python3.12
+#!/Users/bkh223/Documents/GitHub/your-claude-engineer/slack-jira-bridge/.venv/bin/python3.14
 import sys
 from jira.jirashell import main
 if __name__ == '__main__':
-    sys.argv[0] = sys.argv[0].removesuffix('.exe')
+    if sys.argv[0].endswith('.exe'):
+        sys.argv[0] = sys.argv[0][:-4]
     sys.exit(main())

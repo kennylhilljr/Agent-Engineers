@@ -56,4 +56,4 @@ To use Jira instead of Linear for project management, update the orchestrator pr
 
 ## Original Reference
 
-The original standalone Jira automation framework (before integration into your-claude-engineer) is archived at `docs/jira_standalone_reference.md`.
+The original standalone Jira automation framework (before integration into Agent-Engineers) is archived at `docs/jira_standalone_reference.md`.
