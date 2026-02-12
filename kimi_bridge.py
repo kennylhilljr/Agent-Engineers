@@ -1,16 +1,17 @@
 """
-Groq Bridge Module
-==================
+KIMI (Moonshot AI) Bridge Module
+==================================
 
-Unified interface for Groq's LPU-powered inference API.
-Supports both the native Groq SDK and OpenAI-compatible mode.
+Wraps Moonshot AI's KIMI interaction to provide a unified interface for the
+multi-AI orchestrator. KIMI is known for ultra-long context windows (up to 2M
+tokens) and strong Chinese/English bilingual capabilities.
 
-Uses the OpenAI-compatible API at https://api.groq.com/openai/v1,
-so the openai Python SDK works directly with a different base_url.
+Uses the OpenAI-compatible API at https://api.moonshot.cn/v1, so the openai
+Python SDK works directly with a different base_url.
 
 Environment Variables:
-    GROQ_API_KEY: API key from https://console.groq.com/keys
-    GROQ_MODEL: Default model (default: llama-3.3-70b-versatile)
+    KIMI_API_KEY or MOONSHOT_API_KEY: API key from https://platform.moonshot.cn/console/api-keys
+    KIMI_MODEL: Default model (default: moonshot-v1-auto)
 """
 
 import os
@@ -24,93 +25,85 @@ except ImportError:
     AsyncOpenAI = None
     OpenAI = None
 
-GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+KIMI_BASE_URL = "https://api.moonshot.cn/v1"
 
 
-class GroqModel(str, Enum):
-    """Available Groq models organized by category."""
-
-    # Production models
-    LLAMA_3_3_70B = "llama-3.3-70b-versatile"
-    LLAMA_3_1_8B = "llama-3.1-8b-instant"
-    MIXTRAL_8X7B = "mixtral-8x7b-32768"
-    GEMMA2_9B = "gemma2-9b-it"
+class KimiModel(str, Enum):
+    MOONSHOT_V1_AUTO = "moonshot-v1-auto"
+    MOONSHOT_V1_8K = "moonshot-v1-8k"
+    MOONSHOT_V1_32K = "moonshot-v1-32k"
+    MOONSHOT_V1_128K = "moonshot-v1-128k"
+    KIMI_K2 = "kimi-k2"
 
     @classmethod
-    def from_string(cls, value: str) -> "GroqModel":
-        """Resolve a model string to a GroqModel enum, supporting aliases."""
+    def from_string(cls, value: str) -> "KimiModel":
         mapping = {m.value: m for m in cls}
         aliases = {
-            "llama-70b": cls.LLAMA_3_3_70B,
-            "llama-8b": cls.LLAMA_3_1_8B,
-            "mixtral": cls.MIXTRAL_8X7B,
-            "gemma": cls.GEMMA2_9B,
+            "auto": cls.MOONSHOT_V1_AUTO,
+            "8k": cls.MOONSHOT_V1_8K,
+            "32k": cls.MOONSHOT_V1_32K,
+            "128k": cls.MOONSHOT_V1_128K,
+            "k2": cls.KIMI_K2,
         }
         key = value.lower().strip()
-        return mapping.get(key, aliases.get(key, cls.LLAMA_3_3_70B))
-
-
-# Default model
-DEFAULT_MODEL = GroqModel.LLAMA_3_3_70B
+        return mapping.get(key, aliases.get(key, cls.MOONSHOT_V1_AUTO))
 
 
 @dataclass
-class GroqMessage:
-    """A message in a Groq conversation."""
+class KimiMessage:
     role: str
     content: str
 
 
 @dataclass
-class GroqSession:
-    """Manages a conversation session with Groq."""
-    model: GroqModel
-    messages: list[GroqMessage] = field(default_factory=list)
-    temperature: float = 0.7
-    max_tokens: int = 4096
+class KimiSession:
+    model: KimiModel
+    messages: list[KimiMessage] = field(default_factory=list)
 
     def add_message(self, role: str, content: str) -> None:
-        self.messages.append(GroqMessage(role=role, content=content))
+        self.messages.append(KimiMessage(role=role, content=content))
 
     def to_openai_messages(self) -> list[dict[str, str]]:
         return [{"role": m.role, "content": m.content} for m in self.messages]
 
 
 @dataclass
-class GroqResponse:
-    """Response from the Groq API."""
+class KimiResponse:
     content: str
     model: str
     usage: Optional[dict] = None
     finish_reason: Optional[str] = None
 
 
-class GroqClient:
-    """Groq API client using the OpenAI-compatible endpoint."""
+class KimiClient:
+    """KIMI API client using Moonshot's OpenAI-compatible endpoint."""
 
     def __init__(self, api_key: Optional[str] = None) -> None:
         if OpenAI is None or AsyncOpenAI is None:
             raise ImportError("openai package not installed. Run: pip install openai")
-        self.api_key = api_key or os.environ.get("GROQ_API_KEY", "")
+        self.api_key = (
+            api_key
+            or os.environ.get("KIMI_API_KEY", "")
+            or os.environ.get("MOONSHOT_API_KEY", "")
+        )
         if not self.api_key:
             raise ValueError(
-                "GROQ_API_KEY not set. Get a free key from: https://console.groq.com/keys"
+                "KIMI_API_KEY or MOONSHOT_API_KEY not set. "
+                "Get a key from: https://platform.moonshot.cn/console/api-keys"
             )
-        self._client = OpenAI(api_key=self.api_key, base_url=GROQ_BASE_URL)
-        self._async_client = AsyncOpenAI(api_key=self.api_key, base_url=GROQ_BASE_URL)
+        self._client = OpenAI(api_key=self.api_key, base_url=KIMI_BASE_URL)
+        self._async_client = AsyncOpenAI(api_key=self.api_key, base_url=KIMI_BASE_URL)
 
-    def send_message(self, session: GroqSession, message: str) -> GroqResponse:
+    def send_message(self, session: KimiSession, message: str) -> KimiResponse:
         session.add_message("user", message)
         response = self._client.chat.completions.create(
             model=session.model.value,
             messages=session.to_openai_messages(),
-            temperature=session.temperature,
-            max_tokens=session.max_tokens,
             stream=False,
         )
         content = response.choices[0].message.content or ""
         session.add_message("assistant", content)
-        return GroqResponse(
+        return KimiResponse(
             content=content,
             model=response.model,
             usage={
@@ -121,18 +114,16 @@ class GroqClient:
             finish_reason=response.choices[0].finish_reason,
         )
 
-    async def send_message_async(self, session: GroqSession, message: str) -> GroqResponse:
+    async def send_message_async(self, session: KimiSession, message: str) -> KimiResponse:
         session.add_message("user", message)
         response = await self._async_client.chat.completions.create(
             model=session.model.value,
             messages=session.to_openai_messages(),
-            temperature=session.temperature,
-            max_tokens=session.max_tokens,
             stream=False,
         )
         content = response.choices[0].message.content or ""
         session.add_message("assistant", content)
-        return GroqResponse(
+        return KimiResponse(
             content=content,
             model=response.model,
             usage={
@@ -143,7 +134,7 @@ class GroqClient:
             finish_reason=response.choices[0].finish_reason,
         )
 
-    async def stream_response(self, session: GroqSession, message: str) -> AsyncIterator[str]:
+    async def stream_response(self, session: KimiSession, message: str) -> AsyncIterator[str]:
         session.add_message("user", message)
         stream = await self._async_client.chat.completions.create(
             model=session.model.value,
@@ -159,60 +150,57 @@ class GroqClient:
         session.add_message("assistant", full_content)
 
 
-class GroqBridge:
-    """Unified bridge for Groq access."""
+class KimiBridge:
+    """Unified bridge for KIMI / Moonshot AI access."""
 
-    def __init__(self, client: GroqClient) -> None:
+    def __init__(self, client: KimiClient) -> None:
         self._client = client
 
     @classmethod
-    def from_env(cls) -> "GroqBridge":
-        return cls(client=GroqClient())
+    def from_env(cls) -> "KimiBridge":
+        return cls(client=KimiClient())
 
     def create_session(
-        self, model: Optional[str] = None, system_prompt: Optional[str] = None,
-        temperature: float = 0.7, max_tokens: int = 4096,
-    ) -> GroqSession:
-        model_str = model or os.environ.get("GROQ_MODEL", DEFAULT_MODEL.value)
-        groq_model = GroqModel.from_string(model_str)
-        session = GroqSession(
-            model=groq_model, temperature=temperature, max_tokens=max_tokens,
-        )
+        self, model: Optional[str] = None, system_prompt: Optional[str] = None
+    ) -> KimiSession:
+        model_str = model or os.environ.get("KIMI_MODEL", "moonshot-v1-auto")
+        kimi_model = KimiModel.from_string(model_str)
+        session = KimiSession(model=kimi_model)
         if system_prompt:
             session.add_message("system", system_prompt)
         return session
 
-    def send_message(self, session: GroqSession, message: str) -> GroqResponse:
+    def send_message(self, session: KimiSession, message: str) -> KimiResponse:
         return self._client.send_message(session, message)
 
-    async def send_message_async(self, session: GroqSession, message: str) -> GroqResponse:
+    async def send_message_async(self, session: KimiSession, message: str) -> KimiResponse:
         return await self._client.send_message_async(session, message)
 
-    async def stream_response(self, session: GroqSession, message: str) -> AsyncIterator[str]:
+    async def stream_response(self, session: KimiSession, message: str) -> AsyncIterator[str]:
         async for token in self._client.stream_response(session, message):
             yield token
 
     def get_auth_info(self) -> dict[str, str]:
-        key = os.environ.get("GROQ_API_KEY", "")
+        key = os.environ.get("KIMI_API_KEY", "") or os.environ.get("MOONSHOT_API_KEY", "")
         return {
             "auth_type": "api-key",
-            "model_default": os.environ.get("GROQ_MODEL", DEFAULT_MODEL.value),
+            "model_default": os.environ.get("KIMI_MODEL", "moonshot-v1-auto"),
             "api_key_set": "yes" if key else "no",
             "api_key_prefix": key[:8] + "..." if len(key) > 8 else "(short)",
-            "cost_note": "Free tier available. Ultra-fast LPU inference.",
+            "cost_note": "Pay-as-you-go. Up to 2M token context window.",
         }
 
 
 def get_available_models() -> list[str]:
-    return [m.value for m in GroqModel]
+    return [m.value for m in KimiModel]
 
 
 def print_auth_status() -> None:
     try:
-        bridge = GroqBridge.from_env()
+        bridge = KimiBridge.from_env()
         info = bridge.get_auth_info()
-        print("Groq Authentication Status:")
+        print("KIMI Authentication Status:")
         for key, value in info.items():
             print(f"  {key}: {value}")
     except (ValueError, ImportError) as e:
-        print(f"Groq authentication error: {e}")
+        print(f"KIMI authentication error: {e}")

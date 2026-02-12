@@ -11,9 +11,16 @@ from typing import TYPE_CHECKING
 from agents.definitions import (
     AGENT_DEFINITIONS,
     LINEAR_AGENT,
+    JIRA_AGENT,
     GITHUB_AGENT,
     SLACK_AGENT,
     CODING_AGENT,
+    PR_REVIEWER_AGENT,
+    CHATGPT_AGENT,
+    GEMINI_AGENT,
+    GROQ_AGENT,
+    KIMI_AGENT,
+    WINDSURF_AGENT,
 )
 
 if TYPE_CHECKING:
@@ -23,9 +30,16 @@ if TYPE_CHECKING:
 __all__ = [
     "AGENT_DEFINITIONS",
     "LINEAR_AGENT",
+    "JIRA_AGENT",
     "GITHUB_AGENT",
     "SLACK_AGENT",
     "CODING_AGENT",
+    "PR_REVIEWER_AGENT",
+    "CHATGPT_AGENT",
+    "GEMINI_AGENT",
+    "GROQ_AGENT",
+    "KIMI_AGENT",
+    "WINDSURF_AGENT",
     "run_orchestrated_session",
 ]
 
