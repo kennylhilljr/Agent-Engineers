@@ -20,16 +20,16 @@
 <img src="https://img.shields.io/badge/Slack-Notifications-4A154B?style=flat-square" alt="Slack" />
 <img src="https://img.shields.io/badge/Playwright-Browser_Testing-2EAD33?style=flat-square" alt="Playwright" />
 
-- **Long-Running Autonomy**: Harness architecture enables extended coding sessions across multiple iterations
-- **Multi-Agent Orchestration**: 11 specialized agents handle distinct concerns coordinated by an orchestrator
-- **Multi-AI Providers**: Claude (primary), ChatGPT, Gemini, Groq, KIMI, and Windsurf agents for cross-validation, parallel coding, and specialized tasks
-- **Linear + Jira Integration**: Automatic issue tracking with real-time status updates and session handoff (choose your tracker)
-- **GitHub Integration**: Automatic commits, branches, PR creation, and automated PR review with merge
-- **Slack Notifications**: Mandatory progress updates at every task lifecycle event
-- **Arcade MCP Gateway**: Single authentication flow for all external services (Linear, GitHub, Slack)
-- **Browser Testing**: Playwright MCP for automated UI verification with screenshot evidence
-- **Model Configuration**: Per-agent model selection (Haiku, Sonnet, or Opus) plus external AI models
-- **Defense-in-Depth Security**: OS sandbox, filesystem restrictions, bash allowlist, and command validation
+**Long-Running Autonomy**: Harness architecture enables extended coding sessions across multiple iterations
+**Multi-Agent Orchestration**: 11 specialized agents handle distinct concerns coordinated by an orchestrator
+**Multi-AI Providers**: Claude (primary), ChatGPT, Gemini, Groq, KIMI, and Windsurf agents for cross-validation, parallel coding, and specialized tasks
+**Linear + Jira Integration**: Automatic issue tracking with real-time status updates and session handoff (choose your tracker)
+**GitHub Integration**: Automatic commits, branches, PR creation, and automated PR review with merge
+**Slack Notifications**: Mandatory progress updates at every task lifecycle event
+**Arcade MCP Gateway**: Single authentication flow for all external services (Linear, GitHub, Slack)
+**Browser Testing**: Playwright MCP for automated UI verification with screenshot evidence
+**Model Configuration**: Per-agent model selection (Haiku, Sonnet, or Opus) plus external AI models
+**Defense-in-Depth Security**: OS sandbox, filesystem restrictions, bash allowlist, and command validation
 
 ## Architecture
 
