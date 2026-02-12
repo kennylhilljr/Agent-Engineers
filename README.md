@@ -459,18 +459,18 @@ KIMI_MODEL=moonshot-v1-auto  # optional, this is the default
 
 #### Strengths
 
-- Full IDE-level coding: file creation, editing, terminal execution
-- Cascade model provides independent coding perspective
-- Docker mode for complete isolation
-- File-based I/O for reliable task communication
-- Git integration detects changed files automatically
+Full IDE-level coding: file creation, editing, terminal execution
+Cascade model provides independent coding perspective
+Docker mode for complete isolation
+File-based I/O for reliable task communication
+Git integration detects changed files automatically
 
 #### Considerations
 
-- Slower than API-based bridges (IDE startup overhead)
-- Requires Windsurf installation or Docker
-- Output quality depends on task clarity (instructions via file)
-- Not suited for quick cross-validation (use Groq/ChatGPT for that)
+Slower than API-based bridges (IDE startup overhead)
+Requires Windsurf installation or Docker
+Output quality depends on task clarity (instructions via file)
+Not suited for quick cross-validation (use Groq/ChatGPT for that)
 
 #### Setup
 
@@ -587,10 +587,10 @@ Every feature follows a rigorous lifecycle — automatically:
 ```
 
 **Quality gates enforced automatically:**
-- 🚫 No new work until verification tests pass on existing features
-- 📸 No issue marked "Done" without screenshot evidence
-- 🧪 Every feature requires test coverage — no exceptions
-- 🔁 Rejected PRs cycle back with reviewer feedback attached
+🚫 No new work until verification tests pass on existing features
+📸 No issue marked "Done" without screenshot evidence
+🧪 Every feature requires test coverage — no exceptions
+🔁 Rejected PRs cycle back with reviewer feedback attached
 
 <br/>
 
@@ -613,9 +613,9 @@ Gemini integration uses Google's official `gemini-cli` with **OAuth authenticati
 
 ### Prerequisites
 
-- **Python 3.11+** and **Node.js 18+**
-- **Claude Code CLI**: `npm install -g @anthropic-ai/claude-code`
-- **Arcade API Key**: [Get one here](https://api.arcade.dev/dashboard/api-keys)
+**Python 3.11+** and **Node.js 18+**
+**Claude Code CLI**: `npm install -g @anthropic-ai/claude-code`
+**Arcade API Key**: [Get one here](https://api.arcade.dev/dashboard/api-keys)
 
 > ⚠️ Linux/macOS only — Claude Agent SDK subagents don't work on Windows. Use WSL.
 
@@ -734,13 +734,13 @@ uv run python autonomous_agent_demo.py --project-dir my-app --max-iterations 3
 Choose **one** issue tracker:
 
 **Linear** (via Arcade MCP):
-- A Linear workspace with at least one team
-- Linear tools added to your Arcade gateway
-- The orchestrator will automatically detect your team and create projects
+A Linear workspace with at least one team
+Linear tools added to your Arcade gateway
+The orchestrator will automatically detect your team and create projects
 
 **Jira** (via REST API):
-- Set `JIRA_SERVER`, `JIRA_EMAIL`, `JIRA_API_TOKEN`, and `JIRA_PROJECT_KEY` in `.env`
-- Get your API token from https://id.atlassian.com/manage-profile/security/api-tokens
+Set `JIRA_SERVER`, `JIRA_EMAIL`, `JIRA_API_TOKEN`, and `JIRA_PROJECT_KEY` in `.env`
+Get your API token from https://id.atlassian.com/manage-profile/security/api-tokens
 
 The orchestrator auto-detects which tracker to use based on the presence of `.linear_project.json` or `.jira_project.json`, or the `JIRA_SERVER` env var.
 
