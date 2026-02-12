@@ -390,6 +390,20 @@ The architecture supports adding new AI providers by creating a bridge module (s
 | **Cost** | Pay-as-you-go |
 | **Integration Status** | Not yet integrated — would require a `kimi_bridge.py` module |
 
+#### Windsurf (Codeium)
+
+[Windsurf](https://codeium.com/windsurf) by Codeium is an AI-powered IDE with its own agentic coding capabilities.
+
+| Property | Details |
+|----------|---------|
+| **Key Models** | Cascade (Windsurf's proprietary agentic model), GPT-4o, Claude Sonnet (via Windsurf) |
+| **Primary Strength** | Full IDE agentic flows — can browse, edit, run terminal, and iterate autonomously |
+| **Context Window** | Large (IDE-managed, varies by backing model) |
+| **Potential Use Cases** | Parallel coding agent alongside Claude, cross-IDE validation, alternative implementation approach |
+| **Auth** | Windsurf account + CLI or Docker headless mode |
+| **Cost** | Free tier available; Pro subscription for advanced features |
+| **Integration Status** | Not yet integrated — would require a CLI/Docker worker module |
+
 ---
 
 ## Prerequisites
