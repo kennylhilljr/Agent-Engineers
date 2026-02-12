@@ -1,10 +1,8 @@
-# Your Claude Engineer
+# Agent Engineers
 
-**Your own AI software engineer that manages projects, writes code, and communicates progress — autonomously.**
+**An AI software engineering team that autonomously manages projects, writes code, and communicates progress.**
 
-Ever wished you could hand off a feature request and have it come back fully implemented, tested, and documented? Your Claude Engineer is a harness built on top of the Anthropic Harness for long running tasks and using the [Claude Agent SDK](https://github.com/anthropics/claude-code/tree/main/agent-sdk-python) that turns Claude into a long-running software engineer capable of tackling complex, multi-step tasks that go far beyond a single prompt.
-
-It's a complete engineering workflow leveraging subagents to handle distinct concerns:
+A complete engineering workflow leveraging subagents to handle distinct engineering tasks:
 
 - **Project Management**: Creates and tracks work in Linear or Jira, breaking down features into issues and updating status as work progresses
 - **Code Implementation**: Writes, tests, and iterates on code with browser-based UI verification via Playwright
