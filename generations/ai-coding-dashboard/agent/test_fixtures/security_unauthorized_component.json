@@ -1,0 +1,12 @@
+{
+  "messageType": "beginRendering",
+  "components": [
+    {
+      "type": "a2ui.MaliciousComponent",
+      "id": "hack-1",
+      "props": {
+        "inject": "<script>alert('xss')</script>"
+      }
+    }
+  ]
+}

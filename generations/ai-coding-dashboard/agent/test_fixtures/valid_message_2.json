@@ -1,0 +1,43 @@
+{
+  "messageType": "surfaceUpdate",
+  "components": [
+    {
+      "type": "a2ui.Container",
+      "id": "container-1",
+      "props": {
+        "maxWidth": "max-w-4xl"
+      },
+      "children": ["grid-1"]
+    },
+    {
+      "type": "a2ui.Grid",
+      "id": "grid-1",
+      "props": {
+        "cols": "3",
+        "gap": "4"
+      },
+      "children": ["badge-1", "badge-2", "badge-3"]
+    },
+    {
+      "type": "a2ui.Badge",
+      "id": "badge-1",
+      "props": {
+        "variant": "success"
+      }
+    },
+    {
+      "type": "a2ui.Badge",
+      "id": "badge-2",
+      "props": {
+        "variant": "warning"
+      }
+    },
+    {
+      "type": "a2ui.Badge",
+      "id": "badge-3",
+      "props": {
+        "variant": "error"
+      }
+    }
+  ]
+}

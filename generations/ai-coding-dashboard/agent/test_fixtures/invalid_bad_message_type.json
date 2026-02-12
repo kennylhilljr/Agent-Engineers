@@ -1,0 +1,10 @@
+{
+  "messageType": "hackTheSystem",
+  "components": [
+    {
+      "type": "a2ui.Button",
+      "id": "btn-1",
+      "props": {}
+    }
+  ]
+}
