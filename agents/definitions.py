@@ -1,5 +1,6 @@
 """
-Agent Definitions - All specialized agents for the Agent-Engineers orchestrator.
+Agent Definitions - All orchestrator sub-agents including Jira, PR Reviewer,
+ChatGPT, Gemini, Groq, KIMI, and Windsurf for multi-AI orchestration.
 """
 
 import os
@@ -27,6 +28,8 @@ DEFAULT_MODELS: Final[dict[str, ModelOption]] = {
     "chatgpt": "haiku",
     "gemini": "haiku",
     "groq": "haiku",
+    "kimi": "haiku",
+    "windsurf": "haiku",
 }
 
 
@@ -64,9 +67,19 @@ def get_orchestrator_model() -> OrchestratorModelOption:
     return "haiku"
 
 
-def _get_jira_tools() -> list[str]:
-    """Jira tools from Arcade MCP gateway + file tools."""
+def _get_bridge_agent_tools() -> list[str]:
+    """Tools for bridge agents (ChatGPT, Gemini, Groq, KIMI, Windsurf) — file ops + bash."""
     return FILE_TOOLS + ["Bash"]
+
+
+def _get_jira_tools() -> list[str]:
+    """Tools for Jira agent — bash (curl) + file ops."""
+    return FILE_TOOLS + ["Bash"]
+
+
+def _get_pr_reviewer_tools() -> list[str]:
+    """Tools for PR reviewer — GitHub MCP + file ops + bash."""
+    return get_github_tools() + FILE_TOOLS + ["Bash"]
 
 
 def create_agent_definitions() -> dict[str, AgentDefinition]:
@@ -77,7 +90,9 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
             tools=get_linear_tools() + FILE_TOOLS,
             model=_get_model("linear")),
         "jira": AgentDefinition(
-            description="Manages Jira issues, sprint status, and session handoff via META issue.",
+            description=(
+                "Manages Jira issues and project tracking via REST API. "
+                "Alternative to Linear agent. Uses curl for Jira API calls."),
             prompt=_load_prompt("jira_agent_prompt"),
             tools=_get_jira_tools(),
             model=_get_model("jira")),
@@ -97,9 +112,11 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
             tools=get_coding_tools(),
             model=_get_model("coding")),
         "pr_reviewer": AgentDefinition(
-            description="Reviews PRs for quality, approves or requests changes, auto-merges approved PRs.",
+            description=(
+                "Automated PR reviewer. Reviews PRs for quality, correctness, "
+                "and test coverage. Approves and merges or requests changes."),
             prompt=_load_prompt("pr_reviewer_agent_prompt"),
-            tools=get_github_tools() + FILE_TOOLS + ["Bash"],
+            tools=_get_pr_reviewer_tools(),
             model=_get_model("pr_reviewer")),
         "chatgpt": AgentDefinition(
             description=(
@@ -107,22 +124,40 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
                 "Use for cross-validation, ChatGPT-specific tasks, second opinions on code, "
                 "or when the user explicitly requests ChatGPT."),
             prompt=_load_prompt("chatgpt_agent_prompt"),
-            tools=FILE_TOOLS + ["Bash"],
+            tools=_get_bridge_agent_tools(),
             model=_get_model("chatgpt")),
         "gemini": AgentDefinition(
             description=(
-                "Research with Google Search grounding, long-context analysis, "
-                "second opinions. Uses Gemini 2.5 Flash/Pro via gemini-cli."),
+                "Provides access to Google Gemini models (2.5 Flash, 2.5 Pro, 2.0 Flash). "
+                "Use for cross-validation, research, Google ecosystem tasks, "
+                "or large-context analysis (1M token window)."),
             prompt=_load_prompt("gemini_agent_prompt"),
-            tools=FILE_TOOLS + ["Bash"],
+            tools=_get_bridge_agent_tools(),
             model=_get_model("gemini")),
         "groq": AgentDefinition(
             description=(
-                "Ultra-fast inference via Groq LPU. Use for speed-critical tasks, "
-                "open-source models (Llama 3.3 70B), cross-validation, and compound AI."),
+                "Provides ultra-fast inference on open-source models (Llama 3.3 70B, "
+                "Mixtral 8x7B, Gemma 2 9B) via Groq LPU hardware. Use for rapid "
+                "cross-validation, bulk code review, or speed-critical tasks."),
             prompt=_load_prompt("groq_agent_prompt"),
-            tools=FILE_TOOLS + ["Bash"],
+            tools=_get_bridge_agent_tools(),
             model=_get_model("groq")),
+        "kimi": AgentDefinition(
+            description=(
+                "Provides access to Moonshot AI KIMI models with ultra-long context "
+                "(up to 2M tokens). Use for analyzing entire codebases in one pass, "
+                "bilingual Chinese/English tasks, or large-scale code analysis."),
+            prompt=_load_prompt("kimi_agent_prompt"),
+            tools=_get_bridge_agent_tools(),
+            model=_get_model("kimi")),
+        "windsurf": AgentDefinition(
+            description=(
+                "Runs Codeium Windsurf IDE in headless mode for parallel coding tasks. "
+                "Use for cross-IDE validation, alternative implementations, or when "
+                "Windsurf's Cascade model adds unique value to a coding task."),
+            prompt=_load_prompt("windsurf_agent_prompt"),
+            tools=_get_bridge_agent_tools(),
+            model=_get_model("windsurf")),
     }
 
 
@@ -136,3 +171,5 @@ PR_REVIEWER_AGENT = AGENT_DEFINITIONS["pr_reviewer"]
 CHATGPT_AGENT = AGENT_DEFINITIONS["chatgpt"]
 GEMINI_AGENT = AGENT_DEFINITIONS["gemini"]
 GROQ_AGENT = AGENT_DEFINITIONS["groq"]
+KIMI_AGENT = AGENT_DEFINITIONS["kimi"]
+WINDSURF_AGENT = AGENT_DEFINITIONS["windsurf"]
