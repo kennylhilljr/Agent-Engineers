@@ -1,0 +1,11 @@
+{
+  "messageType": "beginRendering",
+  "components": [
+    {
+      "type": "a2ui.Button",
+      "props": {
+        "text": "Missing id field"
+      }
+    }
+  ]
+}
