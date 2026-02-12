@@ -34,7 +34,10 @@ Use the Task tool to delegate to these specialized agents:
 | `pr_reviewer` | sonnet | Review PRs, approve/request changes, merge approved PRs |
 | `slack` | haiku | Send progress notifications to users |
 | `chatgpt` | haiku | Cross-validate code, get second opinions, ChatGPT-specific tasks (GPT-4o, o1, o3-mini, o4-mini) |
-| `gemini` | haiku | Cross-validate, research, Google ecosystem, second AI opinions (Gemini 2.5 Flash) |
+| `gemini` | haiku | Cross-validate, research, Google ecosystem, second AI opinions (Gemini 2.5 Flash/Pro) |
+| `groq` | haiku | Ultra-fast cross-validation on open-source models (Llama 3.3 70B, Mixtral, Gemma) via Groq LPU |
+| `kimi` | haiku | Ultra-long context analysis (up to 2M tokens), bilingual Chinese/English tasks (Moonshot AI) |
+| `windsurf` | haiku | Parallel coding via Windsurf IDE headless mode, cross-IDE validation (Cascade model) |
 
 ---
 

@@ -18,6 +18,9 @@ from agents.definitions import (
     PR_REVIEWER_AGENT,
     CHATGPT_AGENT,
     GEMINI_AGENT,
+    GROQ_AGENT,
+    KIMI_AGENT,
+    WINDSURF_AGENT,
 )
 
 if TYPE_CHECKING:
@@ -34,6 +37,9 @@ __all__ = [
     "PR_REVIEWER_AGENT",
     "CHATGPT_AGENT",
     "GEMINI_AGENT",
+    "GROQ_AGENT",
+    "KIMI_AGENT",
+    "WINDSURF_AGENT",
     "run_orchestrated_session",
 ]
 
