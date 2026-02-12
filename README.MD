@@ -95,7 +95,7 @@ flowchart TB
     style State fill:#16213e,stroke:#e94560,color:#fff
 ```
 
-> **Note:** The legacy diagram `AgentHarnessDiagram.png` shows the original Linear-only architecture. The diagram above reflects the current system with Jira support, PR review, and multi-AI providers.
+> **Note:** The `AgentHarnessDiagram.png` image shows the current architecture with all 11 agents, Jira/Linear support, PR review, multi-AI providers, and defense-in-depth security.
 
 ### Session Flow
 
