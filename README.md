@@ -176,17 +176,17 @@ Claude authenticates via the Claude Agent SDK using `CLAUDE_CODE_OAUTH_TOKEN` or
 
 #### Strengths
 
-- Extended thinking and step-by-step reasoning
-- Strong code generation across all languages
-- Native tool use (file operations, bash, MCP) with no bridging overhead
-- Best-in-class instruction following for agentic workflows
-- Built-in sandbox and security hook support
+Extended thinking and step-by-step reasoning
+Strong code generation across all languages
+Native tool use (file operations, bash, MCP) with no bridging overhead
+Best-in-class instruction following for agentic workflows
+Built-in sandbox and security hook support
 
 #### Considerations
 
-- Primary cost driver for the system (all agents run on Claude)
-- Haiku recommended for coordination agents to minimize cost
-- Sonnet recommended for code-heavy agents (Coding, PR Reviewer)
+Primary cost driver for the system (all agents run on Claude)
+Haiku recommended for coordination agents to minimize cost
+Sonnet recommended for code-heavy agents (Coding, PR Reviewer)
 
 #### Configuration
 
@@ -223,18 +223,18 @@ The ChatGPT agent provides access to OpenAI's model family for cross-validation,
 
 #### Strengths
 
-- Strong at code review and catching edge cases
-- o1/o3-mini models excel at mathematical and logical reasoning
-- Wide ecosystem of fine-tuned models
-- Session token mode enables zero-cost access via web subscription
-- Good at generating alternative approaches to a problem
+Strong at code review and catching edge cases
+o1/o3-mini models excel at mathematical and logical reasoning
+Wide ecosystem of fine-tuned models
+Session token mode enables zero-cost access via web subscription
+Good at generating alternative approaches to a problem
 
 #### Considerations
 
-- Requires separate OpenAI account/subscription
-- Session token auth may break if OpenAI changes their web API
-- No native tool use in bridge mode — responses are text-only
-- Adds latency (Claude host agent → OpenAI API → response parsing)
+Requires separate OpenAI account/subscription
+Session token auth may break if OpenAI changes their web API
+No native tool use in bridge mode — responses are text-only
+Adds latency (Claude host agent → OpenAI API → response parsing)
 
 #### Setup
 
