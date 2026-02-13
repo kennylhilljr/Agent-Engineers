@@ -20,7 +20,7 @@ from claude_agent_sdk import (
 )
 
 from client import create_client
-from progress import print_session_header, print_progress_summary, is_project_initialized, detect_tracker
+from progress import print_session_header, print_progress_summary, is_project_initialized
 from prompts import (
     get_initializer_task,
     get_continuation_task,
@@ -158,9 +158,6 @@ async def run_agent_session(
         elif "linear" in error_lower:
             print("\nThis appears to be a Linear API error.")
             print("Check your LINEAR_API_KEY and Linear project access.")
-        elif "jira" in error_lower:
-            print("\nThis appears to be a Jira API error.")
-            print("Check your JIRA_SERVER, JIRA_EMAIL, and JIRA_API_TOKEN configuration.")
         elif "arcade" in error_lower or "mcp" in error_lower:
             print("\nThis appears to be an Arcade MCP Gateway error.")
             print("Check your ARCADE_API_KEY and ARCADE_GATEWAY_SLUG configuration.")
@@ -207,25 +204,22 @@ async def run_autonomous_agent(
     project_dir.mkdir(parents=True, exist_ok=True)
 
     # Check if this is a fresh start or continuation
-    # We check both .linear_project.json and .jira_project.json
     is_first_run: bool = not is_project_initialized(project_dir)
-    tracker = detect_tracker(project_dir)
-    tracker_name = "Jira" if tracker == "jira" else "Linear"
 
     if is_first_run:
         print("Fresh start - will use initializer agent")
-        print(f"Issue tracker: {tracker_name}")
+        print("Issue tracker: Linear")
         print()
         print("=" * 70)
         print("  NOTE: First session takes 10-20+ minutes!")
-        print(f"  The agent is creating {tracker_name} issues and setting up the project.")
+        print("  The agent is creating Linear issues and setting up the project.")
         print("  This may appear to hang - it's working. Watch for [Tool: ...] output.")
         print("=" * 70)
         print()
         # Copy the app spec into the project directory for the agent to read
         copy_spec_to_project(project_dir)
     else:
-        print(f"Continuing existing project ({tracker_name} initialized)")
+        print("Continuing existing project (Linear initialized)")
         print_progress_summary(project_dir)
 
     iteration: int = 0

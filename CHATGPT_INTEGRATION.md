@@ -1,4 +1,4 @@
-# KAN-196: ChatGPT Agent Integration
+# ChatGPT Agent Integration
 
 ## Overview
 
