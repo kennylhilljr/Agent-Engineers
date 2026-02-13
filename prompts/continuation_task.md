@@ -16,17 +16,22 @@ Determine which tracker is in use:
 - Run `pwd` to confirm working directory
 - Read `.jira_project.json` or `.linear_project.json` for project IDs (including meta issue ID/key)
 
-### Step 2: Get Status (CHECK FOR COMPLETION)
+### Step 2: Get Status and Check for Duplicates (CHECK FOR COMPLETION)
 
 Delegate to the appropriate tracker agent (`jira` or `linear`):
 "Read the project state file, then:
 
 1. Get the latest comment from the META issue for session context
 2. List all issues and count by status (Done/In Progress/Todo) - EXCLUDE META issue from counts
-3. Compare done count to total_issues from the project state file
-4. Return all_complete: true if done == total_issues, false otherwise
-5. If not complete: Get FULL DETAILS of highest-priority issue to work on
-6. Return: status counts, all_complete flag, last session context, and issue context if not complete"
+3. **DEDUP CHECK:** Group all issues by title (case-insensitive). If any title appears more than once, these are duplicates. Report them and clean them up:
+   - Keep the first-created issue (the one with the earliest creation date or lowest key number)
+   - Archive/close the duplicates with a comment: 'Closed as duplicate of [keeper key]'
+   - Update the `issues` array in the project state file to remove duplicate keys
+   - Adjust `total_issues` count if duplicates were feature issues
+4. Compare done count to total_issues from the project state file (after dedup adjustment)
+5. Return all_complete: true if done == total_issues, false otherwise
+6. If not complete: Get FULL DETAILS of highest-priority issue to work on
+7. Return: status counts, all_complete flag, last session context, issue context if not complete, and dedup results (duplicates_found, duplicates_removed)"
 
 **IF all_complete is true:**
 
@@ -170,8 +175,9 @@ The pr_reviewer agent will return one of:
 
 1. Delegate to the tracker agent (`jira` or `linear`):
    "List all issues and count by status (Done/In Progress/Todo) - EXCLUDE META issue from counts.
+   Check for any duplicate issues (same title, case-insensitive). If found, archive/close duplicates and update the state file.
    Compare done count to total_issues from the project state file.
-   Return: all_complete flag, status counts, and FULL DETAILS of the highest-priority Todo issue if not complete."
+   Return: all_complete flag, status counts, dedup results (if any), and FULL DETAILS of the highest-priority Todo issue if not complete."
 
 2. **If all_complete is true:** Go to Step 9 (Project Complete).
 

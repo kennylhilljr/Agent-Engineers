@@ -12,25 +12,29 @@ Check which issue tracker to use:
 
 ### Step 1: Set Up Issue Tracking (Jira tickets for EVERY task)
 
+**CRITICAL — DUPLICATE PREVENTION:** Before creating ANY issues, the tracker agent MUST first search for existing issues in the project. If issues already exist (e.g., from a previous crashed session), reuse them instead of creating duplicates. Only create issues that don't already exist.
+
 **If using `jira` agent:**
 Delegate to `jira` agent:
 "Read app_spec.txt to understand what we're building. Then:
 1. Verify Jira connection (GET /rest/api/3/myself)
-2. Create a Jira issue for EVERY feature/task from app_spec.txt (with test steps in description). Every single task MUST have a corresponding Jira ticket — no exceptions. Use the Jira REST API to actually create each issue.
-3. Create a META issue '[META] Project Progress Tracker' for session handoffs
-4. Add initial comment to META issue with project summary and session 1 status
-5. Save state to .jira_project.json (include every issue key created)
-6. Return: project_key, total_issues created, meta_issue_key"
+2. **DEDUP CHECK:** Search for ALL existing issues in the project (GET /search/jql). Build a list of existing issue summaries (lowercased). You will use this to skip duplicates in step 3.
+3. Create a Jira issue for EVERY feature/task from app_spec.txt (with test steps in description) — BUT skip any issue whose title matches an existing issue from step 2. Every single task MUST have a corresponding Jira ticket — no exceptions. Use the Jira REST API to actually create each issue.
+4. Create a META issue '[META] Project Progress Tracker' for session handoffs — ONLY if one doesn't already exist
+5. Add initial comment to META issue with project summary and session 1 status
+6. Save state to .jira_project.json (include every issue key created in the `issues` array for dedup tracking)
+7. Return: project_key, total_issues created, meta_issue_key, and count of duplicates skipped"
 
 **If using `linear` agent:**
 Delegate to `linear` agent:
 "Read app_spec.txt to understand what we're building. Then:
-1. Create a Linear project with appropriate name
-2. Create issues for ALL features/tasks from app_spec.txt (with test steps in description). Every single task MUST have a corresponding issue — no exceptions.
-3. Create a META issue '[META] Project Progress Tracker' for session handoffs
-4. Add initial comment to META issue with project summary and session 1 status
-5. Save state to .linear_project.json
-6. Return: project_id, total_issues created, meta_issue_id"
+1. **DEDUP CHECK:** List existing projects and issues. If a project with this name already exists, reuse it. Build a list of existing issue titles (lowercased). You will use this to skip duplicates in step 3.
+2. Create a Linear project with appropriate name — ONLY if it doesn't already exist
+3. Create issues for ALL features/tasks from app_spec.txt (with test steps in description) — BUT skip any issue whose title matches an existing issue from step 1. Every single task MUST have a corresponding issue — no exceptions.
+4. Create a META issue '[META] Project Progress Tracker' for session handoffs — ONLY if one doesn't already exist
+5. Add initial comment to META issue with project summary and session 1 status
+6. Save state to .linear_project.json (include every issue key created in the `issues` array for dedup tracking)
+7. Return: project_id, total_issues created, meta_issue_id, and count of duplicates skipped"
 
 ### Step 1b: Slack — Notify Project Created (MANDATORY)
 
