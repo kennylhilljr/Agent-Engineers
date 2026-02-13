@@ -54,7 +54,17 @@ When asked to initialize a project:
    ListTeams → get team name/key
    ```
 
-3. **Create Linear project:**
+3. **Check for existing project and issues (DEDUP CHECK — MANDATORY):**
+   Before creating anything, search for existing issues in the team/project:
+   ```
+   ListProjects → check if a project with this name already exists
+   ListIssues (filter by project) → get all existing issues
+   ```
+   - If a project already exists with the same name, **reuse it** — do NOT create a duplicate
+   - Build a list of existing issue titles (normalized: lowercased, stripped)
+   - You will use this list in step 5 to skip issues that already exist
+
+4. **Create Linear project (only if it doesn't exist):**
    ```
    CreateProject:
      name: [from app_spec.txt]
@@ -62,12 +72,18 @@ When asked to initialize a project:
      description: [brief overview]
    ```
 
-4. **Create issues for each feature:**
+5. **Create issues for each feature (with dedup check):**
+   For EACH feature from app_spec.txt:
+   - Normalize the proposed title (lowercase, strip whitespace)
+   - Check if an issue with a matching title already exists in the list from step 3
+   - **If it exists: SKIP creation** — log "Skipping duplicate: [title]"
+   - **If it does NOT exist: CREATE it**
+
    ```
    CreateIssue:
      team: [team name or key]
      title: "Feature Name - Brief Description"
-     project: [project name from step 3]
+     project: [project name from step 4]
      description: [see template below]
      priority: urgent|high|medium|low
    ```
@@ -87,7 +103,10 @@ When asked to initialize a project:
    - [ ] [Criterion 2]
    ```
 
-5. **Create META issue:**
+   **Track every created issue key + title** for the state file in step 7.
+
+6. **Create META issue (only if one doesn't already exist):**
+   Check the existing issues list for any title containing "[META]". If found, reuse it.
    ```
    CreateIssue:
      team: [team]
@@ -96,7 +115,7 @@ When asked to initialize a project:
      description: "Session tracking issue for agent handoffs"
    ```
 
-6. **Save state to .linear_project.json:**
+7. **Save state to .linear_project.json (including issues list for dedup):**
    ```json
    {
      "initialized": true,
@@ -105,11 +124,49 @@ When asked to initialize a project:
      "project_name": "[name]",
      "project_slug": "[slug from CreateProject response]",
      "meta_issue_id": "[META issue identifier, e.g., ENG-42]",
-     "total_issues": [count]
+     "total_issues": [count of feature issues, excluding META],
+     "issues": [
+       {"key": "ENG-1", "title": "Feature Name - Brief Description"},
+       {"key": "ENG-2", "title": "Another Feature"}
+     ]
    }
    ```
 
-7. **Add initial comment to META issue** with session 1 summary
+   The `issues` array is critical for preventing duplicates on re-runs.
+
+8. **Add initial comment to META issue** with session 1 summary
+
+---
+
+### Duplicate Cleanup (When Requested)
+
+When the orchestrator asks you to check for and clean up duplicates:
+
+1. **List all issues** in the project (excluding META):
+   ```
+   ListIssues:
+     project: [project name]
+   ```
+
+2. **Group by normalized title** (lowercase, stripped):
+   - For each group with more than one issue: the FIRST created issue is the "keeper"
+   - All subsequent issues with the same title are duplicates
+
+3. **Archive duplicates:**
+   ```
+   ArchiveIssue:
+     issue_id: [duplicate issue identifier]
+   ```
+
+4. **Update the state file** to remove archived issue keys from the `issues` array
+
+5. **Report:**
+   ```
+   dedup_results:
+     duplicates_found: N
+     duplicates_archived: [list of archived keys]
+     kept: [list of keeper keys]
+   ```
 
 ---
 
