@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Trigger script for Agent-Engineers from LibreChat.
-Usage: python trigger_engineer.py --project-name "my-project" --task "Build a todo app"
+Usage: python scripts/trigger_engineer.py --project-name "my-project" --task "Build a todo app"
 """
 
 import argparse
@@ -18,11 +18,12 @@ def main():
 
     args = parser.parse_args()
 
-    # Get the directory where this script is located
+    # Get the repo root (parent of scripts/)
     script_dir = os.path.dirname(os.path.abspath(__file__))
+    repo_root = os.path.dirname(script_dir)
 
     # Write the task to app_spec.txt
-    app_spec_path = os.path.join(script_dir, 'prompts', 'app_spec.txt')
+    app_spec_path = os.path.join(repo_root, 'prompts', 'app_spec.txt')
     with open(app_spec_path, 'w') as f:
         f.write(args.task)
 
@@ -33,7 +34,7 @@ def main():
     print(f"   Max iterations: {args.max_iterations}")
 
     # Activate venv and run the autonomous agent
-    venv_python = os.path.join(script_dir, 'venv', 'bin', 'python')
+    venv_python = os.path.join(repo_root, 'venv', 'bin', 'python')
     demo_script = os.path.join(script_dir, 'autonomous_agent_demo.py')
 
     cmd = [
@@ -45,7 +46,7 @@ def main():
     ]
 
     try:
-        result = subprocess.run(cmd, cwd=script_dir, capture_output=False)
+        result = subprocess.run(cmd, cwd=repo_root, capture_output=False)
         return result.returncode
     except Exception as e:
         print(f"❌ Error: {e}")

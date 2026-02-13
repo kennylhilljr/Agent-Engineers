@@ -13,15 +13,21 @@ This is a **multi-agent autonomous software engineering harness** built on the C
 ## Repository Structure
 
 ```
-├── autonomous_agent_demo.py   # Main entry point / CLI
 ├── agent.py                   # Core agent session loop logic
 ├── client.py                  # Claude SDK client configuration
 ├── security.py                # Bash command security hooks (allowlist-based)
 ├── progress.py                # Progress tracking via .linear_project.json
 ├── prompts.py                 # Prompt template loading utilities
-├── arcade_config.py           # Arcade MCP gateway config and tool definitions
-├── authorize_arcade.py        # OAuth authorization flow for Arcade services
-├── test_security.py           # Security hook test suite
+├── scripts/
+│   ├── autonomous_agent_demo.py # Main entry point / CLI
+│   ├── daemon.py              # Long-running ticket polling daemon
+│   ├── arcade_config.py       # Arcade MCP gateway config and tool definitions
+│   ├── authorize_arcade.py    # OAuth authorization flow for Arcade services
+│   ├── trigger_engineer.py    # LibreChat trigger script
+│   ├── test_security.py       # Security hook test suite
+│   ├── parallel_dispatch.py   # Multi-agent parallel ticket processing
+│   ├── agent_watchdog.py      # Agent health monitoring
+│   └── ...                    # Provider workers, CLI bridges, Jira integration
 ├── agents/
 │   ├── __init__.py            # Exports agent definitions and orchestrator
 │   ├── definitions.py         # Agent definitions with per-agent model config
@@ -82,22 +88,22 @@ cp .env.example .env
 # Edit .env with your ARCADE_API_KEY and ARCADE_GATEWAY_SLUG
 
 # Authorize Arcade OAuth (one-time)
-uv run python authorize_arcade.py
+uv run python scripts/authorize_arcade.py
 
 # Run the autonomous agent
-uv run python autonomous_agent_demo.py --project-dir my-app
+uv run python scripts/autonomous_agent_demo.py --project-dir my-app
 
 # With options
-uv run python autonomous_agent_demo.py --project-dir my-app --model opus --max-iterations 5
+uv run python scripts/autonomous_agent_demo.py --project-dir my-app --model opus --max-iterations 5
 ```
 
 ### Running Tests
 
 ```bash
-uv run python test_security.py
+uv run python scripts/test_security.py
 ```
 
-Tests are in `test_security.py` and cover:
+Tests are in `scripts/test_security.py` and cover:
 - Command extraction logic (`extract_commands`)
 - chmod validation (only `+x` variants allowed)
 - init.sh validation (only `./init.sh` allowed)
@@ -164,7 +170,7 @@ while True:
 ### Agent Definitions (agents/definitions.py)
 Agent models are configurable via `{AGENT_NAME}_AGENT_MODEL` env vars. Definitions are created at import time. Each agent gets a subset of tools matching its domain.
 
-### MCP Integration (client.py, arcade_config.py)
+### MCP Integration (client.py, scripts/arcade_config.py)
 Two MCP servers are configured:
 - **Playwright** (`@playwright/mcp@latest`) — browser automation for UI testing
 - **Arcade** (HTTP gateway) — unified auth for Linear (39 tools), GitHub (46 tools), Slack (8 tools)
@@ -180,12 +186,12 @@ Each run creates an isolated project in `generations/<project-name>/` with:
 ## Common Tasks for Contributors
 
 ### Adding a new allowed bash command
-Add to `ALLOWED_COMMANDS` in `security.py`. If the command needs extra validation, add it to `COMMANDS_NEEDING_EXTRA_VALIDATION` and implement a `validate_<cmd>_command()` function following the existing pattern. Add test cases to `test_security.py`.
+Add to `ALLOWED_COMMANDS` in `security.py`. If the command needs extra validation, add it to `COMMANDS_NEEDING_EXTRA_VALIDATION` and implement a `validate_<cmd>_command()` function following the existing pattern. Add test cases to `scripts/test_security.py`.
 
 ### Adding a new specialized agent
 1. Create a prompt file in `prompts/<name>_agent_prompt.md`
 2. Add an `AgentDefinition` in `agents/definitions.py`
-3. Define the tool subset for the agent in `arcade_config.py` (if using Arcade tools)
+3. Define the tool subset for the agent in `scripts/arcade_config.py` (if using Arcade tools)
 4. Add a `{NAME}_AGENT_MODEL` env var in the `_get_model()` function
 
 ### Modifying the app specification

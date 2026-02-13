@@ -8,9 +8,9 @@ This script implements an orchestrator pattern where a main agent delegates to
 specialized sub-agents (linear, coding, github, slack) for different domains.
 
 Example Usage:
-    uv run python autonomous_agent_demo.py --project-dir my-app
-    uv run python autonomous_agent_demo.py --project-dir my-app --max-iterations 5
-    uv run python autonomous_agent_demo.py --generations-base ~/projects/ai --project-dir my-app
+    uv run python scripts/autonomous_agent_demo.py --project-dir my-app
+    uv run python scripts/autonomous_agent_demo.py --project-dir my-app --max-iterations 5
+    uv run python scripts/autonomous_agent_demo.py --generations-base ~/projects/ai --project-dir my-app
 """
 
 import argparse
@@ -18,6 +18,9 @@ import asyncio
 import os
 import sys
 from pathlib import Path
+
+# Add repo root to path so we can import top-level modules
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from dotenv import load_dotenv
 
@@ -55,19 +58,19 @@ def parse_args() -> argparse.Namespace:
         epilog="""
 Examples:
   # Start fresh project (creates ./generations/my-app/)
-  uv run python autonomous_agent_demo.py --project-dir my-app
+  uv run python scripts/autonomous_agent_demo.py --project-dir my-app
 
   # Use a custom generations base directory
-  uv run python autonomous_agent_demo.py --generations-base ~/projects/ai --project-dir my-app
+  uv run python scripts/autonomous_agent_demo.py --generations-base ~/projects/ai --project-dir my-app
 
   # Use opus for orchestrator (more capable but costs more)
-  uv run python autonomous_agent_demo.py --project-dir my-app --model opus
+  uv run python scripts/autonomous_agent_demo.py --project-dir my-app --model opus
 
   # Limit iterations for testing
-  uv run python autonomous_agent_demo.py --project-dir my-app --max-iterations 5
+  uv run python scripts/autonomous_agent_demo.py --project-dir my-app --max-iterations 5
 
   # Use absolute path (bypasses generations base)
-  uv run python autonomous_agent_demo.py --project-dir /absolute/path/to/project
+  uv run python scripts/autonomous_agent_demo.py --project-dir /absolute/path/to/project
 
 Environment Variables:
   ARCADE_API_KEY             Arcade API key for Linear integration (required)

@@ -166,13 +166,13 @@ class ParallelDispatcher:
         return available
 
     def _launch_claude_worker(self, ticket_key: str) -> WorkerInfo:
-        """Launch a Claude worker via autonomous_agent_demo.py."""
+        """Launch a Claude worker via scripts/autonomous_agent_demo.py."""
         log_file = self.log_dir / f"worker_claude_{ticket_key}.log"
         log_handle = open(log_file, "w")
 
         cmd = [
             str(self.venv_python),
-            str(self.repo_root / "autonomous_agent_demo.py"),
+            str(self.repo_root / "scripts" / "autonomous_agent_demo.py"),
             "--project-dir", str(self.project_dir),
             "--max-iterations", "1",
         ]
