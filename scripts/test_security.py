@@ -4,12 +4,16 @@ Security Hook Tests
 ===================
 
 Tests for the bash command security validation logic.
-Run with: uv run python test_security.py
+Run with: uv run python scripts/test_security.py
 """
 
 import asyncio
 import sys
+from pathlib import Path
 from typing import cast
+
+# Add repo root to path so we can import top-level modules
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from claude_agent_sdk import PreToolUseHookInput
 

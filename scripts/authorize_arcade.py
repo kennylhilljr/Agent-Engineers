@@ -6,10 +6,10 @@ Authorize Arcade Services
 Run this script to connect your Linear, GitHub, and Slack accounts via OAuth.
 
 Usage:
-    python authorize_arcade.py          # Authorize all services
-    python authorize_arcade.py linear   # Authorize Linear only
-    python authorize_arcade.py github   # Authorize GitHub only
-    python authorize_arcade.py slack    # Authorize Slack only
+    python scripts/authorize_arcade.py          # Authorize all services
+    python scripts/authorize_arcade.py linear   # Authorize Linear only
+    python scripts/authorize_arcade.py github   # Authorize GitHub only
+    python scripts/authorize_arcade.py slack    # Authorize Slack only
 """
 
 import sys
@@ -98,7 +98,7 @@ def authorize_service(client: Arcade, user_id: str, service: str) -> bool:
             except KeyboardInterrupt:
                 print(f"\n\nAuthorization interrupted by user.")
                 print(f"Stopped at: {auth_tool}")
-                print(f"\nTo resume, run: python authorize_arcade.py {service}")
+                print(f"\nTo resume, run: python scripts/authorize_arcade.py {service}")
                 raise  # Let KeyboardInterrupt propagate to exit cleanly
 
     # Verify connection
