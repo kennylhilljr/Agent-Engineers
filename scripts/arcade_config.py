@@ -9,7 +9,7 @@ Setup:
 1. Create an MCP Gateway at https://api.arcade.dev/dashboard/mcp-gateways
 2. Add Linear, GitHub, and/or Slack tools to your gateway
 3. Set ARCADE_GATEWAY_SLUG in your .env file
-4. Run: python authorize_arcade.py
+4. Run: python scripts/authorize_arcade.py
 """
 
 import os

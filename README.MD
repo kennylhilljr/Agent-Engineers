@@ -634,7 +634,7 @@ cp .env.example .env
 # Edit .env with your Arcade API key and gateway slug
 
 # Authorize Arcade tools (one-time OAuth flow)
-python authorize_arcade.py
+python scripts/authorize_arcade.py
 
 # (Optional) Set up Gemini CLI for research agent
 chmod +x setup_gemini.sh && ./setup_gemini.sh
@@ -691,13 +691,13 @@ chmod +x setup_gemini.sh && ./setup_gemini.sh
 
 ```bash
 # Start an autonomous engineering session
-uv run python autonomous_agent_demo.py --project-dir my-app
+uv run python scripts/autonomous_agent_demo.py --project-dir my-app
 
 # Use Sonnet for orchestration (more capable, higher cost)
-uv run python autonomous_agent_demo.py --project-dir my-app --model sonnet
+uv run python scripts/autonomous_agent_demo.py --project-dir my-app --model sonnet
 
 # Limit iterations for testing
-uv run python autonomous_agent_demo.py --project-dir my-app --max-iterations 3
+uv run python scripts/autonomous_agent_demo.py --project-dir my-app --max-iterations 3
 ```
 
 ## Command Line Options
@@ -721,7 +721,7 @@ uv run python autonomous_agent_demo.py --project-dir my-app --max-iterations 3
 2. Create MCP gateway at https://api.arcade.dev/dashboard/mcp-gateways
 3. Add Linear tools to your gateway (required if using Linear)
 4. Optionally add GitHub and Slack tools
-5. Run `python authorize_arcade.py` to authorize
+5. Run `python scripts/authorize_arcade.py` to authorize
 
 #### 2. Issue Tracker (Linear)
 
@@ -771,20 +771,26 @@ See the [Gemini section above](#gemini-google--cross-validation-provider) or `GE
 
 ```
 Agent-Engineers/
-├── autonomous_agent_demo.py     # Main entry point
 ├── agent.py                     # Agent session logic
 ├── client.py                    # Claude SDK + MCP client configuration
 ├── security.py                  # Bash command allowlist and validation
 ├── progress.py                  # Progress tracking utilities
 ├── prompts.py                   # Prompt loading utilities
-├── arcade_config.py             # Arcade MCP gateway configuration
-├── authorize_arcade.py          # Arcade authorization flow
 ├── model_router.py              # Multi-AI provider routing (Claude ↔ ChatGPT)
 ├── openai_bridge.py             # ChatGPT integration (dual auth)
 ├── gemini_bridge.py             # Gemini integration (triple auth)
 ├── groq_bridge.py               # Groq integration (OpenAI-compatible API)
 ├── kimi_bridge.py               # KIMI/Moonshot integration (OpenAI-compatible API)
 ├── windsurf_bridge.py           # Windsurf integration (CLI/Docker)
+├── scripts/
+│   ├── autonomous_agent_demo.py # Main entry point / CLI
+│   ├── daemon.py                # Long-running ticket polling daemon
+│   ├── arcade_config.py         # Arcade MCP gateway configuration
+│   ├── authorize_arcade.py      # Arcade authorization flow
+│   ├── trigger_engineer.py      # LibreChat trigger script
+│   ├── test_security.py         # Security hook test suite
+│   ├── parallel_dispatch.py     # Multi-agent parallel ticket processing
+│   └── agent_watchdog.py        # Agent health monitoring
 ├── agents/
 │   ├── definitions.py           # Agent definitions with model config
 │   └── orchestrator.py          # Orchestrator session runner
@@ -868,7 +874,7 @@ Defense-in-depth — multiple layers protect against unintended operations:
 |:------|:----|
 | `ARCADE_API_KEY not set` | Get your key from [Arcade Dashboard](https://api.arcade.dev/dashboard/api-keys) |
 | `ARCADE_GATEWAY_SLUG not set` | Create a gateway at [Arcade MCP Gateways](https://api.arcade.dev/dashboard/mcp-gateways) |
-| `Authorization required` | Run `python authorize_arcade.py` |
+| `Authorization required` | Run `python scripts/authorize_arcade.py` |
 | `Command blocked by security hook` | Add command to `ALLOWED_COMMANDS` in `security.py` |
 | `MCP server connection failed` | Verify Arcade API key and gateway configuration |
 | `GitHub agent requires GITHUB_REPO` | Set `GITHUB_REPO=owner/repo` in `.env` |

@@ -7,8 +7,8 @@ dispatches agent workers to process them concurrently. Ensures agents are
 always working on tickets around the clock.
 
 Usage:
-    uv run python daemon.py --project-dir my-app
-    uv run python daemon.py --project-dir my-app --max-workers 3 --poll-interval 60
+    uv run python scripts/daemon.py --project-dir my-app
+    uv run python scripts/daemon.py --project-dir my-app --max-workers 3 --poll-interval 60
 """
 
 import asyncio
@@ -16,11 +16,16 @@ import json
 import logging
 import os
 import signal
+import subprocess
+import sys
 import traceback
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
+
+# Add repo root to path so we can import top-level modules
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from dotenv import load_dotenv
 
@@ -544,13 +549,13 @@ def main() -> int:
         epilog="""
 Examples:
   # Start daemon for an existing project
-  uv run python daemon.py --project-dir my-app
+  uv run python scripts/daemon.py --project-dir my-app
 
   # Start with 5 concurrent workers and 60s poll interval
-  uv run python daemon.py --project-dir my-app --max-workers 5 --poll-interval 60
+  uv run python scripts/daemon.py --project-dir my-app --max-workers 5 --poll-interval 60
 
   # Use sonnet model for orchestrator
-  uv run python daemon.py --project-dir my-app --model sonnet
+  uv run python scripts/daemon.py --project-dir my-app --model sonnet
 
 Environment Variables:
   ARCADE_API_KEY             Arcade API key (required)

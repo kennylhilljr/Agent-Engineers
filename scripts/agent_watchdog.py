@@ -119,7 +119,7 @@ def setup_logging(log_file: Path) -> logging.Logger:
 
 
 def resolve_project_dir(project_dir: Path, generations_base: Path | None = None) -> Path:
-    """Resolve project directory, matching autonomous_agent_demo.py behaviour."""
+    """Resolve project directory, matching scripts/autonomous_agent_demo.py behaviour."""
     if project_dir.is_absolute():
         return project_dir
     if generations_base is None:
@@ -422,7 +422,7 @@ class AgentWatchdog:
 
     def _build_agent_command(self, project_dir: Path) -> list[str]:
         venv_python = REPO_ROOT / "venv" / "bin" / "python"
-        demo_script = REPO_ROOT / "autonomous_agent_demo.py"
+        demo_script = REPO_ROOT / "scripts" / "autonomous_agent_demo.py"
         return [str(venv_python), str(demo_script), "--project-dir", project_dir.name]
 
     # ------------------------------------------------------------------
