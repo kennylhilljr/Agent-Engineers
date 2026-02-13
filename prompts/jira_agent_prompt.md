@@ -77,13 +77,30 @@ When asked to initialize a project:
      -H "Authorization: Basic $(echo -n "${JIRA_EMAIL}:${JIRA_API_TOKEN}" | base64)"
    ```
 
-4. **Create issues for each feature** using POST /issue
+4. **Check for existing issues (DEDUP CHECK — MANDATORY):**
+   Before creating anything, search for ALL existing issues in the project:
+   ```bash
+   curl -s "${JIRA_SERVER}/rest/api/3/search/jql?jql=project=${JIRA_PROJECT_KEY}+ORDER+BY+created+ASC&maxResults=100" \
+     -H "Authorization: Basic $(echo -n "${JIRA_EMAIL}:${JIRA_API_TOKEN}" | base64)"
+   ```
+   - Build a list of existing issue summaries (normalized: lowercased, stripped)
+   - You will use this list in step 5 to skip issues that already exist
 
-5. **Create META issue** for session tracking:
+5. **Create issues for each feature (with dedup check):**
+   For EACH feature from app_spec.txt:
+   - Normalize the proposed title (lowercase, strip whitespace)
+   - Check if an issue with a matching summary already exists in the list from step 4
+   - **If it exists: SKIP creation** — log "Skipping duplicate: [title] (already exists as [KEY])"
+   - **If it does NOT exist: CREATE it** using POST /issue
+
+   Track every created issue key + title for the state file in step 7.
+
+6. **Create META issue (only if one doesn't already exist):**
+   Check the existing issues from step 4 for any summary containing "[META]". If found, reuse it.
    - Title: `[META] Project Progress Tracker`
    - Description: `Session tracking issue for agent handoffs`
 
-6. **Save state to .jira_project.json:**
+7. **Save state to .jira_project.json (including issues list for dedup):**
    ```json
    {
      "initialized": true,
@@ -91,11 +108,64 @@ When asked to initialize a project:
      "project_key": "[JIRA_PROJECT_KEY]",
      "project_name": "[name from app_spec]",
      "meta_issue_key": "[META issue key, e.g., KAN-42]",
-     "total_issues": [count]
+     "total_issues": [count of feature issues, excluding META],
+     "issues": [
+       {"key": "KAN-1", "title": "Feature Name - Brief Description"},
+       {"key": "KAN-2", "title": "Another Feature"}
+     ]
    }
    ```
 
-7. **Add initial comment to META issue** with session 1 summary
+   The `issues` array is critical for preventing duplicates on re-runs.
+
+8. **Add initial comment to META issue** with session 1 summary
+
+---
+
+### Duplicate Cleanup (When Requested)
+
+When the orchestrator asks you to check for and clean up duplicates:
+
+1. **Search ALL issues** in the project:
+   ```bash
+   curl -s "${JIRA_SERVER}/rest/api/3/search/jql?jql=project=${JIRA_PROJECT_KEY}+ORDER+BY+created+ASC&maxResults=100" \
+     -H "Authorization: Basic $(echo -n "${JIRA_EMAIL}:${JIRA_API_TOKEN}" | base64)"
+   ```
+
+2. **Group by normalized summary** (lowercase, stripped):
+   - For each group with more than one issue: the FIRST created issue (earliest `created` timestamp) is the "keeper"
+   - All subsequent issues with the same summary are duplicates
+
+3. **Close or delete duplicates** (prefer closing over deleting to preserve audit trail):
+   First get the transition ID for "Done" or a closed status:
+   ```bash
+   curl -s "${JIRA_SERVER}/rest/api/3/issue/{duplicateKey}/transitions" \
+     -H "Authorization: Basic $(echo -n "${JIRA_EMAIL}:${JIRA_API_TOKEN}" | base64)"
+   ```
+   Then add a comment explaining the closure and transition:
+   ```bash
+   # Add comment
+   curl -s -X POST "${JIRA_SERVER}/rest/api/3/issue/{duplicateKey}/comment" \
+     -H "Authorization: Basic $(echo -n "${JIRA_EMAIL}:${JIRA_API_TOKEN}" | base64)" \
+     -H "Content-Type: application/json" \
+     -d '{"body":{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"text","text":"Closed as duplicate of {keeperKey}. Automated dedup cleanup."}]}]}}'
+   # Transition to Done/Closed
+   curl -s -X POST "${JIRA_SERVER}/rest/api/3/issue/{duplicateKey}/transitions" \
+     -H "Authorization: Basic $(echo -n "${JIRA_EMAIL}:${JIRA_API_TOKEN}" | base64)" \
+     -H "Content-Type: application/json" \
+     -d '{"transition":{"id":"[done_transition_id]"}}'
+   ```
+
+4. **Update the state file** to remove closed duplicate keys from the `issues` array and adjust `total_issues`
+
+5. **Report:**
+   ```
+   dedup_results:
+     duplicates_found: N
+     duplicates_closed: [list of closed keys with their keeper keys]
+     kept: [list of keeper keys]
+     updated_total_issues: M
+   ```
 
 ---
 

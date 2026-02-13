@@ -306,6 +306,32 @@ You MUST send Slack notifications to `#ai-cli-macz` for **every task lifecycle e
 
 ---
 
+### Duplicate Prevention (MANDATORY)
+
+**Before creating any new issues, always ask the tracker agent to check for existing issues first.**
+
+Duplicates can occur when:
+- The initializer session is re-run after a crash or timeout
+- Multiple sessions overlap and both try to create issues
+- An issue was created but the state file wasn't updated
+
+**Rules:**
+1. **First run:** Always tell the tracker agent to list existing issues BEFORE creating new ones. The tracker agent has dedup logic in its initialization steps.
+2. **Continuation sessions:** At the start of every session (Step 2), tell the tracker agent to check for and report any duplicate issues. If duplicates are found, ask the tracker agent to clean them up before proceeding with work.
+3. **State file `issues` array:** The `.linear_project.json` / `.jira_project.json` file contains an `issues` array tracking all created issue keys and titles. This is the source of truth for dedup. Always tell the tracker agent to keep this list updated.
+
+**Dedup delegation example:**
+```
+Check for duplicate issues in the project:
+1. List all issues (excluding META)
+2. Group by title (case-insensitive)
+3. If any title appears more than once: archive/close the duplicates (keep the first-created)
+4. Update the state file issues array
+5. Report: duplicates found, duplicates removed, final issue count
+```
+
+---
+
 ### Quality Rules
 
 1. **Never skip verification test** - Always run before new work
@@ -317,6 +343,7 @@ You MUST send Slack notifications to `#ai-cli-macz` for **every task lifecycle e
 7. **Every task gets a Jira ticket** - No work happens without a tracked issue
 8. **Every task gets Slack begin + close notifications** - No exceptions
 9. **Robust test coverage required** - Coding agent must write tests for every feature; reject results without test_results
+10. **Never create duplicate issues** - Always check for existing issues before creating new ones
 
 ---
 
