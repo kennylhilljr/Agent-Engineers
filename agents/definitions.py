@@ -1,5 +1,5 @@
 """
-Agent Definitions - All orchestrator sub-agents including Jira, PR Reviewer,
+Agent Definitions - All orchestrator sub-agents including PR Reviewer,
 ChatGPT, Gemini, Groq, KIMI, and Windsurf for multi-AI orchestration.
 """
 
@@ -20,7 +20,6 @@ _VALID_MODELS: Final[tuple[str, ...]] = ("haiku", "sonnet", "opus", "inherit")
 
 DEFAULT_MODELS: Final[dict[str, ModelOption]] = {
     "linear": "haiku",
-    "jira": "haiku",
     "coding": "sonnet",
     "github": "haiku",
     "slack": "haiku",
@@ -72,11 +71,6 @@ def _get_bridge_agent_tools() -> list[str]:
     return FILE_TOOLS + ["Bash"]
 
 
-def _get_jira_tools() -> list[str]:
-    """Tools for Jira agent — bash (curl) + file ops."""
-    return FILE_TOOLS + ["Bash"]
-
-
 def _get_pr_reviewer_tools() -> list[str]:
     """Tools for PR reviewer — GitHub MCP + file ops + bash."""
     return get_github_tools() + FILE_TOOLS + ["Bash"]
@@ -89,13 +83,6 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
             prompt=_load_prompt("linear_agent_prompt"),
             tools=get_linear_tools() + FILE_TOOLS,
             model=_get_model("linear")),
-        "jira": AgentDefinition(
-            description=(
-                "Manages Jira issues and project tracking via REST API. "
-                "Alternative to Linear agent. Uses curl for Jira API calls."),
-            prompt=_load_prompt("jira_agent_prompt"),
-            tools=_get_jira_tools(),
-            model=_get_model("jira")),
         "github": AgentDefinition(
             description="Handles Git commits, branches, and GitHub PRs.",
             prompt=_load_prompt("github_agent_prompt"),
@@ -163,7 +150,6 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
 
 AGENT_DEFINITIONS: dict[str, AgentDefinition] = create_agent_definitions()
 LINEAR_AGENT = AGENT_DEFINITIONS["linear"]
-JIRA_AGENT = AGENT_DEFINITIONS["jira"]
 GITHUB_AGENT = AGENT_DEFINITIONS["github"]
 SLACK_AGENT = AGENT_DEFINITIONS["slack"]
 CODING_AGENT = AGENT_DEFINITIONS["coding"]

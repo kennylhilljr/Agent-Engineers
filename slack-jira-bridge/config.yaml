@@ -1,9 +1,0 @@
-jira:
-  server: "https://kennylhilljr.atlassian.net"
-  email: "kennylhilljr@gmail.com"
-  api_token: "ATATT3xFfGF072gdcnVshZEjZBiru3IKzoks_udvCA7hiLpF-GOBFnueWRuvS1wuXq7jWdTTWRwj7r8C79yni-DG8XIlA9NvPGdcfZX3iiRaROc1aOFlPlPlUMF7YRnpa5INAB7HIr-vybWkIYRXXD9M-f3yEgtoBNP0ylhXTh9Y_pc0LI-KHsQ=FE6166D0"
-  jql: "project = KAN ORDER BY created DESC"
-  max_results: null
-
-output:
-  directory: "downloaded_issues"

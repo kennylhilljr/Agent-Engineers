@@ -2,12 +2,12 @@
 Duplicate Issue Detection and Cleanup
 ======================================
 
-Utilities for preventing duplicate ticket creation in Linear and Jira,
+Utilities for preventing duplicate ticket creation in Linear,
 and for cleaning up any duplicates that already exist.
 
 Duplicates are detected by normalized title matching. The local state file
-(.linear_project.json / .jira_project.json) tracks all created issue
-keys and titles so that re-runs of the initializer don't create duplicates.
+(.linear_project.json) tracks all created issue keys and titles so that
+re-runs of the initializer don't create duplicates.
 """
 
 import json
@@ -17,17 +17,15 @@ from typing import TypedDict
 
 from progress import (
     ProjectState,
-    TrackerType,
-    detect_tracker,
+    LINEAR_PROJECT_MARKER,
     load_project_state,
-    _get_marker_file,
 )
 
 
 class TrackedIssue(TypedDict):
     """An issue tracked in the local state file for dedup purposes."""
 
-    key: str    # e.g. "ENG-42" (Linear) or "KAN-42" (Jira)
+    key: str    # e.g. "AI-42"
     title: str  # Original issue title
 
 
@@ -45,7 +43,7 @@ def normalize_title(title: str) -> str:
         Normalized title string for comparison
     """
     normalized = title.strip().lower()
-    # Remove leading issue-key-style prefixes like "[KAN-5]" or "ENG-42:"
+    # Remove leading issue-key-style prefixes like "[AI-5]" or "ENG-42:"
     normalized = re.sub(r"^\[?[A-Z]+-\d+\]?\s*[:–—-]?\s*", "", normalized)
     # Collapse multiple whitespace
     normalized = re.sub(r"\s+", " ", normalized)
@@ -71,18 +69,17 @@ def find_duplicates(issues: list[TrackedIssue]) -> dict[str, list[TrackedIssue]]
     return {title: group for title, group in by_title.items() if len(group) > 1}
 
 
-def get_tracked_issues(project_dir: Path, tracker: TrackerType | None = None) -> list[TrackedIssue]:
+def get_tracked_issues(project_dir: Path) -> list[TrackedIssue]:
     """
     Load the list of tracked issues from the project state file.
 
     Args:
         project_dir: Project directory containing the state file
-        tracker: Which tracker (auto-detected if None)
 
     Returns:
         List of tracked issues, or empty list if none tracked yet
     """
-    state = load_project_state(project_dir, tracker)
+    state = load_project_state(project_dir)
     if state is None:
         return []
     raw_issues = state.get("issues", [])
@@ -99,7 +96,6 @@ def get_tracked_issues(project_dir: Path, tracker: TrackerType | None = None) ->
 def save_tracked_issues(
     project_dir: Path,
     issues: list[TrackedIssue],
-    tracker: TrackerType | None = None,
 ) -> None:
     """
     Save the tracked issues list back to the project state file.
@@ -110,12 +106,8 @@ def save_tracked_issues(
     Args:
         project_dir: Project directory containing the state file
         issues: Updated list of tracked issues
-        tracker: Which tracker (auto-detected if None)
     """
-    if tracker is None:
-        tracker = detect_tracker(project_dir)
-
-    marker_file = _get_marker_file(project_dir, tracker)
+    marker_file = project_dir / LINEAR_PROJECT_MARKER
 
     # Load existing state or start fresh
     state: dict = {}
@@ -177,18 +169,17 @@ def deduplicate_issues(issues: list[TrackedIssue]) -> tuple[list[TrackedIssue], 
     return keepers, duplicates
 
 
-def get_dedup_summary(project_dir: Path, tracker: TrackerType | None = None) -> str:
+def get_dedup_summary(project_dir: Path) -> str:
     """
     Generate a human-readable summary of duplicate issues.
 
     Args:
         project_dir: Project directory
-        tracker: Which tracker (auto-detected if None)
 
     Returns:
         Summary string describing any duplicates found, or a clean message
     """
-    issues = get_tracked_issues(project_dir, tracker)
+    issues = get_tracked_issues(project_dir)
     if not issues:
         return "No tracked issues found in project state."
 

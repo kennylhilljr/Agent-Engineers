@@ -229,7 +229,7 @@ files_committed:
 
 **Commit and create PR for a story (standard flow):**
 
-PRs are created **per Jira story**, not per session. When the orchestrator asks to commit and create a PR for a story:
+PRs are created **per Linear issue**, not per session. When the orchestrator asks to commit and create a PR for an issue:
 
 1. Check env: `echo $GITHUB_REPO`
 2. If empty: commit locally, report `remote_configured: false`
@@ -248,7 +248,7 @@ git commit -m "feat: <description>
 - <detail 1>
 - <detail 2>
 
-Jira issue: <ISSUE_KEY>"
+Linear issue: <ISSUE_KEY>"
 
 # Push feature branch
 git push -u origin feature/<ISSUE_KEY>-<short-name>
@@ -272,7 +272,7 @@ CreatePullRequest:
     ## Testing
     - <test results from coding agent>
 
-    ## Jira Issue
+    ## Linear Issue
     Resolves <ISSUE_KEY>
 ```
 

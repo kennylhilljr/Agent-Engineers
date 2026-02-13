@@ -1,4 +1,4 @@
-# KAN-195: Google Gemini Agent Integration
+# Google Gemini Agent Integration
 
 ## Overview
 
@@ -79,7 +79,7 @@ echo "prompt" | python scripts/gemini_cli.py -q -      # Pipe
 ```
 Orchestrator
     |
-    +-- linear/jira (Haiku)
+    +-- linear (Haiku)
     +-- coding (Sonnet)
     +-- github (Haiku)
     +-- slack (Haiku)

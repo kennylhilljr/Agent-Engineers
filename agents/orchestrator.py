@@ -16,7 +16,7 @@ from claude_agent_sdk import (
 )
 
 from agent import SessionResult, SESSION_CONTINUE, SESSION_ERROR
-from progress import detect_tracker, JIRA_PROJECT_MARKER, LINEAR_PROJECT_MARKER
+from progress import LINEAR_PROJECT_MARKER
 
 
 async def run_orchestrated_session(
@@ -38,26 +38,16 @@ async def run_orchestrated_session(
         - status="error": Exception occurred during orchestration
 
     The orchestrator will use the Task tool to delegate to specialized agents
-    (linear/jira, coding, github, slack) based on the work needed.
+    (linear, coding, github, slack) based on the work needed.
     """
-    tracker = detect_tracker(project_dir)
-    if tracker == "jira":
-        state_file = JIRA_PROJECT_MARKER
-        tracker_name = "Jira"
-        tracker_agent = "jira"
-    else:
-        state_file = LINEAR_PROJECT_MARKER
-        tracker_name = "Linear"
-        tracker_agent = "linear"
-
     initial_message = f"""
     Start a new session. Your working directory is: {project_dir}
 
-    Issue tracker: {tracker_name} (use the `{tracker_agent}` agent for all issue operations)
+    Issue tracker: Linear (use the `linear` agent for all issue operations)
 
     Begin by:
-    1. Reading {state_file} to understand project state
-    2. Checking {tracker_name} for current issue status via the `{tracker_agent}` agent
+    1. Reading {LINEAR_PROJECT_MARKER} to understand project state
+    2. Checking Linear for current issue status via the `linear` agent
     3. Deciding what to work on next
     4. Delegating to appropriate agents
     """
