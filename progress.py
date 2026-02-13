@@ -39,6 +39,8 @@ class ProjectState(TypedDict, total=False):
     # Common
     total_issues: int
     notes: str
+    # Dedup tracking: list of {"key": "ENG-42", "title": "Feature Name"} dicts
+    issues: list[dict[str, str]]
 
 
 def detect_tracker(project_dir: Path) -> TrackerType:
