@@ -1,4 +1,4 @@
-# Groq SDK Integration (KAN-1)
+# Groq SDK Integration
 
 ## Overview
 
@@ -13,7 +13,7 @@ models including Llama 4, Llama 3.3, GPT-OSS, Qwen, and Kimi K2.
 │             Orchestrator Agent                   │
 │  (routes tasks to specialized agents)            │
 ├─────────┬──────────┬──────────┬────────┬────────┤
-│ coding  │ github   │ slack    │ jira   │ groq   │
+│ coding  │ github   │ slack    │ linear │ groq   │
 │ agent   │ agent    │ agent    │ agent  │ agent  │
 └─────────┴──────────┴──────────┴────────┴────┬───┘
                                                │

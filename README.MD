@@ -16,7 +16,7 @@
 
 <img src="https://img.shields.io/badge/Claude-Orchestrator-D4A574?style=flat-square" alt="Claude" />
 <img src="https://img.shields.io/badge/Gemini-Research-4285F4?style=flat-square" alt="Gemini" />
-<img src="https://img.shields.io/badge/Jira-Tracking-0052CC?style=flat-square" alt="Jira" />
+<img src="https://img.shields.io/badge/Linear-Tracking-5E6AD2?style=flat-square" alt="Linear" />
 <img src="https://img.shields.io/badge/GitHub-Version_Control-181717?style=flat-square" alt="GitHub" />
 <img src="https://img.shields.io/badge/Slack-Notifications-4A154B?style=flat-square" alt="Slack" />
 <img src="https://img.shields.io/badge/Playwright-Browser_Testing-2EAD33?style=flat-square" alt="Playwright" />
@@ -24,7 +24,7 @@
 **Long-Running Autonomy**: Harness architecture enables extended coding sessions across multiple iterations
 **Multi-Agent Orchestration**: 11 specialized agents handle distinct concerns coordinated by an orchestrator
 **Multi-AI Providers**: Claude (primary), ChatGPT, Gemini, Groq, KIMI, and Windsurf agents for cross-validation, parallel coding, and specialized tasks
-**Linear + Jira Integration**: Automatic issue tracking with real-time status updates and session handoff (choose your tracker)
+**Linear Integration**: Automatic issue tracking with real-time status updates and session handoff
 **GitHub Integration**: Automatic commits, branches, PR creation, and automated PR review with merge
 **Slack Notifications**: Mandatory progress updates at every task lifecycle event
 **Arcade MCP Gateway**: Single authentication flow for all external services (Linear, GitHub, Slack)
@@ -48,7 +48,6 @@ flowchart TB
 
     subgraph WorkflowAgents["Workflow Agents"]
         LINEAR["Linear Agent<br/>(Haiku)<br/>Issues & project tracking"]
-        JIRA["Jira Agent<br/>(Haiku)<br/>Issues & project tracking"]
         CODING["Coding Agent<br/>(Sonnet)<br/>Implementation + Playwright"]
         GITHUB["GitHub Agent<br/>(Haiku)<br/>Commits, branches, PRs"]
         PR_REVIEW["PR Reviewer Agent<br/>(Sonnet)<br/>Code review & auto-merge"]
@@ -71,13 +70,13 @@ flowchart TB
     end
 
     subgraph State["Shared State"]
-        STATE_FILE[".linear_project.json<br/>or .jira_project.json"]
+        STATE_FILE[".linear_project.json"]
         META["META Issue<br/>Session tracking"]
         PROJECT["Project Output<br/>generations/project-name/"]
     end
 
     SPEC --> ORCH
-    ORCH --> LINEAR & JIRA & CODING & GITHUB & PR_REVIEW & SLACK
+    ORCH --> LINEAR & CODING & GITHUB & PR_REVIEW & SLACK
     ORCH --> CHATGPT & GEMINI & GROQ & KIMI & WINDSURF
     LINEAR --> LINEAR_API
     GITHUB --> GITHUB_API
@@ -86,7 +85,6 @@ flowchart TB
     CODING --> PROJECT
     GITHUB --> PROJECT
     LINEAR --> STATE_FILE & META
-    JIRA --> STATE_FILE & META
 
     style Orchestrator fill:#1a1a2e,stroke:#e94560,color:#fff
     style WorkflowAgents fill:#16213e,stroke:#0f3460,color:#fff
@@ -95,16 +93,16 @@ flowchart TB
     style State fill:#16213e,stroke:#e94560,color:#fff
 ```
 
-> **Note:** The `AgentHarnessDiagram.png` image shows the current architecture with all 11 agents, Jira/Linear support, PR review, multi-AI providers, and defense-in-depth security.
+> **Note:** The `AgentHarnessDiagram.png` image shows the current architecture with all agents, Linear support, PR review, multi-AI providers, and defense-in-depth security.
 
 ### Session Flow
 
 ```
 Session 1 (Initialization)              Sessions 2-N (Implementation Loop)
 ─────────────────────────               ──────────────────────────────────
-1. Read app_spec.txt                    1. Read state (.linear/.jira_project.json)
-2. Create project + issues              2. Query tracker for status
-   (Linear or Jira agent)              3. Verification gate (test existing features)
+1. Read app_spec.txt                    1. Read state (.linear_project.json)
+2. Create project + issues              2. Query Linear for status
+   (Linear agent)                      3. Verification gate (test existing features)
 3. Create META tracking issue           4. Slack: notify task started
 4. Initialize git repo                  5. Implement next issue (Coding agent)
 5. Push to GitHub (if configured)       6. Commit + create PR (GitHub agent)
@@ -135,7 +133,6 @@ The central coordinator that reads project state, decides what to work on, and d
 | Agent | Default Model | Purpose | Tools | Prompt |
 |-------|---------------|---------|-------|--------|
 | **Linear** | Haiku | Issue tracking via Linear API (projects, issues, status, comments, META tracking) | 39 Linear MCP tools + file ops | `linear_agent_prompt.md` |
-| **Jira** | Haiku | Issue tracking via Jira REST API (alternative to Linear) | Bash (curl) + file ops | `jira_agent_prompt.md` |
 | **Coding** | Sonnet | Feature implementation, test writing, Playwright browser testing, screenshot evidence | File ops + Bash + Playwright MCP | `coding_agent_prompt.md` |
 | **GitHub** | Haiku | Git commits, branches, remote push, PR creation per story | GitHub MCP tools + file ops + Bash | `github_agent_prompt.md` |
 | **PR Reviewer** | Sonnet | Automated code review against a 5-point checklist; approves and merges or requests changes | GitHub MCP tools + file ops + Bash | `pr_reviewer_agent_prompt.md` |
@@ -520,8 +517,8 @@ The multi-model architecture means the right AI handles the right job: Claude So
             ┌────────────┬───────────┼───────────┬────────────┐
             │            │           │           │            │
     ┌───────▼──────┐ ┌───▼────┐ ┌───▼────┐ ┌───▼─────┐ ┌───▼──────┐
-    │   TRACKER    │ │ CODER  │ │ GITHUB │ │  SLACK  │ │ GEMINI   │
-    │  Jira/Linear │ │ Sonnet │ │ Haiku  │ │  Haiku  │ │  Haiku   │
+    │   LINEAR     │ │ CODER  │ │ GITHUB │ │  SLACK  │ │ GEMINI   │
+    │    Linear    │ │ Sonnet │ │ Haiku  │ │  Haiku  │ │  Haiku   │
     │    Haiku     │ │        │ │        │ │         │ │    ↓     │
     ├──────────────┤ ├────────┤ ├────────┤ ├─────────┤ │ gemini   │
     │ Create issues│ │ Write  │ │ Branch │ │ Notify  │ │  -cli    │
@@ -543,8 +540,7 @@ The multi-model architecture means the right AI handles the right job: Claude So
 | Agent | Model | Role |
 |:------|:------|:-----|
 | **Orchestrator** | Claude Haiku | Coordinates all agents, passes context between them, enforces quality gates |
-| **Tracker** (Jira) | Claude Haiku | Creates/updates Jira issues, manages sprint status, session handoff via META issue |
-| **Tracker** (Linear) | Claude Haiku | Alternative tracker — same capabilities for Linear workspaces |
+| **Linear** | Claude Haiku | Creates/updates Linear issues, manages project status, session handoff via META issue |
 | **Coder** | Claude Sonnet | Implements features, writes tests, browser-tests with Playwright, provides screenshot evidence |
 | **GitHub** | Claude Haiku | Creates branches, commits code, pushes to remote, opens pull requests |
 | **PR Reviewer** | Claude Sonnet | Reviews PRs for quality, approves or requests changes, auto-merges approved PRs |
@@ -560,7 +556,7 @@ Every feature follows a rigorous lifecycle — automatically:
 ```
  ┌──────────────────────────────────────────────────────────────────────┐
  │                                                                      │
- │   📋 Jira: Create issue         🔔 Slack: "Starting KAN-42..."      │
+ │   📋 Linear: Create issue        🔔 Slack: "Starting AI-42..."      │
  │          │                              │                            │
  │          ▼                              ▼                            │
  │   🔍 Verification Gate ◄── FAIL ── Fix regressions first            │
@@ -582,7 +578,7 @@ Every feature follows a rigorous lifecycle — automatically:
  │       APPROVED                                                       │
  │          │                                                           │
  │          ▼                                                           │
- │   ✅ Merge → Jira: Done → Slack: "Completed!"                       │
+ │   ✅ Merge → Linear: Done → Slack: "Completed!"                       │
  │                                                                      │
  └──────────────────────────────────────────────────────────────────────┘
 ```
@@ -655,10 +651,7 @@ chmod +x setup_gemini.sh && ./setup_gemini.sh
 | `ARCADE_USER_ID` | Your email for user tracking | Recommended |
 | `GENERATIONS_BASE_PATH` | Base directory for generated projects (default: ./generations) | No |
 | **Issue Tracker** | | |
-| `JIRA_SERVER` | Atlassian instance URL (e.g., https://yourorg.atlassian.net) | If using Jira |
-| `JIRA_EMAIL` | Atlassian account email | If using Jira |
-| `JIRA_API_TOKEN` | Jira API token | If using Jira |
-| `JIRA_PROJECT_KEY` | Jira project key (e.g., KAN) | If using Jira |
+| *(Linear via Arcade MCP — no extra env vars needed)* | | |
 | **GitHub** | | |
 | `GITHUB_REPO` | GitHub repo in format `owner/repo` for auto-push | No |
 | **Slack** | | |
@@ -730,20 +723,12 @@ uv run python autonomous_agent_demo.py --project-dir my-app --max-iterations 3
 4. Optionally add GitHub and Slack tools
 5. Run `python authorize_arcade.py` to authorize
 
-#### 2. Issue Tracker
+#### 2. Issue Tracker (Linear)
 
-Choose **one** issue tracker:
-
-**Linear** (via Arcade MCP):
+Linear is the issue tracker (via Arcade MCP):
 A Linear workspace with at least one team
 Linear tools added to your Arcade gateway
 The orchestrator will automatically detect your team and create projects
-
-**Jira** (via REST API):
-Set `JIRA_SERVER`, `JIRA_EMAIL`, `JIRA_API_TOKEN`, and `JIRA_PROJECT_KEY` in `.env`
-Get your API token from https://id.atlassian.com/manage-profile/security/api-tokens
-
-The orchestrator auto-detects which tracker to use based on the presence of `.linear_project.json` or `.jira_project.json`, or the `JIRA_SERVER` env var.
 
 #### 3. GitHub Integration (Optional)
 
@@ -774,7 +759,6 @@ See the [Gemini section above](#gemini-google--cross-validation-provider) or `GE
 |:---------|:--------|:--------|
 | `ORCHESTRATOR_MODEL` | `haiku` | `haiku`, `sonnet`, `opus` |
 | `LINEAR_AGENT_MODEL` | `haiku` | `haiku`, `sonnet`, `opus`, `inherit` |
-| `JIRA_AGENT_MODEL` | `haiku` | `haiku`, `sonnet`, `opus`, `inherit` |
 | `CODING_AGENT_MODEL` | `sonnet` | `haiku`, `sonnet`, `opus`, `inherit` |
 | `GITHUB_AGENT_MODEL` | `haiku` | `haiku`, `sonnet`, `opus`, `inherit` |
 | `SLACK_AGENT_MODEL` | `haiku` | `haiku`, `sonnet`, `opus`, `inherit` |
@@ -810,7 +794,6 @@ Agent-Engineers/
 │   ├── initializer_task.md          # Task message for first session
 │   ├── continuation_task.md         # Task message for continuation sessions
 │   ├── linear_agent_prompt.md       # Linear subagent prompt
-│   ├── jira_agent_prompt.md         # Jira subagent prompt
 │   ├── coding_agent_prompt.md       # Coding subagent prompt
 │   ├── github_agent_prompt.md       # GitHub subagent prompt
 │   ├── pr_reviewer_agent_prompt.md  # PR review subagent prompt
@@ -837,8 +820,7 @@ Agent-Engineers/
 
 ```
 generations/my-app/           # Or GENERATIONS_BASE_PATH/my-app/
-├── .linear_project.json      # Linear project state (if using Linear)
-├── .jira_project.json        # Jira project state (if using Jira)
+├── .linear_project.json      # Linear project state
 ├── app_spec.txt              # Copied specification
 ├── init.sh                   # Environment setup script
 ├── .claude_settings.json     # Security settings
@@ -862,7 +844,7 @@ Defense-in-depth — multiple layers protect against unintended operations:
 
 | Server | Transport | Purpose |
 |:-------|:----------|:--------|
-| **Arcade Gateway** | HTTP | Unified OAuth access to Linear, Jira, GitHub, Slack (93+ tools) |
+| **Arcade Gateway** | HTTP | Unified OAuth access to Linear, GitHub, Slack (93+ tools) |
 | **Playwright** | stdio | Browser automation for UI testing & screenshot evidence |
 | **gemini-cli** | subprocess | Google Gemini models for research & web search grounding |
 
@@ -876,7 +858,7 @@ Defense-in-depth — multiple layers protect against unintended operations:
 
 **Add allowed commands:** Edit `security.py` to add commands to `ALLOWED_COMMANDS`.
 
-**Switch trackers:** Set `JIRA_SERVER` in `.env` for Jira, or leave it unset for Linear. The orchestrator auto-detects based on `.jira_project.json` or `.linear_project.json`.
+**Issue tracker:** Linear is used for all issue tracking via Arcade MCP. State is stored in `.linear_project.json`.
 
 <br/>
 
@@ -899,7 +881,7 @@ Defense-in-depth — multiple layers protect against unintended operations:
 
 | Where | What You See |
 |:------|:-------------|
-| **Jira/Linear** | Real-time issue transitions, implementation comments, session summaries on META issue |
+| **Linear** | Real-time issue transitions, implementation comments, session summaries on META issue |
 | **GitHub** | Feature branches, commits, pull requests with linked issues |
 | **Slack** | Live notifications for every task lifecycle event (start → PR → review → done) |
 | **Terminal** | Agent coordination logs, tool calls, iteration progress |

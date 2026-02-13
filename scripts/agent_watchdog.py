@@ -418,73 +418,12 @@ class AgentWatchdog:
 
         self.logger.info(f"[{tag}] Agent restarted with PID {process.pid}")
 
-        # Jira comment (best-effort)
-        self._jira_restart_comment(project_dir, reason, process.pid)
-
         return process.pid
 
     def _build_agent_command(self, project_dir: Path) -> list[str]:
         venv_python = REPO_ROOT / "venv" / "bin" / "python"
         demo_script = REPO_ROOT / "autonomous_agent_demo.py"
         return [str(venv_python), str(demo_script), "--project-dir", project_dir.name]
-
-    # ------------------------------------------------------------------
-    # Jira integration (best-effort)
-    # ------------------------------------------------------------------
-
-    def _jira_restart_comment(self, project_dir: Path, reason: str, new_pid: int) -> None:
-        server = os.environ.get("JIRA_SERVER")
-        email = os.environ.get("JIRA_EMAIL")
-        token = os.environ.get("JIRA_API_TOKEN")
-
-        if not all([server, email, token]):
-            return
-
-        try:
-            state = load_project_state(project_dir)
-        except (ValueError, OSError):
-            return
-
-        if not state:
-            return
-
-        meta_key = state.get("meta_issue_key")
-        if not meta_key:
-            return
-
-        body = {
-            "body": {
-                "type": "doc", "version": 1,
-                "content": [{
-                    "type": "paragraph",
-                    "content": [{
-                        "type": "text",
-                        "text": (
-                            f"[Watchdog] Agent auto-restarted at "
-                            f"{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}. "
-                            f"New PID: {new_pid}. Reason: {reason}"
-                        ),
-                    }],
-                }],
-            }
-        }
-
-        auth = b64encode(f"{email}:{token}".encode()).decode()
-
-        try:
-            subprocess.run(
-                [
-                    "curl", "-s", "-X", "POST",
-                    f"{server}/rest/api/3/issue/{meta_key}/comment",
-                    "-H", f"Authorization: Basic {auth}",
-                    "-H", "Content-Type: application/json",
-                    "-d", json.dumps(body),
-                ],
-                capture_output=True, timeout=30,
-            )
-            self.logger.info(f"[{project_dir.name}] Jira comment added to {meta_key}")
-        except (subprocess.TimeoutExpired, OSError) as exc:
-            self.logger.debug(f"[{project_dir.name}] Jira comment failed: {exc}")
 
     # ------------------------------------------------------------------
     # Check cycle

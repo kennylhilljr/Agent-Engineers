@@ -2,7 +2,7 @@
 Ticket Daemon
 =============
 
-A long-running daemon that polls Jira/Linear for available tickets and
+A long-running daemon that polls Linear for available tickets and
 dispatches agent workers to process them concurrently. Ensures agents are
 always working on tickets around the clock.
 
@@ -16,7 +16,6 @@ import json
 import logging
 import os
 import signal
-import subprocess
 import traceback
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -35,10 +34,7 @@ from agent import (
 )
 from client import create_client
 from progress import (
-    JIRA_PROJECT_MARKER,
     LINEAR_PROJECT_MARKER,
-    TrackerType,
-    detect_tracker,
     is_project_initialized,
     load_project_state,
 )
@@ -92,7 +88,7 @@ TicketStatus = Literal["todo", "in_progress", "review", "done"]
 
 @dataclass
 class Ticket:
-    """A ticket from Jira or Linear that can be worked on."""
+    """A ticket from Linear that can be worked on."""
 
     key: str
     title: str
@@ -111,103 +107,8 @@ class Ticket:
 
 
 # ---------------------------------------------------------------------------
-# Jira poller
+# Linear poller
 # ---------------------------------------------------------------------------
-
-def _jira_auth_header() -> str:
-    """Build the Basic auth header value for Jira."""
-    import base64
-
-    email = os.environ.get("JIRA_EMAIL", "")
-    token = os.environ.get("JIRA_API_TOKEN", "")
-    if not email or not token:
-        raise ValueError("JIRA_EMAIL and JIRA_API_TOKEN must be set")
-    encoded = base64.b64encode(f"{email}:{token}".encode()).decode()
-    return f"Basic {encoded}"
-
-
-def _poll_jira_tickets(project_key: str) -> list[Ticket]:
-    """
-    Poll Jira for tickets that are in To Do or In Progress status.
-
-    Returns tickets sorted by priority (highest first).
-    """
-    server = os.environ.get("JIRA_SERVER", "")
-    if not server:
-        raise ValueError("JIRA_SERVER environment variable not set")
-
-    auth = _jira_auth_header()
-
-    # Query for tickets that are actionable (To Do or In Progress, excluding META)
-    jql = (
-        f"project={project_key} "
-        f"AND status IN ('To Do', 'In Progress') "
-        f"AND summary !~ '[META]' "
-        f"ORDER BY priority DESC, created ASC"
-    )
-
-    result = subprocess.run(
-        [
-            "curl", "-s", "-X", "GET",
-            f"{server}/rest/api/3/search/jql?jql={jql}&maxResults=50",
-            "-H", f"Authorization: {auth}",
-            "-H", "Content-Type: application/json",
-        ],
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-
-    if result.returncode != 0:
-        raise RuntimeError(f"Jira API call failed: {result.stderr}")
-
-    data = json.loads(result.stdout)
-    issues = data.get("issues", [])
-
-    tickets: list[Ticket] = []
-    for issue in issues:
-        fields = issue.get("fields", {})
-        status_name = fields.get("status", {}).get("name", "").lower()
-
-        # Map Jira status names to our internal status
-        if "done" in status_name:
-            ticket_status: TicketStatus = "done"
-        elif "progress" in status_name:
-            ticket_status = "in_progress"
-        elif "review" in status_name:
-            ticket_status = "review"
-        else:
-            ticket_status = "todo"
-
-        # Skip tickets that are already done or in review
-        if ticket_status in ("done", "review"):
-            continue
-
-        # Extract description text
-        desc = fields.get("description", {})
-        desc_text = ""
-        if isinstance(desc, dict):
-            # ADF format - extract text from content blocks
-            for block in desc.get("content", []):
-                for item in block.get("content", []):
-                    if item.get("type") == "text":
-                        desc_text += item.get("text", "")
-                desc_text += "\n"
-        elif isinstance(desc, str):
-            desc_text = desc
-
-        priority_name = fields.get("priority", {}).get("name", "Medium").lower()
-
-        tickets.append(Ticket(
-            key=issue["key"],
-            title=fields.get("summary", ""),
-            description=desc_text.strip(),
-            status=ticket_status,
-            priority=priority_name,
-        ))
-
-    return tickets
-
 
 def _poll_linear_tickets(project_dir: Path) -> list[Ticket]:
     """
@@ -326,7 +227,7 @@ class TicketDaemon:
     Long-running daemon that polls for tickets and dispatches workers.
 
     The daemon:
-    1. Polls Jira/Linear at regular intervals for actionable tickets
+    1. Polls Linear at regular intervals for actionable tickets
     2. Assigns tickets to idle workers (up to max_workers concurrently)
     3. Tracks which tickets are being worked on to avoid duplicates
     4. Retries with exponential backoff on errors
@@ -366,11 +267,6 @@ class TicketDaemon:
         self.consecutive_poll_errors: int = 0
 
     @property
-    def tracker(self) -> TrackerType:
-        """Detect which tracker is in use."""
-        return detect_tracker(self.project_dir)
-
-    @property
     def idle_workers(self) -> list[WorkerState]:
         """Get workers that are not currently busy."""
         return [w for w in self.workers if not w.busy]
@@ -398,21 +294,8 @@ class TicketDaemon:
             logger.info("  Worker %d: IDLE (completed %d tickets)", w.worker_id, w.tickets_completed)
 
     def _poll_tickets(self) -> list[Ticket]:
-        """Poll for available tickets based on the configured tracker."""
-        tracker = self.tracker
-
-        if tracker == "jira":
-            state = load_project_state(self.project_dir, "jira")
-            if state is None:
-                logger.warning("No .jira_project.json found — project not initialized")
-                return []
-            project_key = state.get("project_key", os.environ.get("JIRA_PROJECT_KEY", ""))
-            if not project_key:
-                logger.error("No project_key in state file and JIRA_PROJECT_KEY not set")
-                return []
-            return _poll_jira_tickets(project_key)
-        else:
-            return _poll_linear_tickets(self.project_dir)
+        """Poll for available tickets from Linear."""
+        return _poll_linear_tickets(self.project_dir)
 
     def _filter_actionable_tickets(self, tickets: list[Ticket]) -> list[Ticket]:
         """Filter out tickets that are already being worked on."""
@@ -526,7 +409,7 @@ class TicketDaemon:
         logger.info("Model: %s", self.model)
         logger.info("Max workers: %d", self.max_workers)
         logger.info("Poll interval: %ds", self.poll_interval)
-        logger.info("Tracker: %s", self.tracker)
+        logger.info("Tracker: Linear")
         logger.info("=" * 70)
 
         # Ensure project is initialized
@@ -672,10 +555,6 @@ Examples:
 Environment Variables:
   ARCADE_API_KEY             Arcade API key (required)
   ARCADE_GATEWAY_SLUG        MCP gateway slug (required)
-  JIRA_SERVER                Jira instance URL (for Jira projects)
-  JIRA_EMAIL                 Jira email (for Jira projects)
-  JIRA_API_TOKEN             Jira API token (for Jira projects)
-  JIRA_PROJECT_KEY           Jira project key (for Jira projects)
   ORCHESTRATOR_MODEL         Default orchestrator model
   DAEMON_MAX_WORKERS         Default max workers (overridden by --max-workers)
   DAEMON_POLL_INTERVAL       Default poll interval in seconds (overridden by --poll-interval)
