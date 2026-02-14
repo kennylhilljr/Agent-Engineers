@@ -81,7 +81,7 @@ MAX_CONSECUTIVE_ERRORS: int = 5
 BACKOFF_CEILING: int = 300
 
 # Cooldown after a worker finishes a ticket before it can pick up a new one
-WORKER_COOLDOWN: int = 5
+WORKER_COOLDOWN: int = 0
 
 
 # ---------------------------------------------------------------------------

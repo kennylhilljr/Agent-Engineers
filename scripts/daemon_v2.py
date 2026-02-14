@@ -73,7 +73,7 @@ logger = logging.getLogger("daemon_v2")
 MAX_CONSECUTIVE_ERRORS: int = 5
 BACKOFF_CEILING: int = 300
 ERROR_RETRY_DELAY: int = 30
-WORKER_COOLDOWN: int = 5
+WORKER_COOLDOWN: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -347,8 +347,30 @@ class ScalableDaemon:
 
     # --- Ticket polling and dispatch ---
 
+    def _drain_event_queue(self) -> list[Ticket]:
+        """Drain all tickets from the webhook event queue (Proposal 9)."""
+        queued: list[Ticket] = []
+        while not self.pool_manager.ticket_queue.empty():
+            try:
+                ticket = self.pool_manager.ticket_queue.get_nowait()
+                queued.append(ticket)
+            except asyncio.QueueEmpty:
+                break
+        return queued
+
     def _poll_tickets(self) -> list[Ticket]:
-        """Poll for actionable tickets."""
+        """Poll for actionable tickets.
+
+        First drains the webhook event queue for immediate dispatch.
+        Falls back to synthetic LINEAR_CHECK if queue is empty.
+        """
+        # Drain webhook-delivered tickets first (instant, no latency)
+        queued = self._drain_event_queue()
+        if queued:
+            logger.info("Event queue: %d tickets from webhooks", len(queued))
+            return queued
+
+        # Fallback: synthetic check (polling mode)
         return [Ticket(
             key="LINEAR_CHECK",
             title="Check Linear for available tickets",
