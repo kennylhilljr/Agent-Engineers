@@ -146,13 +146,23 @@ def write_security_settings(project_dir: Path, settings: SecuritySettings) -> Pa
     return settings_file
 
 
-def create_client(project_dir: Path, model: str) -> ClaudeSDKClient:
+def create_client(
+    project_dir: Path,
+    model: str,
+    cwd: Path | None = None,
+    agent_overrides: dict | None = None,
+) -> ClaudeSDKClient:
     """
     Create a Claude Agent SDK client with multi-layered security.
 
     Args:
         project_dir: Directory for the project
         model: Claude model to use
+        cwd: Working directory override (defaults to project_dir).
+            Used by daemon_v2 for worktree isolation.
+        agent_overrides: Optional agent definitions to use instead of the
+            default AGENT_DEFINITIONS. Used by daemon_v2 for per-pool
+            model routing.
 
     Returns:
         Configured ClaudeSDKClient
@@ -190,6 +200,12 @@ def create_client(project_dir: Path, model: str) -> ClaudeSDKClient:
     # Load orchestrator prompt as system prompt
     orchestrator_prompt = load_orchestrator_prompt()
 
+    # Use provided agent definitions or fall back to defaults
+    agents = agent_overrides if agent_overrides is not None else AGENT_DEFINITIONS
+
+    # Use provided cwd or fall back to project_dir
+    effective_cwd = cwd if cwd is not None else project_dir
+
     return ClaudeSDKClient(
         options=ClaudeAgentOptions(
             model=model,
@@ -214,9 +230,9 @@ def create_client(project_dir: Path, model: str) -> ClaudeSDKClient:
                     ),
                 ],
             },
-            agents=AGENT_DEFINITIONS,
+            agents=agents,
             max_turns=MAX_AGENT_TURNS,
-            cwd=str(project_dir.resolve()),
+            cwd=str(effective_cwd.resolve()),
             settings=str(settings_file.resolve()),
         )
     )
