@@ -27,19 +27,18 @@ Environment Variables:
 import json
 import os
 import subprocess
-import tempfile
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import AsyncIterator, Optional
+from enum import StrEnum
 
 
-class GeminiAuthType(str, Enum):
+class GeminiAuthType(StrEnum):
     CLI_OAUTH = "cli-oauth"
     API_KEY = "api-key"
     VERTEX_AI = "vertex-ai"
 
 
-class GeminiModel(str, Enum):
+class GeminiModel(StrEnum):
     GEMINI_25_FLASH = "gemini-2.5-flash"
     GEMINI_25_PRO = "gemini-2.5-pro"
     GEMINI_20_FLASH = "gemini-2.0-flash"
@@ -83,8 +82,8 @@ class GeminiSession:
 class GeminiResponse:
     content: str
     model: str
-    usage: Optional[dict] = None
-    finish_reason: Optional[str] = None
+    usage: dict | None = None
+    finish_reason: str | None = None
 
 
 class GeminiCLIClient:
@@ -102,7 +101,9 @@ class GeminiCLIClient:
         try:
             result = subprocess.run(
                 ["gemini", "--version"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             return result.returncode == 0
         except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -115,13 +116,25 @@ class GeminiCLIClient:
             prefix = "User:" if msg.role == "user" else "Gemini:"
             context_parts.append(f"{prefix} {msg.content}")
         if context_parts:
-            full_prompt = "Previous conversation:\n" + "\n".join(context_parts) + f"\n\nUser: {message}"
+            full_prompt = (
+                "Previous conversation:\n" + "\n".join(context_parts) + f"\n\nUser: {message}"
+            )
         else:
             full_prompt = message
         try:
             result = subprocess.run(
-                ["gemini", "-p", full_prompt, "--model", session.model.value, "--output-format", "json"],
-                capture_output=True, text=True, timeout=120,
+                [
+                    "gemini",
+                    "-p",
+                    full_prompt,
+                    "--model",
+                    session.model.value,
+                    "--output-format",
+                    "json",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=120,
             )
             if result.returncode != 0:
                 error_msg = result.stderr.strip() or "gemini-cli returned non-zero exit code"
@@ -134,14 +147,26 @@ class GeminiCLIClient:
         except subprocess.TimeoutExpired:
             raise TimeoutError("gemini-cli timed out after 120 seconds")
         session.add_message("model", content)
-        return GeminiResponse(content=content, model=session.model.value, usage=None, finish_reason="stop")
+        return GeminiResponse(
+            content=content, model=session.model.value, usage=None, finish_reason="stop"
+        )
 
     def stream_message(self, session: GeminiSession, message: str) -> str:
         session.add_message("user", message)
         try:
             process = subprocess.Popen(
-                ["gemini", "-p", message, "--model", session.model.value, "--output-format", "stream-json"],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                [
+                    "gemini",
+                    "-p",
+                    message,
+                    "--model",
+                    session.model.value,
+                    "--output-format",
+                    "stream-json",
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
             )
             full_content = ""
             for line in process.stdout:
@@ -169,6 +194,7 @@ class GenAISDKClient:
     def __init__(self, auth_type: GeminiAuthType):
         try:
             from google import genai
+
             self._genai = genai
         except ImportError:
             raise ImportError("google-genai package not installed. Run: pip install google-genai")
@@ -176,7 +202,9 @@ class GenAISDKClient:
         if auth_type == GeminiAuthType.API_KEY:
             api_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY", "")
             if not api_key:
-                raise ValueError("GOOGLE_API_KEY or GEMINI_API_KEY not set.\nGet a free key from: https://aistudio.google.com/app/apikey")
+                raise ValueError(
+                    "GOOGLE_API_KEY or GEMINI_API_KEY not set.\nGet a free key from: https://aistudio.google.com/app/apikey"
+                )
             self._client = genai.Client(api_key=api_key)
             self._async_client = genai.Client(api_key=api_key).aio
         elif auth_type == GeminiAuthType.VERTEX_AI:
@@ -205,7 +233,9 @@ class GenAISDKClient:
                 "completion_tokens": getattr(um, "candidates_token_count", 0) or 0,
                 "total_tokens": getattr(um, "total_token_count", 0) or 0,
             }
-        return GeminiResponse(content=content, model=session.model.value, usage=usage, finish_reason="stop")
+        return GeminiResponse(
+            content=content, model=session.model.value, usage=usage, finish_reason="stop"
+        )
 
     async def send_message_async(self, session: GeminiSession, message: str) -> GeminiResponse:
         session.add_message("user", message)
@@ -223,7 +253,9 @@ class GenAISDKClient:
                 "completion_tokens": getattr(um, "candidates_token_count", 0) or 0,
                 "total_tokens": getattr(um, "total_token_count", 0) or 0,
             }
-        return GeminiResponse(content=content, model=session.model.value, usage=usage, finish_reason="stop")
+        return GeminiResponse(
+            content=content, model=session.model.value, usage=usage, finish_reason="stop"
+        )
 
     async def stream_response(self, session: GeminiSession, message: str) -> AsyncIterator[str]:
         session.add_message("user", message)
@@ -260,7 +292,9 @@ class GeminiBridge:
             client = GenAISDKClient(auth_type)
         return cls(auth_type=auth_type, client=client)
 
-    def create_session(self, model: Optional[str] = None, system_prompt: Optional[str] = None) -> GeminiSession:
+    def create_session(
+        self, model: str | None = None, system_prompt: str | None = None
+    ) -> GeminiSession:
         model_str = model or os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
         gemini_model = GeminiModel.from_string(model_str)
         session = GeminiSession(model=gemini_model)
@@ -289,9 +323,14 @@ class GeminiBridge:
             yield response.content
 
     def get_auth_info(self) -> dict[str, str]:
-        info = {"auth_type": self.auth_type.value, "model_default": os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")}
+        info = {
+            "auth_type": self.auth_type.value,
+            "model_default": os.environ.get("GEMINI_MODEL", "gemini-2.5-flash"),
+        }
         if self.auth_type == GeminiAuthType.CLI_OAUTH:
-            info["cost_note"] = "Using gemini-cli OAuth. Uses Google AI subscription. No per-token billing."
+            info["cost_note"] = (
+                "Using gemini-cli OAuth. Uses Google AI subscription. No per-token billing."
+            )
             info["cli_installed"] = "yes" if check_gemini_cli_installed() else "no"
         elif self.auth_type == GeminiAuthType.API_KEY:
             key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY", "")

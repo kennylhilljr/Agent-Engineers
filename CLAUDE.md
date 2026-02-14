@@ -13,52 +13,74 @@ This is a **multi-agent autonomous software engineering harness** built on the C
 ## Repository Structure
 
 ```
-├── agent.py                   # Core agent session loop logic
-├── client.py                  # Claude SDK client configuration
-├── security.py                # Bash command security hooks (allowlist-based)
-├── progress.py                # Progress tracking via .linear_project.json
-├── prompts.py                 # Prompt template loading utilities
+├── agent.py                    # Core agent session loop logic
+├── client.py                   # Claude SDK client configuration
+├── security.py                 # Bash command security hooks (allowlist-based)
+├── progress.py                 # Progress tracking via .linear_project.json
+├── prompts.py                  # Prompt template loading utilities
+├── agents/
+│   ├── __init__.py             # Exports agent definitions and orchestrator
+│   ├── definitions.py          # 13 agent definitions with per-agent model config
+│   └── orchestrator.py         # Orchestrator session runner
+├── bridges/                    # External AI provider bridges
+│   ├── openai_bridge.py        # ChatGPT integration (Codex OAuth + Session Token)
+│   ├── gemini_bridge.py        # Gemini integration (CLI OAuth + API key + Vertex AI)
+│   ├── groq_bridge.py          # Groq integration (LPU inference)
+│   ├── kimi_bridge.py          # KIMI/Moonshot integration (OpenAI-compatible)
+│   ├── windsurf_bridge.py      # Windsurf integration (CLI/Docker)
+│   └── *_INTEGRATION.md        # Per-provider setup docs
+├── daemon/                     # Scalable ticket processing daemon
+│   ├── control_plane.py        # HTTP control plane (port 9100)
+│   ├── worker_pool.py          # Typed worker pool manager
+│   ├── ticket_router.py        # Complexity-based ticket routing
+│   └── worktree.py             # Git worktree isolation
 ├── scripts/
 │   ├── autonomous_agent_demo.py # Main entry point / CLI
-│   ├── daemon.py              # Long-running ticket polling daemon
-│   ├── arcade_config.py       # Arcade MCP gateway config and tool definitions
-│   ├── authorize_arcade.py    # OAuth authorization flow for Arcade services
-│   ├── trigger_engineer.py    # LibreChat trigger script
-│   ├── test_security.py       # Security hook test suite
-│   ├── parallel_dispatch.py   # Multi-agent parallel ticket processing
-│   ├── agent_watchdog.py      # Agent health monitoring
-│   └── ...                    # Provider workers, CLI bridges, Jira integration
-├── agents/
-│   ├── __init__.py            # Exports agent definitions and orchestrator
-│   ├── definitions.py         # Agent definitions with per-agent model config
-│   └── orchestrator.py        # Orchestrator session runner
+│   ├── daemon.py               # Simple ticket polling daemon
+│   ├── daemon_v2.py            # Scalable daemon with worker pools
+│   ├── arcade_config.py        # Arcade MCP gateway config and tool definitions
+│   ├── authorize_arcade.py     # OAuth authorization flow for Arcade services
+│   ├── chatgpt_cli.py          # Standalone ChatGPT CLI
+│   ├── gemini_cli.py           # Standalone Gemini CLI
+│   ├── groq_cli.py             # Standalone Groq CLI
+│   ├── kimi_cli.py             # Standalone KIMI CLI
+│   ├── windsurf_cli.py         # Standalone Windsurf CLI
+│   ├── test_security.py        # Security hook test suite
+│   └── ...                     # Other utilities
 ├── prompts/
-│   ├── orchestrator_prompt.md # Orchestrator system prompt
-│   ├── initializer_task.md    # First-run initialization task template
-│   ├── continuation_task.md   # Continuation session task template
-│   ├── linear_agent_prompt.md # Linear agent system prompt
-│   ├── coding_agent_prompt.md # Coding agent system prompt
-│   ├── github_agent_prompt.md # GitHub agent system prompt
-│   ├── slack_agent_prompt.md  # Slack agent system prompt
-│   ├── app_spec.txt           # Default application specification
-│   └── example_app_specs/     # Example app spec templates
-├── .claude/
-│   └── agents/py-sdk-agent.md # SDK verification agent config
-├── requirements.txt           # Pinned Python dependencies
-├── .env.example               # Environment variable template
-└── .gitignore                 # Git ignore rules
+│   ├── orchestrator_prompt.md  # Orchestrator system prompt
+│   ├── *_agent_prompt.md       # Per-agent system prompts (13 total)
+│   ├── initializer_task.md     # First-run initialization task template
+│   ├── continuation_task.md    # Continuation session task template
+│   ├── app_spec.txt            # Default application specification
+│   └── example_app_specs/      # Example app spec templates
+├── pyproject.toml              # Ruff linter/formatter config
+├── requirements.txt            # Pinned Python dependencies
+├── .env.example                # Environment variable template
+└── .gitignore                  # Git ignore rules
 ```
 
 ## Architecture
 
-The system uses an **orchestrator pattern** with four specialized agents:
+The system uses an **orchestrator pattern** with 13 specialized agents:
 
 ```
 ORCHESTRATOR (haiku by default)
-├── LINEAR agent (haiku)   — Issue/project management in Linear
-├── CODING agent (sonnet)  — Code implementation + Playwright browser testing
-├── GITHUB agent (haiku)   — Git operations, branches, PRs
-└── SLACK agent (haiku)    — Progress notifications
+├── Workflow Agents
+│   ├── LINEAR (haiku)          — Issue/project management in Linear
+│   ├── CODING (sonnet)         — Code implementation + Playwright browser testing
+│   ├── CODING_FAST (haiku)     — Simple changes (copy, CSS, config, tests)
+│   ├── GITHUB (haiku)          — Git operations, branches, PRs
+│   ├── PR_REVIEWER (sonnet)    — Automated code review and merge
+│   ├── PR_REVIEWER_FAST (haiku) — Quick PR review for low-risk changes
+│   ├── OPS (haiku)             — Batch operations (Linear + Slack + GitHub)
+│   └── SLACK (haiku)           — Progress notifications
+└── AI Provider Agents
+    ├── CHATGPT (haiku)         — OpenAI GPT-4o, o1, o3-mini via bridge
+    ├── GEMINI (haiku)          — Google Gemini 2.5 Flash/Pro via bridge
+    ├── GROQ (haiku)            — Llama, Mixtral via Groq LPU bridge
+    ├── KIMI (haiku)            — Moonshot AI ultra-long context via bridge
+    └── WINDSURF (haiku)        — Codeium IDE headless/Docker via bridge
 ```
 
 Key architectural decisions:
@@ -127,6 +149,13 @@ There is no test framework — tests use a custom `test_hook()` harness that run
 | `CODING_AGENT_MODEL` | No | haiku/sonnet/opus/inherit |
 | `GITHUB_AGENT_MODEL` | No | haiku/sonnet/opus/inherit |
 | `SLACK_AGENT_MODEL` | No | haiku/sonnet/opus/inherit |
+| `PR_REVIEWER_AGENT_MODEL` | No | haiku/sonnet/opus/inherit |
+| `OPS_AGENT_MODEL` | No | haiku/sonnet/opus/inherit |
+| `CHATGPT_AGENT_MODEL` | No | haiku/sonnet/opus/inherit |
+| `GEMINI_AGENT_MODEL` | No | haiku/sonnet/opus/inherit |
+| `GROQ_AGENT_MODEL` | No | haiku/sonnet/opus/inherit |
+| `KIMI_AGENT_MODEL` | No | haiku/sonnet/opus/inherit |
+| `WINDSURF_AGENT_MODEL` | No | haiku/sonnet/opus/inherit |
 
 ## Security Model
 
@@ -152,7 +181,7 @@ Only commands in `ALLOWED_COMMANDS` (in `security.py:29-73`) are permitted. Key 
 - **Docstrings** — all public functions have docstrings with Args/Returns/Raises sections
 - **Constants** — module-level typed constants with `Final` where appropriate
 - **Error handling** — specific exception types caught with actionable error messages
-- **No linter/formatter config** — follows PEP 8 implicitly; no `.flake8`, `pyproject.toml`, or formatter configured
+- **Ruff** — linter and formatter configured via `pyproject.toml` (line-length=100, target py311)
 - **No CI/CD** — no `.github/workflows` directory
 
 ## Key Patterns
@@ -170,10 +199,13 @@ while True:
 ### Agent Definitions (agents/definitions.py)
 Agent models are configurable via `{AGENT_NAME}_AGENT_MODEL` env vars. Definitions are created at import time. Each agent gets a subset of tools matching its domain.
 
-### MCP Integration (client.py, scripts/arcade_config.py)
+### MCP Integration (client.py, arcade_config.py)
 Two MCP servers are configured:
 - **Playwright** (`@playwright/mcp@latest`) — browser automation for UI testing
 - **Arcade** (HTTP gateway) — unified auth for Linear (39 tools), GitHub (46 tools), Slack (8 tools)
+
+### Bridge Modules (bridges/)
+External AI providers are integrated via bridge modules in `bridges/`. Each bridge wraps a provider's API (using their SDK or OpenAI-compatible endpoints) and is invoked by the corresponding agent via Bash. CLIs are in `scripts/*_cli.py`.
 
 ### Generated Project Structure
 Each run creates an isolated project in `generations/<project-name>/` with:

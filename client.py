@@ -14,18 +14,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient, McpServerConfig
-from claude_agent_sdk.types import HookCallback, HookMatcher
-
-from arcade_config import (
+from arcade_config import (  # noqa: E402
     ALL_ARCADE_TOOLS,
     ARCADE_TOOLS_PERMISSION,
     get_arcade_mcp_config,
     validate_arcade_config,
 )
-from agents.definitions import AGENT_DEFINITIONS
-from security import bash_security_hook
+from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient, McpServerConfig  # noqa: E402
+from claude_agent_sdk.types import HookCallback, HookMatcher  # noqa: E402
 
+from agents.definitions import AGENT_DEFINITIONS  # noqa: E402
+from security import bash_security_hook  # noqa: E402
 
 # Valid permission modes for the Claude SDK
 PermissionMode = Literal["acceptEdits", "acceptAll", "reject", "ask"]
@@ -167,13 +166,13 @@ def write_security_settings(project_dir: Path, settings: SecuritySettings) -> Pa
             existing = settings_file.read_text()
             if existing == new_content:
                 return settings_file
-        except IOError:
+        except OSError:
             pass  # File unreadable — rewrite it
 
     try:
         settings_file.write_text(new_content)
-    except IOError as e:
-        raise IOError(
+    except OSError as e:
+        raise OSError(
             f"Failed to write security settings to {settings_file}: {e}\n"
             f"Check disk space and file permissions.\n"
             f"Agent cannot start without security settings."

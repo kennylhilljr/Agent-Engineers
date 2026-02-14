@@ -93,8 +93,6 @@ flowchart TB
     style State fill:#16213e,stroke:#e94560,color:#fff
 ```
 
-> **Note:** The `AgentHarnessDiagram.png` image shows the current architecture with all agents, Linear support, PR review, multi-AI providers, and defense-in-depth security.
-
 ### Session Flow
 
 ```
@@ -637,7 +635,7 @@ cp .env.example .env
 python scripts/authorize_arcade.py
 
 # (Optional) Set up Gemini CLI for research agent
-chmod +x setup_gemini.sh && ./setup_gemini.sh
+npm install -g @google/gemini-cli && gemini
 ```
 
 <details>
@@ -776,45 +774,39 @@ Agent-Engineers/
 ├── security.py                  # Bash command allowlist and validation
 ├── progress.py                  # Progress tracking utilities
 ├── prompts.py                   # Prompt loading utilities
-├── model_router.py              # Multi-AI provider routing (Claude ↔ ChatGPT)
-├── openai_bridge.py             # ChatGPT integration (dual auth)
-├── gemini_bridge.py             # Gemini integration (triple auth)
-├── groq_bridge.py               # Groq integration (OpenAI-compatible API)
-├── kimi_bridge.py               # KIMI/Moonshot integration (OpenAI-compatible API)
-├── windsurf_bridge.py           # Windsurf integration (CLI/Docker)
+├── agents/
+│   ├── definitions.py           # 13 agent definitions with model config
+│   └── orchestrator.py          # Orchestrator session runner
+├── bridges/                     # External AI provider bridges
+│   ├── openai_bridge.py         # ChatGPT (Codex OAuth + Session Token)
+│   ├── gemini_bridge.py         # Gemini (CLI OAuth + API key + Vertex AI)
+│   ├── groq_bridge.py           # Groq (LPU inference)
+│   ├── kimi_bridge.py           # KIMI/Moonshot (OpenAI-compatible)
+│   ├── windsurf_bridge.py       # Windsurf (CLI/Docker)
+│   └── *_INTEGRATION.md         # Per-provider setup docs
+├── daemon/                      # Scalable ticket processing
+│   ├── control_plane.py         # HTTP control plane (port 9100)
+│   ├── worker_pool.py           # Typed worker pool manager
+│   ├── ticket_router.py         # Complexity-based routing
+│   └── worktree.py              # Git worktree isolation
 ├── scripts/
 │   ├── autonomous_agent_demo.py # Main entry point / CLI
-│   ├── daemon.py                # Long-running ticket polling daemon
-│   ├── arcade_config.py         # Arcade MCP gateway configuration
-│   ├── authorize_arcade.py      # Arcade authorization flow
-│   ├── trigger_engineer.py      # LibreChat trigger script
-│   ├── test_security.py         # Security hook test suite
-│   ├── parallel_dispatch.py     # Multi-agent parallel ticket processing
-│   └── agent_watchdog.py        # Agent health monitoring
-├── agents/
-│   ├── definitions.py           # Agent definitions with model config
-│   └── orchestrator.py          # Orchestrator session runner
-├── prompts/
-│   ├── app_spec.txt                 # Application specification
-│   ├── orchestrator_prompt.md       # Orchestrator system prompt
-│   ├── initializer_task.md          # Task message for first session
-│   ├── continuation_task.md         # Task message for continuation sessions
-│   ├── linear_agent_prompt.md       # Linear subagent prompt
-│   ├── coding_agent_prompt.md       # Coding subagent prompt
-│   ├── github_agent_prompt.md       # GitHub subagent prompt
-│   ├── pr_reviewer_agent_prompt.md  # PR review subagent prompt
-│   ├── slack_agent_prompt.md        # Slack subagent prompt
-│   ├── chatgpt_agent_prompt.md      # ChatGPT bridge subagent prompt
-│   ├── gemini_agent_prompt.md       # Gemini bridge subagent prompt
-│   ├── groq_agent_prompt.md         # Groq bridge subagent prompt
-│   ├── kimi_agent_prompt.md         # KIMI bridge subagent prompt
-│   └── windsurf_agent_prompt.md     # Windsurf bridge subagent prompt
-├── scripts/
+│   ├── daemon.py                # Simple ticket polling daemon
+│   ├── daemon_v2.py             # Scalable daemon with worker pools
 │   ├── chatgpt_cli.py           # Standalone ChatGPT CLI
 │   ├── gemini_cli.py            # Standalone Gemini CLI
-│   └── agent_watchdog.py        # Agent monitoring
-├── CHATGPT_INTEGRATION.md      # ChatGPT setup documentation
-├── GEMINI_INTEGRATION.md        # Gemini setup documentation
+│   ├── groq_cli.py              # Standalone Groq CLI
+│   ├── kimi_cli.py              # Standalone KIMI CLI
+│   ├── windsurf_cli.py          # Standalone Windsurf CLI
+│   ├── arcade_config.py         # Arcade MCP gateway configuration
+│   ├── authorize_arcade.py      # Arcade authorization flow
+│   └── test_security.py         # Security hook test suite
+├── prompts/
+│   ├── orchestrator_prompt.md   # Orchestrator system prompt
+│   ├── *_agent_prompt.md        # Per-agent system prompts (13 total)
+│   ├── app_spec.txt             # Application specification
+│   └── example_app_specs/       # Example app spec templates
+├── pyproject.toml               # Ruff linter/formatter config
 └── requirements.txt             # Python dependencies
 ```
 

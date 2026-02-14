@@ -12,15 +12,13 @@ Usage:
 """
 
 import asyncio
-import json
 import logging
 import os
 import signal
-import subprocess
 import sys
 import traceback
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
@@ -30,20 +28,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from dotenv import load_dotenv
 
 from agent import (
-    COMPLETION_SIGNAL,
     SESSION_COMPLETE,
-    SESSION_CONTINUE,
     SESSION_ERROR,
     SessionResult,
     run_agent_session,
 )
 from client import create_client
 from progress import (
-    LINEAR_PROJECT_MARKER,
     is_project_initialized,
-    load_project_state,
 )
-from prompts import get_continuation_task, get_initializer_task, copy_spec_to_project
+from prompts import copy_spec_to_project, get_continuation_task, get_initializer_task
 
 load_dotenv()
 
@@ -115,6 +109,7 @@ class Ticket:
 # Linear poller
 # ---------------------------------------------------------------------------
 
+
 def _poll_linear_tickets(project_dir: Path) -> list[Ticket]:
     """
     Poll Linear for actionable tickets.
@@ -126,17 +121,23 @@ def _poll_linear_tickets(project_dir: Path) -> list[Ticket]:
     # Instead, we return a single synthetic ticket that tells the orchestrator
     # to check Linear for available work. The orchestrator's continuation task
     # already handles this.
-    return [Ticket(
-        key="LINEAR_CHECK",
-        title="Check Linear for available tickets",
-        description="The daemon detected Linear is the tracker. Run a continuation session to check for work.",
-        status="todo",
-    )]
+    return [
+        Ticket(
+            key="LINEAR_CHECK",
+            title="Check Linear for available tickets",
+            description=(
+                "The daemon detected Linear is the tracker. "
+                "Run a continuation session to check for work."
+            ),
+            status="todo",
+        )
+    ]
 
 
 # ---------------------------------------------------------------------------
 # Worker
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class WorkerState:
@@ -174,11 +175,13 @@ async def run_worker(
     """
     worker.busy = True
     worker.current_ticket = ticket
-    worker.started_at = datetime.now(timezone.utc)
+    worker.started_at = datetime.now(UTC)
 
     logger.info(
         "Worker %d picking up %s: %s",
-        worker.worker_id, ticket.key, ticket.title,
+        worker.worker_id,
+        ticket.key,
+        ticket.title,
     )
 
     try:
@@ -203,16 +206,20 @@ async def run_worker(
             worker.consecutive_errors += 1
             logger.warning(
                 "Worker %d error on %s (attempt %d): %s",
-                worker.worker_id, ticket.key,
-                worker.consecutive_errors, result.response[:200],
+                worker.worker_id,
+                ticket.key,
+                worker.consecutive_errors,
+                result.response[:200],
             )
         else:
             worker.consecutive_errors = 0
             worker.tickets_completed += 1
             logger.info(
                 "Worker %d finished %s (status=%s, total_completed=%d)",
-                worker.worker_id, ticket.key,
-                result.status, worker.tickets_completed,
+                worker.worker_id,
+                ticket.key,
+                result.status,
+                worker.tickets_completed,
             )
 
         return result
@@ -226,6 +233,7 @@ async def run_worker(
 # ---------------------------------------------------------------------------
 # Daemon
 # ---------------------------------------------------------------------------
+
 
 class TicketDaemon:
     """
@@ -252,9 +260,7 @@ class TicketDaemon:
         self.poll_interval = poll_interval
 
         # Worker pool
-        self.workers: list[WorkerState] = [
-            WorkerState(worker_id=i) for i in range(max_workers)
-        ]
+        self.workers: list[WorkerState] = [WorkerState(worker_id=i) for i in range(max_workers)]
 
         # Tickets currently being processed (keys)
         self.active_ticket_keys: set[str] = set()
@@ -288,15 +294,23 @@ class TicketDaemon:
 
         logger.info(
             "Status: %d/%d workers busy, %d tickets processed, poll #%d",
-            len(busy), self.max_workers,
-            self.total_tickets_processed, self.poll_count,
+            len(busy),
+            self.max_workers,
+            self.total_tickets_processed,
+            self.poll_count,
         )
 
         for w in busy:
-            ticket_info = f"{w.current_ticket.key}: {w.current_ticket.title}" if w.current_ticket else "unknown"
+            ticket_info = (
+                f"{w.current_ticket.key}: {w.current_ticket.title}"
+                if w.current_ticket
+                else "unknown"
+            )
             logger.info("  Worker %d: BUSY — %s", w.worker_id, ticket_info)
         for w in idle:
-            logger.info("  Worker %d: IDLE (completed %d tickets)", w.worker_id, w.tickets_completed)
+            logger.info(
+                "  Worker %d: IDLE (completed %d tickets)", w.worker_id, w.tickets_completed
+            )
 
     def _poll_tickets(self) -> list[Ticket]:
         """Poll for available tickets from Linear."""
@@ -347,12 +361,14 @@ class TicketDaemon:
             worker = idle.pop(0)
             if worker.consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
                 backoff = min(
-                    ERROR_RETRY_DELAY * (2 ** worker.consecutive_errors),
+                    ERROR_RETRY_DELAY * (2**worker.consecutive_errors),
                     BACKOFF_CEILING,
                 )
                 logger.warning(
                     "Worker %d has %d consecutive errors, backing off %ds",
-                    worker.worker_id, worker.consecutive_errors, backoff,
+                    worker.worker_id,
+                    worker.consecutive_errors,
+                    backoff,
                 )
                 # Reset after backoff period (handled by next poll cycle)
                 worker.consecutive_errors = 0
@@ -405,7 +421,7 @@ class TicketDaemon:
 
         Polls for tickets, dispatches workers, and runs until shutdown.
         """
-        self.daemon_start_time = datetime.now(timezone.utc)
+        self.daemon_start_time = datetime.now(UTC)
 
         logger.info("=" * 70)
         logger.info("  TICKET DAEMON STARTED")
@@ -432,7 +448,9 @@ class TicketDaemon:
 
                 logger.info(
                     "Poll #%d: %d total tickets, %d actionable, %d workers idle",
-                    self.poll_count, len(all_tickets), len(actionable),
+                    self.poll_count,
+                    len(all_tickets),
+                    len(actionable),
                     len(self.idle_workers),
                 )
 
@@ -449,12 +467,14 @@ class TicketDaemon:
             except Exception as e:
                 self.consecutive_poll_errors += 1
                 backoff = min(
-                    ERROR_RETRY_DELAY * (2 ** self.consecutive_poll_errors),
+                    ERROR_RETRY_DELAY * (2**self.consecutive_poll_errors),
                     BACKOFF_CEILING,
                 )
                 logger.error(
                     "Poll error (attempt %d, backoff %ds): %s",
-                    self.consecutive_poll_errors, backoff, e,
+                    self.consecutive_poll_errors,
+                    backoff,
+                    e,
                 )
                 await asyncio.sleep(backoff)
                 continue
@@ -470,7 +490,7 @@ class TicketDaemon:
                 )
                 # If we get here, shutdown was signaled
                 break
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # Normal — poll interval elapsed
                 pass
 
@@ -506,12 +526,13 @@ class TicketDaemon:
         logger.info("Total tickets processed: %d", self.total_tickets_processed)
         logger.info("Total polls: %d", self.poll_count)
         if self.daemon_start_time:
-            uptime = datetime.now(timezone.utc) - self.daemon_start_time
+            uptime = datetime.now(UTC) - self.daemon_start_time
             logger.info("Uptime: %s", uptime)
         for w in self.workers:
             logger.info(
                 "  Worker %d: %d tickets completed",
-                w.worker_id, w.tickets_completed,
+                w.worker_id,
+                w.tickets_completed,
             )
         logger.info("=" * 70)
 
@@ -525,6 +546,7 @@ class TicketDaemon:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main() -> int:
     """
     Main entry point for the ticket daemon.
@@ -535,9 +557,7 @@ def main() -> int:
     import argparse
 
     # Default base path for generated projects
-    default_generations_base = Path(
-        os.environ.get("GENERATIONS_BASE_PATH", "./generations")
-    )
+    default_generations_base = Path(os.environ.get("GENERATIONS_BASE_PATH", "./generations"))
 
     default_model = os.environ.get("ORCHESTRATOR_MODEL", "haiku").lower()
     if default_model not in AVAILABLE_MODELS:
@@ -660,4 +680,5 @@ Environment Variables:
 
 if __name__ == "__main__":
     import sys
+
     sys.exit(main())

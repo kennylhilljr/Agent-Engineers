@@ -10,20 +10,21 @@ from typing import TYPE_CHECKING
 
 from agents.definitions import (
     AGENT_DEFINITIONS,
-    LINEAR_AGENT,
-    GITHUB_AGENT,
-    SLACK_AGENT,
-    CODING_AGENT,
-    PR_REVIEWER_AGENT,
     CHATGPT_AGENT,
+    CODING_AGENT,
     GEMINI_AGENT,
+    GITHUB_AGENT,
     GROQ_AGENT,
     KIMI_AGENT,
+    LINEAR_AGENT,
+    PR_REVIEWER_AGENT,
+    SLACK_AGENT,
     WINDSURF_AGENT,
 )
 
 if TYPE_CHECKING:
     from claude_agent_sdk import ClaudeSDKClient
+
     from agent import SessionResult
 
 __all__ = [

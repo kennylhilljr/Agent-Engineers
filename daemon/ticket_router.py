@@ -13,10 +13,10 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
-from worker_pool import (
+from daemon.worker_pool import (
     AVAILABLE_MODELS,
     PoolType,
     Ticket,
@@ -87,14 +87,35 @@ class RoutingRule:
 
 # Keywords that suggest higher or lower complexity
 _HIGH_COMPLEXITY_KEYWORDS = [
-    "refactor", "redesign", "migrate", "architecture", "performance",
-    "security", "database", "auth", "authentication", "integration",
-    "real-time", "websocket", "infrastructure",
+    "refactor",
+    "redesign",
+    "migrate",
+    "architecture",
+    "performance",
+    "security",
+    "database",
+    "auth",
+    "authentication",
+    "integration",
+    "real-time",
+    "websocket",
+    "infrastructure",
 ]
 
 _LOW_COMPLEXITY_KEYWORDS = [
-    "typo", "rename", "label", "color", "text", "copy", "readme",
-    "comment", "lint", "format", "style", "docs", "documentation",
+    "typo",
+    "rename",
+    "label",
+    "color",
+    "text",
+    "copy",
+    "readme",
+    "comment",
+    "lint",
+    "format",
+    "style",
+    "docs",
+    "documentation",
 ]
 
 
@@ -199,11 +220,11 @@ class TicketRouter:
 
     def _infer_pool(self, ticket: Ticket) -> PoolType:
         """Infer pool type from ticket labels when no rule matches."""
-        labels_lower = [l.lower() for l in ticket.labels]
+        labels_lower = [lab.lower() for lab in ticket.labels]
 
-        if any(l in labels_lower for l in ("review", "pr", "code-review")):
+        if any(lab in labels_lower for lab in ("review", "pr", "code-review")):
             return PoolType.REVIEW
-        if any(l in labels_lower for l in ("linear", "triage", "planning")):
+        if any(lab in labels_lower for lab in ("linear", "triage", "planning")):
             return PoolType.LINEAR
 
         return PoolType.CODING

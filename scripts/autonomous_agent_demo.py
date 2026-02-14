@@ -10,7 +10,8 @@ specialized sub-agents (linear, coding, github, slack) for different domains.
 Example Usage:
     uv run python scripts/autonomous_agent_demo.py --project-dir my-app
     uv run python scripts/autonomous_agent_demo.py --project-dir my-app --max-iterations 5
-    uv run python scripts/autonomous_agent_demo.py --generations-base ~/projects/ai --project-dir my-app
+    uv run python scripts/autonomous_agent_demo.py \\
+        --generations-base ~/projects/ai --project-dir my-app
 """
 
 import argparse
@@ -45,9 +46,7 @@ if DEFAULT_MODEL not in AVAILABLE_MODELS:
 
 # Default base path for generated projects
 # Can be overridden by GENERATIONS_BASE_PATH env var or --generations-base flag
-DEFAULT_GENERATIONS_BASE: Path = Path(
-    os.environ.get("GENERATIONS_BASE_PATH", "./generations")
-)
+DEFAULT_GENERATIONS_BASE: Path = Path(os.environ.get("GENERATIONS_BASE_PATH", "./generations"))
 
 
 def parse_args() -> argparse.Namespace:
@@ -61,7 +60,8 @@ Examples:
   uv run python scripts/autonomous_agent_demo.py --project-dir my-app
 
   # Use a custom generations base directory
-  uv run python scripts/autonomous_agent_demo.py --generations-base ~/projects/ai --project-dir my-app
+  uv run python scripts/autonomous_agent_demo.py \\
+      --generations-base ~/projects/ai --project-dir my-app
 
   # Use opus for orchestrator (more capable but costs more)
   uv run python scripts/autonomous_agent_demo.py --project-dir my-app --model opus
@@ -83,15 +83,20 @@ Environment Variables:
         "--generations-base",
         type=Path,
         default=None,
-        help=f"Base directory for all generated projects (default: {DEFAULT_GENERATIONS_BASE}, or set GENERATIONS_BASE_PATH env var). "
-        "Each project creates a subfolder here with its own git repo.",
+        help=(
+            f"Base directory for all generated projects "
+            f"(default: {DEFAULT_GENERATIONS_BASE}, or set GENERATIONS_BASE_PATH env var). "
+            "Each project creates a subfolder here with its own git repo."
+        ),
     )
 
     parser.add_argument(
         "--project-dir",
         type=Path,
         default=Path("./autonomous_demo_project"),
-        help="Project name or path. Relative paths are placed inside the generations base directory.",
+        help=(
+            "Project name or path. Relative paths are placed inside the generations base directory."
+        ),
     )
 
     parser.add_argument(
@@ -106,7 +111,10 @@ Environment Variables:
         type=str,
         choices=list(AVAILABLE_MODELS.keys()),
         default=DEFAULT_MODEL,
-        help=f"Model for orchestrator (sub-agents have fixed models: coding=sonnet, others=haiku) (default: {DEFAULT_MODEL})",
+        help=(
+            f"Model for orchestrator (sub-agents have fixed models: "
+            f"coding=sonnet, others=haiku) (default: {DEFAULT_MODEL})"
+        ),
     )
 
     return parser.parse_args()

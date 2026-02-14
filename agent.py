@@ -20,13 +20,12 @@ from claude_agent_sdk import (
 )
 
 from client import create_client
-from progress import print_session_header, print_progress_summary, is_project_initialized
+from progress import is_project_initialized, print_progress_summary, print_session_header
 from prompts import (
-    get_initializer_task,
-    get_continuation_task,
     copy_spec_to_project,
+    get_continuation_task,
+    get_initializer_task,
 )
-
 
 # Configuration
 AUTO_CONTINUE_DELAY_SECONDS: int = 0

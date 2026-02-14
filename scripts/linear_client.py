@@ -22,7 +22,7 @@ import os
 import sys
 import urllib.error
 import urllib.request
-from typing import Any, Optional
+from typing import Any
 
 LINEAR_API_URL = "https://api.linear.app/graphql"
 
@@ -41,7 +41,7 @@ PRIORITY_REVERSE = {v: k for k, v in PRIORITY_MAP.items()}
 class LinearAPIError(Exception):
     """Raised when the Linear API returns an error."""
 
-    def __init__(self, message: str, errors: Optional[list] = None):
+    def __init__(self, message: str, errors: list | None = None):
         super().__init__(message)
         self.errors = errors or []
 
@@ -53,7 +53,7 @@ class LinearClient:
     All methods return plain dicts/lists suitable for JSON serialization.
     """
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         self._api_key = api_key or os.environ.get("LINEAR_API_KEY", "")
         if not self._api_key:
             raise ValueError(
@@ -66,7 +66,7 @@ class LinearClient:
     # Core GraphQL transport
     # -----------------------------------------------------------------
 
-    def _graphql(self, query: str, variables: Optional[dict] = None) -> dict:
+    def _graphql(self, query: str, variables: dict | None = None) -> dict:
         """Execute a GraphQL query/mutation against the Linear API.
 
         Args:
@@ -145,7 +145,8 @@ class LinearClient:
         Returns:
             List of project dicts.
         """
-        data = self._graphql("""
+        data = self._graphql(
+            """
             query ListProjects($teamId: String!) {
                 team(id: $teamId) {
                     projects {
@@ -159,12 +160,12 @@ class LinearClient:
                     }
                 }
             }
-        """, {"teamId": team_id})
+        """,
+            {"teamId": team_id},
+        )
         return data.get("team", {}).get("projects", {}).get("nodes", [])
 
-    def create_project(
-        self, team_id: str, name: str, description: str = ""
-    ) -> dict:
+    def create_project(self, team_id: str, name: str, description: str = "") -> dict:
         """Create a new project.
 
         Args:
@@ -182,7 +183,8 @@ class LinearClient:
         if description:
             input_data["description"] = description
 
-        data = self._graphql("""
+        data = self._graphql(
+            """
             mutation CreateProject($input: ProjectCreateInput!) {
                 projectCreate(input: $input) {
                     success
@@ -193,7 +195,9 @@ class LinearClient:
                     }
                 }
             }
-        """, {"input": input_data})
+        """,
+            {"input": input_data},
+        )
         result = data.get("projectCreate", {})
         if not result.get("success"):
             raise LinearAPIError("Failed to create project")
@@ -205,9 +209,9 @@ class LinearClient:
 
     def list_issues(
         self,
-        team_id: Optional[str] = None,
-        project_id: Optional[str] = None,
-        state: Optional[str] = None,
+        team_id: str | None = None,
+        project_id: str | None = None,
+        state: str | None = None,
     ) -> list:
         """List issues with optional filters.
 
@@ -228,7 +232,8 @@ class LinearClient:
         if state:
             filter_parts["state"] = {"name": {"eqCaseInsensitive": state}}
 
-        data = self._graphql("""
+        data = self._graphql(
+            """
             query ListIssues($filter: IssueFilter) {
                 issues(filter: $filter, first: 100, orderBy: createdAt) {
                     nodes {
@@ -250,7 +255,9 @@ class LinearClient:
                     }
                 }
             }
-        """, {"filter": filter_parts if filter_parts else None})
+        """,
+            {"filter": filter_parts if filter_parts else None},
+        )
         return data.get("issues", {}).get("nodes", [])
 
     def get_issue(self, issue_id: str) -> dict:
@@ -266,7 +273,8 @@ class LinearClient:
         if "-" in issue_id and any(c.isalpha() for c in issue_id.split("-")[0]):
             return self._get_issue_by_identifier(issue_id)
 
-        data = self._graphql("""
+        data = self._graphql(
+            """
             query GetIssue($id: String!) {
                 issue(id: $id) {
                     id
@@ -297,7 +305,9 @@ class LinearClient:
                     }
                 }
             }
-        """, {"id": issue_id})
+        """,
+            {"id": issue_id},
+        )
         issue = data.get("issue")
         if not issue:
             raise LinearAPIError(f"Issue not found: {issue_id}")
@@ -305,7 +315,8 @@ class LinearClient:
 
     def _get_issue_by_identifier(self, identifier: str) -> dict:
         """Look up an issue by its human-readable identifier (e.g. ENG-123)."""
-        data = self._graphql("""
+        data = self._graphql(
+            """
             query SearchIssue($filter: IssueFilter) {
                 issues(filter: $filter, first: 1) {
                     nodes {
@@ -338,7 +349,9 @@ class LinearClient:
                     }
                 }
             }
-        """, {"filter": {"identifier": {"eq": identifier}}})
+        """,
+            {"filter": {"identifier": {"eq": identifier}}},
+        )
         nodes = data.get("issues", {}).get("nodes", [])
         if not nodes:
             raise LinearAPIError(f"Issue not found: {identifier}")
@@ -349,8 +362,8 @@ class LinearClient:
         team_id: str,
         title: str,
         description: str = "",
-        project_id: Optional[str] = None,
-        priority: Optional[str] = None,
+        project_id: str | None = None,
+        priority: str | None = None,
     ) -> dict:
         """Create a new issue.
 
@@ -374,7 +387,8 @@ class LinearClient:
         if priority and priority in PRIORITY_MAP:
             input_data["priority"] = PRIORITY_MAP[priority]
 
-        data = self._graphql("""
+        data = self._graphql(
+            """
             mutation CreateIssue($input: IssueCreateInput!) {
                 issueCreate(input: $input) {
                     success
@@ -388,7 +402,9 @@ class LinearClient:
                     }
                 }
             }
-        """, {"input": input_data})
+        """,
+            {"input": input_data},
+        )
         result = data.get("issueCreate", {})
         if not result.get("success"):
             raise LinearAPIError("Failed to create issue")
@@ -407,7 +423,8 @@ class LinearClient:
         Returns:
             List of state dicts with id, name, type, position.
         """
-        data = self._graphql("""
+        data = self._graphql(
+            """
             query WorkflowStates($teamId: String!) {
                 team(id: $teamId) {
                     states {
@@ -420,7 +437,9 @@ class LinearClient:
                     }
                 }
             }
-        """, {"teamId": team_id})
+        """,
+            {"teamId": team_id},
+        )
         return data.get("team", {}).get("states", {}).get("nodes", [])
 
     def transition_issue(self, issue_id: str, state_name: str) -> dict:
@@ -452,13 +471,12 @@ class LinearClient:
 
         if not target_state:
             available = [s["name"] for s in states]
-            raise LinearAPIError(
-                f"State '{state_name}' not found. Available: {available}"
-            )
+            raise LinearAPIError(f"State '{state_name}' not found. Available: {available}")
 
         # Update the issue
         real_id = issue["id"]  # Always use UUID for mutations
-        data = self._graphql("""
+        data = self._graphql(
+            """
             mutation TransitionIssue($id: String!, $input: IssueUpdateInput!) {
                 issueUpdate(id: $id, input: $input) {
                     success
@@ -471,7 +489,9 @@ class LinearClient:
                     }
                 }
             }
-        """, {"id": real_id, "input": {"stateId": target_state["id"]}})
+        """,
+            {"id": real_id, "input": {"stateId": target_state["id"]}},
+        )
         result = data.get("issueUpdate", {})
         if not result.get("success"):
             raise LinearAPIError(f"Failed to transition issue to {state_name}")
@@ -496,16 +516,14 @@ class LinearClient:
         # UUID format has 4 dashes and is all hex
         parts = issue_id.split("-")
         is_identifier = (
-            len(parts) == 2 and
-            parts[0].isalpha() and
-            len(parts[0]) <= 3 and
-            parts[1].isdigit()
+            len(parts) == 2 and parts[0].isalpha() and len(parts[0]) <= 3 and parts[1].isdigit()
         )
         if is_identifier:
             issue = self._get_issue_by_identifier(issue_id)
             issue_id = issue["id"]
 
-        data = self._graphql("""
+        data = self._graphql(
+            """
             mutation AddComment($input: CommentCreateInput!) {
                 commentCreate(input: $input) {
                     success
@@ -515,7 +533,9 @@ class LinearClient:
                     }
                 }
             }
-        """, {"input": {"issueId": issue_id, "body": body}})
+        """,
+            {"input": {"issueId": issue_id, "body": body}},
+        )
         result = data.get("commentCreate", {})
         if not result.get("success"):
             raise LinearAPIError("Failed to add comment")
@@ -539,22 +559,22 @@ class LinearClient:
         # UUID format has 4 dashes and is all hex
         parts = issue_id.split("-")
         is_identifier = (
-            len(parts) == 2 and
-            parts[0].isalpha() and
-            len(parts[0]) <= 3 and
-            parts[1].isdigit()
+            len(parts) == 2 and parts[0].isalpha() and len(parts[0]) <= 3 and parts[1].isdigit()
         )
         if is_identifier:
             issue = self._get_issue_by_identifier(issue_id)
             issue_id = issue["id"]
 
-        data = self._graphql("""
+        data = self._graphql(
+            """
             mutation ArchiveIssue($id: String!) {
                 issueArchive(id: $id) {
                     success
                 }
             }
-        """, {"id": issue_id})
+        """,
+            {"id": issue_id},
+        )
         return data.get("issueArchive", {}).get("success", False)
 
     # -----------------------------------------------------------------
@@ -570,7 +590,8 @@ class LinearClient:
         Returns:
             List of label dicts with id, name, color.
         """
-        data = self._graphql("""
+        data = self._graphql(
+            """
             query Labels($teamId: String!) {
                 team(id: $teamId) {
                     labels {
@@ -582,13 +603,16 @@ class LinearClient:
                     }
                 }
             }
-        """, {"teamId": team_id})
+        """,
+            {"teamId": team_id},
+        )
         return data.get("team", {}).get("labels", {}).get("nodes", [])
 
 
 # =====================================================================
 # CLI Interface
 # =====================================================================
+
 
 def _build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser."""
@@ -671,8 +695,11 @@ def _run_cli(args: argparse.Namespace) -> Any:
         return client.get_issue(args.id)
     elif cmd == "create-issue":
         return client.create_issue(
-            args.team_id, args.title, args.description,
-            args.project_id, args.priority,
+            args.team_id,
+            args.title,
+            args.description,
+            args.project_id,
+            args.priority,
         )
     elif cmd == "transition-issue":
         return client.transition_issue(args.id, args.state)

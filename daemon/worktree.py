@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import logging
 import re
-import shutil
 import subprocess
 from pathlib import Path
 
@@ -147,7 +146,9 @@ class WorktreeManager:
         self._worker_worktrees[worker_id] = worktree_path
         logger.info(
             "Created worktree for %s at %s (branch=%s)",
-            worker_id, worktree_path, branch_name,
+            worker_id,
+            worktree_path,
+            branch_name,
         )
         return worktree_path
 
@@ -208,9 +209,7 @@ class WorktreeManager:
             if port not in self._allocated_ports:
                 self._allocated_ports.add(port)
                 return port
-        raise WorktreeError(
-            f"No free ports in range {PORT_RANGE_START}-{PORT_RANGE_END}"
-        )
+        raise WorktreeError(f"No free ports in range {PORT_RANGE_START}-{PORT_RANGE_END}")
 
     def release_port(self, port: int) -> None:
         """Release a previously allocated port."""
@@ -227,7 +226,7 @@ class WorktreeManager:
             return 0
 
         # Get list of registered worktrees from git
-        result = _run_git(
+        _run_git(
             ["worktree", "list", "--porcelain"],
             cwd=self.project_dir,
             check=False,
@@ -246,8 +245,6 @@ class WorktreeManager:
                     cleaned += 1
                     logger.info("Cleaned stale worktree: %s", child.name)
                 except WorktreeError as e:
-                    logger.warning(
-                        "Failed to clean worktree %s: %s", child.name, e
-                    )
+                    logger.warning("Failed to clean worktree %s: %s", child.name, e)
 
         return cleaned

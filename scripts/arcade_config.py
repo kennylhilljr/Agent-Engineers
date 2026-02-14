@@ -50,8 +50,8 @@ ARCADE_GITHUB_TOOLS: list[str] = [
     "mcp__arcade__Github_GetUserRecentActivity",
     "mcp__arcade__Github_GetUserOpenItems",
     "mcp__arcade__Github_GetReviewWorkload",
-    "mcp__arcade__Github_GetNotificationSummary",   # Requires Classic PAT
-    "mcp__arcade__Github_ListNotifications",        # Requires Classic PAT
+    "mcp__arcade__Github_GetNotificationSummary",  # Requires Classic PAT
+    "mcp__arcade__Github_ListNotifications",  # Requires Classic PAT
     # Repository
     "mcp__arcade__Github_GetRepository",
     "mcp__arcade__Github_SearchMyRepos",
@@ -64,7 +64,7 @@ ARCADE_GITHUB_TOOLS: list[str] = [
     # Branches & Files
     "mcp__arcade__Github_CreateBranch",
     "mcp__arcade__Github_GetFileContents",
-    "mcp__arcade__Github_CreateOrUpdateFile",       # Fixed: was CreateFile
+    "mcp__arcade__Github_CreateOrUpdateFile",  # Fixed: was CreateFile
     "mcp__arcade__Github_UpdateFileLines",
     # Issues
     "mcp__arcade__Github_ListIssues",
@@ -78,7 +78,7 @@ ARCADE_GITHUB_TOOLS: list[str] = [
     "mcp__arcade__Github_CreatePullRequest",
     "mcp__arcade__Github_UpdatePullRequest",
     "mcp__arcade__Github_MergePullRequest",
-    "mcp__arcade__Github_ManagePullRequest",        # Added: update PR properties
+    "mcp__arcade__Github_ManagePullRequest",  # Added: update PR properties
     "mcp__arcade__Github_CheckPullRequestMergeStatus",
     "mcp__arcade__Github_ListPullRequestCommits",
     # PR Reviews & Reviewers
@@ -98,7 +98,7 @@ ARCADE_GITHUB_TOOLS: list[str] = [
     "mcp__arcade__Github_ListProjectFields",
     "mcp__arcade__Github_ListProjectItems",
     "mcp__arcade__Github_SearchProjectItem",
-    "mcp__arcade__Github_UpdateProjectItem",        # Added: update project item fields
+    "mcp__arcade__Github_UpdateProjectItem",  # Added: update project item fields
 ]
 
 # Slack tools (8 tools) - Uses Slack.* prefix per Arcade docs
@@ -161,9 +161,7 @@ ARCADE_LINEAR_TOOLS: list[str] = [
 ]
 
 # All Arcade tools combined
-ALL_ARCADE_TOOLS: list[str] = (
-    ARCADE_LINEAR_TOOLS + ARCADE_GITHUB_TOOLS + ARCADE_SLACK_TOOLS
-)
+ALL_ARCADE_TOOLS: list[str] = ARCADE_LINEAR_TOOLS + ARCADE_GITHUB_TOOLS + ARCADE_SLACK_TOOLS
 
 
 def get_arcade_mcp_config() -> ArcadeMcpConfig:

@@ -15,9 +15,9 @@ Environment Variables:
 """
 
 import os
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import AsyncIterator, Optional
+from enum import StrEnum
 
 try:
     from openai import AsyncOpenAI, OpenAI
@@ -28,7 +28,7 @@ except ImportError:
 KIMI_BASE_URL = "https://api.moonshot.cn/v1"
 
 
-class KimiModel(str, Enum):
+class KimiModel(StrEnum):
     MOONSHOT_V1_AUTO = "moonshot-v1-auto"
     MOONSHOT_V1_8K = "moonshot-v1-8k"
     MOONSHOT_V1_32K = "moonshot-v1-32k"
@@ -71,20 +71,18 @@ class KimiSession:
 class KimiResponse:
     content: str
     model: str
-    usage: Optional[dict] = None
-    finish_reason: Optional[str] = None
+    usage: dict | None = None
+    finish_reason: str | None = None
 
 
 class KimiClient:
     """KIMI API client using Moonshot's OpenAI-compatible endpoint."""
 
-    def __init__(self, api_key: Optional[str] = None) -> None:
+    def __init__(self, api_key: str | None = None) -> None:
         if OpenAI is None or AsyncOpenAI is None:
             raise ImportError("openai package not installed. Run: pip install openai")
         self.api_key = (
-            api_key
-            or os.environ.get("KIMI_API_KEY", "")
-            or os.environ.get("MOONSHOT_API_KEY", "")
+            api_key or os.environ.get("KIMI_API_KEY", "") or os.environ.get("MOONSHOT_API_KEY", "")
         )
         if not self.api_key:
             raise ValueError(
@@ -161,7 +159,7 @@ class KimiBridge:
         return cls(client=KimiClient())
 
     def create_session(
-        self, model: Optional[str] = None, system_prompt: Optional[str] = None
+        self, model: str | None = None, system_prompt: str | None = None
     ) -> KimiSession:
         model_str = model or os.environ.get("KIMI_MODEL", "moonshot-v1-auto")
         kimi_model = KimiModel.from_string(model_str)

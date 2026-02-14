@@ -17,9 +17,9 @@ import json
 import os
 import subprocess
 import uuid
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import AsyncIterator, Optional
+from enum import StrEnum
 
 try:
     import httpx
@@ -33,12 +33,12 @@ except ImportError:
     OpenAI = None
 
 
-class AuthType(str, Enum):
+class AuthType(StrEnum):
     CODEX_OAUTH = "codex-oauth"
     SESSION_TOKEN = "session-token"
 
 
-class ChatGPTModel(str, Enum):
+class ChatGPTModel(StrEnum):
     GPT_4O = "gpt-4o"
     O1 = "o1"
     O3_MINI = "o3-mini"
@@ -60,7 +60,7 @@ class ChatMessage:
 class ChatSession:
     model: ChatGPTModel
     messages: list[ChatMessage] = field(default_factory=list)
-    session_id: Optional[str] = None
+    session_id: str | None = None
 
     def add_message(self, role: str, content: str) -> None:
         self.messages.append(ChatMessage(role=role, content=content))
@@ -73,14 +73,14 @@ class ChatSession:
 class ChatResponse:
     content: str
     model: str
-    usage: Optional[dict] = None
-    finish_reason: Optional[str] = None
+    usage: dict | None = None
+    finish_reason: str | None = None
 
 
 class CodexOAuthClient:
     """Primary path: Uses OpenAI SDK with API key from Codex CLI OAuth flow."""
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         if OpenAI is None or AsyncOpenAI is None:
             raise ImportError("openai package not installed. Run: pip install openai")
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
@@ -89,36 +89,49 @@ class CodexOAuthClient:
         self._client = OpenAI(api_key=self.api_key)
         self._async_client = AsyncOpenAI(api_key=self.api_key)
 
-    def send_message(self, session: ChatSession, message: str, stream: bool = False) -> ChatResponse:
+    def send_message(
+        self, session: ChatSession, message: str, stream: bool = False
+    ) -> ChatResponse:
         session.add_message("user", message)
         response = self._client.chat.completions.create(
-            model=session.model.value, messages=session.to_openai_messages(), stream=False)
+            model=session.model.value, messages=session.to_openai_messages(), stream=False
+        )
         content = response.choices[0].message.content or ""
         session.add_message("assistant", content)
         return ChatResponse(
-            content=content, model=response.model,
-            usage={"prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
-                   "completion_tokens": response.usage.completion_tokens if response.usage else 0,
-                   "total_tokens": response.usage.total_tokens if response.usage else 0},
-            finish_reason=response.choices[0].finish_reason)
+            content=content,
+            model=response.model,
+            usage={
+                "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
+                "completion_tokens": response.usage.completion_tokens if response.usage else 0,
+                "total_tokens": response.usage.total_tokens if response.usage else 0,
+            },
+            finish_reason=response.choices[0].finish_reason,
+        )
 
     async def send_message_async(self, session: ChatSession, message: str) -> ChatResponse:
         session.add_message("user", message)
         response = await self._async_client.chat.completions.create(
-            model=session.model.value, messages=session.to_openai_messages(), stream=False)
+            model=session.model.value, messages=session.to_openai_messages(), stream=False
+        )
         content = response.choices[0].message.content or ""
         session.add_message("assistant", content)
         return ChatResponse(
-            content=content, model=response.model,
-            usage={"prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
-                   "completion_tokens": response.usage.completion_tokens if response.usage else 0,
-                   "total_tokens": response.usage.total_tokens if response.usage else 0},
-            finish_reason=response.choices[0].finish_reason)
+            content=content,
+            model=response.model,
+            usage={
+                "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
+                "completion_tokens": response.usage.completion_tokens if response.usage else 0,
+                "total_tokens": response.usage.total_tokens if response.usage else 0,
+            },
+            finish_reason=response.choices[0].finish_reason,
+        )
 
     async def stream_response(self, session: ChatSession, message: str) -> AsyncIterator[str]:
         session.add_message("user", message)
         stream = await self._async_client.chat.completions.create(
-            model=session.model.value, messages=session.to_openai_messages(), stream=True)
+            model=session.model.value, messages=session.to_openai_messages(), stream=True
+        )
         full_content = ""
         async for chunk in stream:
             if chunk.choices and chunk.choices[0].delta.content:
@@ -134,14 +147,15 @@ class SessionTokenClient:
     Uses curl_cffi to impersonate Chrome's TLS fingerprint, bypassing
     Cloudflare's bot detection on chatgpt.com.
     """
+
     CHATGPT_BASE_URL = "https://chatgpt.com"
     BACKEND_API_URL = f"{CHATGPT_BASE_URL}/backend-api"
 
     # Browser-like headers that match a real Chrome session
     _BROWSER_HEADERS = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                      "AppleWebKit/537.36 (KHTML, like Gecko) "
-                      "Chrome/131.0.0.0 Safari/537.36",
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/131.0.0.0 Safari/537.36",
         "Accept": "*/*",
         "Accept-Language": "en-US,en;q=0.9",
         "Accept-Encoding": "gzip, deflate, br",
@@ -155,9 +169,10 @@ class SessionTokenClient:
         "Referer": "https://chatgpt.com/",
     }
 
-    def __init__(self, session_token: Optional[str] = None):
+    def __init__(self, session_token: str | None = None):
         try:
             from curl_cffi.requests import Session as CffiSession
+
             self._CffiSession = CffiSession
         except ImportError:
             raise ImportError(
@@ -167,9 +182,9 @@ class SessionTokenClient:
         self.session_token = session_token or os.environ.get("CHATGPT_SESSION_TOKEN", "")
         if not self.session_token:
             raise ValueError("CHATGPT_SESSION_TOKEN not set.")
-        self._access_token: Optional[str] = None
+        self._access_token: str | None = None
         # Persistent session preserves Cloudflare cookies across requests
-        self._http: Optional[object] = None
+        self._http: object | None = None
 
     def _get_http(self):
         """Get or create a persistent HTTP session with Chrome impersonation."""
@@ -207,21 +222,33 @@ class SessionTokenClient:
         if not self._access_token:
             raise ValueError("Failed to get access token. Session token may be expired.")
 
-    def send_message(self, session: ChatSession, message: str, stream: bool = False) -> ChatResponse:
+    def send_message(
+        self, session: ChatSession, message: str, stream: bool = False
+    ) -> ChatResponse:
         session.add_message("user", message)
-        payload = {"action": "next",
-            "messages": [{"id": str(uuid.uuid4()), "author": {"role": "user"},
-                "content": {"content_type": "text", "parts": [message]}}],
-            "model": session.model.value, "parent_message_id": str(uuid.uuid4())}
+        payload = {
+            "action": "next",
+            "messages": [
+                {
+                    "id": str(uuid.uuid4()),
+                    "author": {"role": "user"},
+                    "content": {"content_type": "text", "parts": [message]},
+                }
+            ],
+            "model": session.model.value,
+            "parent_message_id": str(uuid.uuid4()),
+        }
         if session.session_id:
             payload["conversation_id"] = session.session_id
         s = self._get_http()
-        response = s.post(f"{self.BACKEND_API_URL}/conversation",
-            headers=self._get_headers(), json=payload)
+        response = s.post(
+            f"{self.BACKEND_API_URL}/conversation", headers=self._get_headers(), json=payload
+        )
         if response.status_code == 401:
             self._refresh_access_token()
-            response = s.post(f"{self.BACKEND_API_URL}/conversation",
-                headers=self._get_headers(), json=payload)
+            response = s.post(
+                f"{self.BACKEND_API_URL}/conversation", headers=self._get_headers(), json=payload
+            )
         response.raise_for_status()
         content = ""
         for line in response.text.split("\n"):
@@ -237,7 +264,9 @@ class SessionTokenClient:
                 except (json.JSONDecodeError, KeyError, IndexError):
                     continue
         session.add_message("assistant", content)
-        return ChatResponse(content=content, model=session.model.value, usage=None, finish_reason="stop")
+        return ChatResponse(
+            content=content, model=session.model.value, usage=None, finish_reason="stop"
+        )
 
 
 class OpenAIBridge:
@@ -253,7 +282,9 @@ class OpenAIBridge:
         try:
             auth_type = AuthType(auth_type_str.lower().strip())
         except ValueError:
-            print(f"Warning: Unknown CHATGPT_AUTH_TYPE '{auth_type_str}', falling back to codex-oauth")
+            print(
+                f"Warning: Unknown CHATGPT_AUTH_TYPE '{auth_type_str}', falling back to codex-oauth"
+            )
             auth_type = AuthType.CODEX_OAUTH
         if auth_type == AuthType.CODEX_OAUTH:
             client = CodexOAuthClient()
@@ -261,7 +292,9 @@ class OpenAIBridge:
             client = SessionTokenClient()
         return cls(auth_type=auth_type, client=client)
 
-    def create_session(self, model: Optional[str] = None, system_prompt: Optional[str] = None) -> ChatSession:
+    def create_session(
+        self, model: str | None = None, system_prompt: str | None = None
+    ) -> ChatSession:
         model_str = model or os.environ.get("CHATGPT_MODEL", "gpt-4o")
         chat_model = ChatGPTModel.from_string(model_str)
         session = ChatSession(model=chat_model)
@@ -286,8 +319,10 @@ class OpenAIBridge:
             yield response.content
 
     def get_auth_info(self) -> dict[str, str]:
-        info = {"auth_type": self.auth_type.value,
-                "model_default": os.environ.get("CHATGPT_MODEL", "gpt-4o")}
+        info = {
+            "auth_type": self.auth_type.value,
+            "model_default": os.environ.get("CHATGPT_MODEL", "gpt-4o"),
+        }
         if self.auth_type == AuthType.CODEX_OAUTH:
             key = os.environ.get("OPENAI_API_KEY", "")
             info["api_key_set"] = "yes" if key else "no"

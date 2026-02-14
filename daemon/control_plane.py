@@ -24,7 +24,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from worker_pool import WorkerPoolManager
+    from daemon.worker_pool import WorkerPoolManager
 
 logger = logging.getLogger("control_plane")
 
@@ -48,7 +48,9 @@ class ControlPlane:
     async def start(self) -> None:
         """Start the control plane HTTP server."""
         self._server = await asyncio.start_server(
-            self._handle_connection, "127.0.0.1", self.port,
+            self._handle_connection,
+            "127.0.0.1",
+            self.port,
         )
         logger.info("Control plane listening on http://127.0.0.1:%d", self.port)
 
@@ -96,14 +98,15 @@ class ControlPlane:
             body: bytes = b""
             if content_length > 0:
                 body = await asyncio.wait_for(
-                    reader.readexactly(content_length), timeout=5.0,
+                    reader.readexactly(content_length),
+                    timeout=5.0,
                 )
 
             # Route request
             response = self._route(method, path, body)
             await self._send_response(writer, response[0], response[1])
 
-        except (asyncio.TimeoutError, ConnectionError, asyncio.IncompleteReadError):
+        except (TimeoutError, ConnectionError, asyncio.IncompleteReadError):
             pass
         except Exception as e:
             logger.warning("Control plane request error: %s", e)
@@ -172,7 +175,7 @@ class ControlPlane:
         pool_name = data.get("pool", "coding")
         count = data.get("count", 1)
 
-        from worker_pool import PoolType
+        from daemon.worker_pool import PoolType
 
         try:
             pool_type = PoolType(pool_name)
@@ -229,7 +232,7 @@ class ControlPlane:
         # Enqueue tickets that are actionable (moved to Todo or back to Todo)
         actionable_states = ("todo", "backlog", "triage")
         if action in ("create", "update") and state_name in actionable_states:
-            from worker_pool import Ticket
+            from daemon.worker_pool import Ticket
 
             ticket = Ticket(
                 key=issue_data.get("identifier", issue_data.get("id", "UNKNOWN")),
@@ -237,13 +240,18 @@ class ControlPlane:
                 description=issue_data.get("description", ""),
                 status="todo",
                 priority=str(issue_data.get("priority", "medium")),
-                labels=[l.get("name", "") for l in issue_data.get("labels", {}).get("nodes", [])],
+                labels=[
+                    node.get("name", "") for node in issue_data.get("labels", {}).get("nodes", [])
+                ],
             )
 
             self.pool_manager.ticket_queue.put_nowait(ticket)
             logger.info(
                 "Webhook: enqueued %s '%s' (action=%s, state=%s)",
-                ticket.key, ticket.title, action, state_name,
+                ticket.key,
+                ticket.title,
+                action,
+                state_name,
             )
             return 200, {"status": "enqueued", "ticket": ticket.key}
 
@@ -256,7 +264,7 @@ class ControlPlane:
         except json.JSONDecodeError:
             return 400, {"error": "Invalid JSON"}
 
-        from worker_pool import PoolType
+        from daemon.worker_pool import PoolType
 
         try:
             pool_type = PoolType(pool_name)
@@ -286,7 +294,12 @@ class ControlPlane:
         body: dict,
     ) -> None:
         """Send an HTTP response with JSON body."""
-        status_text = {200: "OK", 400: "Bad Request", 404: "Not Found", 500: "Internal Server Error"}
+        status_text = {
+            200: "OK",
+            400: "Bad Request",
+            404: "Not Found",
+            500: "Internal Server Error",
+        }
         body_bytes = json.dumps(body, indent=2).encode("utf-8")
         response = (
             f"HTTP/1.1 {status} {status_text.get(status, 'Unknown')}\r\n"
@@ -294,6 +307,6 @@ class ControlPlane:
             f"Content-Length: {len(body_bytes)}\r\n"
             f"Connection: close\r\n"
             f"\r\n"
-        ).encode("utf-8") + body_bytes
+        ).encode() + body_bytes
         writer.write(response)
         await writer.drain()

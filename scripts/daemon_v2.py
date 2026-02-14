@@ -22,7 +22,7 @@ import os
 import signal
 import sys
 import traceback
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Add repo root to path so we can import top-level modules
@@ -31,30 +31,27 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from dotenv import load_dotenv
 
 from agent import (
-    COMPLETION_SIGNAL,
     SESSION_COMPLETE,
-    SESSION_CONTINUE,
     SESSION_ERROR,
     SessionResult,
     run_agent_session,
 )
 from agents.definitions import create_agent_definitions_for_pool
 from client import create_client
-from control_plane import ControlPlane
-from progress import is_project_initialized, load_project_state
-from prompts import copy_spec_to_project, get_continuation_task, get_initializer_task
-from ticket_router import TicketRouter
-from worker_pool import (
+from daemon.control_plane import ControlPlane
+from daemon.ticket_router import TicketRouter
+from daemon.worker_pool import (
     AVAILABLE_MODELS,
     DaemonConfig,
     PoolType,
     Ticket,
-    TicketComplexity,
     TypedWorker,
     WorkerPoolManager,
     WorkerStatus,
 )
-from worktree import WorktreeError, WorktreeManager
+from daemon.worktree import WorktreeError, WorktreeManager
+from progress import is_project_initialized
+from prompts import copy_spec_to_project, get_continuation_task, get_initializer_task
 
 load_dotenv()
 
@@ -169,19 +166,13 @@ class ScalableDaemon:
         ticket: Ticket,
     ) -> SessionResult:
         """Run a coding worker session with worktree isolation."""
-        branch_name = self.worktree_manager.get_branch_for_ticket(
-            ticket.key, ticket.title
-        )
+        branch_name = self.worktree_manager.get_branch_for_ticket(ticket.key, ticket.title)
 
         try:
-            worktree_path = self.worktree_manager.create_worktree(
-                worker.worker_id, branch_name
-            )
+            worktree_path = self.worktree_manager.create_worktree(worker.worker_id, branch_name)
             worker.worktree_path = worktree_path
         except WorktreeError as e:
-            logger.error(
-                "%s failed to create worktree: %s", worker.worker_id, e
-            )
+            logger.error("%s failed to create worktree: %s", worker.worker_id, e)
             return SessionResult(status=SESSION_ERROR, response=str(e))
 
         try:
@@ -192,9 +183,7 @@ class ScalableDaemon:
             port = None
 
         try:
-            _, model_id = self.ticket_router.route_and_select(
-                ticket, self.pool_manager.pools
-            )
+            _, model_id = self.ticket_router.route_and_select(ticket, self.pool_manager.pools)
 
             model_name = None
             for name, mid in AVAILABLE_MODELS.items():
@@ -217,16 +206,17 @@ class ScalableDaemon:
 
             logger.info(
                 "%s running on %s (branch=%s, model=%s, port=%s)",
-                worker.worker_id, ticket.key, branch_name,
-                model_name or model_id, port,
+                worker.worker_id,
+                ticket.key,
+                branch_name,
+                model_name or model_id,
+                port,
             )
 
             result: SessionResult
             try:
                 async with client:
-                    result = await run_agent_session(
-                        client, prompt, self.project_dir
-                    )
+                    result = await run_agent_session(client, prompt, self.project_dir)
             except Exception as e:
                 logger.error("%s session error: %s", worker.worker_id, e)
                 traceback.print_exc()
@@ -235,13 +225,12 @@ class ScalableDaemon:
             if result.status != SESSION_ERROR:
                 merged = self.worktree_manager.merge_to_main(branch_name)
                 if merged:
-                    logger.info(
-                        "%s merged %s to main", worker.worker_id, branch_name
-                    )
+                    logger.info("%s merged %s to main", worker.worker_id, branch_name)
                 else:
                     logger.warning(
                         "%s merge conflict on %s — leaving branch for manual review",
-                        worker.worker_id, branch_name,
+                        worker.worker_id,
+                        branch_name,
                     )
 
             return result
@@ -250,9 +239,7 @@ class ScalableDaemon:
             try:
                 self.worktree_manager.remove_worktree(worker.worker_id)
             except WorktreeError as e:
-                logger.warning(
-                    "%s worktree cleanup failed: %s", worker.worker_id, e
-                )
+                logger.warning("%s worktree cleanup failed: %s", worker.worker_id, e)
             if port is not None:
                 self.worktree_manager.release_port(port)
             worker.worktree_path = None
@@ -264,16 +251,16 @@ class ScalableDaemon:
         ticket: Ticket,
     ) -> SessionResult:
         """Run a non-coding worker (review, linear) in the main project dir."""
-        _, model_id = self.ticket_router.route_and_select(
-            ticket, self.pool_manager.pools
-        )
+        _, model_id = self.ticket_router.route_and_select(ticket, self.pool_manager.pools)
 
         client = create_client(self.project_dir, model_id)
         prompt = get_continuation_task(self.project_dir)
 
         logger.info(
             "%s running on %s (model=%s)",
-            worker.worker_id, ticket.key, model_id,
+            worker.worker_id,
+            ticket.key,
+            model_id,
         )
 
         try:
@@ -292,7 +279,7 @@ class ScalableDaemon:
         """Wrapper that runs a worker session and cleans up state."""
         worker.status = WorkerStatus.EXECUTING
         worker.current_ticket = ticket
-        worker.started_at = datetime.now(timezone.utc)
+        worker.started_at = datetime.now(UTC)
         self._active_ticket_keys.add(ticket.key)
 
         try:
@@ -311,8 +298,10 @@ class ScalableDaemon:
                 worker.consecutive_errors += 1
                 logger.warning(
                     "%s error on %s (attempt %d): %s",
-                    worker.worker_id, ticket.key,
-                    worker.consecutive_errors, result.response[:200],
+                    worker.worker_id,
+                    ticket.key,
+                    worker.consecutive_errors,
+                    result.response[:200],
                 )
             else:
                 worker.consecutive_errors = 0
@@ -320,14 +309,17 @@ class ScalableDaemon:
                 self.total_tickets_processed += 1
                 logger.info(
                     "%s finished %s (status=%s, total=%d)",
-                    worker.worker_id, ticket.key,
-                    result.status, worker.tickets_completed,
+                    worker.worker_id,
+                    ticket.key,
+                    result.status,
+                    worker.tickets_completed,
                 )
 
             if result.status == SESSION_COMPLETE:
                 logger.info(
                     "%s reports PROJECT_COMPLETE for %s",
-                    worker.worker_id, ticket.key,
+                    worker.worker_id,
+                    ticket.key,
                 )
 
         except Exception as e:
@@ -371,12 +363,14 @@ class ScalableDaemon:
             return queued
 
         # Fallback: synthetic check (polling mode)
-        return [Ticket(
-            key="LINEAR_CHECK",
-            title="Check Linear for available tickets",
-            description="Run a continuation session to check for work.",
-            status="todo",
-        )]
+        return [
+            Ticket(
+                key="LINEAR_CHECK",
+                title="Check Linear for available tickets",
+                description="Run a continuation session to check for work.",
+                status="todo",
+            )
+        ]
 
     def _filter_actionable_tickets(self, tickets: list[Ticket]) -> list[Ticket]:
         """Filter out tickets already being worked on."""
@@ -401,12 +395,14 @@ class ScalableDaemon:
 
             if worker.consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
                 backoff = min(
-                    ERROR_RETRY_DELAY * (2 ** worker.consecutive_errors),
+                    ERROR_RETRY_DELAY * (2**worker.consecutive_errors),
                     BACKOFF_CEILING,
                 )
                 logger.warning(
                     "%s has %d consecutive errors, backing off %ds",
-                    worker.worker_id, worker.consecutive_errors, backoff,
+                    worker.worker_id,
+                    worker.consecutive_errors,
+                    backoff,
                 )
                 worker.consecutive_errors = 0
                 continue
@@ -428,7 +424,8 @@ class ScalableDaemon:
         for lease in expired:
             logger.warning(
                 "Lease expired for ticket '%s' (worker=%s) — releasing",
-                lease.ticket_key, lease.worker_id,
+                lease.ticket_key,
+                lease.worker_id,
             )
             self.pool_manager.release_ticket(lease.ticket_key)
             self._active_ticket_keys.discard(lease.ticket_key)
@@ -443,16 +440,21 @@ class ScalableDaemon:
 
         logger.info(
             "Status: %d workers total, %d tickets processed, poll #%d",
-            total_workers, self.total_tickets_processed, self.poll_count,
+            total_workers,
+            self.total_tickets_processed,
+            self.poll_count,
         )
 
         for pool_name, info in pools_info.items():
-            idle = info.get("idle", 0)
+            info.get("idle", 0)
             busy = info.get("busy", 0)
             total = info.get("worker_count", 0)
             logger.info(
                 "  Pool %s: %d/%d busy, model=%s",
-                pool_name, busy, total, info.get("default_model", "?"),
+                pool_name,
+                busy,
+                total,
+                info.get("default_model", "?"),
             )
 
         for pool_type, pool in self.pool_manager.pools.items():
@@ -460,7 +462,9 @@ class ScalableDaemon:
                 if w.current_ticket:
                     logger.info(
                         "  %s: BUSY — %s: %s",
-                        w.worker_id, w.current_ticket.key, w.current_ticket.title,
+                        w.worker_id,
+                        w.current_ticket.key,
+                        w.current_ticket.title,
                     )
 
     # --- Config reload ---
@@ -481,14 +485,13 @@ class ScalableDaemon:
                     self.pool_manager.resize_pool(pool_type, pool_config.max_workers)
                     logger.info(
                         "Resized %s pool: max=%d",
-                        pool_name, pool_config.max_workers,
+                        pool_name,
+                        pool_config.max_workers,
                     )
                 except (ValueError, KeyError):
                     pass
 
-            self.ticket_router = TicketRouter.from_rule_dicts(
-                new_config.routing_rules
-            )
+            self.ticket_router = TicketRouter.from_rule_dicts(new_config.routing_rules)
 
             logger.info("Configuration reloaded successfully")
 
@@ -499,7 +502,7 @@ class ScalableDaemon:
 
     async def run(self, config_path: Path | None = None) -> None:
         """Main daemon loop."""
-        self.daemon_start_time = datetime.now(timezone.utc)
+        self.daemon_start_time = datetime.now(UTC)
 
         logger.info("=" * 70)
         logger.info("  SCALABLE TICKET DAEMON v2")
@@ -512,7 +515,9 @@ class ScalableDaemon:
         for pool_name, pool_cfg in self.config.pools.items():
             logger.info(
                 "  Pool %s: min=%d, max=%d, model=%s",
-                pool_name, pool_cfg.min_workers, pool_cfg.max_workers,
+                pool_name,
+                pool_cfg.min_workers,
+                pool_cfg.max_workers,
                 pool_cfg.default_model,
             )
         logger.info("=" * 70)
@@ -539,7 +544,9 @@ class ScalableDaemon:
 
                 logger.info(
                     "Poll #%d: %d total, %d actionable, %d idle workers",
-                    self.poll_count, len(all_tickets), len(actionable),
+                    self.poll_count,
+                    len(all_tickets),
+                    len(actionable),
                     len(self.pool_manager.get_idle_workers()),
                 )
 
@@ -553,12 +560,14 @@ class ScalableDaemon:
             except Exception as e:
                 self.consecutive_poll_errors += 1
                 backoff = min(
-                    ERROR_RETRY_DELAY * (2 ** self.consecutive_poll_errors),
+                    ERROR_RETRY_DELAY * (2**self.consecutive_poll_errors),
                     BACKOFF_CEILING,
                 )
                 logger.error(
                     "Poll error (attempt %d, backoff %ds): %s",
-                    self.consecutive_poll_errors, backoff, e,
+                    self.consecutive_poll_errors,
+                    backoff,
+                    e,
                 )
                 await asyncio.sleep(backoff)
                 continue
@@ -571,7 +580,7 @@ class ScalableDaemon:
                     timeout=self.config.poll_interval,
                 )
                 break
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass
 
         await self._shutdown_gracefully()
@@ -612,14 +621,15 @@ class ScalableDaemon:
         logger.info("Total tickets processed: %d", self.total_tickets_processed)
         logger.info("Total polls: %d", self.poll_count)
         if self.daemon_start_time:
-            uptime = datetime.now(timezone.utc) - self.daemon_start_time
+            uptime = datetime.now(UTC) - self.daemon_start_time
             logger.info("Uptime: %s", uptime)
 
         for pool_type, pool in self.pool_manager.pools.items():
             for w in pool.workers:
                 logger.info(
                     "  %s: %d tickets completed",
-                    w.worker_id, w.tickets_completed,
+                    w.worker_id,
+                    w.tickets_completed,
                 )
         logger.info("=" * 70)
 
@@ -638,9 +648,7 @@ def main() -> int:
     """Main entry point for the scalable daemon."""
     import argparse
 
-    default_generations_base = Path(
-        os.environ.get("GENERATIONS_BASE_PATH", "./generations")
-    )
+    default_generations_base = Path(os.environ.get("GENERATIONS_BASE_PATH", "./generations"))
 
     parser = argparse.ArgumentParser(
         description="Scalable Ticket Daemon v2 — Typed worker pools with dynamic scaling",

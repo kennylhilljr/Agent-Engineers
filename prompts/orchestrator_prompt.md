@@ -143,6 +143,10 @@ Follow the continuation task steps. Key flow per ticket:
 | Low-risk PR review | `pr_reviewer_fast` | PR number, files, test steps |
 | High-risk PR review | `pr_reviewer` | PR number, files, test steps |
 | Verification test | `coding` | Run init.sh, test features |
+| Ultra-long context analysis (>100K tokens) | `kimi` | Full codebase/doc + task |
+| Bilingual Chinese/English tasks | `kimi` | Content + language instructions |
+| Parallel coding / cross-IDE validation | `windsurf` | Task description + workspace path |
+| Alternative implementation for comparison | `windsurf` | Same spec as primary coding agent |
 
 ---
 

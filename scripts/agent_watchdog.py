@@ -21,8 +21,7 @@ import signal
 import subprocess
 import sys
 import time
-from base64 import b64encode
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal, NamedTuple, TypedDict
 
@@ -32,16 +31,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from progress import load_project_state, detect_tracker
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
 REPO_ROOT: Path = Path(__file__).parent.parent
-DEFAULT_CHECK_INTERVAL: int = 300       # 5 minutes
-DEFAULT_STALL_THRESHOLD: int = 1800     # 30 minutes
-DEFAULT_COMMIT_THRESHOLD: int = 3600    # 60 minutes
+DEFAULT_CHECK_INTERVAL: int = 300  # 5 minutes
+DEFAULT_STALL_THRESHOLD: int = 1800  # 30 minutes
+DEFAULT_COMMIT_THRESHOLD: int = 3600  # 60 minutes
 DEFAULT_MAX_RESTARTS: int = 3
 SIGTERM_TIMEOUT: int = 10
 MAX_BACKOFF_SECONDS: float = 600.0
@@ -159,7 +157,9 @@ class AgentWatchdog:
         try:
             result = subprocess.run(
                 ["ps", "-eo", "pid,command"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
         except (subprocess.TimeoutExpired, OSError):
             return None
@@ -197,7 +197,9 @@ class AgentWatchdog:
         try:
             result = subprocess.run(
                 ["ps", "-p", str(pid), "-o", "%cpu="],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             return float(result.stdout.strip()) if result.returncode == 0 else 0.0
         except (subprocess.TimeoutExpired, OSError, ValueError):
@@ -208,7 +210,9 @@ class AgentWatchdog:
         try:
             result = subprocess.run(
                 ["ps", "-eo", "pid,ppid"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
         except (subprocess.TimeoutExpired, OSError):
             return False
@@ -228,7 +232,9 @@ class AgentWatchdog:
         try:
             result = subprocess.run(
                 ["git", "-C", str(project_dir), "log", "-1", "--format=%aI"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             if result.returncode == 0 and result.stdout.strip():
                 return datetime.fromisoformat(result.stdout.strip())
@@ -242,17 +248,21 @@ class AgentWatchdog:
 
     def assess_health(self, pid: int, project_dir: Path) -> AgentHealthReport:
         """Run all checks and return a composite health report."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         tag = project_dir.name
 
         alive = self.check_process_alive(pid)
         if not alive:
             self._last_cpu_active.pop(pid, None)
             return AgentHealthReport(
-                pid=pid, project_dir=str(project_dir),
-                is_alive=False, cpu_percent=0.0,
-                last_cpu_active=now.isoformat(), last_git_commit=None,
-                has_children=False, status="dead",
+                pid=pid,
+                project_dir=str(project_dir),
+                is_alive=False,
+                cpu_percent=0.0,
+                last_cpu_active=now.isoformat(),
+                last_git_commit=None,
+                has_children=False,
+                status="dead",
                 reason="Process not found",
             )
 
@@ -304,10 +314,7 @@ class AgentWatchdog:
                     if commit_age is not None
                     else "no commits found"
                 )
-                reason = (
-                    f"CPU=0% for {_fmt_duration(idle_seconds)}, "
-                    f"no children, {commit_info}"
-                )
+                reason = f"CPU=0% for {_fmt_duration(idle_seconds)}, no children, {commit_info}"
 
         self.logger.log(
             logging.WARNING if status in ("stalled", "dead") else logging.INFO,
@@ -315,12 +322,15 @@ class AgentWatchdog:
         )
 
         return AgentHealthReport(
-            pid=pid, project_dir=str(project_dir),
-            is_alive=alive, cpu_percent=cpu,
+            pid=pid,
+            project_dir=str(project_dir),
+            is_alive=alive,
+            cpu_percent=cpu,
             last_cpu_active=last_active.isoformat(),
             last_git_commit=last_commit_str,
             has_children=has_children,
-            status=status, reason=reason,
+            status=status,
+            reason=reason,
         )
 
     # ------------------------------------------------------------------
@@ -359,13 +369,13 @@ class AgentWatchdog:
 
     def _can_restart(self, key: str) -> bool:
         history = self._restart_history.get(key, [])
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
+        cutoff = datetime.now(UTC) - timedelta(hours=1)
         recent = [r for r in history if r.timestamp > cutoff]
         return len(recent) < self.config.max_restarts_per_hour
 
     def _get_backoff_delay(self, key: str) -> float:
         history = self._restart_history.get(key, [])
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
+        cutoff = datetime.now(UTC) - timedelta(hours=1)
         count = sum(1 for r in history if r.timestamp > cutoff)
         if count == 0:
             return 0.0
@@ -409,7 +419,7 @@ class AgentWatchdog:
 
         self._restart_history.setdefault(key, []).append(
             RestartRecord(
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 pid=process.pid,
                 project_dir=key,
                 reason=reason,
@@ -440,30 +450,40 @@ class AgentWatchdog:
             if pid is None:
                 was_pid = self._was_running.get(str(project_dir))
                 if was_pid is not None:
-                    self.logger.warning(
-                        f"[{tag}] Agent disappeared (was PID {was_pid})"
-                    )
+                    self.logger.warning(f"[{tag}] Agent disappeared (was PID {was_pid})")
                     self._last_cpu_active.pop(was_pid, None)
                     del self._was_running[str(project_dir)]
                     new_pid = self.restart_agent(project_dir, "process_disappeared")
                     if new_pid:
                         self._was_running[str(project_dir)] = new_pid
-                    reports.append(AgentHealthReport(
-                        pid=was_pid, project_dir=str(project_dir),
-                        is_alive=False, cpu_percent=0.0,
-                        last_cpu_active=datetime.now(timezone.utc).isoformat(),
-                        last_git_commit=None, has_children=False,
-                        status="dead", reason="Process disappeared — restarted",
-                    ))
+                    reports.append(
+                        AgentHealthReport(
+                            pid=was_pid,
+                            project_dir=str(project_dir),
+                            is_alive=False,
+                            cpu_percent=0.0,
+                            last_cpu_active=datetime.now(UTC).isoformat(),
+                            last_git_commit=None,
+                            has_children=False,
+                            status="dead",
+                            reason="Process disappeared — restarted",
+                        )
+                    )
                 else:
                     self.logger.debug(f"[{tag}] No agent running (not previously tracked)")
-                    reports.append(AgentHealthReport(
-                        pid=0, project_dir=str(project_dir),
-                        is_alive=False, cpu_percent=0.0,
-                        last_cpu_active="", last_git_commit=None,
-                        has_children=False, status="dead",
-                        reason="No agent process found",
-                    ))
+                    reports.append(
+                        AgentHealthReport(
+                            pid=0,
+                            project_dir=str(project_dir),
+                            is_alive=False,
+                            cpu_percent=0.0,
+                            last_cpu_active="",
+                            last_git_commit=None,
+                            has_children=False,
+                            status="dead",
+                            reason="No agent process found",
+                        )
+                    )
                 continue
 
             self._was_running[str(project_dir)] = pid
@@ -572,34 +592,48 @@ Examples:
         """,
     )
     parser.add_argument(
-        "--project-dir", type=Path, action="append", required=True,
+        "--project-dir",
+        type=Path,
+        action="append",
+        required=True,
         help="Project to monitor (repeatable)",
     )
     parser.add_argument(
-        "--check-interval", type=int, default=DEFAULT_CHECK_INTERVAL,
+        "--check-interval",
+        type=int,
+        default=DEFAULT_CHECK_INTERVAL,
         help=f"Seconds between checks (default: {DEFAULT_CHECK_INTERVAL})",
     )
     parser.add_argument(
-        "--stall-threshold", type=int, default=DEFAULT_STALL_THRESHOLD,
+        "--stall-threshold",
+        type=int,
+        default=DEFAULT_STALL_THRESHOLD,
         help=f"Seconds of 0%% CPU before stall (default: {DEFAULT_STALL_THRESHOLD})",
     )
     parser.add_argument(
-        "--commit-threshold", type=int, default=DEFAULT_COMMIT_THRESHOLD,
+        "--commit-threshold",
+        type=int,
+        default=DEFAULT_COMMIT_THRESHOLD,
         help=f"Seconds since last commit before flagging (default: {DEFAULT_COMMIT_THRESHOLD})",
     )
     parser.add_argument(
-        "--max-restarts", type=int, default=DEFAULT_MAX_RESTARTS,
+        "--max-restarts",
+        type=int,
+        default=DEFAULT_MAX_RESTARTS,
         help=f"Max restarts per project per hour (default: {DEFAULT_MAX_RESTARTS})",
     )
     parser.add_argument("--dry-run", action="store_true", help="Report only, no kill/restart")
     parser.add_argument("--once", action="store_true", help="Single check then exit")
     parser.add_argument(
-        "--log-file", type=Path,
+        "--log-file",
+        type=Path,
         default=REPO_ROOT / "logs" / "watchdog.log",
         help="Log file path (default: logs/watchdog.log)",
     )
     parser.add_argument(
-        "--generations-base", type=Path, default=None,
+        "--generations-base",
+        type=Path,
+        default=None,
         help="Base directory for projects (default: from env or ./generations)",
     )
     return parser.parse_args()
@@ -608,9 +642,7 @@ Examples:
 def main() -> int:
     args = parse_args()
 
-    project_dirs = [
-        resolve_project_dir(p, args.generations_base) for p in args.project_dir
-    ]
+    project_dirs = [resolve_project_dir(p, args.generations_base) for p in args.project_dir]
 
     config = WatchdogConfig(
         check_interval=args.check_interval,

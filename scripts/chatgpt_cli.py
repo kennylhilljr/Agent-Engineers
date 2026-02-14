@@ -13,32 +13,46 @@ Usage:
 
 import argparse
 import asyncio
-import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from openai_bridge import (
-    ChatGPTModel, OpenAIBridge, get_available_models, print_auth_status,
+from bridges.openai_bridge import (
+    ChatGPTModel,
+    OpenAIBridge,
+    get_available_models,
+    print_auth_status,
 )
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="ChatGPT CLI")
-    parser.add_argument("-q", "--query", type=str, default=None,
-        help="Single query mode. Use '-' to read from stdin.")
-    parser.add_argument("-m", "--model", type=str, default=None,
+    parser.add_argument(
+        "-q",
+        "--query",
+        type=str,
+        default=None,
+        help="Single query mode. Use '-' to read from stdin.",
+    )
+    parser.add_argument(
+        "-m",
+        "--model",
+        type=str,
+        default=None,
         choices=get_available_models(),
-        help="ChatGPT model to use (default: from CHATGPT_MODEL env or gpt-4o)")
-    parser.add_argument("-s", "--stream", action="store_true", default=False,
-        help="Enable streaming responses (codex-oauth only)")
-    parser.add_argument("--system", type=str, default=None,
-        help="System prompt to set context")
-    parser.add_argument("--status", action="store_true",
-        help="Show authentication status and exit")
-    parser.add_argument("--verbose", action="store_true",
-        help="Show token usage and model info")
+        help="ChatGPT model to use (default: from CHATGPT_MODEL env or gpt-4o)",
+    )
+    parser.add_argument(
+        "-s",
+        "--stream",
+        action="store_true",
+        default=False,
+        help="Enable streaming responses (codex-oauth only)",
+    )
+    parser.add_argument("--system", type=str, default=None, help="System prompt to set context")
+    parser.add_argument("--status", action="store_true", help="Show authentication status and exit")
+    parser.add_argument("--verbose", action="store_true", help="Show token usage and model info")
     return parser.parse_args()
 
 
@@ -87,8 +101,10 @@ def run_repl(bridge: OpenAIBridge, args: argparse.Namespace) -> None:
                 response = bridge.send_message(session, user_input)
                 print(f"\nChatGPT: {response.content}")
                 if args.verbose and response.usage:
-                    print(f"\n  [{response.model} | "
-                          f"tokens: {response.usage.get('total_tokens', '?')}]")
+                    print(
+                        f"\n  [{response.model} | "
+                        f"tokens: {response.usage.get('total_tokens', '?')}]"
+                    )
         except Exception as e:
             print(f"\nError: {e}")
             print("Try 'status' to check your configuration.")
@@ -128,7 +144,8 @@ def main() -> None:
         print_auth_status()
         print()
         print(f"Available models: {', '.join(get_available_models())}")
-        from openai_bridge import check_codex_cli_installed
+        from bridges.openai_bridge import check_codex_cli_installed
+
         print(f"Codex CLI installed: {'yes' if check_codex_cli_installed() else 'no'}")
         return
     try:

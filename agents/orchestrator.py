@@ -15,7 +15,7 @@ from claude_agent_sdk import (
     ToolUseBlock,
 )
 
-from agent import SessionResult, SESSION_CONTINUE, SESSION_ERROR
+from agent import SESSION_CONTINUE, SESSION_ERROR, SessionResult
 from progress import LINEAR_PROJECT_MARKER
 
 

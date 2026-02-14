@@ -14,9 +14,9 @@ Environment Variables:
 """
 
 import os
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import AsyncIterator, Optional
+from enum import StrEnum
 
 try:
     from openai import AsyncOpenAI, OpenAI
@@ -27,7 +27,7 @@ except ImportError:
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
 
-class GroqModel(str, Enum):
+class GroqModel(StrEnum):
     """Available Groq models organized by category."""
 
     # Production models
@@ -57,6 +57,7 @@ DEFAULT_MODEL = GroqModel.LLAMA_3_3_70B
 @dataclass
 class GroqMessage:
     """A message in a Groq conversation."""
+
     role: str
     content: str
 
@@ -64,6 +65,7 @@ class GroqMessage:
 @dataclass
 class GroqSession:
     """Manages a conversation session with Groq."""
+
     model: GroqModel
     messages: list[GroqMessage] = field(default_factory=list)
     temperature: float = 0.7
@@ -79,16 +81,17 @@ class GroqSession:
 @dataclass
 class GroqResponse:
     """Response from the Groq API."""
+
     content: str
     model: str
-    usage: Optional[dict] = None
-    finish_reason: Optional[str] = None
+    usage: dict | None = None
+    finish_reason: str | None = None
 
 
 class GroqClient:
     """Groq API client using the OpenAI-compatible endpoint."""
 
-    def __init__(self, api_key: Optional[str] = None) -> None:
+    def __init__(self, api_key: str | None = None) -> None:
         if OpenAI is None or AsyncOpenAI is None:
             raise ImportError("openai package not installed. Run: pip install openai")
         self.api_key = api_key or os.environ.get("GROQ_API_KEY", "")
@@ -170,13 +173,18 @@ class GroqBridge:
         return cls(client=GroqClient())
 
     def create_session(
-        self, model: Optional[str] = None, system_prompt: Optional[str] = None,
-        temperature: float = 0.7, max_tokens: int = 4096,
+        self,
+        model: str | None = None,
+        system_prompt: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
     ) -> GroqSession:
         model_str = model or os.environ.get("GROQ_MODEL", DEFAULT_MODEL.value)
         groq_model = GroqModel.from_string(model_str)
         session = GroqSession(
-            model=groq_model, temperature=temperature, max_tokens=max_tokens,
+            model=groq_model,
+            temperature=temperature,
+            max_tokens=max_tokens,
         )
         if system_prompt:
             session.add_message("system", system_prompt)

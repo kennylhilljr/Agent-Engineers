@@ -8,7 +8,6 @@ Functions for loading prompt templates from the prompts directory.
 import shutil
 from pathlib import Path
 
-
 PROMPTS_DIR: Path = Path(__file__).parent / "prompts"
 
 
@@ -45,10 +44,9 @@ def load_prompt(name: str) -> str:
 
     try:
         return prompt_path.read_text()
-    except IOError as e:
-        raise IOError(
-            f"Failed to read prompt file {prompt_path}: {e}\n"
-            f"Check file permissions."
+    except OSError as e:
+        raise OSError(
+            f"Failed to read prompt file {prompt_path}: {e}\nCheck file permissions."
         ) from e
 
 
@@ -108,8 +106,7 @@ def copy_spec_to_project(project_dir: Path) -> None:
         try:
             shutil.copy(spec_source, spec_dest)
             print(f"Copied app_spec.txt to {project_dir}")
-        except IOError as e:
-            raise IOError(
-                f"Failed to copy app spec to {spec_dest}: {e}\n"
-                f"Check disk space and permissions."
+        except OSError as e:
+            raise OSError(
+                f"Failed to copy app spec to {spec_dest}: {e}\nCheck disk space and permissions."
             ) from e

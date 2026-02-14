@@ -12,14 +12,15 @@ Usage:
     python scripts/authorize_arcade.py slack    # Authorize Slack only
 """
 
+import os
 import sys
 import traceback
+
 from dotenv import load_dotenv
-import os
 
 load_dotenv()
 
-from arcadepy import Arcade
+from arcadepy import Arcade  # noqa: E402
 
 # Tools that require write authorization per service
 # Based on actual agent prompt requirements
@@ -29,23 +30,25 @@ SERVICES = {
         "extract_name": lambda o: o.get("name", str(o)),
         # All write tools the Linear agent actually uses
         "auth_tools": [
-            "Linear.CreateProject",      # First run: create project
-            "Linear.CreateIssue",        # First run: create 5-6 issues + META
-            "Linear.UpdateIssue",        # Update issue fields
+            "Linear.CreateProject",  # First run: create project
+            "Linear.CreateIssue",  # First run: create 5-6 issues + META
+            "Linear.UpdateIssue",  # Update issue fields
             "Linear.TransitionIssueState",  # Move Todo→InProgress→Done
-            "Linear.AddComment",         # Add implementation details
+            "Linear.AddComment",  # Add implementation details
         ],
     },
     "github": {
         "verify_tool": "Github.WhoAmI",
-        "extract_name": lambda o: o.get("profile", {}).get("name") or o.get("profile", {}).get("login") or str(o),
+        "extract_name": lambda o: (
+            o.get("profile", {}).get("name") or o.get("profile", {}).get("login") or str(o)
+        ),
         # All write tools the GitHub agent actually uses
         "auth_tools": [
-            "Github.CreateBranch",       # Create feature branches
+            "Github.CreateBranch",  # Create feature branches
             "Github.CreatePullRequest",  # Open PRs
             "Github.UpdatePullRequest",  # Update PR details
-            "Github.MergePullRequest",   # Merge PRs
-            "Github.CreateIssueComment", # Comment on PRs
+            "Github.MergePullRequest",  # Merge PRs
+            "Github.CreateIssueComment",  # Comment on PRs
         ],
     },
     "slack": {
@@ -67,9 +70,9 @@ def authorize_service(client: Arcade, user_id: str, service: str) -> bool:
     verify_tool = config["verify_tool"]  # Tool to verify connection
     extract_name = config["extract_name"]
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  {service.upper()} ({len(auth_tools)} tools to authorize)")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     all_authorized = True
 
@@ -82,21 +85,21 @@ def authorize_service(client: Arcade, user_id: str, service: str) -> bool:
         )
 
         if auth_response.status == "completed":
-            print(f"  Already authorized")
+            print("  Already authorized")
         else:
-            print(f"  Authorization required. Click this link:\n")
+            print("  Authorization required. Click this link:\n")
             print(f"    {auth_response.url}")
             print("\n  Waiting for authorization...")
 
             try:
                 if auth_response.id is None:
-                    print(f"  Error: No authorization ID returned")
+                    print("  Error: No authorization ID returned")
                     all_authorized = False
                     continue
                 client.auth.wait_for_completion(auth_response.id)
-                print(f"  Authorized!")
+                print("  Authorized!")
             except KeyboardInterrupt:
-                print(f"\n\nAuthorization interrupted by user.")
+                print("\n\nAuthorization interrupted by user.")
                 print(f"Stopped at: {auth_tool}")
                 print(f"\nTo resume, run: python scripts/authorize_arcade.py {service}")
                 raise  # Let KeyboardInterrupt propagate to exit cleanly
@@ -127,7 +130,7 @@ def authorize_service(client: Arcade, user_id: str, service: str) -> bool:
             print("  - Invalid API credentials")
             print("  - Expired OAuth token (re-run authorization)")
             print("  - MCP gateway connectivity issues")
-            print(f"\nCheck your configuration at: https://api.arcade.dev/dashboard/mcp-gateways")
+            print("\nCheck your configuration at: https://api.arcade.dev/dashboard/mcp-gateways")
             all_authorized = False
 
     return all_authorized
@@ -169,9 +172,9 @@ def main() -> None:
         results[service] = authorize_service(client, user_id, service)
 
     # Summary
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("  AUTHORIZATION SUMMARY")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     total_tools = 0
     for service, success in results.items():
         tool_count = len(SERVICES[service]["auth_tools"])

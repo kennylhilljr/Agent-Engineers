@@ -18,10 +18,10 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Literal, NamedTuple
+from typing import Literal
 
 logger = logging.getLogger("worker_pool")
 
@@ -132,7 +132,7 @@ class TicketLease:
 
     @property
     def is_expired(self) -> bool:
-        elapsed = (datetime.now(timezone.utc) - self.acquired_at).total_seconds()
+        elapsed = (datetime.now(UTC) - self.acquired_at).total_seconds()
         return elapsed > self.ttl
 
 
@@ -262,8 +262,10 @@ class WorkerPoolManager:
             self.pools[pool_type] = pool
             logger.info(
                 "Initialized %s pool: %d workers (min=%d, max=%d, model=%s)",
-                pool_name, len(pool.workers),
-                pool_config.min_workers, pool_config.max_workers,
+                pool_name,
+                len(pool.workers),
+                pool_config.min_workers,
+                pool_config.max_workers,
                 pool_config.default_model,
             )
 
@@ -292,7 +294,7 @@ class WorkerPoolManager:
         self._leases[ticket.key] = TicketLease(
             ticket_key=ticket.key,
             worker_id=worker.worker_id,
-            acquired_at=datetime.now(timezone.utc),
+            acquired_at=datetime.now(UTC),
             ttl=self.config.lease_ttl,
         )
 
@@ -302,7 +304,7 @@ class WorkerPoolManager:
 
     def get_expired_leases(self) -> list[TicketLease]:
         """Return all leases that have exceeded their TTL."""
-        return [l for l in self._leases.values() if l.is_expired]
+        return [lease for lease in self._leases.values() if lease.is_expired]
 
     def resize_pool(self, pool_type: PoolType, max_workers: int) -> None:
         """Resize a pool's max_workers. Adds workers if below new min."""

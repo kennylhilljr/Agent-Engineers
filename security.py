@@ -9,7 +9,7 @@ Uses an allowlist approach - only explicitly permitted commands can run.
 import os
 import re
 import shlex
-from typing import Any, NamedTuple
+from typing import NamedTuple
 
 from claude_agent_sdk import PreToolUseHookInput
 from claude_agent_sdk.types import HookContext, SyncHookJSONOutput
@@ -20,8 +20,6 @@ class ValidationResult(NamedTuple):
 
     allowed: bool
     reason: str = ""
-
-
 
 
 # Allowed commands for development tasks
@@ -286,9 +284,7 @@ def validate_chmod_command(command_string: str) -> ValidationResult:
         return ValidationResult(allowed=False, reason="chmod requires a mode")
 
     if not files:
-        return ValidationResult(
-            allowed=False, reason="chmod requires at least one file"
-        )
+        return ValidationResult(allowed=False, reason="chmod requires at least one file")
 
     # Only allow +x variants (making files executable)
     # This matches: +x, u+x, g+x, o+x, a+x, ug+x, etc.
@@ -313,9 +309,7 @@ def validate_init_script(command_string: str) -> ValidationResult:
     try:
         tokens: list[str] = shlex.split(command_string)
     except ValueError:
-        return ValidationResult(
-            allowed=False, reason="Could not parse init script command"
-        )
+        return ValidationResult(allowed=False, reason="Could not parse init script command")
 
     if not tokens:
         return ValidationResult(allowed=False, reason="Empty command")
@@ -327,9 +321,7 @@ def validate_init_script(command_string: str) -> ValidationResult:
     if script == "./init.sh" or script.endswith("/init.sh"):
         return ValidationResult(allowed=True)
 
-    return ValidationResult(
-        allowed=False, reason=f"Only ./init.sh is allowed, got: {script}"
-    )
+    return ValidationResult(allowed=False, reason=f"Only ./init.sh is allowed, got: {script}")
 
 
 def validate_rm_command(command_string: str) -> ValidationResult:
@@ -421,9 +413,7 @@ def validate_rm_command(command_string: str) -> ValidationResult:
 
         # Block rm /* patterns (removing everything in root)
         if path == "/*" or path.startswith("/*"):
-            return ValidationResult(
-                allowed=False, reason="rm on root wildcard is not allowed"
-            )
+            return ValidationResult(allowed=False, reason="rm on root wildcard is not allowed")
 
     return ValidationResult(allowed=True)
 

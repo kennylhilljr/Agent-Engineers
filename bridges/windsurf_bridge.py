@@ -17,18 +17,16 @@ Environment Variables:
     WINDSURF_WORKSPACE: Working directory for Windsurf tasks
 """
 
-import json
 import os
 import subprocess
 import tempfile
 import time
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
-from typing import Optional
 
 
-class WindsurfMode(str, Enum):
+class WindsurfMode(StrEnum):
     CLI = "cli"
     DOCKER = "docker"
 
@@ -73,7 +71,9 @@ class WindsurfCLIClient:
         try:
             result = subprocess.run(
                 ["windsurf", "--version"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             return result.returncode == 0
         except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -90,11 +90,17 @@ class WindsurfCLIClient:
         try:
             result = subprocess.run(
                 [
-                    "windsurf", "--headless",
-                    "--folder", session.workspace,
-                    "--execute", f"Follow the instructions in .windsurf-instructions.md and write your summary to .windsurf-output.txt",
+                    "windsurf",
+                    "--headless",
+                    "--folder",
+                    session.workspace,
+                    "--execute",
+                    "Follow the instructions in .windsurf-instructions.md"
+                    " and write your summary to .windsurf-output.txt",
                 ],
-                capture_output=True, text=True, timeout=self.timeout,
+                capture_output=True,
+                text=True,
+                timeout=self.timeout,
                 cwd=session.workspace,
             )
             if output_path.exists():
@@ -102,12 +108,16 @@ class WindsurfCLIClient:
             elif result.stdout.strip():
                 content = result.stdout.strip()
             else:
-                content = f"Windsurf completed (exit code {result.returncode}) but produced no output."
+                content = (
+                    f"Windsurf completed (exit code {result.returncode}) but produced no output."
+                )
 
             files_changed = self._detect_changed_files(session.workspace)
             session.add_message("assistant", content)
             return WindsurfResponse(
-                content=content, exit_code=result.returncode, files_changed=files_changed,
+                content=content,
+                exit_code=result.returncode,
+                files_changed=files_changed,
             )
         except subprocess.TimeoutExpired:
             session.add_message("assistant", f"Windsurf timed out after {self.timeout}s")
@@ -123,7 +133,10 @@ class WindsurfCLIClient:
         try:
             result = subprocess.run(
                 ["git", "diff", "--name-only"],
-                capture_output=True, text=True, timeout=10, cwd=workspace,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                cwd=workspace,
             )
             if result.returncode == 0 and result.stdout.strip():
                 return result.stdout.strip().split("\n")
@@ -136,7 +149,9 @@ class WindsurfDockerClient:
     """Runs Windsurf inside a Docker container for isolation."""
 
     def __init__(
-        self, image: str = "windsurfinabox:latest", timeout: int = 300,
+        self,
+        image: str = "windsurfinabox:latest",
+        timeout: int = 300,
     ) -> None:
         self.image = image
         self.timeout = timeout
@@ -149,7 +164,10 @@ class WindsurfDockerClient:
     def _is_docker_available() -> bool:
         try:
             result = subprocess.run(
-                ["docker", "info"], capture_output=True, text=True, timeout=10,
+                ["docker", "info"],
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             return result.returncode == 0
         except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -167,14 +185,22 @@ class WindsurfDockerClient:
         try:
             result = subprocess.run(
                 [
-                    "docker", "run", "--rm",
-                    "--name", container_name,
-                    "-v", f"{session.workspace}:/workspace",
-                    "-e", "TASK_FILE=/workspace/.windsurf-instructions.md",
-                    "-e", "OUTPUT_FILE=/workspace/.windsurf-output.txt",
+                    "docker",
+                    "run",
+                    "--rm",
+                    "--name",
+                    container_name,
+                    "-v",
+                    f"{session.workspace}:/workspace",
+                    "-e",
+                    "TASK_FILE=/workspace/.windsurf-instructions.md",
+                    "-e",
+                    "OUTPUT_FILE=/workspace/.windsurf-output.txt",
                     self.image,
                 ],
-                capture_output=True, text=True, timeout=self.timeout,
+                capture_output=True,
+                text=True,
+                timeout=self.timeout,
             )
             if output_path.exists():
                 content = output_path.read_text(encoding="utf-8").strip()
@@ -186,12 +212,15 @@ class WindsurfDockerClient:
             files_changed = WindsurfCLIClient._detect_changed_files(session.workspace)
             session.add_message("assistant", content)
             return WindsurfResponse(
-                content=content, exit_code=result.returncode, files_changed=files_changed,
+                content=content,
+                exit_code=result.returncode,
+                files_changed=files_changed,
             )
         except subprocess.TimeoutExpired:
             subprocess.run(
                 ["docker", "kill", container_name],
-                capture_output=True, timeout=10,
+                capture_output=True,
+                timeout=10,
             )
             session.add_message("assistant", f"Docker task timed out after {self.timeout}s")
             return WindsurfResponse(
@@ -229,7 +258,9 @@ class WindsurfBridge:
         return cls(mode=mode, client=client)
 
     def create_session(
-        self, workspace: Optional[str] = None, task_description: Optional[str] = None,
+        self,
+        workspace: str | None = None,
+        task_description: str | None = None,
     ) -> WindsurfSession:
         ws = workspace or os.environ.get("WINDSURF_WORKSPACE", "")
         if not ws:

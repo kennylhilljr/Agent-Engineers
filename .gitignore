@@ -12,3 +12,5 @@ __pycache__
 api-key
 .playwright-mcp
 .jira_tokens.json
+.DS_Store
+.ruff_cache/

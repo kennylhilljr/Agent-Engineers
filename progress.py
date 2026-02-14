@@ -13,11 +13,9 @@ Includes:
 """
 
 import json
-import os
 import time
 from pathlib import Path
 from typing import Literal, TypedDict
-
 
 # Local marker file to track project initialization
 LINEAR_PROJECT_MARKER: str = ".linear_project.json"
@@ -69,17 +67,16 @@ def load_project_state(project_dir: Path) -> ProjectState | None:
         return None
 
     try:
-        with open(marker_file, "r") as f:
+        with open(marker_file) as f:
             data = json.load(f)
     except json.JSONDecodeError as e:
         raise ValueError(
             f"Corrupted state file at {marker_file}: {e}\n"
             f"Delete the file to restart initialization, or restore from backup."
         ) from e
-    except IOError as e:
+    except OSError as e:
         raise ValueError(
-            f"Cannot read state file at {marker_file}: {e}\n"
-            f"Check file permissions."
+            f"Cannot read state file at {marker_file}: {e}\nCheck file permissions."
         ) from e
 
     if not isinstance(data, dict):
@@ -143,15 +140,15 @@ def print_progress_summary(project_dir: Path) -> None:
         return
 
     if state is None:
-        print(f"\nProgress: Linear project not yet initialized")
+        print("\nProgress: Linear project not yet initialized")
         return
 
     total: int = state.get("total_issues", 0)
     meta_ref: str = state.get("meta_issue_id", "unknown")
-    print(f"\nLinear Project Status:")
+    print("\nLinear Project Status:")
     print(f"  Total issues created: {total}")
     print(f"  META issue ID: {meta_ref}")
-    print(f"  (Check Linear for current Done/In Progress/Todo counts)")
+    print("  (Check Linear for current Done/In Progress/Todo counts)")
 
 
 # ---------------------------------------------------------------------------

@@ -13,27 +13,32 @@ Usage:
 """
 
 import argparse
-import json
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from groq_bridge import GroqBridge, GroqModel, DEFAULT_MODEL
+from bridges.groq_bridge import DEFAULT_MODEL, GroqBridge
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Groq CLI - Ultra-fast LPU inference")
     parser.add_argument("query", nargs="?", default=None, help="Query to send")
-    parser.add_argument("--model", "-m", default=None, help=f"Model (default: {DEFAULT_MODEL.value})")
+    parser.add_argument(
+        "--model", "-m", default=None, help=f"Model (default: {DEFAULT_MODEL.value})"
+    )
     parser.add_argument("--stream", "-s", action="store_true", help="Stream response")
     parser.add_argument("--json", "-j", action="store_true", help="JSON response format")
     parser.add_argument("--status", action="store_true", help="Check API connectivity")
     parser.add_argument("--models", action="store_true", help="List available models")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show usage stats")
-    parser.add_argument("--temperature", "-t", type=float, default=0.7, help="Temperature (default: 0.7)")
+    parser.add_argument(
+        "--temperature", "-t", type=float, default=0.7, help="Temperature (default: 0.7)"
+    )
     parser.add_argument("--max-tokens", type=int, default=4096, help="Max tokens (default: 4096)")
     parser.add_argument("--system", type=str, default=None, help="System prompt")
-    parser.add_argument("--openai-compat", action="store_true", help="Use OpenAI SDK compatibility mode")
+    parser.add_argument(
+        "--openai-compat", action="store_true", help="Use OpenAI SDK compatibility mode"
+    )
     return parser.parse_args()
 
 
@@ -70,7 +75,12 @@ def single_query(bridge, args):
     if not query:
         print("No query provided. Use --help for usage.")
         sys.exit(1)
-    session = bridge.create_session(model=args.model, system_prompt=args.system, temperature=args.temperature, max_tokens=args.max_tokens)
+    session = bridge.create_session(
+        model=args.model,
+        system_prompt=args.system,
+        temperature=args.temperature,
+        max_tokens=args.max_tokens,
+    )
     if args.stream:
         for chunk in bridge.stream_response(session, query):
             print(chunk, end="", flush=True)
@@ -79,7 +89,7 @@ def single_query(bridge, args):
         response = bridge.send_message(session, query, json_mode=args.json)
         print(response.content)
         if args.verbose and response.usage:
-            print(f"\n--- Usage ---")
+            print("\n--- Usage ---")
             print(f"Prompt tokens:     {response.usage.get('prompt_tokens', 'N/A')}")
             print(f"Completion tokens: {response.usage.get('completion_tokens', 'N/A')}")
             print(f"Total tokens:      {response.usage.get('total_tokens', 'N/A')}")
@@ -98,7 +108,12 @@ def interactive_repl(bridge, args):
     print(f"   Stream: {'on' if args.stream else 'off'}")
     print("   Commands: /model <id>, /stream, /models, /status, /quit")
     print()
-    session = bridge.create_session(model=args.model, system_prompt=args.system, temperature=args.temperature, max_tokens=args.max_tokens)
+    session = bridge.create_session(
+        model=args.model,
+        system_prompt=args.system,
+        temperature=args.temperature,
+        max_tokens=args.max_tokens,
+    )
     streaming = args.stream
     while True:
         try:
