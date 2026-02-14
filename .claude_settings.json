@@ -1,6 +1,6 @@
 {
   "sandbox": {
-    "enabled": true,
+    "enabled": false,
     "autoAllowBashIfSandboxed": true
   },
   "permissions": {
@@ -21,6 +21,7 @@
       "mcp__playwright__browser_snapshot",
       "mcp__playwright__browser_wait_for",
       "mcp__arcade__*",
+      "mcp__slack__*",
       "mcp__claude_ai_Linear__*",
       "mcp__claude_ai_ai-cli-macz__*"
     ]
