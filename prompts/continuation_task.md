@@ -103,6 +103,8 @@ Return: confirmation of all operations."
 
 ### Step 6: Implement Feature
 
+**REUSE CHECK:** Before delegating to the coding agent, check if the issue description mentions a reusable component (from `reusable/` at the repo root). If so, tell the coding agent to copy and adapt it instead of building from scratch.
+
 Delegate to `coding` or `coding_fast` (based on Step 4 complexity assessment) with FULL context from Step 2:
 "Implement this issue:
 
@@ -110,14 +112,16 @@ Delegate to `coding` or `coding_fast` (based on Step 4 complexity assessment) wi
 - Title: [from linear agent]
 - Description: [from linear agent]
 - Test Steps: [from linear agent]
+- Reusable component: [path from reusable/ if mentioned in issue description, otherwise 'none']
 
 Requirements:
 
-1. Implement the feature
-2. Write unit/integration tests with robust coverage (REQUIRED)
-3. Test via Playwright (browser testing REQUIRED)
-4. Take screenshot evidence
-5. Report: files_changed, screenshot_path, test_results, test_coverage"
+1. **If a reusable component is referenced:** Copy it from `reusable/` (one level above the project directory) and adapt it to fit the project. Do NOT rebuild from scratch.
+2. Implement the feature (or adapt the reusable component)
+3. Write unit/integration tests with robust coverage (REQUIRED)
+4. Test via Playwright (browser testing REQUIRED)
+5. Take screenshot evidence
+6. Report: files_changed, screenshot_path, test_results, test_coverage, reused_component (if any)"
 
 ### Step 7: Commit, Push & Create PR (per story)
 
