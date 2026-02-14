@@ -36,7 +36,12 @@ from typing import Iterator, Literal
 
 from achievements import check_all_achievements
 from metrics import AgentEvent, AgentProfile, DashboardState, SessionSummary
-from strengths_weaknesses import detect_agent_strengths_weaknesses
+from strengths_weaknesses import (
+    calculate_rolling_window_stats,
+    calculate_agent_percentiles,
+    detect_strengths,
+    detect_weaknesses,
+)
 from xp_calculations import calculate_level_from_xp
 
 
@@ -542,11 +547,19 @@ class AgentMetricsCollector:
                 profile["achievements"].append(achievement_id)
 
         # Update strengths and weaknesses
-        profile["strengths"], profile["weaknesses"] = detect_agent_strengths_weaknesses(
-            profile,
-            agent_events,
-            list(self.state["agents"].values())
+        # Calculate rolling window statistics for this agent
+        stats = calculate_rolling_window_stats(
+            self.state["events"],
+            event["agent_name"],
+            window_size=20
         )
+
+        # Calculate percentiles across all agents for comparison
+        percentiles = calculate_agent_percentiles(self.state, window_size=20)
+
+        # Detect strengths and weaknesses
+        profile["strengths"] = detect_strengths(event["agent_name"], stats, percentiles)
+        profile["weaknesses"] = detect_weaknesses(event["agent_name"], stats, percentiles)
 
         # Persist updated state
         self.store.save(self.state)
