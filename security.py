@@ -71,7 +71,7 @@ ALLOWED_COMMANDS: set[str] = {
 }
 
 # Commands that need additional validation even when in the allowlist
-COMMANDS_NEEDING_EXTRA_VALIDATION: set[str] = {"pkill", "chmod", "init.sh", "rm"}
+COMMANDS_NEEDING_EXTRA_VALIDATION: set[str] = {"pkill", "chmod", "init.sh", "rm", "git"}
 
 # Regex patterns for command string splitting
 # Splits on && or || operators (not inside quotes - simple heuristic)
@@ -418,6 +418,46 @@ def validate_rm_command(command_string: str) -> ValidationResult:
     return ValidationResult(allowed=True)
 
 
+def validate_git_command(command_string: str) -> ValidationResult:
+    """
+    Validate git commands - require --author flag on git commit for identity tracking.
+
+    Only validates 'git commit' subcommands. All other git subcommands
+    (status, add, push, log, etc.) pass through without additional validation.
+
+    Args:
+        command_string: The git command to validate
+
+    Returns:
+        ValidationResult with allowed status and reason if blocked
+    """
+    try:
+        tokens: list[str] = shlex.split(command_string)
+    except ValueError:
+        return ValidationResult(allowed=False, reason="Could not parse git command")
+
+    if not tokens or tokens[0] != "git":
+        return ValidationResult(allowed=False, reason="Not a git command")
+
+    # Only validate 'git commit' subcommands
+    if len(tokens) < 2 or tokens[1] != "commit":
+        return ValidationResult(allowed=True)
+
+    # Check for --author flag
+    has_author = any(token.startswith("--author") for token in tokens)
+
+    if not has_author:
+        return ValidationResult(
+            allowed=False,
+            reason=(
+                "git commit requires --author flag for agent identity tracking. "
+                'Use: git commit --author="Agent Name <email>" -m "message"'
+            ),
+        )
+
+    return ValidationResult(allowed=True)
+
+
 def get_command_for_validation(cmd: str, segments: list[str]) -> str:
     """
     Find the specific command segment that contains the given command.
@@ -508,5 +548,16 @@ async def bash_security_hook(
                 result = validate_rm_command(cmd_segment)
                 if not result.allowed:
                     return SyncHookJSONOutput(decision="block", reason=result.reason)
+            elif cmd == "git":
+                # Validate ALL segments containing git (not just the first)
+                # since chained commands like "git add . && git commit ..." have
+                # multiple git segments and each commit must include --author.
+                for seg in segments:
+                    if "git" in extract_commands(seg):
+                        result = validate_git_command(seg)
+                        if not result.allowed:
+                            return SyncHookJSONOutput(
+                                decision="block", reason=result.reason
+                            )
 
     return {}

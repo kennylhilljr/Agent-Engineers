@@ -39,7 +39,7 @@ This is mandatory - heredocs will fail silently or error.
 **Git Commands (via Bash):**
 - `git status` - Check working directory state
 - `git add <files>` - Stage specific files
-- `git commit -m "message"` - Create commits
+- `git commit --author="GitHub Agent <github-agent@claude-agents.dev>" -m "message"` - Create commits
 - `git push` - Push to remote (if configured)
 - `git log --oneline -10` - View recent history
 - `git branch` - List/manage branches
@@ -68,7 +68,7 @@ Write .gitignore
 ```bash
 git init
 git add README.md init.sh .gitignore
-git commit -m "chore: Initial project setup
+git commit --author="GitHub Agent <github-agent@claude-agents.dev>" -m "chore: Initial project setup
 
 - Added README with project overview
 - Added init.sh for dev environment setup"
@@ -111,7 +111,7 @@ git add src/App.tsx
 
 **3. Commit with descriptive message:**
 ```bash
-git commit -m "feat: Implement timer countdown display
+git commit --author="GitHub Agent <github-agent@claude-agents.dev>" -m "feat: Implement timer countdown display
 
 - Added Timer component with start/pause controls
 - Integrated countdown logic with visual feedback
@@ -243,7 +243,7 @@ git checkout -b feature/<ISSUE_KEY>-<short-name>
 
 # Stage and commit specific files
 git add <file1> <file2> ...
-git commit -m "feat: <description>
+git commit --author="GitHub Agent <github-agent@claude-agents.dev>" -m "feat: <description>
 
 - <detail 1>
 - <detail 2>

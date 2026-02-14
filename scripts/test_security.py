@@ -22,6 +22,7 @@ from security import (
     bash_security_hook,
     extract_commands,
     validate_chmod_command,
+    validate_git_command,
     validate_init_script,
 )
 
@@ -176,6 +177,55 @@ def test_validate_init_script() -> tuple[int, int]:
     return passed, failed
 
 
+def test_validate_git_command() -> tuple[int, int]:
+    """Test git commit --author validation."""
+    print("\nTesting git commit validation:\n")
+    passed: int = 0
+    failed: int = 0
+
+    test_cases: list[tuple[str, bool, str]] = [
+        # Allowed cases — non-commit git commands
+        ("git status", True, "git status"),
+        ("git add file.txt", True, "git add"),
+        ("git push origin main", True, "git push"),
+        ("git log --oneline -10", True, "git log"),
+        ("git branch -a", True, "git branch"),
+        ("git diff HEAD", True, "git diff"),
+        ("git checkout -b feature", True, "git checkout"),
+        # Allowed cases — commit with --author
+        (
+            'git commit --author="GitHub Agent <github-agent@claude-agents.dev>" -m "test"',
+            True,
+            "commit with --author",
+        ),
+        (
+            'git commit --author="Coding Agent <coding-agent@claude-agents.dev>" -m "feat: add"',
+            True,
+            "commit with different agent author",
+        ),
+        # Blocked cases — commit without --author
+        ("git commit -m 'test'", False, "commit without --author"),
+        ('git commit -m "feat: add feature"', False, "commit with message only"),
+        ("git commit --amend", False, "amend without --author"),
+    ]
+
+    for cmd, should_allow, description in test_cases:
+        result: ValidationResult = validate_git_command(cmd)
+        if result.allowed == should_allow:
+            print(f"  PASS: {cmd!r} ({description})")
+            passed += 1
+        else:
+            expected = "allowed" if should_allow else "blocked"
+            actual = "allowed" if result.allowed else "blocked"
+            print(f"  FAIL: {cmd!r} ({description})")
+            print(f"         Expected: {expected}, Got: {actual}")
+            if result.reason:
+                print(f"         Reason: {result.reason}")
+            failed += 1
+
+    return passed, failed
+
+
 def main() -> int:
     print("=" * 70)
     print("  SECURITY HOOK TESTS")
@@ -198,6 +248,11 @@ def main() -> int:
     init_passed, init_failed = test_validate_init_script()
     passed += init_passed
     failed += init_failed
+
+    # Test git commit validation
+    git_passed, git_failed = test_validate_git_command()
+    passed += git_passed
+    failed += git_failed
 
     # Commands that SHOULD be blocked
     print("\nCommands that should be BLOCKED:\n")
@@ -231,6 +286,9 @@ def main() -> int:
         "./setup.sh",
         "./malicious.sh",
         "bash script.sh",
+        # git commit without --author (blocked by git validation)
+        "git commit -m 'test'",
+        "git add . && git commit -m 'msg'",
         # Command chaining with dangerous rm (blocked by rm validation after splitting)
         "./init.sh; rm -rf /",
     ]
@@ -275,8 +333,14 @@ def main() -> int:
         "node server.js",
         # Version control
         "git status",
-        "git commit -m 'test'",
-        "git add . && git commit -m 'msg'",
+        "git add file.txt",
+        "git push origin main",
+        "git log --oneline -10",
+        'git commit --author="GitHub Agent <github-agent@claude-agents.dev>" -m "test"',
+        (
+            "git add . && git commit"
+            ' --author="Coding Agent <coding-agent@claude-agents.dev>" -m "msg"'
+        ),
         # Process management
         "ps aux",
         "lsof -i :3000",
