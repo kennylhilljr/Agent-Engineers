@@ -86,6 +86,30 @@ def load_orchestrator_prompt() -> str:
     return (PROMPTS_DIR / "orchestrator_prompt.md").read_text()
 
 
+# ---------------------------------------------------------------------------
+# Module-level caches to avoid redundant work across iterations
+# ---------------------------------------------------------------------------
+
+_cached_arcade_config: dict | None = None
+_cached_orchestrator_prompt: str | None = None
+
+
+def _get_cached_arcade_config() -> dict:
+    """Return cached Arcade MCP config (created once per process)."""
+    global _cached_arcade_config
+    if _cached_arcade_config is None:
+        _cached_arcade_config = get_arcade_mcp_config()
+    return _cached_arcade_config
+
+
+def _get_cached_orchestrator_prompt() -> str:
+    """Return cached orchestrator prompt (loaded once per process)."""
+    global _cached_orchestrator_prompt
+    if _cached_orchestrator_prompt is None:
+        _cached_orchestrator_prompt = load_orchestrator_prompt()
+    return _cached_orchestrator_prompt
+
+
 def create_security_settings() -> SecuritySettings:
     """
     Create the security settings structure.
@@ -118,7 +142,10 @@ def create_security_settings() -> SecuritySettings:
 
 def write_security_settings(project_dir: Path, settings: SecuritySettings) -> Path:
     """
-    Write security settings to project directory.
+    Write security settings to project directory (cached — skips if unchanged).
+
+    Only writes the file if it doesn't exist or its content has changed.
+    This avoids redundant disk writes on every session iteration.
 
     Args:
         project_dir: Directory to write settings to
@@ -132,10 +159,19 @@ def write_security_settings(project_dir: Path, settings: SecuritySettings) -> Pa
     """
     project_dir.mkdir(parents=True, exist_ok=True)
     settings_file: Path = project_dir / ".claude_settings.json"
+    new_content = json.dumps(settings, indent=2)
+
+    # Skip write if file already has identical content
+    if settings_file.exists():
+        try:
+            existing = settings_file.read_text()
+            if existing == new_content:
+                return settings_file
+        except IOError:
+            pass  # File unreadable — rewrite it
 
     try:
-        with open(settings_file, "w") as f:
-            json.dump(settings, f, indent=2)
+        settings_file.write_text(new_content)
     except IOError as e:
         raise IOError(
             f"Failed to write security settings to {settings_file}: {e}\n"
@@ -180,25 +216,21 @@ def create_client(
 
     Execution: Permissions checked first, then hooks run, finally sandbox executes.
     """
-    # Validate Arcade configuration
+    # Validate Arcade configuration (cached after first call)
     validate_arcade_config()
 
-    # Get Arcade MCP configuration
-    arcade_config = get_arcade_mcp_config()
+    # Get Arcade MCP configuration (cached at module level)
+    arcade_config = _get_cached_arcade_config()
 
-    # Create and write security settings
+    # Create and write security settings (cached — skips if unchanged)
     security_settings: SecuritySettings = create_security_settings()
     settings_file: Path = write_security_settings(project_dir, security_settings)
 
-    print(f"Created security settings at {settings_file}")
-    print("   - Sandbox enabled (OS-level bash isolation)")
-    print(f"   - Filesystem restricted to: {project_dir.resolve()}")
-    print("   - Bash commands restricted to allowlist (see security.py)")
-    print(f"   - MCP servers: playwright (browser), arcade ({arcade_config['url']})")
-    print()
+    print(f"Security settings: {settings_file}")
+    print(f"   Sandbox: on | Dir: {project_dir.resolve()} | MCP: arcade")
 
-    # Load orchestrator prompt as system prompt
-    orchestrator_prompt = load_orchestrator_prompt()
+    # Load orchestrator prompt (cached at module level)
+    orchestrator_prompt = _get_cached_orchestrator_prompt()
 
     # Use provided agent definitions or fall back to defaults
     agents = agent_overrides if agent_overrides is not None else AGENT_DEFINITIONS

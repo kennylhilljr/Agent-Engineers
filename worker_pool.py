@@ -14,6 +14,7 @@ Provides:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
@@ -237,12 +238,14 @@ class WorkerPool:
 
 
 class WorkerPoolManager:
-    """Manages multiple typed worker pools with ticket leasing."""
+    """Manages multiple typed worker pools with ticket leasing and event queue."""
 
     def __init__(self, config: DaemonConfig) -> None:
         self.config = config
         self.pools: dict[PoolType, WorkerPool] = {}
         self._leases: dict[str, TicketLease] = {}  # ticket_key -> lease
+        # Event queue for webhook-driven dispatch (Proposal 9)
+        self.ticket_queue: asyncio.Queue[Ticket] = asyncio.Queue()
 
     def initialize_pools(self) -> None:
         """Create pools and spawn initial workers based on config."""
