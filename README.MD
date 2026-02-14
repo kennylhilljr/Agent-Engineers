@@ -804,8 +804,11 @@ Agent-Engineers/
 ├── prompts/
 │   ├── orchestrator_prompt.md   # Orchestrator system prompt
 │   ├── *_agent_prompt.md        # Per-agent system prompts (13 total)
-│   ├── app_spec.txt             # Application specification
-│   └── example_app_specs/       # Example app spec templates
+│   ├── initializer_task.md      # First-run task template
+│   └── continuation_task.md    # Continuation task template
+├── specs/                       # Application specifications
+│   ├── app_spec.txt             # Default spec
+│   └── *.txt                    # Additional spec templates
 ├── pyproject.toml               # Ruff linter/formatter config
 └── requirements.txt             # Python dependencies
 ```
@@ -850,7 +853,7 @@ Defense-in-depth — multiple layers protect against unintended operations:
 
 ## 📖 Customization
 
-**Change what gets built:** Edit `prompts/app_spec.txt` with your application specification.
+**Change what gets built:** Edit `specs/app_spec.txt` with your application specification.
 
 **Adjust issue count:** Edit `prompts/initializer_task.md` to control how many issues are created during initialization.
 

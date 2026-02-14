@@ -51,9 +51,10 @@ This is a **multi-agent autonomous software engineering harness** built on the C
 │   ├── orchestrator_prompt.md  # Orchestrator system prompt
 │   ├── *_agent_prompt.md       # Per-agent system prompts (13 total)
 │   ├── initializer_task.md     # First-run initialization task template
-│   ├── continuation_task.md    # Continuation session task template
+│   └── continuation_task.md    # Continuation session task template
+├── specs/                      # Application specifications
 │   ├── app_spec.txt            # Default application specification
-│   └── example_app_specs/      # Example app spec templates
+│   └── *.txt                   # Additional spec templates
 ├── pyproject.toml              # Ruff linter/formatter config
 ├── requirements.txt            # Pinned Python dependencies
 ├── .env.example                # Environment variable template
@@ -227,4 +228,4 @@ Add to `ALLOWED_COMMANDS` in `security.py`. If the command needs extra validatio
 4. Add a `{NAME}_AGENT_MODEL` env var in the `_get_model()` function
 
 ### Modifying the app specification
-Edit `prompts/app_spec.txt` or create a new spec in `prompts/example_app_specs/`. The spec is copied into the project directory on first run.
+Edit `specs/app_spec.txt` or create a new spec in `specs/`. The default spec is copied into the project directory on first run.

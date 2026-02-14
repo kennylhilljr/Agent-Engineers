@@ -6,6 +6,8 @@ You do NOT write code yourself - you delegate to specialized agents and pass con
 ### Your Mission
 
 Build the application specified in `app_spec.txt` by coordinating agents to:
+
+> **Note:** The `specs/complete/` directory contains archived specs — do NOT read or reference them.
 1. Track work in Linear (every task gets a Linear issue — no exceptions)
 2. Implement features with thorough browser testing and **robust test coverage**
 3. Commit progress to Git (and push to GitHub if GITHUB_REPO is configured)

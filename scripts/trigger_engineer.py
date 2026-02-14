@@ -25,8 +25,8 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     repo_root = os.path.dirname(script_dir)
 
-    # Write the task to app_spec.txt
-    app_spec_path = os.path.join(repo_root, "prompts", "app_spec.txt")
+    # Write the task to specs/app_spec.txt
+    app_spec_path = os.path.join(repo_root, "specs", "app_spec.txt")
     with open(app_spec_path, "w") as f:
         f.write(args.task)
 

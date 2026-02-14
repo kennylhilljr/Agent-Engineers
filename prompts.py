@@ -9,6 +9,7 @@ import shutil
 from pathlib import Path
 
 PROMPTS_DIR: Path = Path(__file__).parent / "prompts"
+SPECS_DIR: Path = Path(__file__).parent / "specs"
 
 
 def load_prompt(name: str) -> str:
@@ -82,31 +83,54 @@ def get_continuation_task(project_dir: Path) -> str:
     return template.format(project_dir=project_dir)
 
 
-def copy_spec_to_project(project_dir: Path) -> None:
+def find_active_spec() -> Path:
     """
-    Copy the app spec file into the project directory for the agent to read.
+    Find the active spec file in the specs/ directory.
+
+    Looks for spec files at the top level of specs/ (ignores specs/complete/).
+    Returns the first .md or .txt file found.
+
+    Returns:
+        Path to the active spec file
+
+    Raises:
+        FileNotFoundError: If no spec file is found
+    """
+    # Look for .md files first, then .txt
+    for pattern in ("*.md", "*.txt"):
+        specs = sorted(SPECS_DIR.glob(pattern))
+        if specs:
+            return specs[0]
+
+    raise FileNotFoundError(
+        f"No spec file found in {SPECS_DIR}\n"
+        f"Add a .md or .txt spec file to the specs/ directory."
+    )
+
+
+def copy_spec_to_project(project_dir: Path, spec_path: Path | None = None) -> None:
+    """
+    Copy a spec file into the project directory for the agent to read.
 
     Args:
         project_dir: Target project directory
+        spec_path: Explicit path to spec file. If None, auto-detects from specs/.
 
     Raises:
         FileNotFoundError: If source spec file doesn't exist
         IOError: If copy operation fails
     """
-    spec_source: Path = PROMPTS_DIR / "app_spec.txt"
+    spec_source: Path = spec_path if spec_path is not None else find_active_spec()
     spec_dest: Path = project_dir / "app_spec.txt"
 
     if not spec_source.exists():
-        raise FileNotFoundError(
-            f"App spec template not found: {spec_source}\n"
-            f"This indicates an incomplete installation."
-        )
+        raise FileNotFoundError(f"Spec file not found: {spec_source}")
 
     if not spec_dest.exists():
         try:
             shutil.copy(spec_source, spec_dest)
-            print(f"Copied app_spec.txt to {project_dir}")
+            print(f"Copied {spec_source.name} to {project_dir}")
         except OSError as e:
             raise OSError(
-                f"Failed to copy app spec to {spec_dest}: {e}\nCheck disk space and permissions."
+                f"Failed to copy spec to {spec_dest}: {e}\nCheck disk space and permissions."
             ) from e
