@@ -1,0 +1,96 @@
+{
+  "project_id": "97161f99-4c96-4244-8ff5-46716c6a7bd9",
+  "project_name": "Agent Status Dashboard",
+  "project_url": "https://linear.app/ai-cli-macz/project/agent-status-dashboard-07c805669811",
+  "meta_issue_id": "AI-67",
+  "meta_issue_url": "https://linear.app/ai-cli-macz/issue/AI-67/meta-agent-status-dashboard-progress-tracker",
+  "total_issues": 24,
+  "issues": [
+    "AI-44",
+    "AI-45",
+    "AI-46",
+    "AI-47",
+    "AI-48",
+    "AI-49",
+    "AI-50",
+    "AI-51",
+    "AI-52",
+    "AI-53",
+    "AI-54",
+    "AI-55",
+    "AI-56",
+    "AI-57",
+    "AI-58",
+    "AI-59",
+    "AI-60",
+    "AI-61",
+    "AI-62",
+    "AI-63",
+    "AI-64",
+    "AI-65",
+    "AI-66"
+  ],
+  "phases": {
+    "phase_1_data_layer": [
+      "AI-44",
+      "AI-45",
+      "AI-46",
+      "AI-47",
+      "AI-48",
+      "AI-49"
+    ],
+    "phase_2_instrumentation": [
+      "AI-50",
+      "AI-51",
+      "AI-52",
+      "AI-53"
+    ],
+    "phase_3_cli_dashboard": [
+      "AI-54",
+      "AI-55",
+      "AI-56",
+      "AI-57",
+      "AI-58"
+    ],
+    "phase_4_testing_polish": [
+      "AI-59",
+      "AI-60",
+      "AI-61",
+      "AI-62",
+      "AI-63"
+    ],
+    "phase_5_web_dashboard": [
+      "AI-64",
+      "AI-65",
+      "AI-66"
+    ]
+  },
+  "reusable_components_referenced": 4,
+  "reusable_components": [
+    {
+      "name": "TaskCard",
+      "usage": "AI-64, AI-65",
+      "description": "Display agent tasks with status tracking"
+    },
+    {
+      "name": "ProgressRing",
+      "usage": "AI-64, AI-65",
+      "description": "Circular progress indicator with completion metrics"
+    },
+    {
+      "name": "ActivityItem",
+      "usage": "AI-64, AI-65",
+      "description": "Timeline activity entries"
+    },
+    {
+      "name": "ErrorCard",
+      "usage": "AI-64, AI-65",
+      "description": "Error display with severity levels"
+    }
+  ],
+  "duplicates_skipped": 0,
+  "created_at": "2026-02-14T21:48:03Z",
+  "updated_at": "2026-02-14T21:49:11Z",
+  "team_id": "a0ee7ae0-2ad9-4272-a99a-0fe1e2f84942",
+  "team_name": "Ai-cli-macz"
+}
