@@ -5,7 +5,7 @@ ChatGPT, Gemini, Groq, KIMI, and Windsurf for multi-AI orchestration.
 
 import os
 from pathlib import Path
-from typing import Final, Literal, TypeGuard
+from typing import Final, Literal, NamedTuple, TypeGuard
 
 from arcade_config import (
     get_coding_tools,
@@ -71,6 +71,52 @@ def get_orchestrator_model() -> OrchestratorModelOption:
     return "haiku"
 
 
+class GitIdentity(NamedTuple):
+    """Git author identity for an agent."""
+
+    name: str
+    email: str
+
+
+AGENT_GIT_IDENTITIES: Final[dict[str, GitIdentity]] = {
+    "linear": GitIdentity("Linear Agent", "linear-agent@claude-agents.dev"),
+    "github": GitIdentity("GitHub Agent", "github-agent@claude-agents.dev"),
+    "slack": GitIdentity("Slack Agent", "slack-agent@claude-agents.dev"),
+    "coding": GitIdentity("Coding Agent", "coding-agent@claude-agents.dev"),
+    "pr_reviewer": GitIdentity("PR Reviewer Agent", "pr-reviewer-agent@claude-agents.dev"),
+    "ops": GitIdentity("Ops Agent", "ops-agent@claude-agents.dev"),
+    "coding_fast": GitIdentity("Coding Agent (Fast)", "coding-fast-agent@claude-agents.dev"),
+    "pr_reviewer_fast": GitIdentity(
+        "PR Reviewer Agent (Fast)", "pr-reviewer-fast-agent@claude-agents.dev"
+    ),
+    "chatgpt": GitIdentity("ChatGPT Bridge Agent", "chatgpt-agent@claude-agents.dev"),
+    "gemini": GitIdentity("Gemini Bridge Agent", "gemini-agent@claude-agents.dev"),
+    "groq": GitIdentity("Groq Bridge Agent", "groq-agent@claude-agents.dev"),
+    "kimi": GitIdentity("KIMI Bridge Agent", "kimi-agent@claude-agents.dev"),
+    "windsurf": GitIdentity("Windsurf Bridge Agent", "windsurf-agent@claude-agents.dev"),
+}
+
+
+def _build_git_identity_prompt(agent_name: str) -> str:
+    """Build git identity instructions to append to an agent's prompt."""
+    identity = AGENT_GIT_IDENTITIES.get(agent_name)
+    if identity is None:
+        return ""
+    return f"""
+
+### Git Identity (MANDATORY)
+
+Your git identity is: **{identity.name} <{identity.email}>**
+
+When making ANY git commit, you MUST include the `--author` flag:
+```bash
+git commit --author="{identity.name} <{identity.email}>" -m "your message"
+```
+
+Commits without `--author` will be BLOCKED by the security system.
+"""
+
+
 def _get_bridge_agent_tools() -> list[str]:
     """Tools for bridge agents (ChatGPT, Gemini, Groq, KIMI, Windsurf) — file ops + bash."""
     return FILE_TOOLS + ["Bash"]
@@ -87,28 +133,31 @@ def _get_ops_agent_tools() -> list[str]:
 
 
 def create_agent_definitions() -> dict[str, AgentDefinition]:
+    def _prompt(name: str, prompt_file: str) -> str:
+        return _load_prompt(prompt_file) + _build_git_identity_prompt(name)
+
     return {
         "linear": AgentDefinition(
             description="Manages Linear issues, project status, and session handoff.",
-            prompt=_load_prompt("linear_agent_prompt"),
+            prompt=_prompt("linear", "linear_agent_prompt"),
             tools=get_linear_tools() + FILE_TOOLS,
             model=_get_model("linear"),
         ),
         "github": AgentDefinition(
             description="Handles Git commits, branches, and GitHub PRs.",
-            prompt=_load_prompt("github_agent_prompt"),
+            prompt=_prompt("github", "github_agent_prompt"),
             tools=get_github_tools() + FILE_TOOLS + ["Bash"],
             model=_get_model("github"),
         ),
         "slack": AgentDefinition(
             description="Sends Slack notifications to keep users informed.",
-            prompt=_load_prompt("slack_agent_prompt"),
+            prompt=_prompt("slack", "slack_agent_prompt"),
             tools=get_slack_tools() + FILE_TOOLS,
             model=_get_model("slack"),
         ),
         "coding": AgentDefinition(
             description="Writes and tests code.",
-            prompt=_load_prompt("coding_agent_prompt"),
+            prompt=_prompt("coding", "coding_agent_prompt"),
             tools=get_coding_tools(),
             model=_get_model("coding"),
         ),
@@ -117,7 +166,7 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
                 "Automated PR reviewer. Reviews PRs for quality, correctness, "
                 "and test coverage. Approves and merges or requests changes."
             ),
-            prompt=_load_prompt("pr_reviewer_agent_prompt"),
+            prompt=_prompt("pr_reviewer", "pr_reviewer_agent_prompt"),
             tools=_get_pr_reviewer_tools(),
             model=_get_model("pr_reviewer"),
         ),
@@ -127,7 +176,7 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
                 "operations (Linear transitions, Slack notifications, GitHub labels) "
                 "in a single delegation. Replaces sequential linear+slack+github calls."
             ),
-            prompt=_load_prompt("ops_agent_prompt"),
+            prompt=_prompt("ops", "ops_agent_prompt"),
             tools=_get_ops_agent_tools(),
             model=_get_model("ops"),
         ),
@@ -137,7 +186,7 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
                 "copy updates, CSS fixes, config changes, adding tests, "
                 "renaming, documentation. Faster than the default coding agent."
             ),
-            prompt=_load_prompt("coding_agent_prompt"),
+            prompt=_prompt("coding_fast", "coding_agent_prompt"),
             tools=get_coding_tools(),
             model=_get_model("coding_fast"),
         ),
@@ -147,7 +196,7 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
                 "frontend-only changes, <= 3 files changed, no auth/db/API changes. "
                 "Faster than the default PR reviewer."
             ),
-            prompt=_load_prompt("pr_reviewer_agent_prompt"),
+            prompt=_prompt("pr_reviewer_fast", "pr_reviewer_agent_prompt"),
             tools=_get_pr_reviewer_tools(),
             model=_get_model("pr_reviewer_fast"),
         ),
@@ -157,7 +206,7 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
                 "Use for cross-validation, ChatGPT-specific tasks, second opinions on code, "
                 "or when the user explicitly requests ChatGPT."
             ),
-            prompt=_load_prompt("chatgpt_agent_prompt"),
+            prompt=_prompt("chatgpt", "chatgpt_agent_prompt"),
             tools=_get_bridge_agent_tools(),
             model=_get_model("chatgpt"),
         ),
@@ -167,7 +216,7 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
                 "Use for cross-validation, research, Google ecosystem tasks, "
                 "or large-context analysis (1M token window)."
             ),
-            prompt=_load_prompt("gemini_agent_prompt"),
+            prompt=_prompt("gemini", "gemini_agent_prompt"),
             tools=_get_bridge_agent_tools(),
             model=_get_model("gemini"),
         ),
@@ -177,7 +226,7 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
                 "Mixtral 8x7B, Gemma 2 9B) via Groq LPU hardware. Use for rapid "
                 "cross-validation, bulk code review, or speed-critical tasks."
             ),
-            prompt=_load_prompt("groq_agent_prompt"),
+            prompt=_prompt("groq", "groq_agent_prompt"),
             tools=_get_bridge_agent_tools(),
             model=_get_model("groq"),
         ),
@@ -187,7 +236,7 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
                 "(up to 2M tokens). Use for analyzing entire codebases in one pass, "
                 "bilingual Chinese/English tasks, or large-scale code analysis."
             ),
-            prompt=_load_prompt("kimi_agent_prompt"),
+            prompt=_prompt("kimi", "kimi_agent_prompt"),
             tools=_get_bridge_agent_tools(),
             model=_get_model("kimi"),
         ),
@@ -197,7 +246,7 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
                 "Use for cross-IDE validation, alternative implementations, or when "
                 "Windsurf's Cascade model adds unique value to a coding task."
             ),
-            prompt=_load_prompt("windsurf_agent_prompt"),
+            prompt=_prompt("windsurf", "windsurf_agent_prompt"),
             tools=_get_bridge_agent_tools(),
             model=_get_model("windsurf"),
         ),
