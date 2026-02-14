@@ -82,14 +82,16 @@ The orchestrator will provide FULL issue context:
 - Title
 - Description
 - Test Steps
+- Reusable component (if any)
 
 **Steps:**
 1. Read the issue context (provided by orchestrator)
-2. Read existing code to understand structure
-3. Implement the feature
-4. Test via Playwright (mandatory)
-5. Take screenshot evidence (mandatory)
-6. Report results
+2. **If a reusable component is referenced:** Check the `reusable/` directory at the repository root (one level above the project directory) and copy/adapt the component instead of building from scratch
+3. Read existing code to understand structure
+4. Implement the feature (or adapt the reusable component)
+5. Test via Playwright (mandatory)
+6. Take screenshot evidence (mandatory)
+7. Report results
 
 **Output format:**
 ```

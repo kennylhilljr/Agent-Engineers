@@ -186,6 +186,10 @@ Before creating new issues, check for existing ones. At session start, tell `lin
 
 ---
 
+### Reusable Components
+
+A `reusable/` directory at the repository root may contain pre-built components from previous projects. Before implementing a feature from scratch, check if a reusable component exists that can be copied/adapted. This saves significant time and ensures consistency. Always tell the coding agent about available reusable components when delegating implementation tasks.
+
 ### No Temporary Files
 
 Tell the coding agent to keep the project directory clean. Only application code, config files, and `screenshots/` directory belong in the project root.
