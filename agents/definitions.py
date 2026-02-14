@@ -148,6 +148,32 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
     }
 
 
+def create_agent_definitions_for_pool(
+    coding_model: str | None = None,
+) -> dict[str, AgentDefinition]:
+    """Create agent definitions with per-pool model overrides.
+
+    Used by daemon_v2 to run coding workers with different models
+    based on ticket complexity (e.g. haiku for trivial, opus for hard).
+
+    Args:
+        coding_model: Override model name for the coding agent.
+            One of "haiku", "sonnet", "opus", or None to use the default.
+
+    Returns:
+        Agent definitions dict with the coding agent model overridden.
+    """
+    defs = create_agent_definitions()
+    if coding_model is not None and coding_model in _VALID_MODELS:
+        defs["coding"] = AgentDefinition(
+            description=defs["coding"].description,
+            prompt=defs["coding"].prompt,
+            tools=defs["coding"].tools,
+            model=coding_model,
+        )
+    return defs
+
+
 AGENT_DEFINITIONS: dict[str, AgentDefinition] = create_agent_definitions()
 LINEAR_AGENT = AGENT_DEFINITIONS["linear"]
 GITHUB_AGENT = AGENT_DEFINITIONS["github"]
