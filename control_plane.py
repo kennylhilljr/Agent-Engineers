@@ -10,7 +10,9 @@ Endpoints:
     GET  /health           — Health check
     GET  /workers          — List all workers and their status
     GET  /pools            — Pool summary
+    GET  /queue            — Queue depth
     POST /workers          — Add workers to a pool
+    POST /webhook/linear   — Linear webhook receiver (Proposal 9)
     PATCH /pools/<name>    — Resize a pool
 """
 
@@ -126,6 +128,10 @@ class ControlPlane:
             return self._handle_add_workers(body)
         elif path == "/pools" and method == "GET":
             return self._handle_get_pools()
+        elif path == "/queue" and method == "GET":
+            return self._handle_get_queue()
+        elif path == "/webhook/linear" and method == "POST":
+            return self._handle_linear_webhook(body)
         elif path.startswith("/pools/") and method == "PATCH":
             pool_name = path.split("/pools/", 1)[1].rstrip("/")
             return self._handle_resize_pool(pool_name, body)
@@ -192,6 +198,56 @@ class ControlPlane:
     def _handle_get_pools(self) -> tuple[int, dict]:
         """GET /pools — Pool summary."""
         return 200, self.pool_manager.status_summary()
+
+    def _handle_get_queue(self) -> tuple[int, dict]:
+        """GET /queue — Queue depth and status."""
+        return 200, {
+            "queue_depth": self.pool_manager.ticket_queue.qsize(),
+        }
+
+    def _handle_linear_webhook(self, body: bytes) -> tuple[int, dict]:
+        """POST /webhook/linear — Receive Linear webhook events.
+
+        Parses the webhook payload and enqueues actionable tickets.
+        Linear webhooks send JSON with action, type, and data fields.
+        """
+        try:
+            data = json.loads(body) if body else {}
+        except json.JSONDecodeError:
+            return 400, {"error": "Invalid JSON"}
+
+        action = data.get("action", "")
+        obj_type = data.get("type", "")
+
+        # Only process issue state changes
+        if obj_type != "Issue":
+            return 200, {"status": "ignored", "reason": f"type={obj_type}"}
+
+        issue_data = data.get("data", {})
+        state_name = issue_data.get("state", {}).get("name", "").lower()
+
+        # Enqueue tickets that are actionable (moved to Todo or back to Todo)
+        actionable_states = ("todo", "backlog", "triage")
+        if action in ("create", "update") and state_name in actionable_states:
+            from worker_pool import Ticket
+
+            ticket = Ticket(
+                key=issue_data.get("identifier", issue_data.get("id", "UNKNOWN")),
+                title=issue_data.get("title", "Untitled"),
+                description=issue_data.get("description", ""),
+                status="todo",
+                priority=str(issue_data.get("priority", "medium")),
+                labels=[l.get("name", "") for l in issue_data.get("labels", {}).get("nodes", [])],
+            )
+
+            self.pool_manager.ticket_queue.put_nowait(ticket)
+            logger.info(
+                "Webhook: enqueued %s '%s' (action=%s, state=%s)",
+                ticket.key, ticket.title, action, state_name,
+            )
+            return 200, {"status": "enqueued", "ticket": ticket.key}
+
+        return 200, {"status": "ignored", "reason": f"action={action}, state={state_name}"}
 
     def _handle_resize_pool(self, pool_name: str, body: bytes) -> tuple[int, dict]:
         """PATCH /pools/<name> — Resize a pool."""

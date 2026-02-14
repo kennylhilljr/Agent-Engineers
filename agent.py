@@ -29,7 +29,7 @@ from prompts import (
 
 
 # Configuration
-AUTO_CONTINUE_DELAY_SECONDS: int = 3
+AUTO_CONTINUE_DELAY_SECONDS: int = 0
 
 
 # Type-safe literal union - no runtime overhead
@@ -285,10 +285,9 @@ async def run_autonomous_agent(
         # Always wait before next iteration
         await asyncio.sleep(AUTO_CONTINUE_DELAY_SECONDS)
 
-        # Small delay between sessions
+        # Proceed immediately to next session (no artificial delay)
         if max_iterations is None or iteration < max_iterations:
             print("\nPreparing next session...\n")
-            await asyncio.sleep(1)
 
     # Final summary
     print("\n" + "=" * 70)

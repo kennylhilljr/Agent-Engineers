@@ -24,6 +24,9 @@ DEFAULT_MODELS: Final[dict[str, ModelOption]] = {
     "github": "haiku",
     "slack": "haiku",
     "pr_reviewer": "sonnet",
+    "ops": "haiku",
+    "coding_fast": "haiku",
+    "pr_reviewer_fast": "haiku",
     "chatgpt": "haiku",
     "gemini": "haiku",
     "groq": "haiku",
@@ -76,6 +79,11 @@ def _get_pr_reviewer_tools() -> list[str]:
     return get_github_tools() + FILE_TOOLS + ["Bash"]
 
 
+def _get_ops_agent_tools() -> list[str]:
+    """Tools for ops agent — Linear + Slack + GitHub + file ops."""
+    return get_linear_tools() + get_slack_tools() + get_github_tools() + FILE_TOOLS
+
+
 def create_agent_definitions() -> dict[str, AgentDefinition]:
     return {
         "linear": AgentDefinition(
@@ -105,6 +113,30 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
             prompt=_load_prompt("pr_reviewer_agent_prompt"),
             tools=_get_pr_reviewer_tools(),
             model=_get_model("pr_reviewer")),
+        "ops": AgentDefinition(
+            description=(
+                "Composite operations agent. Handles all lightweight non-coding "
+                "operations (Linear transitions, Slack notifications, GitHub labels) "
+                "in a single delegation. Replaces sequential linear+slack+github calls."),
+            prompt=_load_prompt("ops_agent_prompt"),
+            tools=_get_ops_agent_tools(),
+            model=_get_model("ops")),
+        "coding_fast": AgentDefinition(
+            description=(
+                "Fast coding agent using haiku. Use for simple changes: "
+                "copy updates, CSS fixes, config changes, adding tests, "
+                "renaming, documentation. Faster than the default coding agent."),
+            prompt=_load_prompt("coding_agent_prompt"),
+            tools=get_coding_tools(),
+            model=_get_model("coding_fast")),
+        "pr_reviewer_fast": AgentDefinition(
+            description=(
+                "Fast PR reviewer using haiku. Use for low-risk reviews: "
+                "frontend-only changes, <= 3 files changed, no auth/db/API changes. "
+                "Faster than the default PR reviewer."),
+            prompt=_load_prompt("pr_reviewer_agent_prompt"),
+            tools=_get_pr_reviewer_tools(),
+            model=_get_model("pr_reviewer_fast")),
         "chatgpt": AgentDefinition(
             description=(
                 "Provides access to OpenAI ChatGPT models (GPT-4o, o1, o3-mini, o4-mini). "
@@ -180,6 +212,9 @@ GITHUB_AGENT = AGENT_DEFINITIONS["github"]
 SLACK_AGENT = AGENT_DEFINITIONS["slack"]
 CODING_AGENT = AGENT_DEFINITIONS["coding"]
 PR_REVIEWER_AGENT = AGENT_DEFINITIONS["pr_reviewer"]
+OPS_AGENT = AGENT_DEFINITIONS["ops"]
+CODING_FAST_AGENT = AGENT_DEFINITIONS["coding_fast"]
+PR_REVIEWER_FAST_AGENT = AGENT_DEFINITIONS["pr_reviewer_fast"]
 CHATGPT_AGENT = AGENT_DEFINITIONS["chatgpt"]
 GEMINI_AGENT = AGENT_DEFINITIONS["gemini"]
 GROQ_AGENT = AGENT_DEFINITIONS["groq"]
