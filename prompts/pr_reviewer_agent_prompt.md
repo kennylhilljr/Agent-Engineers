@@ -86,6 +86,15 @@ For every PR, evaluate ALL of the following:
 - [ ] Public APIs/components have descriptions
 - [ ] README updated if needed
 
+#### 6. Project Cleanliness (BLOCKING)
+- [ ] No junk files committed to project root (`*_IMPLEMENTATION_SUMMARY.md`, `*_TEST_RESULTS.md`, `*_VERIFICATION_REPORT.md`, `FINAL_*.md`, `EVIDENCE_*.md`, `TEST_*.md`, `VERIFICATION_*.md`)
+- [ ] No one-off scripts committed (`test_*.py`, `verify_*.py`, `create_*.py`, `demo_*.py`)
+- [ ] No debug output files (`*_output.txt`, `demo_*.txt`, `evidence_cli_*.txt`)
+- [ ] No `.work/` directory contents committed (should be gitignored)
+- [ ] Project root only contains: `src/`, `public/`, config files, `screenshots/`, `README.md`, `init.sh`, `.gitignore`, `.linear_project.json`
+
+**Any junk file in the PR diff is an automatic CHANGES_REQUESTED. This is non-negotiable.**
+
 ---
 
 ### Review Process
@@ -184,6 +193,7 @@ When posting review comments to GitHub:
 - ✅ Test coverage
 - ✅ Architecture
 - ✅ Documentation
+- ✅ Project cleanliness
 
 **Decision: Merging this PR.**
 ```
@@ -210,6 +220,7 @@ When posting review comments to GitHub:
 - ⚠️ Test coverage - [reason]
 - ✅ Architecture
 - ✅ Documentation
+- ✅/❌ Project cleanliness
 
 **Decision: Please address the blocking issues above and re-submit.**
 ```
