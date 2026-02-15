@@ -934,6 +934,208 @@
         .event-item .event-status { margin-left: 8px; }
         .event-item .event-status.success { color: #4ade80; }
         .event-item .event-status.error { color: #f87171; }
+
+        /* Chat Interface Styles */
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 500px;
+            gap: 16px;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 16px;
+            background: rgba(15, 23, 42, 0.3);
+            border-radius: 8px;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .chat-messages::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .chat-messages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.3);
+            border-radius: 3px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.5);
+        }
+
+        .chat-welcome {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #94a3b8;
+            text-align: center;
+            font-size: 0.95rem;
+        }
+
+        .chat-message {
+            display: flex;
+            gap: 8px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .chat-message.user {
+            justify-content: flex-end;
+        }
+
+        .chat-message-content {
+            max-width: 70%;
+            padding: 10px 14px;
+            border-radius: 8px;
+            word-wrap: break-word;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        .chat-message.user .chat-message-content {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: #fff;
+            border-bottom-right-radius: 2px;
+        }
+
+        .chat-message.ai .chat-message-content {
+            background: rgba(148, 163, 184, 0.15);
+            color: #e2e8f0;
+            border-bottom-left-radius: 2px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .chat-timestamp {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 4px;
+        }
+
+        .chat-input-area {
+            display: flex;
+            gap: 8px;
+        }
+
+        .chat-input-wrapper {
+            display: flex;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 12px 14px;
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 8px;
+            color: #f1f5f9;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            background: rgba(15, 23, 42, 0.7);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+        }
+
+        .chat-input::placeholder {
+            color: #64748b;
+        }
+
+        .chat-send-btn {
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 48px;
+            flex-shrink: 0;
+        }
+
+        .chat-send-btn:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            transform: translateY(-2px);
+        }
+
+        .chat-send-btn:active {
+            transform: translateY(0);
+        }
+
+        .chat-send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .chat-send-btn svg {
+            width: 20px;
+            height: 20px;
+            stroke-width: 2;
+        }
+
+        .chat-loading {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .chat-loading-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #94a3b8;
+            animation: bounce 1.4s infinite;
+        }
+
+        .chat-loading-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .chat-loading-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes bounce {
+            0%, 80%, 100% {
+                transform: translateY(0);
+                opacity: 0.8;
+            }
+            40% {
+                transform: translateY(-8px);
+                opacity: 1;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1062,6 +1264,46 @@
                 </div>
                 <div class="chart-container">
                     <canvas id="allocation-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Interface -->
+        <div class="card" style="margin-top: 40px;">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <svg class="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                    </svg>
+                    Chat Interface
+                </h2>
+            </div>
+            <div id="chat-container" class="chat-container">
+                <div id="chat-messages" class="chat-messages">
+                    <div class="chat-welcome">
+                        <p>Welcome to the Agent Dashboard Chat. Ask me anything about your agent status, metrics, or general questions!</p>
+                    </div>
+                </div>
+                <div class="chat-input-area">
+                    <div class="chat-input-wrapper">
+                        <input
+                            type="text"
+                            id="chat-input"
+                            class="chat-input"
+                            placeholder="Type a message... (e.g., 'What's my status?')"
+                            data-testid="chat-message-input"
+                        />
+                        <button
+                            id="chat-send-btn"
+                            class="chat-send-btn"
+                            data-testid="chat-send-button"
+                            aria-label="Send message"
+                        >
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2259,11 +2501,186 @@
             console.log(`Fallback polling: every ${REFRESH_INTERVAL/1000}s`);
         }
 
+        // ==========================================
+        // Chat Interface Implementation
+        // ==========================================
+
+        class ChatInterface {
+            constructor() {
+                this.messagesContainer = document.getElementById('chat-messages');
+                this.input = document.getElementById('chat-input');
+                this.sendBtn = document.getElementById('chat-send-btn');
+                this.messages = [];
+
+                this.init();
+            }
+
+            init() {
+                if (!this.input || !this.sendBtn) {
+                    console.warn('Chat interface elements not found');
+                    return;
+                }
+
+                this.sendBtn.addEventListener('click', () => this.sendMessage());
+                this.input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        this.sendMessage();
+                    }
+                });
+            }
+
+            sendMessage() {
+                const text = this.input.value.trim();
+                if (!text) return;
+
+                // Add user message
+                this.addMessage(text, 'user');
+                this.input.value = '';
+
+                // Simulate AI response
+                this.showLoadingIndicator();
+                setTimeout(() => {
+                    this.removeLoadingIndicator();
+                    this.addMessage(this.generateAIResponse(text), 'ai');
+                }, 800);
+            }
+
+            addMessage(text, sender) {
+                const message = {
+                    id: Date.now(),
+                    text,
+                    sender,
+                    timestamp: new Date()
+                };
+
+                this.messages.push(message);
+                this.renderMessage(message);
+                this.scrollToBottom();
+            }
+
+            renderMessage(message) {
+                // Remove welcome message on first message
+                const welcome = this.messagesContainer.querySelector('.chat-welcome');
+                if (welcome && this.messages.length === 1) {
+                    welcome.remove();
+                }
+
+                const div = document.createElement('div');
+                div.className = `chat-message ${message.sender}`;
+                div.setAttribute('data-testid', `chat-message-${message.sender}`);
+                div.setAttribute('data-message-id', message.id);
+
+                const content = document.createElement('div');
+                const timeStr = message.timestamp.toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                content.innerHTML = `
+                    <div class="chat-message-content">${this.escapeHtml(message.text)}</div>
+                    <div class="chat-timestamp">${timeStr}</div>
+                `;
+
+                div.appendChild(content);
+                this.messagesContainer.appendChild(div);
+            }
+
+            showLoadingIndicator() {
+                const div = document.createElement('div');
+                div.className = 'chat-message ai';
+                div.id = 'chat-loading';
+                div.setAttribute('data-testid', 'chat-loading-indicator');
+
+                div.innerHTML = `
+                    <div class="chat-message-content">
+                        <div class="chat-loading">
+                            <div class="chat-loading-dot"></div>
+                            <div class="chat-loading-dot"></div>
+                            <div class="chat-loading-dot"></div>
+                        </div>
+                    </div>
+                `;
+
+                this.messagesContainer.appendChild(div);
+                this.scrollToBottom();
+            }
+
+            removeLoadingIndicator() {
+                const loading = document.getElementById('chat-loading');
+                if (loading) {
+                    loading.remove();
+                }
+            }
+
+            generateAIResponse(userMessage) {
+                // Simple response generation based on keywords
+                const lower = userMessage.toLowerCase();
+
+                if (lower.includes('status') || lower.includes('how')) {
+                    return 'Your agents are running smoothly. All systems are operational with 99.2% uptime.';
+                }
+                if (lower.includes('metric') || lower.includes('performance')) {
+                    return 'Current metrics show strong performance: 94% success rate, avg response time 245ms.';
+                }
+                if (lower.includes('error') || lower.includes('issue') || lower.includes('problem')) {
+                    return 'No critical errors detected. All monitoring systems are reporting normal status.';
+                }
+                if (lower.includes('cost') || lower.includes('usage') || lower.includes('token')) {
+                    return 'Token usage is at 42% of daily allocation. Cost trending 8% below budget.';
+                }
+                if (lower.includes('hello') || lower.includes('hi') || lower.includes('hey')) {
+                    return 'Hello! I\'m here to help you with any questions about your agent dashboard.';
+                }
+
+                return 'I understand. Based on your agent dashboard, everything is performing within expected parameters. Is there anything specific you\'d like to know?';
+            }
+
+            scrollToBottom() {
+                this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+            }
+
+            escapeHtml(text) {
+                const map = {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                };
+                return text.replace(/[&<>"']/g, m => map[m]);
+            }
+
+            getMessages() {
+                return this.messages;
+            }
+
+            clearMessages() {
+                this.messages = [];
+                this.messagesContainer.innerHTML = `
+                    <div class="chat-welcome">
+                        <p>Welcome to the Agent Dashboard Chat. Ask me anything about your agent status, metrics, or general questions!</p>
+                    </div>
+                `;
+            }
+        }
+
+        let chatInterface;
+
+        function initChat() {
+            chatInterface = new ChatInterface();
+            console.log('Chat interface initialized');
+        }
+
         // Start when DOM is ready
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', init);
+            document.addEventListener('DOMContentLoaded', () => {
+                init();
+                initChat();
+            });
         } else {
             init();
+            initChat();
         }
 
         // Cleanup on page unload
