@@ -55,12 +55,17 @@ ALLOWED_COMMANDS: set[str] = {
     # Python (for file creation scripts)
     "python",
     "python3",
+    # Package management
+    "uv",
+    "pip",
+    "pip3",
     # Node.js development
     "npm",
     "npx",
     "node",
     # Version control
     "git",
+    "gh",  # GitHub CLI for PR creation, issue management
     # Process management
     "ps",
     "lsof",
