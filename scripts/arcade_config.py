@@ -160,6 +160,27 @@ ARCADE_LINEAR_TOOLS: list[str] = [
     "mcp__arcade__Linear_LinkGithubToIssue",
 ]
 
+# Slack MCP tools (via slack-mcp-server npm package, uses xoxb bot token)
+# These provide direct Slack integration independent of the Arcade gateway.
+SLACK_MCP_TOOLS: list[str] = [
+    "mcp__slack__conversations_add_message",
+    "mcp__slack__channels_list",
+    "mcp__slack__conversations_history",
+    "mcp__slack__conversations_replies",
+    "mcp__slack__conversations_search_messages",
+    "mcp__slack__reactions_add",
+    "mcp__slack__reactions_remove",
+    "mcp__slack__users_search",
+    "mcp__slack__usergroups_list",
+    "mcp__slack__usergroups_create",
+    "mcp__slack__usergroups_update",
+    "mcp__slack__usergroups_users_update",
+    "mcp__slack__usergroups_me",
+]
+
+# Permission wildcard for Slack MCP tools
+SLACK_MCP_TOOLS_PERMISSION: str = "mcp__slack__*"
+
 # All Arcade tools combined
 ALL_ARCADE_TOOLS: list[str] = ARCADE_LINEAR_TOOLS + ARCADE_GITHUB_TOOLS + ARCADE_SLACK_TOOLS
 
@@ -243,8 +264,8 @@ def get_github_tools() -> list[str]:
 
 
 def get_slack_tools() -> list[str]:
-    """Get Slack-only tools for Slack agent."""
-    return ARCADE_SLACK_TOOLS
+    """Get Slack tools for Slack agent (Arcade + Slack MCP server)."""
+    return ARCADE_SLACK_TOOLS + SLACK_MCP_TOOLS
 
 
 def get_coding_tools() -> list[str]:

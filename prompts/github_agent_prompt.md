@@ -15,7 +15,9 @@ This is mandatory - heredocs will fail silently or error.
 
 ### Available Tools
 
-**GitHub API (via Arcade MCP) - all use `mcp__arcade__Github_` prefix:**
+**GitHub API tools — available under two prefixes (use whichever works):**
+- Preferred: `mcp__claude_ai_ai-cli-macz__Github_*` (e.g., `mcp__claude_ai_ai-cli-macz__Github_CreatePullRequest`)
+- Fallback: `mcp__arcade__Github_*` (e.g., `mcp__arcade__Github_CreatePullRequest`)
 
 **Repository:**
 - `GetRepository` - Get repo details (owner, repo)

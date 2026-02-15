@@ -5,7 +5,11 @@ Session tracking happens via comments on the META issue.
 
 ### Available Tools
 
-All tools use `mcp__arcade__Linear_` prefix:
+Tools are available under two possible prefixes — use whichever is available:
+- **`mcp__claude_ai_Linear__*`** (preferred — e.g., `mcp__claude_ai_Linear__list_teams`)
+- **`mcp__arcade__Linear_*`** (fallback — e.g., `mcp__arcade__Linear_ListTeams`)
+
+Try Claude AI tools first. Both are permitted.
 
 **User Context:**
 - `WhoAmI` - Get your profile and team memberships
