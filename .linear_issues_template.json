@@ -1,0 +1,510 @@
+{
+  "project_name": "Agent Dashboard",
+  "description": "Web-based dashboard for real-time agent monitoring, AI chat interface, and agent controls",
+  "total_issues_to_create": 71,
+  "issues": [
+    {
+      "title": "[META] Project Progress Tracker",
+      "type": "Meta",
+      "team": "Agent Dashboard",
+      "description": "Session handoff and project coordination issue. Use this issue to track overall progress, blockers, and session context.",
+      "component_reference": null
+    },
+    {
+      "title": "Phase 1: Foundation - Dashboard Server & Agent Status",
+      "type": "Epic",
+      "team": "Agent Dashboard",
+      "description": "Phase 1: Foundation\nGoal: Dashboard server starts and serves a static page with agent status.\nSuccess criteria: `python scripts/dashboard_server.py --project-dir my-app` opens a browser showing all 13 agents with their current status from `.agent_metrics.json`.\n\nTest Steps:\n1. Start dashboard server\n2. Navigate to http://localhost:8420\n3. Verify all 13 agents display with current status\n4. Verify status updates when refreshing page\n5. Verify API endpoints respond correctly\n\nDeliverables:\n- Create `scripts/dashboard_server.py` with async HTTP server\n- Create single-file HTML dashboard with agent status panel\n- REST API: `/api/health`, `/api/metrics`, `/api/agents`\n- Load data from existing `MetricsStore`",
+      "component_reference": "TaskCard for agent status display"
+    },
+    {
+      "title": "Phase 2: Real-Time Updates - WebSocket & Event Streaming",
+      "type": "Epic",
+      "team": "Agent Dashboard",
+      "description": "Phase 2: Real-Time Updates\nGoal: Agent status updates appear in the dashboard without page refresh.\nSuccess criteria: When the orchestrator delegates to a coding agent, the dashboard shows the agent transition from Idle to Running within 1 second.\n\nTest Steps:\n1. Start orchestrator with dashboard server running\n2. Observe agent status changes in real-time\n3. Verify WebSocket connections establish and maintain\n4. Test reconnection logic on disconnect\n5. Verify activity feed updates in real-time\n\nDeliverables:\n- Add WebSocket server\n- Add event emission hooks in `agent.py` and `agents/orchestrator.py`\n- Frontend WebSocket client with auto-reconnection\n- Live activity feed",
+      "component_reference": "ActivityItem for event feed display"
+    },
+    {
+      "title": "Phase 3: AI Chat Interface - Multi-Provider Support",
+      "type": "Epic",
+      "team": "Agent Dashboard",
+      "description": "Phase 3: AI Chat Interface\nGoal: User can chat with Claude through the dashboard and see responses.\nSuccess criteria: User types \"What is the status of all Linear issues?\" and receives a formatted response with data from Linear.\n\nTest Steps:\n1. Open dashboard chat interface\n2. Type message\n3. Verify message appears in history\n4. Verify AI response streams in real-time\n5. Verify code blocks render with syntax highlighting\n6. Verify Linear/GitHub/Slack tool calls are shown\n\nDeliverables:\n- Chat UI component (message thread, input box)\n- POST `/api/chat` endpoint with streaming response\n- Provider/model selector UI\n- Tool call transparency (show Linear/Slack/GitHub tool invocations)",
+      "component_reference": null
+    },
+    {
+      "title": "Phase 4: Multi-Provider Switching - Provider Detection & Hot-Swap",
+      "type": "Epic",
+      "team": "Agent Dashboard",
+      "description": "Phase 4: Multi-Provider Support\nGoal: User can switch AI providers and models in the chat.\nSuccess criteria: User switches from Claude to Gemini, sends a message, and receives a response from Gemini 2.5 Flash.\n\nTest Steps:\n1. Verify all 6 providers display in selector\n2. Check provider availability indicators (Available/Unconfigured/Error)\n3. Switch between providers without losing chat history\n4. Verify correct model appears in selector for each provider\n5. Test hot-swap during conversation\n\nDeliverables:\n- Provider availability detection (check API keys)\n- Bridge module integration for chat routing\n- Provider status indicators in UI\n- Hot-swap without context loss",
+      "component_reference": null
+    },
+    {
+      "title": "Phase 5: Agent Controls - Pause, Resume & Requirement Editing",
+      "type": "Epic",
+      "team": "Agent Dashboard",
+      "description": "Phase 5: Agent Controls\nGoal: User can pause, edit requirements, and resume agents.\nSuccess criteria: User pauses the coding agent, edits the requirement for AI-42, resumes, and the agent picks up the updated requirements.\n\nTest Steps:\n1. Click pause on running agent\n2. Verify agent stops accepting new delegations\n3. Open requirement editor\n4. Modify requirement text\n5. Save changes\n6. Resume agent\n7. Verify agent uses updated requirements\n\nDeliverables:\n- Pause/Resume API endpoints and UI controls\n- Requirement editor UI\n- Requirement sync to Linear (optional)\n- Pause All / Resume All global controls",
+      "component_reference": null
+    },
+    {
+      "title": "Phase 6: Transparency Features - Reasoning, Decisions & Code Streaming",
+      "type": "Epic",
+      "team": "Agent Dashboard",
+      "description": "Phase 6: Reasoning and Decision Transparency\nGoal: User can see why the orchestrator made each decision.\nSuccess criteria: When the orchestrator delegates to `coding` instead of `coding_fast`, the dashboard shows the reasoning: \"Complexity: COMPLEX — auth keyword found. Routing to coding (sonnet).\"\n\nTest Steps:\n1. Observe orchestrator reasoning in chat\n2. Verify complexity assessment displays\n3. Expand/collapse reasoning blocks\n4. Watch live code streaming from coding agents\n5. View file change summary after delegation\n6. Verify test results display\n\nDeliverables:\n- Reasoning event emission from orchestrator\n- Collapsible reasoning blocks in chat UI\n- Decision history log\n- Live code streaming from coding agents",
+      "component_reference": "DecisionCard for orchestrator decisions"
+    },
+    {
+      "title": "REQ-CHAT-001: Implement Conversational Chat Interface",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 3: AI Chat Interface - Multi-Provider Support",
+      "description": "REQ-CHAT-001: Conversational Interface\nThe dashboard must provide a chat interface where users type natural language messages and receive responses from the AI system. Messages display in a scrollable conversation thread with clear visual distinction between user messages and AI responses.\n\nTest Steps:\n1. Load dashboard and locate chat interface\n2. Type a test message\n3. Verify message appears in user message format\n4. Observe AI response streams in\n5. Verify response displays in AI message format\n6. Scroll through conversation history\n7. Verify visual distinction between user/AI messages\n\nAcceptance Criteria:\n- Messages display in scrollable thread\n- User messages clearly distinguished from AI responses\n- Chat interface is responsive\n- No external dependencies required",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-CHAT-002: Implement Message History Persistence",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 3: AI Chat Interface - Multi-Provider Support",
+      "description": "REQ-CHAT-002: Message History\nThe chat must persist message history for the current session. Messages include:\n- User input (text)\n- AI response (text, code blocks, structured data)\n- System messages (agent status changes, errors, notifications)\n- Timestamps for all messages\n\nTest Steps:\n1. Send multiple messages to chat\n2. Verify all messages retain order\n3. Check timestamps are accurate\n4. Verify system messages appear correctly\n5. Refresh page and verify history persists\n6. Test history limit (maintain last 100 messages)\n\nAcceptance Criteria:\n- All message types persist\n- Timestamps are accurate\n- History survives page refresh\n- Performance is acceptable with large history",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-CHAT-003: Implement Code Block Rendering with Syntax Highlighting",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 3: AI Chat Interface - Multi-Provider Support",
+      "description": "REQ-CHAT-003: Code Block Rendering\nAI responses containing code must render with:\n- Syntax highlighting appropriate to the language\n- Copy-to-clipboard button\n- File path annotation when the code references a specific file\n- Diff view for code changes (additions in green, deletions in red)\n\nTest Steps:\n1. Request code from AI (e.g., \"Write a Python function\")\n2. Verify syntax highlighting applies to code block\n3. Click copy button and paste in editor\n4. Verify file path displays if provided\n5. Request code diff and verify colors (green/red)\n6. Test multiple language syntax highlighting (Python, JS, etc.)\n\nAcceptance Criteria:\n- Syntax highlighting works for major languages\n- Copy button works correctly\n- File paths display clearly\n- Diffs show with color coding",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-PROVIDER-001: Implement Provider Switcher UI",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 4: Multi-Provider Switching - Provider Detection & Hot-Swap",
+      "description": "REQ-PROVIDER-001: Provider Switcher\nThe chat interface must include a provider selector that allows the user to switch between available AI providers. Supported providers:\n- Claude (default) — Haiku 4.5, Sonnet 4.5, Opus 4.6\n- ChatGPT — GPT-4o, o1, o3-mini, o4-mini\n- Gemini — 2.5 Flash, 2.5 Pro, 2.0 Flash\n- Groq — Llama 3.3 70B, Mixtral 8x7B\n- KIMI — Moonshot (2M context)\n- Windsurf — Cascade\n\nTest Steps:\n1. Locate provider selector in UI\n2. Verify all 6 providers appear in dropdown\n3. Click each provider and verify it highlights\n4. Verify default provider is Claude\n5. Send message with different provider selected\n6. Verify response comes from selected provider\n\nAcceptance Criteria:\n- All 6 providers available in selector\n- Current selection displays\n- Selection persists across messages\n- UI is intuitive and accessible",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-PROVIDER-002: Implement Model Selector with Provider-Specific Models",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 4: Multi-Provider Switching - Provider Detection & Hot-Swap",
+      "description": "REQ-PROVIDER-002: Model Selector\nWithin each provider, the user must be able to select a specific model. The selector must:\n- Show only models available for the selected provider\n- Display the currently active model\n- Persist the selection for the duration of the session\n- Default to the provider's recommended model\n\nTest Steps:\n1. Select Claude provider\n2. Verify Claude models appear (Haiku, Sonnet, Opus)\n3. Select Gemini provider\n4. Verify model list updates to Gemini models\n5. Select a specific model (e.g., Sonnet)\n6. Verify model persists on next message\n7. Switch providers and back\n8. Verify model selection is preserved per provider\n\nAcceptance Criteria:\n- Model list updates dynamically with provider\n- Selection persists during session\n- Defaults are sensible (Sonnet for Claude, etc.)\n- Cascade of dropdowns is smooth",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-PROVIDER-003: Implement Provider Status Indicators",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 4: Multi-Provider Switching - Provider Detection & Hot-Swap",
+      "description": "REQ-PROVIDER-003: Provider Status Indicators\nEach provider in the selector must show its availability status:\n- Available — API key configured, provider reachable\n- Unconfigured — API key missing (show setup instructions on hover)\n- Error — API key present but provider unreachable\n\nTest Steps:\n1. Check provider selector for status indicators\n2. Verify icons/colors for Available status (green)\n3. Verify icons/colors for Unconfigured status (gray)\n4. Hover over Unconfigured provider\n5. Verify setup instructions appear\n6. Simulate provider error (disconnect network)\n7. Verify Error status displays (red)\n\nAcceptance Criteria:\n- Status indicators display correctly\n- Colors are intuitive (green/gray/red)\n- Setup instructions are helpful\n- Status updates dynamically",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-PROVIDER-004: Implement Hot-Swap Without Context Loss",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 4: Multi-Provider Switching - Provider Detection & Hot-Swap",
+      "description": "REQ-PROVIDER-004: Hot-Swap Without Context Loss\nSwitching providers mid-conversation must:\n- Preserve the full conversation history in the UI\n- Insert a system message noting the provider change\n- Send conversation context to the new provider for continuity\n- Not interrupt any running agent operations\n\nTest Steps:\n1. Start conversation with Claude\n2. Send 3-4 messages\n3. Switch to Gemini provider\n4. Verify all previous messages still visible\n5. Check system message about provider change appears\n6. Send message with Gemini\n7. Verify context was passed (AI references previous messages)\n8. Switch back to Claude\n9. Verify previous context is maintained\n\nAcceptance Criteria:\n- Chat history fully preserved\n- System message insertion is clear\n- Context is passed to new provider\n- No message loss or reordering",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-INTEGRATION-001: Implement Linear Access in Chat",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 3: AI Chat Interface - Multi-Provider Support",
+      "description": "REQ-INTEGRATION-001: Linear Access\nThe chat interface must have access to all 39 Linear MCP tools defined in `scripts/arcade_config.py`. Users can:\n- Query issue status (\"What's the status of AI-42?\")\n- Create issues (\"Create a bug for the login page crash\")\n- Transition issues (\"Move AI-42 to In Progress\")\n- View project boards and backlogs\n\nTest Steps:\n1. Ask chat \"What is the status of AI-1?\"\n2. Verify Linear tool is called\n3. Verify response contains issue data\n4. Request to create a test issue via chat\n5. Verify issue is created in Linear\n6. Check that multiple tool calls work\n7. Verify tool responses integrate into chat response\n\nAcceptance Criteria:\n- All Linear tools accessible through chat\n- Tool calls succeed and return data\n- User-friendly natural language commands work\n- Error handling is graceful",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-INTEGRATION-002: Implement Slack Access in Chat",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 3: AI Chat Interface - Multi-Provider Support",
+      "description": "REQ-INTEGRATION-002: Slack Access\nThe chat interface must have access to all 8 Slack MCP tools. Users can:\n- Send messages to configured channels\n- Read recent messages\n- React to messages\n- Pin important updates\n\nTest Steps:\n1. Request to send message to #notifications\n2. Verify message appears in Slack\n3. Read recent messages via chat\n4. Verify messages display in chat\n5. Request to react to a message\n6. Verify reaction appears in Slack\n7. Pin a message via chat\n8. Verify pin appears in Slack\n\nAcceptance Criteria:\n- All Slack operations work\n- Messages sync correctly\n- No rate limiting issues\n- Error handling for missing channels",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-INTEGRATION-003: Implement GitHub Access in Chat",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 3: AI Chat Interface - Multi-Provider Support",
+      "description": "REQ-INTEGRATION-003: GitHub Access\nThe chat interface must have access to all 46 GitHub MCP tools. Users can:\n- View PR status and diffs\n- Create and merge PRs\n- View repository information\n- Manage issues and labels\n\nTest Steps:\n1. Ask \"What's the status of PR #42?\"\n2. Verify PR data returns\n3. Request PR diff and verify it displays\n4. Ask to create a PR via chat\n5. Verify PR is created on GitHub\n6. Check repository information queries work\n7. Test issue/label management commands\n\nAcceptance Criteria:\n- All GitHub tools accessible\n- PR diffs render correctly\n- Create/merge operations work\n- Repository queries complete successfully",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-INTEGRATION-004: Implement Tool Transparency & Call Visualization",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 3: AI Chat Interface - Multi-Provider Support",
+      "description": "REQ-INTEGRATION-004: Tool Transparency\nWhen the AI invokes an external tool (Linear, Slack, GitHub), the chat must:\n- Show which tool is being called and with what parameters (collapsible detail)\n- Show the tool's response (collapsible detail)\n- Indicate success or failure with a visual status icon\n\nTest Steps:\n1. Request action that calls Linear tool\n2. Verify tool name appears in chat\n3. Click to expand tool parameters\n4. Verify parameters display correctly\n5. Check tool response is shown\n6. Verify success icon appears (green checkmark)\n7. Simulate tool error\n8. Verify error icon and message appear\n9. Verify tool blocks are collapsible\n\nAcceptance Criteria:\n- Tool calls are visible\n- Parameters can be inspected\n- Responses are shown\n- Status icons are clear\n- All blocks are collapsible",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-MONITOR-001: Implement Agent Status Panel",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 1: Foundation - Dashboard Server & Agent Status",
+      "description": "REQ-MONITOR-001: Agent Status Panel\nThe dashboard must display a panel showing all 13 agents defined in `agents/definitions.py` with their current status:\n- Running: Green pulsing dot\n- Idle: Gray dot\n- Paused: Yellow dot\n- Error: Red dot\n\nTest Steps:\n1. Load dashboard and find agent status panel\n2. Verify all 13 agents appear\n3. Click on running agent\n4. Verify green pulsing dot shows\n5. Check idle agents have gray dots\n6. Pause an agent and verify yellow dot\n7. Simulate error and verify red dot\n8. Verify status updates in real-time\n\nAcceptance Criteria:\n- All 13 agents listed\n- Status indicators are accurate\n- Colors are distinct and intuitive\n- Real-time updates work",
+      "component_reference": "TaskCard for agent status display, ProgressRing for visual indicators"
+    },
+    {
+      "title": "REQ-MONITOR-002: Implement Active Requirement Display",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 1: Foundation - Dashboard Server & Agent Status",
+      "description": "REQ-MONITOR-002: Active Requirement Display\nWhen an agent is in \"Running\" status, the panel must show:\n- The Linear ticket key and title the agent is working on (e.g., \"AI-42: Add user authentication\")\n- The full requirement description (expandable)\n- Time elapsed since the agent started this delegation\n- Token count accumulating in real-time\n- Estimated cost accumulating in real-time\n\nTest Steps:\n1. Start orchestrator with dashboard\n2. Observe running agent\n3. Verify ticket key and title display\n4. Click to expand requirement description\n5. Verify full description appears\n6. Check timer increments correctly\n7. Verify token count updates in real-time\n8. Verify cost calculation is accurate\n\nAcceptance Criteria:\n- Ticket info displays clearly\n- Expandable description works\n- Timer is accurate\n- Token/cost tracking is real-time\n- Numbers format clearly (K for thousands, etc.)",
+      "component_reference": "TaskCard with expandable details"
+    },
+    {
+      "title": "REQ-MONITOR-003: Implement Agent Detail View",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 2: Real-Time Updates - WebSocket & Event Streaming",
+      "description": "REQ-MONITOR-003: Agent Detail View\nClicking on an agent in the status panel opens a detail view showing:\n- The agent's `AgentProfile` data (from `metrics.py` types):\n  - Lifetime statistics (invocations, success rate, tokens, cost)\n  - Contribution counters (commits, PRs, files, issues, messages, reviews)\n  - Gamification data (XP, level, streak, achievements)\n  - Strengths and weaknesses (auto-detected)\n- Recent event history (last 20 events from `recent_events`)\n- The agent's current model assignment (from `DEFAULT_MODELS` in `definitions.py`)\n\nTest Steps:\n1. Click on an agent in status panel\n2. Verify detail panel opens\n3. Check lifetime statistics display\n4. Verify contribution counters show\n5. Check gamification data (XP, level, streak)\n6. Verify strengths/weaknesses appear\n7. Scroll recent event history\n8. Verify last 20 events display\n9. Check model assignment shows\n10. Close detail view\n\nAcceptance Criteria:\n- All agent profile data displays\n- Event history loads correctly\n- Detail panel is readable\n- Close functionality works",
+      "component_reference": "ActivityItem for event history display"
+    },
+    {
+      "title": "REQ-MONITOR-004: Implement Orchestrator Flow Visualization",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 2: Real-Time Updates - WebSocket & Event Streaming",
+      "description": "REQ-MONITOR-004: Orchestrator Flow Visualization\nThe dashboard must show the orchestrator's current delegation flow:\n```\nOrchestrator\n  ├─► ops (Starting AI-42) ✓ 3s\n  ├─► coding (Implementing AI-42) ● 45s [ACTIVE]\n  ├─► github (Commit + PR) ○ [PENDING]\n  └─► ops (Mark Done + Notify) ○ [PENDING]\n```\n\nThis visualizes the pipeline defined in the orchestrator prompt.\n\nTest Steps:\n1. Start orchestrator with dashboard\n2. Observe flow visualization\n3. Verify current active step highlights\n4. Check completed steps show checkmarks\n5. Verify pending steps show circles\n6. Monitor time elapsed per step\n7. Verify flow updates as agents complete\n8. Check flow clears when orchestrator finishes\n\nAcceptance Criteria:\n- Flow structure matches orchestrator pipeline\n- Status indicators are correct\n- Timing is accurate\n- Visual hierarchy is clear",
+      "component_reference": "FileTree for hierarchical flow display, ProgressRing for status indicators"
+    },
+    {
+      "title": "REQ-METRICS-001: Implement Global Metrics Bar",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 2: Real-Time Updates - WebSocket & Event Streaming",
+      "description": "REQ-METRICS-001: Global Metrics Bar\nThe top of the dashboard must show global metrics (from `DashboardState` in `metrics.py`):\n- Total sessions completed\n- Total tokens consumed\n- Total estimated cost (USD)\n- Total uptime/duration\n- Current session number\n\nTest Steps:\n1. Load dashboard\n2. Check header for global metrics\n3. Verify sessions count displays\n4. Check total tokens show\n5. Verify cost displays in USD\n6. Check uptime/duration shows\n7. Verify current session number\n8. Run agent delegation\n9. Verify metrics update in real-time\n10. Check formatting is readable\n\nAcceptance Criteria:\n- All 5 metrics display\n- Updates are real-time\n- Formatting is clear and readable\n- Metrics match `DashboardState` data",
+      "component_reference": "ProgressRing for cost/token visualization"
+    },
+    {
+      "title": "REQ-METRICS-002: Implement Agent Leaderboard",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 2: Real-Time Updates - WebSocket & Event Streaming",
+      "description": "REQ-METRICS-002: Agent Leaderboard\nDisplay agents ranked by XP (from `AgentProfile.xp`), showing:\n- Rank\n- Agent name\n- Level and XP\n- Success rate\n- Average execution time\n- Total cost\n- Current status (Running/Idle/Paused/Error)\n\nTest Steps:\n1. Locate leaderboard in footer or sidebar\n2. Verify agents ranked by XP\n3. Check rank numbers display correctly\n4. Verify all agent names appear\n5. Check level and XP show correctly\n6. Verify success rates calculate\n7. Check execution time averages\n8. Verify total cost displays\n9. Check status icons appear\n10. Verify leaderboard updates in real-time\n\nAcceptance Criteria:\n- All columns display\n- Ranking is accurate\n- Data is current\n- Status indicators match agent status\n- Leaderboard is sortable (by XP, cost, success rate, etc.)",
+      "component_reference": "TaskCard for agent rows with metrics"
+    },
+    {
+      "title": "REQ-METRICS-003: Implement Cost and Token Charts",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 2: Real-Time Updates - WebSocket & Event Streaming",
+      "description": "REQ-METRICS-003: Cost and Token Charts\nProvide visual charts for:\n- Token usage by agent (horizontal bar chart)\n- Cost trend over recent sessions (line chart)\n- Success rate by agent (bar chart)\n\nTest Steps:\n1. Find charts section in dashboard\n2. Verify token usage bar chart displays\n3. Check agents ranked by tokens\n4. Verify cost trend line chart\n5. Check time period selector works\n6. Verify success rate bar chart\n7. Confirm bars are proportional\n8. Test chart interactions (hover, zoom, etc.)\n9. Verify charts update with new data\n\nAcceptance Criteria:\n- All 3 charts render correctly\n- Data is accurate\n- Charts are readable and proportional\n- Charts update in real-time\n- Mobile responsive behavior",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-FEED-001: Implement Live Activity Feed",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 2: Real-Time Updates - WebSocket & Event Streaming",
+      "description": "REQ-FEED-001: Live Activity Feed\nA scrolling feed showing agent events as they happen:\n- Timestamp\n- Agent name\n- Status icon (success/error)\n- Ticket key\n- Duration\n- Brief description\n\nTest Steps:\n1. Locate activity feed in left sidebar\n2. Verify feed displays events in chronological order\n3. Check timestamps are accurate\n4. Verify agent names appear\n5. Check status icons (green for success, red for error)\n6. Verify ticket keys display\n7. Check duration shows (e.g., \"2m 34s\")\n8. Verify brief description is helpful\n9. Scroll up to see older events\n10. Verify new events appear at top\n\nAcceptance Criteria:\n- Events display in real-time\n- Latest events appear at top\n- All fields display correctly\n- Timestamps are accurate\n- Feed handles many events without lag",
+      "component_reference": "ActivityItem for each event display"
+    },
+    {
+      "title": "REQ-CONTROL-001: Implement Pause Agent Control",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 5: Agent Controls - Pause, Resume & Requirement Editing",
+      "description": "REQ-CONTROL-001: Pause Agent\nThe user must be able to pause a running agent. Pausing:\n- Signals the orchestrator to stop delegating new work to this agent\n- Does NOT terminate an in-progress delegation (the current task completes)\n- Sets the agent's status to \"Paused\" in the status panel\n- Inserts a system message in the chat: \"Agent [name] paused by user\"\n- Prevents the orchestrator from selecting this agent for new tasks\n\nTest Steps:\n1. Locate running agent in status panel\n2. Click pause button\n3. Verify yellow dot appears (Paused status)\n4. Check system message in chat\n5. Verify current delegation continues\n6. Watch delegation complete\n7. Verify new delegations skip this agent\n8. Confirm orchestrator respects pause state\n\nAcceptance Criteria:\n- Pause works on running agents\n- Status changes to Paused\n- System message is clear\n- Current work completes\n- New work is blocked",
+      "component_reference": "TaskCard with pause button"
+    },
+    {
+      "title": "REQ-CONTROL-002: Implement Resume Agent Control",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 5: Agent Controls - Pause, Resume & Requirement Editing",
+      "description": "REQ-CONTROL-002: Resume Agent\nThe user must be able to resume a paused agent. Resuming:\n- Restores the agent to \"Idle\" status\n- Makes the agent available for new delegations\n- Inserts a system message in the chat: \"Agent [name] resumed by user\"\n\nTest Steps:\n1. Pause a running agent\n2. Verify Paused status shows\n3. Click resume button\n4. Verify status changes to Idle\n5. Check system message appears\n6. Wait for new delegation\n7. Verify agent accepts new work\n8. Check resume works on idle agents too\n\nAcceptance Criteria:\n- Resume changes status to Idle\n- System message is clear\n- Agent accepts new work\n- Resume works on paused agents",
+      "component_reference": "TaskCard with resume button"
+    },
+    {
+      "title": "REQ-CONTROL-003: Implement Pause All / Resume All Controls",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 5: Agent Controls - Pause, Resume & Requirement Editing",
+      "description": "REQ-CONTROL-003: Pause All / Resume All\nGlobal controls to pause or resume all agents simultaneously. When all agents are paused:\n- The orchestrator enters a holding state\n- A prominent banner shows \"All agents paused — system is idle\"\n- No new delegations are dispatched\n\nTest Steps:\n1. Locate \"Pause All\" button in footer\n2. Click \"Pause All\"\n3. Verify banner appears\n4. Check all agents have yellow dots\n5. Verify orchestrator stops delegating\n6. Click \"Resume All\"\n7. Verify banner disappears\n8. Check agents return to Idle\n9. Verify orchestrator resumes delegating\n\nAcceptance Criteria:\n- Pause All works instantly\n- Resume All works instantly\n- Banner is prominent and clear\n- Orchestrator respects global pause state",
+      "component_reference": "ApprovalCard for confirmation dialog if needed"
+    },
+    {
+      "title": "REQ-CONTROL-004: Implement View Current Requirements",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 5: Agent Controls - Pause, Resume & Requirement Editing",
+      "description": "REQ-CONTROL-004: View Current Requirements\nThe dashboard must show the current requirement instructions for each active ticket. Requirements come from:\n- Linear issue title and description (via Linear MCP tools)\n- The `app_spec.txt` specification (from `specs/`)\n- Any additional context passed by the orchestrator\n\nTest Steps:\n1. Identify running agent with active ticket\n2. Click on active requirement display\n3. Verify ticket title shows\n4. Check full requirement description appears\n5. Verify source is noted (Linear/spec/context)\n6. Test with multiple tickets\n7. Verify expandable/collapsible sections work\n\nAcceptance Criteria:\n- All requirement sources visible\n- Description is complete\n- Source attribution is clear\n- View works for all agents",
+      "component_reference": "TaskCard with expandable requirement details"
+    },
+    {
+      "title": "REQ-CONTROL-005: Implement Edit Requirements Mid-Flight",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 5: Agent Controls - Pause, Resume & Requirement Editing",
+      "description": "REQ-CONTROL-005: Edit Requirements Mid-Flight\nWhile an agent is paused, the user must be able to:\n- Edit the requirement text for the ticket the agent was working on\n- The edit interface is a text editor with markdown support\n- Changes are saved and will be passed to the agent when it resumes\n\nTest Steps:\n1. Pause a running agent\n2. Click \"Edit Requirements\" button\n3. Verify text editor appears\n4. Check current requirement text is shown\n5. Modify text (add/remove requirements)\n6. Test markdown syntax (bold, code blocks, lists)\n7. Click Save\n8. Verify save succeeds\n9. Resume agent\n10. Verify agent uses updated requirements\n\nAcceptance Criteria:\n- Editor is intuitive\n- Markdown support works\n- Changes persist\n- Agent uses updated text\n- Undo/discard options available",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-CONTROL-006: Implement Requirement Edit Flow",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 5: Agent Controls - Pause, Resume & Requirement Editing",
+      "description": "REQ-CONTROL-006: Requirement Edit Flow\nThe complete flow for editing requirements:\n1. User pauses the agent (the current delegation completes)\n2. User opens the requirement editor for the agent's current ticket\n3. User modifies the requirement instructions\n4. User saves the changes\n5. User resumes the agent\n6. The orchestrator passes the updated requirements to the agent on next delegation\n\nTest Steps:\n1. Start with running agent (e.g., coding)\n2. Click pause\n3. Wait for current task to complete\n4. Click \"Edit Requirements\"\n5. Make modification\n6. Save\n7. Click \"Resume\"\n8. Wait for next delegation\n9. Verify agent starts new task\n10. Check agent's generated output reflects requirement change\n\nAcceptance Criteria:\n- Flow is smooth and intuitive\n- All steps execute correctly\n- Agent respects updated requirements\n- No data loss during edit\n- Clear feedback at each step",
+      "component_reference": "ApprovalCard for confirmation before resume"
+    },
+    {
+      "title": "REQ-CONTROL-007: Implement Requirement Sync to Linear",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 5: Agent Controls - Pause, Resume & Requirement Editing",
+      "description": "REQ-CONTROL-007: Requirement Sync to Linear\nWhen the user edits requirements through the dashboard, changes must optionally sync back to the Linear issue description (configurable via a toggle). This uses the existing Linear MCP tools.\n\nTest Steps:\n1. Open requirement editor for a ticket\n2. Find \"Sync to Linear\" toggle\n3. Toggle it ON\n4. Edit requirement\n5. Save\n6. Verify Linear issue description updates\n7. Check change appears in Linear UI\n8. Toggle sync OFF\n9. Edit again\n10. Verify Linear is NOT updated\n\nAcceptance Criteria:\n- Toggle is visible and clear\n- Sync works when enabled\n- No sync when disabled\n- Linear updates are atomic\n- Error handling if Linear API fails",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-REASONING-001: Implement Live Reasoning Stream Display",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 6: Transparency Features - Reasoning, Decisions & Code Streaming",
+      "description": "REQ-REASONING-001: Live Reasoning Stream\nThe chat interface must show the AI's reasoning and decision-making process in real-time, similar to how Claude Code displays its thinking. This includes:\n- The orchestrator's decision about which agent to delegate to and why\n- The orchestrator's complexity assessment (Simple vs Complex)\n- Context being passed between agents\n\nDisplay format:\n```\n┌─ Orchestrator Reasoning ─────────────────────────────────────┐\n│ Ticket AI-42: \"Add user authentication\"                       │\n│ Complexity: COMPLEX (auth, security-related code)             │\n│ Decision: Delegate to `coding` (sonnet) — not `coding_fast`  │\n│ Reason: Security-related changes require deeper analysis      │\n│ Context passed: Full issue description + existing auth files  │\n└──────────────────────────────────────────────────────────────┘\n```\n\nTest Steps:\n1. Send message to orchestrator\n2. Observe reasoning block appears\n3. Verify reasoning content is detailed\n4. Check complexity assessment\n5. Verify agent selection reasoning\n6. Confirm context description\n7. Click to collapse reasoning\n8. Verify can expand again\n9. Test multiple reasoning blocks\n\nAcceptance Criteria:\n- Reasoning displays in real-time\n- Content is accurate and detailed\n- Blocks are collapsible\n- Format matches specification\n- Multiple blocks can be toggled",
+      "component_reference": "DecisionCard for reasoning block display"
+    },
+    {
+      "title": "REQ-REASONING-002: Implement Agent Thinking Display",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 6: Transparency Features - Reasoning, Decisions & Code Streaming",
+      "description": "REQ-REASONING-002: Agent Thinking Display\nWhen an agent is working, display its reasoning steps:\n- What files it is reading and why\n- What changes it is planning\n- What commands it is executing\n- What tests it is running\n\nThis is the \"inner monologue\" of the agent, streamed in real-time.\n\nTest Steps:\n1. Start agent delegation (e.g., coding agent)\n2. Observe thinking block appears\n3. Check file reads are listed with reasons\n4. Verify planned changes show\n5. Watch commands execute in real-time\n6. Check test execution displays\n7. Verify streaming is smooth\n8. Check thinking block can collapse\n\nAcceptance Criteria:\n- Thinking displays as agent works\n- All 4 categories (files, changes, commands, tests) show\n- Streaming is fluid\n- Content is accurate\n- Block is collapsible",
+      "component_reference": "ActivityItem for each thinking step display"
+    },
+    {
+      "title": "REQ-REASONING-003: Implement Collapsible Reasoning Blocks",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 6: Transparency Features - Reasoning, Decisions & Code Streaming",
+      "description": "REQ-REASONING-003: Collapsible Reasoning Blocks\nReasoning blocks must be collapsible:\n- Default: collapsed, showing only a one-line summary\n- Expanded: full reasoning text, tool calls, and responses\n- The user can toggle individual blocks or expand/collapse all\n\nTest Steps:\n1. Load chat with reasoning blocks\n2. Verify blocks default to collapsed\n3. Check one-line summaries are visible\n4. Click block to expand\n5. Verify full content appears\n6. Click to collapse again\n7. Test \"Expand All\" button\n8. Verify all blocks expand\n9. Test \"Collapse All\" button\n10. Verify all blocks collapse\n\nAcceptance Criteria:\n- Collapse state is default\n- Expand/collapse toggles work\n- One-line summaries are helpful\n- Expand All / Collapse All buttons work\n- State persists during scroll\n- Smooth animations",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-DECISION-001: Implement Decision Log",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 6: Transparency Features - Reasoning, Decisions & Code Streaming",
+      "description": "REQ-DECISION-001: Decision Log\nMaintain a log of all orchestrator decisions:\n- Agent selection decisions (which agent was chosen and alternatives considered)\n- Complexity assessments\n- Verification gate decisions (skip vs. run verification)\n- PR review routing (pr_reviewer vs pr_reviewer_fast)\n- Error recovery decisions\n\nTest Steps:\n1. Run multiple delegations\n2. Access decision history page/panel\n3. Verify all decision types appear\n4. Check agent selection decisions\n5. Verify complexity assessments\n6. Check verification gate decisions\n7. Verify PR review routing decisions\n8. Check error recovery decisions\n9. Scroll through decision history\n10. Verify pagination/infinite scroll\n\nAcceptance Criteria:\n- All decision types logged\n- History is complete\n- Decisions are viewable\n- Can be exported/searched\n- Performance is good with large history",
+      "component_reference": "ActivityItem for each decision log entry"
+    },
+    {
+      "title": "REQ-DECISION-002: Implement Decision Audit Trail",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 6: Transparency Features - Reasoning, Decisions & Code Streaming",
+      "description": "REQ-DECISION-002: Decision Audit Trail\nEach decision in the log includes:\n- Timestamp\n- Decision type\n- Input factors (ticket key, complexity keywords found, recent verification status)\n- Outcome (agent selected, model used)\n- Link to the resulting agent event\n\nTest Steps:\n1. Click on a decision in the log\n2. Verify timestamp is accurate\n3. Check decision type is clear\n4. Verify all input factors display\n5. Check ticket key and keywords show\n6. Verify outcome details are complete\n7. Click link to agent event\n8. Verify event loads\n9. Check audit trail for multiple decisions\n10. Verify data is consistent\n\nAcceptance Criteria:\n- All audit trail fields present\n- Data is accurate and consistent\n- Links work correctly\n- Display is readable\n- Filtering by type works",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-CODE-001: Implement Live Code Streaming Display",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 6: Transparency Features - Reasoning, Decisions & Code Streaming",
+      "description": "REQ-CODE-001: Live Code Streaming\nWhen a coding agent (coding or coding_fast) is generating code, the dashboard must:\n- Stream the code as it is being written (character-by-character or chunk-by-chunk)\n- Show syntax highlighting\n- Show which file is being edited\n- Show the diff (additions/deletions) in real-time\n\nTest Steps:\n1. Trigger coding agent delegation\n2. Observe code streaming block appears\n3. Verify file path shows\n4. Watch code appear in real-time\n5. Check syntax highlighting applies\n6. Verify diff shows green/red lines\n7. Test scrolling in code block\n8. Check copy button works\n9. Verify multiple files can stream\n10. Check performance with large code changes\n\nAcceptance Criteria:\n- Code streams smoothly\n- Syntax highlighting is accurate\n- File path is clear\n- Diff colors are correct\n- No lag with large changes\n- Copy functionality works",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-CODE-002: Implement File Change Summary",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 6: Transparency Features - Reasoning, Decisions & Code Streaming",
+      "description": "REQ-CODE-002: File Change Summary\nAfter a coding delegation completes, show a summary:\n- List of files created/modified/deleted\n- Line counts (added/removed)\n- Diff view for each file (collapsible)\n\nTest Steps:\n1. Wait for coding agent to complete\n2. Verify summary appears\n3. Check files are categorized (created/modified/deleted)\n4. Verify line counts are accurate\n5. Click to expand file diff\n6. Check diff is complete and accurate\n7. Collapse diff\n8. Test with multiple files\n9. Verify summary is readable\n10. Check export functionality if available\n\nAcceptance Criteria:\n- Summary is comprehensive\n- File categorization is correct\n- Line counts are accurate\n- Diffs are complete\n- Collapsible sections work\n- Format is readable",
+      "component_reference": "FileTree for file hierarchy display"
+    },
+    {
+      "title": "REQ-CODE-003: Implement Test Results Display",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 6: Transparency Features - Reasoning, Decisions & Code Streaming",
+      "description": "REQ-CODE-003: Test Results Display\nWhen the coding agent runs tests, display:\n- Test command executed\n- Pass/fail status for each test\n- Error output for failed tests\n- Screenshot evidence (if Playwright tests)\n\nTest Steps:\n1. Trigger code change requiring tests\n2. Watch test execution in real-time\n3. Verify test command displays\n4. Check pass/fail status for each test\n5. For failed tests, verify error output\n6. Check for screenshot attachments\n7. Verify Playwright screenshots render\n8. Test with multiple test suites\n9. Verify summary shows pass rate\n10. Check links to full test output\n\nAcceptance Criteria:\n- Test command is clear\n- Status indicators are accurate\n- Error messages are helpful\n- Screenshots render\n- Pass rate is calculated\n- Links to full output work",
+      "component_reference": "TestResults component for test visualization"
+    },
+    {
+      "title": "REQ-TECH-001: Implement Backend Async Server",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 1: Foundation - Dashboard Server & Agent Status",
+      "description": "REQ-TECH-001: Backend Server\nPython async server using `aiohttp` or `FastAPI`. The server:\n- Serves the web dashboard (single-page application)\n- Exposes REST API endpoints for dashboard data\n- Maintains WebSocket connections for real-time updates\n- Interfaces with the existing orchestrator and metrics collector\n\nTest Steps:\n1. Start dashboard server with `python scripts/dashboard_server.py`\n2. Verify server starts without errors\n3. Access http://localhost:8420\n4. Verify health check endpoint responds\n5. Test REST endpoints return correct data\n6. Verify WebSocket upgrade works\n7. Check server handles concurrent connections\n8. Verify graceful shutdown\n9. Check error handling for invalid requests\n10. Verify logging\n\nAcceptance Criteria:\n- Server starts and serves requests\n- All endpoints respond correctly\n- WebSocket connections work\n- Concurrent handling is robust\n- Graceful error handling\n- Minimal dependencies",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-TECH-002: Implement Frontend Single HTML File",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 1: Foundation - Dashboard Server & Agent Status",
+      "description": "REQ-TECH-002: Frontend\nSingle HTML file with embedded CSS and JavaScript (no build step required). This matches the approach specified in the existing dashboard spec:\n> **No frontend build step** — single HTML file with embedded CSS/JS\n\nTest Steps:\n1. Verify HTML file can be served from server\n2. Check CSS loads inline\n3. Verify JavaScript executes without errors\n4. Test responsive design on mobile/tablet\n5. Verify dark mode toggle works\n6. Check performance (load time < 2 seconds)\n7. Test in multiple browsers\n8. Verify accessibility (keyboard navigation)\n9. Check no external CDN dependencies\n10. Test offline functionality if applicable\n\nAcceptance Criteria:\n- Single HTML file (no build step)\n- Embedded CSS and JS\n- No external dependencies\n- Responsive design\n- Good performance\n- Accessibility compliant",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-TECH-003: Implement WebSocket Protocol & Messages",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 2: Real-Time Updates - WebSocket & Event Streaming",
+      "description": "REQ-TECH-003: WebSocket Protocol\nReal-time updates via WebSocket. Message types:\n- `agent_status` — Agent status change (idle → running → paused → error)\n- `agent_event` — New agent event recorded\n- `reasoning` — Orchestrator or agent reasoning text\n- `code_stream` — Live code generation chunks\n- `chat_message` — Chat response chunk (streaming)\n- `metrics_update` — Updated dashboard metrics\n- `control_ack` — Acknowledgment of pause/resume/edit commands\n\nTest Steps:\n1. Connect WebSocket client\n2. Verify initial state message\n3. Simulate agent status change\n4. Verify `agent_status` message received\n5. Trigger agent event\n6. Verify `agent_event` message\n7. Test reasoning message format\n8. Verify code stream chunks\n9. Test chat message streaming\n10. Check metrics update messages\n11. Test control acknowledgments\n12. Verify message ordering\n\nAcceptance Criteria:\n- All message types work\n- Messages have correct format\n- Order is maintained\n- No message loss\n- Latency < 100ms",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-TECH-004: Implement REST API Endpoints",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 1: Foundation - Dashboard Server & Agent Status",
+      "description": "REQ-TECH-004: REST API Endpoints\nImplement all endpoints:\n- GET `/api/health` — Health check\n- GET `/api/metrics` — Current `DashboardState`\n- GET `/api/agents` — All agent profiles\n- GET `/api/agents/{name}` — Single agent profile\n- GET `/api/agents/{name}/events` — Recent events for an agent\n- GET `/api/sessions` — Session history\n- GET `/api/providers` — Available AI providers and models\n- POST `/api/chat` — Send a chat message (returns streaming response)\n- POST `/api/agents/{name}/pause` — Pause an agent\n- POST `/api/agents/{name}/resume` — Resume an agent\n- PUT `/api/requirements/{ticket_key}` — Update requirement instructions\n- GET `/api/requirements/{ticket_key}` — Get current requirement instructions\n- GET `/api/decisions` — Decision history log\n- GET `/` — Serve the dashboard HTML\n\nTest Steps:\n1. Test each endpoint for correct response\n2. Verify data structure matches spec\n3. Test error handling (404, 500, etc.)\n4. Verify authentication if configured\n5. Check pagination for large datasets\n6. Test request validation\n7. Verify response codes are correct\n8. Test concurrent requests\n9. Check streaming responses\n10. Verify CORS headers if needed\n\nAcceptance Criteria:\n- All endpoints implemented\n- Responses match specification\n- Error handling is robust\n- Performance is acceptable\n- Documentation is clear",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-TECH-005: Implement Metrics Data Source Integration",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 1: Foundation - Dashboard Server & Agent Status",
+      "description": "REQ-TECH-005: Data Source\nAll metrics data reads from `.agent_metrics.json` via the existing `MetricsStore` class. Agent definitions come from `agents/definitions.py`. Provider availability comes from environment variable checks (API keys for each bridge module).\n\nTest Steps:\n1. Verify `.agent_metrics.json` exists and loads\n2. Check MetricsStore integration works\n3. Verify metrics update as agents work\n4. Test provider availability detection\n5. Check all 6 providers are detected\n6. Verify API key checks work\n7. Test with missing API keys\n8. Verify agent definitions load from `definitions.py`\n9. Check all 13 agents appear\n10. Test data consistency\n\nAcceptance Criteria:\n- MetricsStore integration works\n- All providers detected\n- All agents loaded\n- Data is current and consistent\n- No hardcoded data",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-TECH-006: Implement Metrics Collector Hook",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 2: Real-Time Updates - WebSocket & Event Streaming",
+      "description": "REQ-TECH-006: Metrics Collector Hook\nThe dashboard server subscribes to `AgentMetricsCollector` events. When the collector records a new event (in `_record_event()` in `agent_metrics_collector.py`), it must also emit the event to connected WebSocket clients.\n\nTest Steps:\n1. Verify dashboard subscribes to metrics collector\n2. Trigger agent event\n3. Verify collector records event\n4. Check WebSocket broadcasts event\n5. Test with multiple clients\n6. Verify all clients receive event\n7. Test with no connected clients\n8. Verify collector still works\n9. Test reconnecting client gets backlog\n10. Check event ordering is maintained\n\nAcceptance Criteria:\n- Metrics collector hook integrated\n- Events broadcast to all clients\n- No event loss\n- Backlog available on reconnect\n- Performance is good",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-TECH-007: Implement Orchestrator Hook for Events",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 6: Transparency Features - Reasoning, Decisions & Code Streaming",
+      "description": "REQ-TECH-007: Orchestrator Hook\nThe orchestrator (`agents/orchestrator.py`) must emit reasoning and delegation decisions to the dashboard server. This requires adding event emission points in `run_orchestrated_session()`.\n\nTest Steps:\n1. Start orchestrator with dashboard\n2. Observe reasoning events emit\n3. Check decision events emit\n4. Verify events have correct format\n5. Test event ordering\n6. Verify all decision types emit\n7. Check no performance impact\n8. Test with multiple sessions\n9. Verify graceful fallback if dashboard unavailable\n10. Check event data completeness\n\nAcceptance Criteria:\n- Orchestrator emits events\n- Events have all required data\n- No performance impact\n- Graceful fallback works\n- Minimal code changes to orchestrator",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-TECH-008: Implement Chat-to-Agent Bridge",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 3: AI Chat Interface - Multi-Provider Support",
+      "description": "REQ-TECH-008: Chat-to-Agent Bridge\nWhen the user sends a chat message that requires agent action, the dashboard server must:\n1. Parse the user intent\n2. Route to the appropriate agent (or let the orchestrator decide)\n3. Execute the delegation through the existing session loop\n4. Stream results back to the chat\n\nTest Steps:\n1. Send chat message requesting agent action\n2. Verify intent parsing works\n3. Check routing decision is correct\n4. Verify delegation executes\n5. Test streaming response\n6. Verify results appear in chat\n7. Test error handling\n8. Verify agent status updates\n9. Test with different agent types\n10. Check performance\n\nAcceptance Criteria:\n- Intent parsing is accurate\n- Routing is correct\n- Delegation executes\n- Streaming works\n- Errors are handled\n- Performance is acceptable",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-TECH-009: Implement Provider Bridge Integration",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 4: Multi-Provider Switching - Provider Detection & Hot-Swap",
+      "description": "REQ-TECH-009: Provider Bridge Integration\nChat messages routed to non-Claude providers use the existing bridge modules:\n- `bridges/openai_bridge.py` for ChatGPT\n- `bridges/gemini_bridge.py` for Gemini\n- `bridges/groq_bridge.py` for Groq\n- `bridges/kimi_bridge.py` for KIMI\n- `bridges/windsurf_bridge.py` for Windsurf\n\nTest Steps:\n1. Test ChatGPT bridge integration\n2. Verify response comes from ChatGPT\n3. Test Gemini bridge\n4. Verify Gemini response\n5. Test Groq, KIMI, Windsurf bridges\n6. Verify each returns correct provider response\n7. Test error handling for unavailable provider\n8. Test switching between providers\n9. Verify no response overlap\n10. Check performance\n\nAcceptance Criteria:\n- All 6 bridges work\n- Responses are accurate\n- No cross-provider confusion\n- Error handling works\n- Performance is good",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-TECH-010: Implement Configuration via Environment Variables",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 1: Foundation - Dashboard Server & Agent Status",
+      "description": "REQ-TECH-010: Environment Variables\nNew environment variables (all optional, with sensible defaults):\n- `DASHBOARD_WEB_PORT` (default: 8420) — Port for the web dashboard server\n- `DASHBOARD_WS_PORT` (default: 8421) — Port for WebSocket connections (or same port via upgrade)\n- `DASHBOARD_HOST` (default: 0.0.0.0) — Host to bind the dashboard server\n- `DASHBOARD_AUTH_TOKEN` (none) — Bearer token for dashboard API authentication\n- `DASHBOARD_CORS_ORIGINS` (default: *) — Allowed CORS origins\n\nTest Steps:\n1. Start server with default settings\n2. Verify defaults are used\n3. Set DASHBOARD_WEB_PORT=9999\n4. Verify server listens on 9999\n5. Set DASHBOARD_AUTH_TOKEN\n6. Verify authentication required\n7. Test with valid token\n8. Test with invalid token\n9. Set DASHBOARD_CORS_ORIGINS\n10. Verify CORS headers\n\nAcceptance Criteria:\n- All env vars work\n- Defaults are sensible\n- Configuration is flexible\n- No hardcoded values\n- Documentation is clear",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-TECH-011: Implement Authentication",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 1: Foundation - Dashboard Server & Agent Status",
+      "description": "REQ-TECH-011: Authentication\nIf `DASHBOARD_AUTH_TOKEN` is set, all API endpoints and WebSocket connections require a valid bearer token. If not set, the dashboard is open (suitable for local development).\n\nTest Steps:\n1. Start server without auth token\n2. Verify endpoints accessible without token\n3. Set auth token\n4. Verify endpoints require token\n5. Test valid token\n6. Test invalid token (401)\n7. Test missing token header\n8. Test in WebSocket upgrade\n9. Test token in Authorization header\n10. Check token validation is performed\n\nAcceptance Criteria:\n- Authentication is optional\n- Auth works when configured\n- No auth when not configured\n- Token validation is correct\n- WebSocket auth works\n- Error messages are clear",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-TECH-012: Implement Sandbox Compliance",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 1: Foundation - Dashboard Server & Agent Status",
+      "description": "REQ-TECH-012: Sandbox Compliance\nThe dashboard server must operate within the existing security model:\n- Bash commands executed through the chat are subject to the allowlist in `security.py`\n- File operations are restricted to the project directory\n- MCP tool calls go through the Arcade gateway with existing authorization\n\nTest Steps:\n1. Test bash command through chat\n2. Verify allowlist is checked\n3. Test unauthorized command\n4. Verify command is blocked\n5. Test file operation\n6. Verify project directory restriction\n7. Try to access outside project\n8. Verify access denied\n9. Test MCP tool call\n10. Verify Arcade gateway auth\n\nAcceptance Criteria:\n- Allowlist is enforced\n- File operations are restricted\n- MCP calls go through Arcade\n- No security bypass possible\n- Errors are clear",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-UI-001: Implement Panel Collapsibility",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 1: Foundation - Dashboard Server & Agent Status",
+      "description": "REQ-UI-001: Panel Collapsibility\nThe left panel collapses to an icon bar on narrow viewports. The main chat panel takes full width.\n\nTest Steps:\n1. Load dashboard on desktop (1920x1080)\n2. Verify left panel is visible\n3. Resize to tablet width (768px)\n4. Verify left panel collapses to icons\n5. Click icon to expand panel\n6. Verify panel expands\n7. Click again to collapse\n8. Resize to mobile width (375px)\n9. Verify main panel uses full width\n10. Test on actual mobile device\n\nAcceptance Criteria:\n- Collapsible on narrow viewports\n- Icons are clear and clickable\n- Panel expands/collapses smoothly\n- Main panel uses available space\n- No content is cut off",
+      "component_reference": null
+    },
+    {
+      "title": "REQ-UI-002: Implement Dark Mode Toggle",
+      "type": "Feature",
+      "team": "Agent Dashboard",
+      "parent": "Phase 1: Foundation - Dashboard Server & Agent Status",
+      "description": "REQ-UI-002: Dark Mode\nThe dashboard defaults to dark mode (consistent with terminal/IDE workflows). A toggle switches to light mode.\n\nTest Steps:\n1. Load dashboard\n2. Verify dark mode is default\n3. Find dark mode toggle\n4. Click toggle to light mode\n5. Verify colors switch to light theme\n6. Check readability in light mode\n7. Click toggle back to dark\n8. Verify dark mode colors return\n9. Refresh page\n10. Verify preference persists\n\nAcceptance Criteria:\n- Dark mode is default\n- Toggle switches themes\n- Both themes are readable\n- Preference persists\n- Smooth transition",
+      "component_reference": null
+    },
+    {
+      "title": "QA-001: Expand Test Coverage for Core Modules",
+      "type": "Task",
+      "team": "Agent Dashboard",
+      "description": "From QA_updates.md: Expand Test Coverage - Critical for production readiness.\nCurrent State: Only security tests in main codebase, extensive tests only in generations/ subdirectory.\n\nAction Items:\n1. Create tests/test_agent.py\n2. Create tests/test_client.py\n3. Create tests/test_progress.py\n4. Create tests/test_prompts.py\n5. Create tests/bridges/test_*.py\n6. Create tests/dashboard/test_*.py\n\nTest Steps:\n1. Run test suite\n2. Verify coverage > 80%\n3. Check all modules have tests\n4. Run tests in CI pipeline\n5. Verify no test failures\n\nAcceptance Criteria:\n- All modules have unit tests\n- Coverage > 80%\n- Tests pass in CI\n- Test failures are clear",
+      "component_reference": null
+    },
+    {
+      "title": "QA-002: Address Technical Debt & TODOs",
+      "type": "Task",
+      "team": "Agent Dashboard",
+      "description": "From QA_updates.md: Address Technical Debt.\nFound 12 TODO/FIXME comments across 9 files indicating incomplete work.\nPriority Files: daemon/control_plane.py (3 TODOs), scripts/daemon.py (2 TODOs).\n\nAction Items:\n1. Audit all TODO/FIXME comments\n2. Prioritize by impact\n3. Schedule resolution\n4. Create sub-tasks for each\n\nTest Steps:\n1. Run grep for TODO/FIXME\n2. List all findings\n3. Estimate effort\n4. Assign to sprints\n5. Verify completion\n\nAcceptance Criteria:\n- All TODOs reviewed\n- Critical ones resolved\n- Backlog created for rest",
+      "component_reference": null
+    },
+    {
+      "title": "QA-003: Reduce Code Duplication in Bridge Classes",
+      "type": "Task",
+      "team": "Agent Dashboard",
+      "description": "From QA_updates.md: Reduce Code Duplication - Pattern Identified.\nAll bridge classes (openai_bridge.py, gemini_bridge.py, etc.) share similar client patterns.\n\nRecommendation: Extract common interface:\nCreate bridges/base_bridge.py with abstract base class:\n```python\nclass BaseBridge(ABC):\n   @abstractmethod\n   async def send_task(self, task: str) -> BridgeResponse\n  \n   @abstractmethod \n   def get_auth_info(self) -> dict[str, str]\n```\n\nTest Steps:\n1. Extract common code\n2. Create base_bridge.py\n3. Update all bridges to inherit\n4. Run tests\n5. Verify no regression\n\nAcceptance Criteria:\n- Base class is clear\n- All bridges inherit\n- No code duplication\n- Tests pass",
+      "component_reference": null
+    },
+    {
+      "title": "QA-004: Performance Optimizations for Bridges",
+      "type": "Task",
+      "team": "Agent Dashboard",
+      "description": "From QA_updates.md: Performance Optimizations.\nSubprocess Calls: Multiple subprocess.run() calls could be optimized with connection pooling.\nAsync Patterns: Some I/O operations in bridges could benefit from asyncio subprocess handling.\nCaching: API responses and authentication tokens could be cached.\n\nTest Steps:\n1. Profile subprocess calls\n2. Identify bottlenecks\n3. Implement connection pooling\n4. Add asyncio subprocess handling\n5. Implement caching\n6. Measure improvements\n\nAcceptance Criteria:\n- 15-25% improvement in I/O operations\n- No behavior change\n- Tests pass",
+      "component_reference": null
+    },
+    {
+      "title": "QA-005: Centralized Configuration Management",
+      "type": "Task",
+      "team": "Agent Dashboard",
+      "description": "From QA_updates.md: Configuration Management.\nCurrent: Environment variables scattered throughout.\nRecommendation: Centralized configuration class:\n```python\n@dataclass\nclass AgentConfig:\n   windsurf_mode: WindsurfMode\n   timeout: int\n   api_keys: dict[str, str]\n```\n\nTest Steps:\n1. Create config.py\n2. Define AgentConfig dataclass\n3. Update all modules to use\n4. Verify all env vars are handled\n5. Test config loading\n\nAcceptance Criteria:\n- Single source of truth for config\n- All env vars handled\n- No hardcoded values\n- Tests pass",
+      "component_reference": null
+    },
+    {
+      "title": "QA-006: Standardize Error Handling with Custom Exception Hierarchy",
+      "type": "Task",
+      "team": "Agent Dashboard",
+      "description": "From QA_updates.md: Error Handling Standardization.\nGood Foundation: Consistent error patterns exist\nEnhancement: Create custom exception hierarchy:\n```python\nclass AgentError(Exception): pass\nclass BridgeError(AgentError): pass\nclass SecurityError(AgentError): pass\n```\n\nTest Steps:\n1. Create exceptions.py\n2. Define exception classes\n3. Update error handling\n4. Test exception catching\n5. Verify error messages\n\nAcceptance Criteria:\n- Clear exception hierarchy\n- All errors use custom classes\n- Error messages are helpful",
+      "component_reference": null
+    },
+    {
+      "title": "QA-007: Type Safety Improvements",
+      "type": "Task",
+      "team": "Agent Dashboard",
+      "description": "From QA_updates.md: Type Safety Improvements.\nCurrent: Good type hints but some gaps remain.\nRecommendations:\n1. Add Strict typing mode in pyproject.toml\n2. Use typing.Protocol for interfaces\n3. Add runtime type checking with typeguard\n\nTest Steps:\n1. Enable strict mode in mypy\n2. Fix type errors\n3. Add Protocol definitions\n4. Integrate typeguard\n5. Run type checker in CI\n\nAcceptance Criteria:\n- No type errors\n- Strict mode enabled\n- Protocols used for interfaces",
+      "component_reference": null
+    },
+    {
+      "title": "QA-008: Add API Documentation",
+      "type": "Task",
+      "team": "Agent Dashboard",
+      "description": "From QA_updates.md: Documentation Completeness.\nMissing: API documentation for bridge interfaces.\nAction: Generate API docs with pdoc or Sphinx.\nAdd: Inline examples for complex functions.\n\nTest Steps:\n1. Generate API docs\n2. Add doc strings\n3. Create examples\n4. Host docs\n5. Verify completeness\n\nAcceptance Criteria:\n- API docs complete\n- Examples included\n- Docs are accessible",
+      "component_reference": null
+    },
+    {
+      "title": "QA-009: Add Structured Logging and Monitoring",
+      "type": "Task",
+      "team": "Agent Dashboard",
+      "description": "From QA_updates.md: Monitoring & Observability.\nCurrent: Basic metrics collection.\nEnhancement:\n1. Add structured logging\n2. Performance metrics collection\n3. Health check endpoints\n\nTest Steps:\n1. Implement structured logging\n2. Add performance metrics\n3. Create health endpoints\n4. Verify data collection\n5. Test monitoring\n\nAcceptance Criteria:\n- Structured logs available\n- Metrics are collected\n- Health checks work",
+      "component_reference": null
+    },
+    {
+      "title": "QA-010: Add Dependency Security Auditing",
+      "type": "Task",
+      "team": "Agent Dashboard",
+      "description": "From QA_updates.md: Dependency Security.\nCurrent: 41 dependencies in requirements.txt.\nRecommendation:\n1. Add pip-audit to CI pipeline\n2. Consider dependency pinning with exact versions\n3. Remove unused dependencies\n\nTest Steps:\n1. Run pip-audit\n2. Fix vulnerabilities\n3. Pin versions\n4. Remove unused deps\n5. Add to CI\n\nAcceptance Criteria:\n- No known vulnerabilities\n- Dependencies pinned\n- Unused deps removed\n- CI checks security",
+      "component_reference": null
+    }
+  ]
+}

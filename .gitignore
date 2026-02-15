@@ -4,13 +4,27 @@ generations/
 # Log files
 logs/
 
+# Environment and dependencies
 .env
+.env.tmp
 venv
 venv_linux
-.env.tmp
-__pycache__
+node_modules/
+__pycache__/
+*.pyc
+
+# IDE and system files
+.DS_Store
 api-key
+.ruff_cache/
 .playwright-mcp
 .jira_tokens.json
-.DS_Store
-.ruff_cache/
+
+# Test evidence
+screenshots/
+
+# Agent metrics
+.agent_metrics.json
+
+# Worktrees
+.worktrees/
