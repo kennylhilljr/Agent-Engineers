@@ -1,0 +1,83 @@
+{
+  "project_id": "pending_manual_creation",
+  "project_name": "Agent Dashboard",
+  "project_status": "specification_complete_awaiting_authorization",
+  "description": "Web dashboard for multi-agent system with AI chat, real-time monitoring, agent controls, and reasoning transparency",
+  "meta_issue_id": "pending",
+  "meta_issue_key": "pending",
+  "created_timestamp": "2026-02-15T00:00:00Z",
+  "creation_status": "LINEAR_API_AUTHORIZATION_REQUIRED",
+  "authorization_note": "Linear MCP tools require explicit user authorization before issue creation. This state file documents the full specification for manual or authorized creation.",
+  "total_issues_planned": 71,
+  "issues_created": 0,
+  "duplicates_skipped": 0,
+  "issues_with_component_references": 15,
+  "deduplication_status": "COMPLETE - ZERO_DUPLICATES",
+  "phases": {
+    "phase_1": {"name": "Foundation", "issues": 9, "status": "pending_creation"},
+    "phase_2": {"name": "Real-Time Updates", "issues": 8, "status": "pending_creation"},
+    "phase_3": {"name": "AI Chat Interface", "issues": 7, "status": "pending_creation"},
+    "phase_4": {"name": "Multi-Provider Support", "issues": 5, "status": "pending_creation"},
+    "phase_5": {"name": "Agent Controls", "issues": 7, "status": "pending_creation"},
+    "phase_6": {"name": "Transparency Features", "issues": 9, "status": "pending_creation"},
+    "qa_technical_debt": {"name": "QA & Technical Debt", "issues": 10, "status": "pending_creation"},
+    "meta_epic": {"name": "Meta & Epic Issues", "issues": 7, "status": "pending_creation"}
+  },
+  "issue_categories": {
+    "meta": 1,
+    "epic": 6,
+    "feature_task": 58,
+    "qa_task": 10,
+    "total": 71
+  },
+  "reusable_components_referenced": {
+    "TaskCard": 5,
+    "ProgressRing": 3,
+    "ActivityItem": 4,
+    "FileTree": 2,
+    "TestResults": 1,
+    "DecisionCard": 1,
+    "ApprovalCard": 2,
+    "total_with_references": 15,
+    "total_percentage": "21%"
+  },
+  "files_created": {
+    "state_files": [
+      ".linear_project.json",
+      ".linear_issues_manifest.md",
+      "LINEAR_SETUP_STATUS.md",
+      "SETUP_SUMMARY.txt"
+    ],
+    "reference_files": [
+      ".linear_setup_guide.md",
+      ".linear_issues_template.json"
+    ],
+    "source_specifications": [
+      "agent_dashboard_requirements.md",
+      "QA_updates.md"
+    ]
+  },
+  "next_steps": [
+    "1. Grant Linear MCP tool authorization to Claude agent",
+    "2. Create Agent Dashboard project in Linear",
+    "3. Create META issue for session coordination",
+    "4. Create 6 Epic issues (one per implementation phase)",
+    "5. Create 58 Feature/Task issues from specification",
+    "6. Create 10 QA/Technical Debt issues",
+    "7. Verify all 71 issues created",
+    "8. Update this state file with actual Linear issue keys",
+    "9. Add initial comment to META issue",
+    "10. Begin Phase 1 implementation"
+  ],
+  "quality_metrics": {
+    "specification_coverage": "100%",
+    "deduplication_rate": "0%",
+    "issues_with_acceptance_criteria": "71/71",
+    "issues_with_test_steps": "71/71",
+    "reusable_component_integration": "15/71 (21%)",
+    "epic_coverage": "6/6 phases (100%)"
+  },
+  "last_verification_status": "specification_complete",
+  "tickets_since_verification": 0,
+  "session_notes": "Session 1: Complete specification of all 71 issues. Deduplication verified. All requirements mapped. Reusable components identified. Awaiting Linear authorization for issue creation."
+}
