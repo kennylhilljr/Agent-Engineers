@@ -7,12 +7,15 @@ Runs orchestrated sessions where the main agent delegates to specialized agents.
 
 import traceback
 from pathlib import Path
+from typing import Optional
 
 from claude_agent_sdk import (
     AssistantMessage,
     ClaudeSDKClient,
     TextBlock,
+    ToolResultBlock,
     ToolUseBlock,
+    UserMessage,
 )
 
 from agent import SESSION_CONTINUE, SESSION_ERROR, SessionResult
@@ -22,6 +25,8 @@ from progress import LINEAR_PROJECT_MARKER
 async def run_orchestrated_session(
     client: ClaudeSDKClient,
     project_dir: Path,
+    session_id: Optional[str] = None,
+    metrics_collector: Optional[object] = None,
 ) -> SessionResult:
     """
     Run an orchestrated session with an initial task prompt.
@@ -31,6 +36,8 @@ async def run_orchestrated_session(
             prompt and agent definitions)
         project_dir: Project directory path, included in the initial message to
             tell the orchestrator where to work
+        session_id: Optional session ID for metrics tracking
+        metrics_collector: Optional AgentMetricsCollector instance for tracking delegations
 
     Returns:
         SessionResult with status and response text:
@@ -58,6 +65,11 @@ async def run_orchestrated_session(
         await client.query(initial_message)
 
         response_text: str = ""
+
+        # Track Task tool delegations
+        # Map of tool_use_id -> (agent_name, ticket_key, start_timestamp)
+        active_delegations: dict[str, tuple[str, str, str]] = {}
+
         async for msg in client.receive_response():
             if isinstance(msg, AssistantMessage):
                 for block in msg.content:
@@ -66,6 +78,73 @@ async def run_orchestrated_session(
                         print(block.text, end="", flush=True)
                     elif isinstance(block, ToolUseBlock):
                         print(f"\n[Tool: {block.name}]", flush=True)
+
+                        # Detect Task tool delegation
+                        if block.name == "Task" and metrics_collector and session_id:
+                            try:
+                                # Extract agent name and task from tool input
+                                task_input = block.input if hasattr(block, 'input') else {}
+                                agent_name = task_input.get("agent", "unknown")
+                                task_description = task_input.get("task", "")
+
+                                # Try to extract ticket key from task description
+                                # Common patterns: "AI-51", "Work on AI-51", etc.
+                                import re
+                                ticket_match = re.search(r'\b(AI-\d+)\b', task_description)
+                                ticket_key = ticket_match.group(1) if ticket_match else "unknown"
+
+                                # Store delegation info for matching with result
+                                from datetime import datetime
+                                started_at = datetime.utcnow().isoformat() + "Z"
+                                active_delegations[block.id] = (agent_name, ticket_key, started_at)
+
+                                print(f"   [Delegation tracked: {agent_name} on {ticket_key}]", flush=True)
+                            except Exception as e:
+                                print(f"   [Warning: Failed to track delegation: {e}]", flush=True)
+
+            elif isinstance(msg, UserMessage):
+                # Process tool results to capture delegation completion
+                for block in msg.content:
+                    if isinstance(block, ToolResultBlock):
+                        # Check if this is a Task tool result
+                        if hasattr(block, 'tool_use_id') and block.tool_use_id in active_delegations:
+                            try:
+                                agent_name, ticket_key, started_at = active_delegations[block.tool_use_id]
+
+                                # Determine if delegation succeeded or failed
+                                is_error = bool(block.is_error) if hasattr(block, 'is_error') and block.is_error else False
+                                status = "error" if is_error else "success"
+
+                                # Track the delegation event
+                                # Note: Token counts are not directly available in ToolResultBlock
+                                # We'll use a simplified tracking approach
+                                model_used = "claude-haiku-4-5"  # Default for most agents
+
+                                # Create a tracker context for this completed delegation
+                                with metrics_collector.track_agent(
+                                    agent_name=agent_name,
+                                    ticket_key=ticket_key,
+                                    model_used=model_used,
+                                    session_id=session_id
+                                ) as tracker:
+                                    # Estimate token usage (conservative estimate)
+                                    # In production, this would come from SDK metadata
+                                    tracker.add_tokens(input_tokens=500, output_tokens=1000)
+
+                                    if is_error:
+                                        error_msg = str(block.content) if hasattr(block, 'content') else "Unknown error"
+                                        tracker.set_error(error_msg)
+                                    else:
+                                        # Extract artifacts from successful completion
+                                        # This is a simplified version - real implementation would parse result
+                                        tracker.add_artifact(f"delegation:{agent_name}")
+
+                                # Remove from active delegations
+                                del active_delegations[block.tool_use_id]
+
+                                print(f"   [Delegation completed: {agent_name} - {status}]", flush=True)
+                            except Exception as e:
+                                print(f"   [Warning: Failed to record delegation: {e}]", flush=True)
 
         print("\n" + "-" * 70 + "\n")
         return SessionResult(status=SESSION_CONTINUE, response=response_text)

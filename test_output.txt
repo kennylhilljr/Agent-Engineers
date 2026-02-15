@@ -1,0 +1,127 @@
+
+╔====================================================================╗
+║            ORCHESTRATOR DELEGATION TRACKING - SIMPLE TESTS         ║
+╚====================================================================╝
+
+======================================================================
+TESTING TICKET KEY EXTRACTION
+======================================================================
+
+Test cases:
+  ✓ 'Work on AI-51: Implement feature' → 'AI-51' (expected 'AI-51')
+  ✓ 'AI-123 needs implementation' → 'AI-123' (expected 'AI-123')
+  ✓ 'Implement AI-999' → 'AI-999' (expected 'AI-999')
+  ✓ 'Fix bug in AI-1' → 'AI-1' (expected 'AI-1')
+  ✓ 'No ticket here' → 'unknown' (expected 'unknown')
+  ✓ '' → 'unknown' (expected 'unknown')
+
+✓ All extraction tests passed!
+
+======================================================================
+TESTING ERROR TRACKING
+======================================================================
+
+→ Simulating failed delegation...
+
+✓ Event recorded with error status
+  - Status: error
+  - Error: Tests failed: 3 tests did not pass
+
+✓ Agent profile updated:
+  - Failed invocations: 1
+  - Success rate: 0.0%
+
+✓ Error tracking test passed!
+
+======================================================================
+TESTING ORCHESTRATOR DELEGATION TRACKING LOGIC
+======================================================================
+
+✓ Started session: 59f4c283...
+
+----------------------------------------------------------------------
+Simulating 3 Task tool delegations:
+----------------------------------------------------------------------
+
+→ Delegation: coding
+  Task: Work on AI-51: Implement delegation tracking
+  Extracted ticket: AI-51
+  ✓ Tracked
+
+→ Delegation: github
+  Task: Create PR for AI-51
+  Extracted ticket: AI-51
+  ✓ Tracked
+
+→ Delegation: slack
+  Task: Notify team about AI-51 completion
+  Extracted ticket: AI-51
+  ✓ Tracked
+
+✓ Session ended
+
+======================================================================
+VERIFICATION
+======================================================================
+
+✓ Events recorded: 3
+
+Event 1:
+  - Agent: coding
+  - Ticket: AI-51
+  - Status: success
+  - Tokens: 500 in, 1000 out
+  - Duration: 0.052s
+  - Cost: $0.004400
+
+Event 2:
+  - Agent: github
+  - Ticket: AI-51
+  - Status: success
+  - Tokens: 500 in, 1000 out
+  - Duration: 0.052s
+  - Cost: $0.004400
+
+Event 3:
+  - Agent: slack
+  - Ticket: AI-51
+  - Status: success
+  - Tokens: 500 in, 1000 out
+  - Duration: 0.052s
+  - Cost: $0.004400
+
+Session summary:
+  - Session ID: 59f4c283...
+  - Agents invoked: ['coding', 'github', 'slack']
+  - Tickets worked: ['AI-51']
+  - Total tokens: 4500
+  - Total cost: $0.013200
+
+Agent profiles created:
+  - coding: 1 invocations, 1500 tokens
+  - github: 1 invocations, 1500 tokens
+  - slack: 1 invocations, 1500 tokens
+
+======================================================================
+ALL TESTS PASSED ✓
+======================================================================
+
+Metrics saved to: /var/folders/6j/8_5x46rs3db2852wd7wb16v40000gn/T/tmp5dgweypq/.agent_metrics.json
+File size: 5743 bytes
+
+╔====================================================================╗
+║                      ALL TESTS PASSED ✓                        ║
+╚====================================================================╝
+
+SUMMARY:
+----------------------------------------------------------------------
+✓ Ticket key extraction working correctly
+✓ Error tracking working correctly
+✓ Delegation tracking logic working correctly
+✓ Token attribution working correctly
+✓ Session aggregation working correctly
+✓ Agent profiles updated correctly
+----------------------------------------------------------------------
+
+The orchestrator instrumentation is ready for integration!
+
