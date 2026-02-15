@@ -6,6 +6,7 @@ Core agent interaction functions for running autonomous coding sessions.
 """
 
 import asyncio
+import sys
 import traceback
 from pathlib import Path
 from typing import Literal, NamedTuple
@@ -26,6 +27,19 @@ from prompts import (
     get_continuation_task,
     get_initializer_task,
 )
+
+# Import metrics collector if available (graceful degradation)
+try:
+    # Look for agent_metrics in the dashboard project subdirectory
+    dashboard_dir = Path(__file__).parent / "generations" / "agent-status-dashboard"
+    if dashboard_dir.exists():
+        sys.path.insert(0, str(dashboard_dir))
+        from agent_metrics import AgentMetricsCollector
+        METRICS_AVAILABLE = True
+    else:
+        METRICS_AVAILABLE = False
+except ImportError:
+    METRICS_AVAILABLE = False
 
 # Configuration
 AUTO_CONTINUE_DELAY_SECONDS: int = 0
@@ -197,6 +211,19 @@ async def run_autonomous_agent(
         print(f"Max iterations: {max_iterations}")
     else:
         print("Max iterations: Unlimited (will run until completion)")
+
+    # Initialize metrics collector if available
+    collector = None
+    if METRICS_AVAILABLE:
+        try:
+            collector = AgentMetricsCollector(project_dir)
+            print("Metrics collection: Enabled")
+        except Exception as e:
+            print(f"Metrics collection: Disabled (initialization failed: {e})")
+            collector = None
+    else:
+        print("Metrics collection: Disabled (agent_metrics module not available)")
+
     print()
 
     # Create project directory
@@ -235,6 +262,17 @@ async def run_autonomous_agent(
         # Print session header
         print_session_header(iteration, is_first_run)
 
+        # Start session metrics collection
+        if collector:
+            try:
+                session_id = collector.start_session(
+                    session_num=iteration,
+                    is_initializer=is_first_run
+                )
+                print(f"[Metrics] Session started: {session_id[:8]}...")
+            except Exception as e:
+                print(f"[Metrics] Failed to start session: {e}")
+
         # Prevents context window exhaustion in long-running loops
         client: ClaudeSDKClient = create_client(project_dir, model)
 
@@ -265,6 +303,16 @@ async def run_autonomous_agent(
             print("This may indicate an SDK bug, resource exhaustion, or configuration issue.")
             traceback.print_exc()
             result = SessionResult(status=SESSION_ERROR, response=str(e))
+
+        # End session metrics collection
+        if collector:
+            try:
+                summary = collector.end_session(status=result.status)
+                print(f"[Metrics] Session ended: {summary['status']} "
+                      f"(tokens: {summary['total_tokens']}, "
+                      f"cost: ${summary['total_cost_usd']:.4f})")
+            except Exception as e:
+                print(f"[Metrics] Failed to end session: {e}")
 
         # Handle status
         if result.status == SESSION_COMPLETE:

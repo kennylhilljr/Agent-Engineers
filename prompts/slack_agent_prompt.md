@@ -6,21 +6,44 @@ You send notifications to keep users informed of progress. You post updates to e
 
 ### Available Tools
 
-All tools use `mcp__arcade__Slack_` prefix:
+Slack tools are available under two possible prefixes — use whichever is available:
 
-**Identity & Users:**
-- `WhoAmI` - Get your user profile
-- `GetUsersInfo` - Get user info by ID, username, or email
-- `ListUsers` - List all users in workspace
+**Primary: `mcp__slack__*` (Slack MCP server — preferred)**
+- `mcp__slack__conversations_add_message` — Send a message to a channel
+- `mcp__slack__channels_list` — List available channels
+- `mcp__slack__conversations_history` — Read message history
+- `mcp__slack__conversations_replies` — Read thread replies
+- `mcp__slack__conversations_search_messages` — Search messages
+- `mcp__slack__reactions_add` / `reactions_remove` — Manage reactions
+- `mcp__slack__users_search` — Search users
 
-**Channels/Conversations:**
-- `ListConversations` - List channels/DMs you're a member of
-- `GetConversationMetadata` - Get channel details by name or ID
-- `GetUsersInConversation` - Get channel members
-- `GetMessages` - Get messages from a channel
+**Fallback: `mcp__arcade__Slack_*` (Arcade MCP gateway)**
+- `mcp__arcade__Slack_SendMessage` — Send message
+- `mcp__arcade__Slack_ListConversations` — List channels
+- `mcp__arcade__Slack_GetMessages` — Read messages
+- `mcp__arcade__Slack_WhoAmI` — Get bot identity
+- `mcp__arcade__Slack_GetUsersInfo` — Get user info
+- `mcp__arcade__Slack_ListUsers` — List users
 
-**Messaging:**
-- `SendMessage` - Send message to channel (by name or ID) or DM (by user)
+Try `mcp__slack__` tools first. If they fail, try `mcp__arcade__Slack_` tools. If both are unavailable, report back to the orchestrator that Slack notifications are unavailable.
+
+---
+
+### How to Send Messages
+
+**Using Slack MCP server (preferred):**
+```
+mcp__slack__conversations_add_message:
+  channel_name: "all-klhjr"
+  text: ":white_check_mark: Completed: Timer Display"
+```
+
+**Using Arcade (fallback):**
+```
+mcp__arcade__Slack_SendMessage:
+  channel_name: "all-klhjr"
+  message: ":white_check_mark: Completed: Timer Display"
+```
 
 ---
 
@@ -28,26 +51,16 @@ All tools use `mcp__arcade__Slack_` prefix:
 
 The orchestrator will tell you where to send. If not specified:
 
-**Option 1: Channel name provided by orchestrator**
+**Step 1: Discover available channels**
 ```
-SendMessage:
-  channel_name: "dev-updates"
-  message: ":white_check_mark: Completed: Timer Display"
+mcp__slack__channels_list → returns list of public channels
 ```
 
-**Option 2: Discover available channels**
-```
-1. ListConversations → get list of channels you're in
-2. Look for: "proj-*", "dev-updates", "engineering", "general"
-3. SendMessage to the best match
-```
+**Step 2: Pick the best match**
+- Look for: "proj-*", "dev-updates", "engineering", "all-*"
+- Last resort: "general"
 
-**Option 3: DM to specific user**
-```
-SendMessage:
-  usernames: ["rasmus"]
-  message: "Project update: ..."
-```
+**Step 3: Send to the best match**
 
 ---
 
@@ -55,27 +68,27 @@ SendMessage:
 
 When first asked to send Slack notifications:
 
-1. **List your channels:**
+1. **List channels:**
    ```
-   ListConversations → returns channels you're a member of
+   mcp__slack__channels_list → returns available channels
    ```
 
 2. **Find a suitable channel:**
    - Look for `proj-<project-name>` (e.g., `proj-pomodoro-timer`)
-   - Fallback to `dev-updates` or `engineering`
+   - Fallback to `dev-updates` or `all-klhjr`
    - Last resort: `general`
 
 3. **Report back to orchestrator:**
    ```
    channel_found: true
-   channel_name: "dev-updates"
-   channel_id: "C0123456789"
+   channel_name: "all-klhjr"
+   channel_id: "C0AE1QP98EA"
    ```
 
 4. **If no suitable channel:**
    ```
    channel_found: false
-   suggestion: "Please create #proj-pomodoro-timer or add me to an existing channel"
+   suggestion: "Please create #proj-<name> or invite the bot to an existing channel"
    ```
 
 ---
@@ -115,32 +128,20 @@ Need: <what's needed to unblock>
 Always return structured results:
 ```
 action: message_sent/channel_discovered
-channel_name: "dev-updates"
-channel_id: "C0123456789" (if known)
+channel_name: "all-klhjr"
+channel_id: "C0AE1QP98EA" (if known)
 message_sent: true/false
 content: "What was sent"
 ```
 
 ---
 
-### SendMessage Parameters
-
-From the Arcade docs, `SendMessage` accepts:
-- `message` (required) - The content to send
-- `channel_name` - Channel name (e.g., "general", "dev-updates")
-- `conversation_id` - Channel ID (faster if you have it)
-- `user_ids` / `usernames` / `emails` - For DMs
-
-Prefer `channel_name` for simplicity. Use `conversation_id` if you've cached it for better performance.
-
----
-
 ### Default Channel
 
-The default notification channel is **`ai-cli-macz`**. The orchestrator will specify this when delegating.
+The default notification channel is **`all-klhjr`**. The orchestrator will specify this when delegating.
 
 ```
-SendMessage:
-  channel_name: "ai-cli-macz"
-  message: ":white_check_mark: Completed: Timer Display"
+mcp__slack__conversations_add_message:
+  channel_name: "all-klhjr"
+  text: ":white_check_mark: Completed: Timer Display"
 ```
