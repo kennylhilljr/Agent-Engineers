@@ -1,0 +1,28 @@
+{
+  "name": "agent-dashboard",
+  "version": "1.0.0",
+  "description": "Agent Dashboard with async HTTP and WebSocket support",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "test:headed": "playwright test --headed"
+  },
+  "keywords": [
+    "agent",
+    "dashboard",
+    "websocket",
+    "async",
+    "testing"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "ws": "^8.16.0"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  }
+}
