@@ -77,6 +77,7 @@ from aiohttp_cors import ResourceOptions, setup as cors_setup
 from dashboard.metrics_store import MetricsStore
 from dashboard.logging_config import setup_logging, get_logger, LoggingMiddleware
 from dashboard.performance_metrics import metrics_collector, timed_operation, increment_counter, set_gauge
+from dashboard.config import get_config, DashboardConfig
 
 # Setup structured logging
 setup_logging(log_level=os.getenv("LOG_LEVEL", "INFO"))
@@ -163,41 +164,58 @@ class DashboardServer:
 
     Provides REST endpoints for querying metrics data with CORS support.
     Uses MetricsStore for data persistence.
+
+    Configuration via environment variables (AI-111):
+        DASHBOARD_WEB_PORT: Port for the web dashboard server (default: 8420)
+        DASHBOARD_WS_PORT: Port for WebSocket connections (default: 8421)
+        DASHBOARD_HOST: Host to bind the dashboard server (default: 0.0.0.0)
+        DASHBOARD_AUTH_TOKEN: Bearer token for API authentication (default: none)
+        DASHBOARD_CORS_ORIGINS: Allowed CORS origins (default: *)
     """
 
     def __init__(
         self,
         project_name: str = "agent-status-dashboard",
         metrics_dir: Optional[Path] = None,
-        port: int = 8080,
-        host: str = "127.0.0.1"
+        port: Optional[int] = None,
+        host: Optional[str] = None,
+        use_config: bool = True
     ):
         """Initialize DashboardServer.
 
         Args:
             project_name: Project name for metrics store
             metrics_dir: Directory containing .agent_metrics.json
-            port: HTTP server port
-            host: HTTP server host (default: 127.0.0.1 for localhost-only access)
+            port: HTTP server port (overrides DASHBOARD_WEB_PORT env var)
+            host: HTTP server host (overrides DASHBOARD_HOST env var)
+            use_config: If True, load from environment variables via DashboardConfig
 
         Security Notes:
-            - Default host is 127.0.0.1 (localhost only) for security
-            - Use host="0.0.0.0" to bind to all network interfaces (WARNING: exposes server to network)
+            - Default host is 0.0.0.0 (all interfaces) - override with DASHBOARD_HOST
             - For production, use a reverse proxy (nginx/caddy) with proper TLS/SSL
+            - Set DASHBOARD_AUTH_TOKEN for API authentication
         """
         self.project_name = project_name
         self.metrics_dir = metrics_dir or Path.cwd()
-        self.port = port
-        self.host = host
 
-        # Security warning for 0.0.0.0 binding
-        if host == "0.0.0.0":
-            logger.warning(
-                "SECURITY WARNING: Server is binding to 0.0.0.0 (all network interfaces). "
-                "This exposes the server to your network. "
-                "For production deployment, use a reverse proxy with TLS/SSL. "
-                "For local development, consider using 127.0.0.1 instead."
-            )
+        # Load configuration from environment variables if use_config is True
+        if use_config:
+            config = get_config()
+
+            # Validate configuration
+            is_valid, error_msg = config.validate()
+            if not is_valid:
+                raise ValueError(f"Invalid dashboard configuration: {error_msg}")
+
+            # Use environment config unless overridden by parameters
+            self.port = port or config.web_port
+            self.host = host or config.host
+            self.config = config
+        else:
+            # Legacy mode: use provided port/host only
+            self.port = port or 8080
+            self.host = host or "127.0.0.1"
+            self.config = None
 
         # Initialize metrics store
         self.store = MetricsStore(
@@ -883,18 +901,26 @@ class DashboardServer:
 def main():
     """CLI entry point for dashboard server."""
     parser = argparse.ArgumentParser(
-        description='Agent Status Dashboard HTTP Server',
+        description='Agent Status Dashboard HTTP Server (AI-111)',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Start server on default port 8080
-  python dashboard_server.py
+  # Start server with environment variables (recommended)
+  DASHBOARD_WEB_PORT=8420 DASHBOARD_WS_PORT=8421 python -m dashboard.server
 
-  # Start server on custom port
-  python dashboard_server.py --port 8000
+  # Start server with defaults
+  python -m dashboard.server
 
-  # Specify custom metrics directory
-  python dashboard_server.py --metrics-dir /path/to/metrics
+  # Override environment with CLI args
+  python -m dashboard.server --port 9000 --host localhost
+
+Environment Variables (AI-111 Configuration):
+  DASHBOARD_WEB_PORT     - Port for web dashboard (default: 8420)
+  DASHBOARD_WS_PORT      - Port for WebSocket (default: 8421)
+  DASHBOARD_HOST         - Host to bind (default: 0.0.0.0)
+  DASHBOARD_AUTH_TOKEN   - Bearer token for authentication (default: none)
+  DASHBOARD_CORS_ORIGINS - Allowed CORS origins (default: *)
+  LOG_LEVEL              - Logging level (default: INFO)
 
 API Endpoints:
   GET  /health                    - Health check
@@ -913,15 +939,15 @@ A2UI Components:
     parser.add_argument(
         '--port',
         type=int,
-        default=8080,
-        help='HTTP server port (default: 8080)'
+        default=None,
+        help='HTTP server port (overrides DASHBOARD_WEB_PORT env var)'
     )
 
     parser.add_argument(
         '--host',
         type=str,
-        default='127.0.0.1',
-        help='HTTP server host (default: 127.0.0.1 for localhost-only access; use 0.0.0.0 to expose to network)'
+        default=None,
+        help='HTTP server host (overrides DASHBOARD_HOST env var)'
     )
 
     parser.add_argument(
@@ -945,7 +971,8 @@ A2UI Components:
         project_name=args.project_name,
         metrics_dir=args.metrics_dir,
         port=args.port,
-        host=args.host
+        host=args.host,
+        use_config=True  # Load from environment variables
     )
 
     server.run()
