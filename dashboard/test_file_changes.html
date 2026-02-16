@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Change Summary Test</title>
+    <style>
+        /* Copy styles from dashboard.html */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 12px;
+            padding: 24px;
+            backdrop-filter: blur(10px);
+        }
+
+        .card-header {
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .card-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+
+        .card-icon {
+            width: 24px;
+            height: 24px;
+            color: #60a5fa;
+        }
+
+        /* File Change Summary Component */
+        .file-changes-container {
+            margin-top: 12px;
+        }
+
+        .file-changes-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+        }
+
+        .file-changes-stats {
+            display: flex;
+            gap: 20px;
+            font-size: 0.85rem;
+        }
+
+        .file-stat {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .file-stat-icon {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+        }
+
+        .file-stat-icon.created { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .file-stat-icon.modified { background: rgba(96, 165, 250, 0.2); color: #60a5fa; }
+        .file-stat-icon.deleted { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+
+        .file-stat-label {
+            color: #94a3b8;
+        }
+
+        .file-stat-value {
+            color: #f1f5f9;
+            font-weight: 600;
+        }
+
+        .file-changes-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .file-change-item {
+            background: rgba(15, 23, 42, 0.3);
+            border: 1px solid rgba(148, 163, 184, 0.15);
+            border-radius: 8px;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .file-change-item:hover {
+            border-color: rgba(148, 163, 184, 0.3);
+        }
+
+        .file-change-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .file-change-header:hover {
+            background: rgba(15, 23, 42, 0.5);
+        }
+
+        .file-change-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+        }
+
+        .file-change-type-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .file-change-type-badge.created {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .file-change-type-badge.modified {
+            background: rgba(96, 165, 250, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(96, 165, 250, 0.3);
+        }
+
+        .file-change-type-badge.deleted {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .file-path {
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.85rem;
+            color: #f1f5f9;
+            flex: 1;
+        }
+
+        .file-change-stats {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.8rem;
+            margin-right: 8px;
+        }
+
+        .lines-added {
+            color: #10b981;
+        }
+
+        .lines-removed {
+            color: #ef4444;
+        }
+
+        .expand-icon {
+            width: 20px;
+            height: 20px;
+            color: #94a3b8;
+            transition: transform 0.2s ease;
+        }
+
+        .expand-icon.expanded {
+            transform: rotate(180deg);
+        }
+
+        .file-diff-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .file-diff-content.expanded {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .diff-viewer {
+            padding: 16px;
+            background: rgba(0, 0, 0, 0.3);
+            border-top: 1px solid rgba(148, 163, 184, 0.15);
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.75rem;
+            line-height: 1.5;
+        }
+
+        .diff-line {
+            display: flex;
+            padding: 2px 8px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .diff-line-number {
+            min-width: 50px;
+            color: #64748b;
+            user-select: none;
+            text-align: right;
+            padding-right: 12px;
+        }
+
+        .diff-line-content {
+            flex: 1;
+        }
+
+        .diff-line.added {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+        }
+
+        .diff-line.removed {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+        }
+
+        .diff-line.context {
+            color: #cbd5e1;
+        }
+
+        .diff-line.header {
+            background: rgba(96, 165, 250, 0.1);
+            color: #60a5fa;
+            font-weight: 600;
+        }
+
+        .file-changes-empty {
+            text-align: center;
+            padding: 40px 20px;
+            color: #64748b;
+        }
+
+        .file-changes-empty svg {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 16px;
+            opacity: 0.5;
+        }
+
+        .test-controls {
+            margin-bottom: 20px;
+            padding: 20px;
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 12px;
+        }
+
+        .test-controls h2 {
+            margin-bottom: 16px;
+            color: #60a5fa;
+        }
+
+        .test-controls button {
+            margin-right: 10px;
+            margin-bottom: 10px;
+            padding: 8px 16px;
+            background: #60a5fa;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .test-controls button:hover {
+            background: #3b82f6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="test-controls">
+            <h2>Test Scenarios</h2>
+            <button onclick="testScenario1()">1. With File Changes</button>
+            <button onclick="testScenario2()">2. Empty State</button>
+            <button onclick="testScenario3()">3. Multiple File Types</button>
+            <button onclick="testScenario4()">4. Large Diff</button>
+            <button onclick="testScenario5()">5. All Change Types</button>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <svg class="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    Code Activity - File Changes
+                </h2>
+            </div>
+            <div id="file-changes-container" class="file-changes-container" data-testid="file-changes-container">
+                <div class="loading">
+                    <p>Select a test scenario above...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Copy JavaScript functions from dashboard.html
+        function renderFileChanges(events) {
+            const container = document.getElementById('file-changes-container');
+            if (!container) return;
+
+            const codingEvents = (events || []).filter(e =>
+                e.agent_name === 'coding' &&
+                e.file_changes &&
+                e.file_changes.length > 0
+            );
+
+            if (codingEvents.length === 0) {
+                container.innerHTML = `
+                    <div class="file-changes-empty" data-testid="file-changes-empty">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <p>No file changes yet</p>
+                        <p style="font-size: 0.8rem; margin-top: 8px;">File changes will appear here after a coding task completes</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const latestEvent = codingEvents[codingEvents.length - 1];
+            const fileChanges = latestEvent.file_changes || [];
+
+            const created = fileChanges.filter(f => f.change_type === 'created').length;
+            const modified = fileChanges.filter(f => f.change_type === 'modified').length;
+            const deleted = fileChanges.filter(f => f.change_type === 'deleted').length;
+            const totalAdded = fileChanges.reduce((sum, f) => sum + f.lines_added, 0);
+            const totalRemoved = fileChanges.reduce((sum, f) => sum + f.lines_removed, 0);
+
+            let html = `
+                <div class="file-changes-header">
+                    <div class="file-changes-stats">
+                        <div class="file-stat">
+                            <div class="file-stat-icon created">+</div>
+                            <span class="file-stat-label">Created:</span>
+                            <span class="file-stat-value" data-testid="files-created-count">${created}</span>
+                        </div>
+                        <div class="file-stat">
+                            <div class="file-stat-icon modified">~</div>
+                            <span class="file-stat-label">Modified:</span>
+                            <span class="file-stat-value" data-testid="files-modified-count">${modified}</span>
+                        </div>
+                        <div class="file-stat">
+                            <div class="file-stat-icon deleted">-</div>
+                            <span class="file-stat-label">Deleted:</span>
+                            <span class="file-stat-value" data-testid="files-deleted-count">${deleted}</span>
+                        </div>
+                        <div class="file-stat">
+                            <span class="file-stat-label">Lines:</span>
+                            <span class="file-stat-value">
+                                <span class="lines-added" data-testid="total-lines-added">+${totalAdded}</span>
+                                <span style="color: #94a3b8;"> / </span>
+                                <span class="lines-removed" data-testid="total-lines-removed">-${totalRemoved}</span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="file-changes-list">
+            `;
+
+            fileChanges.forEach((file, index) => {
+                const changeTypeClass = file.change_type;
+                const changeTypeLabel = file.change_type.charAt(0).toUpperCase() + file.change_type.slice(1);
+                const fileId = `file-${index}`;
+
+                html += `
+                    <div class="file-change-item" data-testid="file-change-item">
+                        <div class="file-change-header" onclick="toggleFileDiff('${fileId}')">
+                            <div class="file-change-info">
+                                <span class="file-change-type-badge ${changeTypeClass}" data-testid="file-change-type">${changeTypeLabel}</span>
+                                <span class="file-path" data-testid="file-path">${escapeHtml(file.path)}</span>
+                            </div>
+                            <div class="file-change-stats">
+                                ${file.lines_added > 0 ? `<span class="lines-added">+${file.lines_added}</span>` : ''}
+                                ${file.lines_removed > 0 ? `<span class="lines-removed">-${file.lines_removed}</span>` : ''}
+                            </div>
+                            <svg class="expand-icon" id="${fileId}-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </div>
+                        <div class="file-diff-content" id="${fileId}-content" data-testid="file-diff-content">
+                            <div class="diff-viewer">
+                                ${renderDiff(file.diff, file.language)}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function toggleFileDiff(fileId) {
+            const content = document.getElementById(`${fileId}-content`);
+            const icon = document.getElementById(`${fileId}-icon`);
+
+            if (content && icon) {
+                content.classList.toggle('expanded');
+                icon.classList.toggle('expanded');
+            }
+        }
+
+        function renderDiff(diffText, language) {
+            if (!diffText || diffText.trim() === '') {
+                return '<div class="diff-line context"><span class="diff-line-content">No diff available</span></div>';
+            }
+
+            const lines = diffText.split('\n');
+            let html = '';
+            let lineNumber = 0;
+
+            lines.forEach(line => {
+                let className = 'context';
+                let displayLine = line;
+
+                if (line.startsWith('@@')) {
+                    className = 'header';
+                } else if (line.startsWith('+') && !line.startsWith('+++')) {
+                    className = 'added';
+                    lineNumber++;
+                } else if (line.startsWith('-') && !line.startsWith('---')) {
+                    className = 'removed';
+                } else if (!line.startsWith('+++') && !line.startsWith('---')) {
+                    lineNumber++;
+                }
+
+                const lineNum = className === 'header' || line.startsWith('+++') || line.startsWith('---')
+                    ? ''
+                    : lineNumber || '';
+
+                html += `
+                    <div class="diff-line ${className}">
+                        <span class="diff-line-number">${lineNum}</span>
+                        <span class="diff-line-content">${escapeHtml(displayLine)}</span>
+                    </div>
+                `;
+            });
+
+            return html;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Test scenarios
+        function testScenario1() {
+            const events = [
+                {
+                    agent_name: 'coding',
+                    file_changes: [
+                        {
+                            path: 'src/components/FileChangeSummary.tsx',
+                            change_type: 'created',
+                            lines_added: 150,
+                            lines_removed: 0,
+                            language: 'typescript',
+                            diff: `@@ -0,0 +1,150 @@\n+import React from 'react';\n+import { FileChange } from './types';\n+\n+export const FileChangeSummary = () => {\n+  return (\n+    <div className="file-summary">\n+      <h2>File Changes</h2>\n+    </div>\n+  );\n+};`
+                        },
+                        {
+                            path: 'src/styles/dashboard.css',
+                            change_type: 'modified',
+                            lines_added: 25,
+                            lines_removed: 10,
+                            language: 'css',
+                            diff: `@@ -10,15 +10,30 @@\n-.old-class {\n-  color: red;\n-  background: white;\n-}\n+.new-class {\n+  color: blue;\n+  background: #f0f0f0;\n+  padding: 10px;\n+}`
+                        }
+                    ]
+                }
+            ];
+            renderFileChanges(events);
+        }
+
+        function testScenario2() {
+            renderFileChanges([]);
+        }
+
+        function testScenario3() {
+            const events = [
+                {
+                    agent_name: 'coding',
+                    file_changes: [
+                        { path: 'app.js', change_type: 'created', lines_added: 50, lines_removed: 0, language: 'javascript', diff: '+console.log("JavaScript");' },
+                        { path: 'style.css', change_type: 'modified', lines_added: 20, lines_removed: 5, language: 'css', diff: '+.class { color: blue; }' },
+                        { path: 'index.html', change_type: 'modified', lines_added: 10, lines_removed: 2, language: 'html', diff: '+<div>HTML</div>' },
+                        { path: 'component.tsx', change_type: 'created', lines_added: 100, lines_removed: 0, language: 'typescript', diff: '+const Component = () => {};' }
+                    ]
+                }
+            ];
+            renderFileChanges(events);
+        }
+
+        function testScenario4() {
+            const largeDiff = Array.from({ length: 50 }, (_, i) =>
+                i % 2 === 0 ? `+Added line ${i}` : `-Removed line ${i}`
+            ).join('\n');
+
+            const events = [
+                {
+                    agent_name: 'coding',
+                    file_changes: [
+                        {
+                            path: 'src/large-file.js',
+                            change_type: 'modified',
+                            lines_added: 25,
+                            lines_removed: 25,
+                            language: 'javascript',
+                            diff: largeDiff
+                        }
+                    ]
+                }
+            ];
+            renderFileChanges(events);
+        }
+
+        function testScenario5() {
+            const events = [
+                {
+                    agent_name: 'coding',
+                    file_changes: [
+                        { path: 'new-feature.js', change_type: 'created', lines_added: 75, lines_removed: 0, language: 'javascript', diff: '+// New feature\n+function feature() {}' },
+                        { path: 'existing-file.js', change_type: 'modified', lines_added: 30, lines_removed: 15, language: 'javascript', diff: '-old code\n+new code' },
+                        { path: 'deprecated.js', change_type: 'deleted', lines_added: 0, lines_removed: 50, language: 'javascript', diff: '-deprecated function' }
+                    ]
+                }
+            ];
+            renderFileChanges(events);
+        }
+
+        // Load first scenario by default
+        testScenario1();
+    </script>
+</body>
+</html>
