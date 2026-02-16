@@ -7,7 +7,9 @@ to query agent performance metrics, session summaries, and individual agent deta
 Endpoints:
     GET /api/metrics - Returns complete DashboardState with all metrics
     GET /api/agents/<name> - Returns specific agent profile with detailed stats
-    GET /health - Health check endpoint
+    GET /health - Health check endpoint with detailed system status
+    GET /metrics - Prometheus-formatted metrics endpoint
+    GET /monitoring - Monitoring dashboard HTML page
     WS  /ws - WebSocket endpoint for real-time metrics streaming
 
 CORS Configuration:
@@ -60,8 +62,9 @@ Usage:
 import argparse
 import asyncio
 import json
-import logging
 import os
+import psutil
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Set
@@ -71,13 +74,12 @@ from aiohttp.web import Request, Response, WebSocketResponse, middleware
 from aiohttp_cors import ResourceOptions, setup as cors_setup
 
 from dashboard.metrics_store import MetricsStore
+from dashboard.logging_config import setup_logging, get_logger, LoggingMiddleware
+from dashboard.performance_metrics import metrics_collector, timed_operation, increment_counter, set_gauge
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+# Setup structured logging
+setup_logging(log_level=os.getenv("LOG_LEVEL", "INFO"))
+logger = get_logger(__name__)
 
 
 # Get CORS allowed origins from environment
@@ -228,9 +230,16 @@ class DashboardServer:
         self.app.router.add_get('/api/agents/{agent_name}', self.get_agent)
         self.app.router.add_get('/ws', self.websocket_handler)
 
+        # Monitoring endpoints
+        self.app.router.add_get('/metrics', self.prometheus_metrics)
+        self.app.router.add_get('/monitoring', self.serve_monitoring_dashboard)
+        self.app.router.add_get('/api/system/status', self.system_status)
+
         # OPTIONS for CORS preflight
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/agents/{agent_name}', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/metrics', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/system/status', self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
         """Handle CORS preflight OPTIONS requests."""
@@ -247,22 +256,94 @@ class DashboardServer:
         raise web.HTTPNotFound(text='dashboard.html not found')
 
     async def health_check(self, request: Request) -> Response:
-        """Health check endpoint.
+        """Enhanced health check endpoint with detailed system status.
 
         Returns:
-            JSON response with server status and metrics file info
+            JSON response with comprehensive health information including:
+            - Service status
+            - System metrics (CPU, memory, disk)
+            - Metrics store status
+            - Performance metrics
+            - Uptime
         """
-        stats = self.store.get_stats()
+        with timed_operation("health_check_duration"):
+            increment_counter("health_check_requests")
 
-        return web.json_response({
-            'status': 'ok',
-            'timestamp': datetime.utcnow().isoformat() + 'Z',
-            'project': self.project_name,
-            'metrics_file_exists': stats['metrics_file_exists'],
-            'event_count': stats['event_count'],
-            'session_count': stats['session_count'],
-            'agent_count': stats['agent_count']
-        })
+            try:
+                stats = self.store.get_stats()
+
+                # Get system metrics
+                cpu_percent = psutil.cpu_percent(interval=0.1)
+                memory = psutil.virtual_memory()
+                disk = psutil.disk_usage('/')
+
+                # Get performance metrics
+                perf_metrics = metrics_collector.get_metrics()
+
+                health_data = {
+                    'status': 'healthy',
+                    'timestamp': datetime.utcnow().isoformat() + 'Z',
+                    'version': '1.0.0',
+                    'project': self.project_name,
+
+                    # Service info
+                    'service': {
+                        'name': 'agent-dashboard',
+                        'uptime_seconds': perf_metrics.get('uptime_seconds', 0),
+                        'host': self.host,
+                        'port': self.port,
+                        'websocket_connections': len(self.websockets)
+                    },
+
+                    # System metrics
+                    'system': {
+                        'cpu_percent': round(cpu_percent, 2),
+                        'memory_percent': round(memory.percent, 2),
+                        'memory_used_mb': round(memory.used / (1024 * 1024), 2),
+                        'memory_total_mb': round(memory.total / (1024 * 1024), 2),
+                        'disk_percent': round(disk.percent, 2),
+                        'disk_used_gb': round(disk.used / (1024 * 1024 * 1024), 2),
+                        'disk_total_gb': round(disk.total / (1024 * 1024 * 1024), 2),
+                        'python_version': sys.version.split()[0]
+                    },
+
+                    # Metrics store status
+                    'metrics_store': {
+                        'metrics_file_exists': stats['metrics_file_exists'],
+                        'event_count': stats['event_count'],
+                        'session_count': stats['session_count'],
+                        'agent_count': stats['agent_count'],
+                        'metrics_file_size_bytes': stats.get('metrics_file_size_bytes', 0)
+                    },
+
+                    # Performance summary
+                    'performance': {
+                        'total_requests': perf_metrics.get('counters', {}).get('http_requests_total', [{}])[0].get('value', 0),
+                        'avg_response_time_ms': 0  # Will be populated from histograms
+                    }
+                }
+
+                # Calculate average response time from histogram
+                http_duration_hist = perf_metrics.get('histograms', {}).get('http_request_duration', [])
+                if http_duration_hist:
+                    hist = http_duration_hist[0]
+                    if hist.get('count', 0) > 0:
+                        health_data['performance']['avg_response_time_ms'] = round(hist.get('mean', 0) * 1000, 2)
+
+                increment_counter("health_check_success")
+                logger.info("Health check completed", extra={"status": "healthy"})
+
+                return web.json_response(health_data)
+
+            except Exception as e:
+                increment_counter("health_check_errors")
+                logger.error("Health check failed", exc_info=True, extra={"error": str(e)})
+
+                return web.json_response({
+                    'status': 'unhealthy',
+                    'timestamp': datetime.utcnow().isoformat() + 'Z',
+                    'error': str(e)
+                }, status=503)
 
     async def get_metrics(self, request: Request) -> Response:
         """Get all metrics data.
@@ -377,6 +458,188 @@ class DashboardServer:
                 text=json.dumps({'error': str(e)}),
                 content_type='application/json'
             )
+
+    async def prometheus_metrics(self, request: Request) -> Response:
+        """Prometheus metrics endpoint.
+
+        Returns metrics in Prometheus text format for scraping by Prometheus server.
+
+        Returns:
+            Response with Prometheus-formatted metrics
+        """
+        with timed_operation("prometheus_export_duration"):
+            increment_counter("prometheus_scrapes")
+
+            try:
+                # Export metrics in Prometheus format
+                metrics_text = metrics_collector.export_prometheus()
+
+                # Add custom metrics from dashboard state
+                state = self.store.load()
+
+                # Add dashboard-specific metrics
+                extra_metrics = []
+
+                # Total sessions
+                extra_metrics.append(f"# HELP dashboard_total_sessions Total number of sessions")
+                extra_metrics.append(f"# TYPE dashboard_total_sessions counter")
+                extra_metrics.append(f"dashboard_total_sessions {state['total_sessions']}")
+
+                # Total tokens
+                extra_metrics.append(f"# HELP dashboard_total_tokens Total tokens used")
+                extra_metrics.append(f"# TYPE dashboard_total_tokens counter")
+                extra_metrics.append(f"dashboard_total_tokens {state['total_tokens']}")
+
+                # Total cost
+                extra_metrics.append(f"# HELP dashboard_total_cost_usd Total cost in USD")
+                extra_metrics.append(f"# TYPE dashboard_total_cost_usd counter")
+                extra_metrics.append(f"dashboard_total_cost_usd {state['total_cost_usd']}")
+
+                # Agent metrics
+                for agent_name, agent_data in state['agents'].items():
+                    labels = f'{{agent="{agent_name}"}}'
+
+                    extra_metrics.append(f"# HELP agent_invocations_total Total invocations per agent")
+                    extra_metrics.append(f"# TYPE agent_invocations_total counter")
+                    extra_metrics.append(f"agent_invocations_total{labels} {agent_data['total_invocations']}")
+
+                    extra_metrics.append(f"# HELP agent_success_rate Success rate per agent")
+                    extra_metrics.append(f"# TYPE agent_success_rate gauge")
+                    extra_metrics.append(f"agent_success_rate{labels} {agent_data['success_rate']}")
+
+                # Combine metrics
+                full_metrics = metrics_text + "\n" + "\n".join(extra_metrics)
+
+                increment_counter("prometheus_scrapes_success")
+                logger.debug("Prometheus metrics exported")
+
+                return web.Response(
+                    text=full_metrics,
+                    content_type="text/plain; version=0.0.4"
+                )
+
+            except Exception as e:
+                increment_counter("prometheus_scrapes_errors")
+                logger.error("Error exporting Prometheus metrics", exc_info=True, extra={"error": str(e)})
+                raise web.HTTPInternalServerError(text=f"Error exporting metrics: {str(e)}")
+
+    async def serve_monitoring_dashboard(self, request: Request) -> Response:
+        """Serve the monitoring dashboard HTML page.
+
+        Returns:
+            Response with monitoring dashboard HTML
+        """
+        increment_counter("monitoring_dashboard_views")
+
+        html_path = Path(__file__).parent / 'monitoring.html'
+        if html_path.exists():
+            logger.info("Serving monitoring dashboard")
+            return web.Response(
+                text=html_path.read_text(),
+                content_type='text/html',
+            )
+
+        logger.warning("Monitoring dashboard HTML not found")
+        raise web.HTTPNotFound(text='monitoring.html not found')
+
+    async def system_status(self, request: Request) -> Response:
+        """Get detailed system status information.
+
+        Returns:
+            JSON response with system metrics, logs, and alerts
+        """
+        with timed_operation("system_status_duration"):
+            increment_counter("system_status_requests")
+
+            try:
+                # Get system metrics
+                cpu_percent = psutil.cpu_percent(interval=0.1)
+                cpu_count = psutil.cpu_count()
+                memory = psutil.virtual_memory()
+                disk = psutil.disk_usage('/')
+
+                # Get network stats
+                net_io = psutil.net_io_counters()
+
+                # Get process info
+                process = psutil.Process()
+                process_memory = process.memory_info()
+
+                # Get performance metrics
+                perf_metrics = metrics_collector.get_metrics()
+
+                # Check for alerts
+                alerts = []
+                if cpu_percent > 80:
+                    alerts.append({
+                        "severity": "warning",
+                        "message": f"High CPU usage: {cpu_percent}%",
+                        "timestamp": datetime.utcnow().isoformat() + "Z"
+                    })
+                if memory.percent > 85:
+                    alerts.append({
+                        "severity": "warning",
+                        "message": f"High memory usage: {memory.percent}%",
+                        "timestamp": datetime.utcnow().isoformat() + "Z"
+                    })
+                if disk.percent > 90:
+                    alerts.append({
+                        "severity": "critical",
+                        "message": f"High disk usage: {disk.percent}%",
+                        "timestamp": datetime.utcnow().isoformat() + "Z"
+                    })
+
+                status_data = {
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "status": "healthy" if not alerts else "degraded",
+                    "alerts": alerts,
+
+                    "system": {
+                        "cpu": {
+                            "percent": round(cpu_percent, 2),
+                            "count": cpu_count,
+                            "load_average": list(psutil.getloadavg()) if hasattr(psutil, 'getloadavg') else []
+                        },
+                        "memory": {
+                            "percent": round(memory.percent, 2),
+                            "used_mb": round(memory.used / (1024 * 1024), 2),
+                            "total_mb": round(memory.total / (1024 * 1024), 2),
+                            "available_mb": round(memory.available / (1024 * 1024), 2)
+                        },
+                        "disk": {
+                            "percent": round(disk.percent, 2),
+                            "used_gb": round(disk.used / (1024 * 1024 * 1024), 2),
+                            "total_gb": round(disk.total / (1024 * 1024 * 1024), 2),
+                            "free_gb": round(disk.free / (1024 * 1024 * 1024), 2)
+                        },
+                        "network": {
+                            "bytes_sent": net_io.bytes_sent,
+                            "bytes_recv": net_io.bytes_recv,
+                            "packets_sent": net_io.packets_sent,
+                            "packets_recv": net_io.packets_recv
+                        }
+                    },
+
+                    "process": {
+                        "pid": process.pid,
+                        "memory_mb": round(process_memory.rss / (1024 * 1024), 2),
+                        "cpu_percent": round(process.cpu_percent(interval=0.1), 2),
+                        "num_threads": process.num_threads(),
+                        "num_fds": process.num_fds() if hasattr(process, 'num_fds') else None
+                    },
+
+                    "performance_metrics": perf_metrics
+                }
+
+                increment_counter("system_status_success")
+                logger.info("System status retrieved", extra={"alerts_count": len(alerts)})
+
+                return web.json_response(status_data)
+
+            except Exception as e:
+                increment_counter("system_status_errors")
+                logger.error("Error getting system status", exc_info=True, extra={"error": str(e)})
+                raise web.HTTPInternalServerError(text=json.dumps({'error': str(e)}))
 
     async def websocket_handler(self, request: Request) -> WebSocketResponse:
         """WebSocket endpoint for real-time metrics streaming.
