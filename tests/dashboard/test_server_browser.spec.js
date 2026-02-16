@@ -383,8 +383,17 @@ test.describe('Dashboard Server Browser Tests - AI-102', () => {
         await page.waitForLoadState('networkidle');
 
         // Take screenshot for verification
+        const path = require('path');
+        const screenshotDir = path.join(__dirname, 'screenshots');
+        const fs = require('fs');
+
+        // Create screenshots directory if it doesn't exist
+        if (!fs.existsSync(screenshotDir)) {
+            fs.mkdirSync(screenshotDir, { recursive: true });
+        }
+
         await page.screenshot({
-            path: '/Users/bkh223/Documents/GitHub/agent-engineers/generations/agent-dashboard/.worktrees/coding-0/tests/dashboard/screenshots/dashboard-loaded.png',
+            path: path.join(screenshotDir, 'dashboard-loaded.png'),
             fullPage: true
         });
 

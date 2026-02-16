@@ -12,7 +12,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 from aiohttp import ClientSession, WSMsgType
-from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop
+from aiohttp.test_utils import AioHTTPTestCase
 
 from dashboard.server import DashboardServer
 
@@ -163,7 +163,6 @@ class TestDashboardServerUnit(AioHTTPTestCase):
         if hasattr(self, 'temp_dir'):
             shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    @unittest_run_loop
     async def test_health_check_endpoint(self):
         """Test 1: Verify health check endpoint responds."""
         resp = await self.client.request("GET", "/health")
@@ -178,7 +177,6 @@ class TestDashboardServerUnit(AioHTTPTestCase):
         assert data["session_count"] > 0
         assert data["agent_count"] > 0
 
-    @unittest_run_loop
     async def test_get_metrics_endpoint(self):
         """Test 2: Verify metrics endpoint returns current state."""
         resp = await self.client.request("GET", "/api/metrics")
@@ -191,7 +189,6 @@ class TestDashboardServerUnit(AioHTTPTestCase):
         assert "sessions" in data
         assert len(data["agents"]) >= 2  # coding and linear
 
-    @unittest_run_loop
     async def test_get_agents_endpoint_returns_all_agents(self):
         """Test 3: Verify agents endpoint returns all 13 agents (if they exist)."""
         resp = await self.client.request("GET", "/api/metrics")
@@ -205,7 +202,6 @@ class TestDashboardServerUnit(AioHTTPTestCase):
         assert "coding" in agents
         assert "linear" in agents
 
-    @unittest_run_loop
     async def test_get_specific_agent(self):
         """Test 4: Get specific agent profile."""
         resp = await self.client.request("GET", "/api/agents/coding")
@@ -217,7 +213,6 @@ class TestDashboardServerUnit(AioHTTPTestCase):
         assert data["agent"]["total_invocations"] == 10
         assert data["agent"]["success_rate"] == 0.8
 
-    @unittest_run_loop
     async def test_get_agent_not_found(self):
         """Test 5: Get non-existent agent returns 404."""
         resp = await self.client.request("GET", "/api/agents/nonexistent")
@@ -228,7 +223,6 @@ class TestDashboardServerUnit(AioHTTPTestCase):
         assert data["error"] == "Agent not found"
         assert "available_agents" in data
 
-    @unittest_run_loop
     async def test_get_agent_with_events(self):
         """Test 6: Get agent with events included."""
         resp = await self.client.request("GET", "/api/agents/coding?include_events=1")
@@ -239,7 +233,6 @@ class TestDashboardServerUnit(AioHTTPTestCase):
         assert "recent_events" in data
         assert len(data["recent_events"]) >= 0
 
-    @unittest_run_loop
     async def test_get_metrics_pretty_format(self):
         """Test 7: Verify pretty JSON formatting."""
         resp = await self.client.request("GET", "/api/metrics?pretty")
@@ -250,7 +243,6 @@ class TestDashboardServerUnit(AioHTTPTestCase):
         assert "\n" in text
         assert "  " in text  # Indentation
 
-    @unittest_run_loop
     async def test_cors_headers(self):
         """Test 8: Verify CORS headers are present."""
         resp = await self.client.request("GET", "/api/metrics")
@@ -261,13 +253,11 @@ class TestDashboardServerUnit(AioHTTPTestCase):
         assert "Access-Control-Allow-Methods" in resp.headers
         assert "Access-Control-Allow-Headers" in resp.headers
 
-    @unittest_run_loop
     async def test_options_request(self):
         """Test 9: Verify OPTIONS request for CORS preflight."""
         resp = await self.client.request("OPTIONS", "/api/metrics")
         assert resp.status == 204
 
-    @unittest_run_loop
     async def test_serve_dashboard_html(self):
         """Test 10: Verify static HTML dashboard is served."""
         resp = await self.client.request("GET", "/")
@@ -278,7 +268,6 @@ class TestDashboardServerUnit(AioHTTPTestCase):
             assert len(content) > 0
             assert "html" in content.lower()
 
-    @unittest_run_loop
     async def test_error_handling_invalid_json(self):
         """Test 11: Verify error handling for corrupted metrics file."""
         # Write invalid JSON to metrics file
@@ -290,7 +279,6 @@ class TestDashboardServerUnit(AioHTTPTestCase):
         data = await resp.json()
         assert "error" in data
 
-    @unittest_run_loop
     async def test_multiple_concurrent_connections(self):
         """Test 12: Test server handles multiple concurrent connections."""
         # Make multiple concurrent requests
@@ -304,7 +292,6 @@ class TestDashboardServerUnit(AioHTTPTestCase):
         for resp in responses:
             assert resp.status == 200
 
-    @unittest_run_loop
     async def test_websocket_connection(self):
         """Test 13: Verify WebSocket connection works."""
         async with self.client.ws_connect("/ws") as ws:
@@ -317,7 +304,6 @@ class TestDashboardServerUnit(AioHTTPTestCase):
             assert "data" in data
             assert "timestamp" in data
 
-    @unittest_run_loop
     async def test_websocket_ping_pong(self):
         """Test 14: Verify WebSocket ping/pong."""
         async with self.client.ws_connect("/ws") as ws:
@@ -331,7 +317,6 @@ class TestDashboardServerUnit(AioHTTPTestCase):
             msg = await ws.receive()
             assert msg.data == "pong"
 
-    @unittest_run_loop
     async def test_websocket_broadcast(self):
         """Test 15: Verify WebSocket broadcasts metrics updates."""
         async with self.client.ws_connect("/ws") as ws:
@@ -345,7 +330,6 @@ class TestDashboardServerUnit(AioHTTPTestCase):
             assert data["type"] == "metrics_update"
             assert "data" in data
 
-    @unittest_run_loop
     async def test_agent_profile_completeness(self):
         """Test 16: Verify agent profile has all required fields."""
         resp = await self.client.request("GET", "/api/agents/coding")
@@ -365,7 +349,6 @@ class TestDashboardServerUnit(AioHTTPTestCase):
         for field in required_fields:
             assert field in agent, f"Missing required field: {field}"
 
-    @unittest_run_loop
     async def test_metrics_endpoint_structure(self):
         """Test 17: Verify metrics endpoint returns proper structure."""
         resp = await self.client.request("GET", "/api/metrics")
@@ -382,7 +365,6 @@ class TestDashboardServerUnit(AioHTTPTestCase):
         assert "total_tokens" in data
         assert "total_cost_usd" in data
 
-    @unittest_run_loop
     async def test_session_data_structure(self):
         """Test 18: Verify session data has correct structure."""
         resp = await self.client.request("GET", "/api/metrics")
@@ -400,7 +382,6 @@ class TestDashboardServerUnit(AioHTTPTestCase):
             assert "agents_invoked" in session
             assert "total_tokens" in session
 
-    @unittest_run_loop
     async def test_event_data_structure(self):
         """Test 19: Verify event data has correct structure."""
         resp = await self.client.request("GET", "/api/metrics")
@@ -419,7 +400,6 @@ class TestDashboardServerUnit(AioHTTPTestCase):
             assert "status" in event
             assert "total_tokens" in event
 
-    @unittest_run_loop
     async def test_server_handles_empty_metrics(self):
         """Test 20: Verify server handles empty metrics file gracefully."""
         # Create minimal valid metrics
