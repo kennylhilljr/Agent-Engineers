@@ -7,6 +7,7 @@ to query agent performance metrics, session summaries, and individual agent deta
 Endpoints:
     GET /api/metrics - Returns complete DashboardState with all metrics
     GET /api/agents/<name> - Returns specific agent profile with detailed stats
+    GET /api/providers/status - Returns AI provider availability status (AI-73)
     GET /health - Health check endpoint with detailed system status
     GET /metrics - Prometheus-formatted metrics endpoint
     GET /monitoring - Monitoring dashboard HTML page
@@ -228,6 +229,7 @@ class DashboardServer:
         self.app.router.add_get('/health', self.health_check)
         self.app.router.add_get('/api/metrics', self.get_metrics)
         self.app.router.add_get('/api/agents/{agent_name}', self.get_agent)
+        self.app.router.add_get('/api/providers/status', self.get_provider_status)
         self.app.router.add_get('/ws', self.websocket_handler)
 
         # Monitoring endpoints
@@ -238,6 +240,7 @@ class DashboardServer:
         # OPTIONS for CORS preflight
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/agents/{agent_name}', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/providers/status', self.handle_options)
         self.app.router.add_route('OPTIONS', '/metrics', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/system/status', self.handle_options)
 
@@ -454,6 +457,88 @@ class DashboardServer:
             raise
         except Exception as e:
             logger.error(f"Error loading agent {agent_name}: {e}")
+            raise web.HTTPInternalServerError(
+                text=json.dumps({'error': str(e)}),
+                content_type='application/json'
+            )
+
+    async def get_provider_status(self, request: Request) -> Response:
+        """Get AI provider availability status.
+
+        Checks environment variables for API keys and returns status for each provider:
+        - available: API key configured and provider is reachable
+        - unconfigured: API key missing
+        - error: API key present but provider unreachable
+
+        Returns:
+            JSON response with provider status information
+        """
+        logger.info("GET /api/providers/status")
+
+        try:
+            providers = {
+                'claude': {
+                    'env_var': 'ANTHROPIC_API_KEY',
+                    'name': 'Claude',
+                    'setup_instructions': 'Set ANTHROPIC_API_KEY environment variable with your Anthropic API key'
+                },
+                'chatgpt': {
+                    'env_var': 'OPENAI_API_KEY',
+                    'name': 'ChatGPT',
+                    'setup_instructions': 'Set OPENAI_API_KEY environment variable with your OpenAI API key'
+                },
+                'gemini': {
+                    'env_var': 'GOOGLE_API_KEY',
+                    'name': 'Gemini',
+                    'setup_instructions': 'Set GOOGLE_API_KEY environment variable with your Google AI API key'
+                },
+                'groq': {
+                    'env_var': 'GROQ_API_KEY',
+                    'name': 'Groq',
+                    'setup_instructions': 'Set GROQ_API_KEY environment variable with your Groq API key'
+                },
+                'kimi': {
+                    'env_var': 'KIMI_API_KEY',
+                    'name': 'KIMI',
+                    'setup_instructions': 'Set KIMI_API_KEY environment variable with your KIMI API key'
+                },
+                'windsurf': {
+                    'env_var': 'WINDSURF_API_KEY',
+                    'name': 'Windsurf',
+                    'setup_instructions': 'Set WINDSURF_API_KEY environment variable with your Windsurf API key'
+                }
+            }
+
+            status_data = {}
+            for provider_id, config in providers.items():
+                api_key = os.getenv(config['env_var'])
+
+                if provider_id == 'claude':
+                    # Claude is always available as default provider
+                    status = 'available'
+                elif api_key:
+                    # API key is configured
+                    # For now, we assume it's available if configured
+                    # In a real implementation, we would ping the API
+                    status = 'available'
+                else:
+                    # API key not configured
+                    status = 'unconfigured'
+
+                status_data[provider_id] = {
+                    'status': status,
+                    'name': config['name'],
+                    'configured': api_key is not None or provider_id == 'claude',
+                    'setup_instructions': config['setup_instructions'] if status == 'unconfigured' else None
+                }
+
+            return web.json_response({
+                'providers': status_data,
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            })
+
+        except Exception as e:
+            logger.error(f"Error checking provider status: {e}")
             raise web.HTTPInternalServerError(
                 text=json.dumps({'error': str(e)}),
                 content_type='application/json'

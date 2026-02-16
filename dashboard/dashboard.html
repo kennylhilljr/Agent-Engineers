@@ -1093,6 +1093,116 @@
             border: 1px solid rgba(59, 130, 246, 0.3);
         }
 
+        /* Provider Status Indicator Styles - AI-73 */
+        .provider-status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            cursor: help;
+            transition: all 0.2s ease;
+        }
+
+        .provider-status-indicator:hover {
+            background: rgba(15, 23, 42, 0.9);
+            border-color: rgba(148, 163, 184, 0.4);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        /* Status States */
+        .provider-status-indicator.available .status-dot {
+            background: #10b981;
+            box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+        }
+
+        .provider-status-indicator.available .status-text {
+            color: #10b981;
+        }
+
+        .provider-status-indicator.unconfigured .status-dot {
+            background: #6b7280;
+            box-shadow: 0 0 8px rgba(107, 116, 128, 0.4);
+            animation: none;
+        }
+
+        .provider-status-indicator.unconfigured .status-text {
+            color: #9ca3af;
+        }
+
+        .provider-status-indicator.error .status-dot {
+            background: #ef4444;
+            box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+        }
+
+        .provider-status-indicator.error .status-text {
+            color: #ef4444;
+        }
+
+        .status-text {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        /* Tooltip Styles */
+        .provider-status-indicator .tooltip {
+            visibility: hidden;
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(-8px);
+            background: rgba(15, 23, 42, 0.98);
+            color: #f1f5f9;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 400;
+            white-space: nowrap;
+            z-index: 1000;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+
+        .provider-status-indicator:hover .tooltip {
+            visibility: visible;
+            opacity: 1;
+            transform: translateX(-50%) translateY(-12px);
+        }
+
+        .provider-status-indicator .tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: rgba(15, 23, 42, 0.98);
+        }
+
         .model-selector-container {
             display: flex;
             align-items: center;
@@ -1418,6 +1528,10 @@
                         <option value="kimi" data-testid="provider-option-kimi">KIMI</option>
                         <option value="windsurf" data-testid="provider-option-windsurf">Windsurf</option>
                     </select>
+                    <div class="provider-status-indicator" id="provider-status-indicator" data-testid="provider-status-indicator" title="Checking status...">
+                        <span class="status-dot" data-testid="status-dot"></span>
+                        <span class="status-text" data-testid="status-text">Checking...</span>
+                    </div>
                     <span class="provider-badge" id="provider-badge" data-testid="provider-badge">Claude</span>
                 </div>
                 <div class="model-selector-container">
@@ -2669,9 +2783,11 @@
                 this.providerBadge = document.getElementById('provider-badge');
                 this.modelSelector = document.getElementById('ai-model-selector');
                 this.modelBadge = document.getElementById('model-badge');
+                this.providerStatusIndicator = document.getElementById('provider-status-indicator');
                 this.messages = [];
                 this.selectedProvider = 'claude';
                 this.selectedModel = 'haiku-4.5';
+                this.providerStatuses = {};
 
                 // Provider-Model mapping
                 this.providerModels = {
@@ -2735,6 +2851,12 @@
                 if (this.modelSelector) {
                     this.modelSelector.addEventListener('change', (e) => this.handleModelChange(e));
                 }
+
+                // Load provider status (AI-73)
+                this.loadProviderStatus();
+
+                // Refresh provider status every 30 seconds
+                setInterval(() => this.loadProviderStatus(), 30000);
             }
 
             loadSavedProvider() {
@@ -2768,6 +2890,9 @@
 
                 // Update badge
                 this.updateProviderBadge(newProvider);
+
+                // Update provider status indicator (AI-73)
+                this.updateProviderStatusIndicator(newProvider);
 
                 // Update model dropdown for new provider
                 this.updateModelDropdown(newProvider);
@@ -2859,6 +2984,68 @@
                 const models = this.providerModels[provider] || [];
                 const defaultModel = models.find(m => m.isDefault);
                 return defaultModel ? defaultModel.id : (models[0] ? models[0].id : null);
+            }
+
+            // AI-73: Provider Status Indicators
+            async loadProviderStatus() {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/providers/status`);
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch provider status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    this.providerStatuses = data.providers;
+
+                    // Update the status indicator for the currently selected provider
+                    this.updateProviderStatusIndicator(this.selectedProvider);
+                } catch (error) {
+                    console.error('Error loading provider status:', error);
+                    // Show error state if API fails
+                    this.updateProviderStatusIndicator(this.selectedProvider, 'error', 'Unable to check status');
+                }
+            }
+
+            updateProviderStatusIndicator(provider, forceStatus = null, forceMessage = null) {
+                if (!this.providerStatusIndicator) return;
+
+                const status = forceStatus || (this.providerStatuses[provider]?.status || 'unconfigured');
+                const providerData = this.providerStatuses[provider] || {};
+
+                // Update classes
+                this.providerStatusIndicator.className = 'provider-status-indicator ' + status;
+                this.providerStatusIndicator.setAttribute('data-status', status);
+
+                // Update status text
+                const statusText = this.providerStatusIndicator.querySelector('.status-text');
+                if (statusText) {
+                    if (forceMessage) {
+                        statusText.textContent = forceMessage;
+                    } else {
+                        statusText.textContent = status === 'available' ? 'Available' :
+                                                 status === 'unconfigured' ? 'Unconfigured' :
+                                                 status === 'error' ? 'Error' : 'Unknown';
+                    }
+                }
+
+                // Update tooltip
+                let tooltip = this.providerStatusIndicator.querySelector('.tooltip');
+                if (!tooltip) {
+                    tooltip = document.createElement('div');
+                    tooltip.className = 'tooltip';
+                    tooltip.setAttribute('data-testid', 'status-tooltip');
+                    this.providerStatusIndicator.appendChild(tooltip);
+                }
+
+                if (status === 'available') {
+                    tooltip.textContent = `${providerData.name || provider} is configured and ready to use`;
+                } else if (status === 'unconfigured') {
+                    tooltip.textContent = providerData.setup_instructions || `Configure ${providerData.name || provider} API key`;
+                } else if (status === 'error') {
+                    tooltip.textContent = forceMessage || `${providerData.name || provider} is configured but unreachable`;
+                }
+
+                this.providerStatusIndicator.setAttribute('title', tooltip.textContent);
             }
 
             loadSavedModel() {
@@ -3061,6 +3248,7 @@
 
         function initChat() {
             chatInterface = new ChatInterface();
+            window.chatInterface = chatInterface; // Expose for testing
             console.log('Chat interface initialized');
         }
 
