@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Change Summary Test - AI-100</title>
+    <!-- Highlight.js for syntax highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 30px;
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .card {
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .card-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+
+        .card-content {
+            padding: 20px;
+        }
+
+        /* Chat Interface Styles */
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            min-height: 600px;
+            gap: 16px;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 16px;
+            background: rgba(15, 23, 42, 0.3);
+            border-radius: 8px;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .chat-message {
+            display: flex;
+            gap: 8px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .chat-message.ai {
+            justify-content: flex-start;
+        }
+
+        .chat-message-content {
+            max-width: 90%;
+            padding: 10px 14px;
+            border-radius: 8px;
+            word-wrap: break-word;
+            font-size: 0.95rem;
+            line-height: 1.4;
+            background: rgba(148, 163, 184, 0.15);
+            color: #e2e8f0;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .chat-timestamp {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 4px;
+        }
+
+        /* File Change Summary Styles */
+        .file-change-summary {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 10px 0;
+            max-width: 100%;
+        }
+
+        .file-change-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .file-change-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #60a5fa;
+        }
+
+        .file-change-stats {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: rgba(148, 163, 184, 0.1);
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+
+        .stat-label {
+            color: #94a3b8;
+            font-weight: 600;
+        }
+
+        .stat-value {
+            color: #f1f5f9;
+            font-weight: 700;
+        }
+
+        .stat-item.added {
+            background: rgba(16, 185, 129, 0.15);
+        }
+
+        .stat-item.added .stat-label {
+            color: #10b981;
+        }
+
+        .stat-item.added .stat-value {
+            color: #a6e3a1;
+        }
+
+        .stat-item.deleted {
+            background: rgba(239, 68, 68, 0.15);
+        }
+
+        .stat-item.deleted .stat-label {
+            color: #ef4444;
+        }
+
+        .stat-item.deleted .stat-value {
+            color: #f87171;
+        }
+
+        .file-change-content {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .file-category {
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.15);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .category-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #e2e8f0;
+        }
+
+        .category-icon {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .category-icon-created {
+            background: #10b981;
+        }
+
+        .category-icon-modified {
+            background: #f59e0b;
+        }
+
+        .category-icon-deleted {
+            background: #ef4444;
+        }
+
+        .category-files {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .file-item {
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            border-radius: 6px;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .file-item:hover {
+            border-color: rgba(148, 163, 184, 0.3);
+        }
+
+        .file-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .file-header:hover {
+            background: rgba(148, 163, 184, 0.05);
+        }
+
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+        }
+
+        .file-expand-icon {
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #94a3b8;
+            font-size: 0.7rem;
+            transition: transform 0.2s ease;
+        }
+
+        .file-expand-icon.expanded {
+            transform: rotate(90deg);
+        }
+
+        .file-path {
+            color: #e2e8f0;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.9rem;
+            word-break: break-all;
+        }
+
+        .file-stats {
+            display: flex;
+            gap: 8px;
+        }
+
+        .stat-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            font-family: monospace;
+        }
+
+        .stat-badge.added {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+
+        .stat-badge.deleted {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .file-diff {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            background: #1e1e1e;
+            border-top: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .file-diff.expanded {
+            max-height: 1000px;
+            overflow-y: auto;
+        }
+
+        .diff-content {
+            padding: 0;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+
+        .diff-line {
+            display: flex;
+            padding: 2px 12px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .diff-line.hunk-header {
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            font-weight: 600;
+            padding: 6px 12px;
+        }
+
+        .diff-line.added {
+            background: rgba(16, 185, 129, 0.12);
+            color: #a6e3a1;
+        }
+
+        .diff-line.deleted {
+            background: rgba(239, 68, 68, 0.12);
+            color: #f87171;
+        }
+
+        .diff-line.context {
+            background: transparent;
+            color: #cbd5e1;
+        }
+
+        .diff-indicator {
+            display: inline-block;
+            width: 20px;
+            margin-right: 8px;
+            text-align: center;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .diff-line.added .diff-indicator {
+            color: #10b981;
+        }
+
+        .diff-line.deleted .diff-indicator {
+            color: #ef4444;
+        }
+
+        .diff-line.context .diff-indicator {
+            color: #64748b;
+        }
+
+        .diff-empty {
+            padding: 20px;
+            text-align: center;
+            color: #64748b;
+            font-style: italic;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #64748b;
+        }
+
+        /* Test Controls */
+        .test-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .test-btn {
+            padding: 10px 16px;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .test-btn:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            transform: translateY(-2px);
+        }
+
+        .test-btn:active {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>File Change Summary Test</h1>
+            <p>AI-100: File Change Summary - List of Created/Modified/Deleted Files</p>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Test Controls</h2>
+            </div>
+            <div class="card-content">
+                <div class="test-controls">
+                    <button class="test-btn" onclick="testFileChanges()" data-testid="trigger-file-changes">
+                        Show File Changes
+                    </button>
+                    <button class="test-btn" onclick="testEmptyChanges()" data-testid="trigger-empty-changes">
+                        Show Empty State
+                    </button>
+                    <button class="test-btn" onclick="testLargeChanges()" data-testid="trigger-large-changes">
+                        Show Large Changes
+                    </button>
+                    <button class="test-btn" onclick="clearChat()" data-testid="clear-chat">
+                        Clear Chat
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Chat Interface with File Changes</h2>
+            </div>
+            <div class="card-content">
+                <div id="chat-container" class="chat-container">
+                    <div id="chat-messages" class="chat-messages">
+                        <div class="chat-welcome">
+                            <p>Click a test button above to see file change summaries</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include JavaScript modules -->
+    <script src="./file-change-summary.js"></script>
+    <script src="./chat-interface.js"></script>
+    <script>
+        // Initialize
+        let chatInterface;
+        let fileChangeSummary;
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+
+        function init() {
+            chatInterface = new ChatInterface();
+            fileChangeSummary = new FileChangeSummary();
+
+            // Make them globally available
+            window.chatInterface = chatInterface;
+            window.fileChangeSummary = fileChangeSummary;
+        }
+
+        function testFileChanges() {
+            chatInterface.addMessage('Showing file changes from recent coding delegation...', 'ai');
+
+            setTimeout(() => {
+                chatInterface.addFileChangeSummary({
+                    files: [
+                        {
+                            path: 'src/components/Dashboard.tsx',
+                            changeType: 'modified',
+                            linesAdded: 42,
+                            linesRemoved: 15,
+                            diffContent: `@@ -10,7 +10,12 @@ import React from 'react';
+-const Dashboard = () => {
++const Dashboard: React.FC = () => {
++  const [metrics, setMetrics] = useState([]);
++
++  useEffect(() => {
++    fetchMetrics();
++  }, []);
++
+   return (
+-    <div className="dashboard">
++    <div className="dashboard-container">
++      <h1>Agent Dashboard</h1>
+       <MetricsPanel />
+     </div>
+   );`,
+                            language: 'typescript',
+                            id: 'file-src-components-Dashboard-tsx'
+                        },
+                        {
+                            path: 'src/utils/helpers.js',
+                            changeType: 'created',
+                            linesAdded: 23,
+                            linesRemoved: 0,
+                            diffContent: `@@ -0,0 +1,23 @@
++/**
++ * Format date to locale string
++ */
++export function formatDate(date) {
++  return new Date(date).toLocaleDateString();
++}
++
++/**
++ * Calculate metrics from data array
++ */
++export function calculateMetrics(data) {
++  const total = data.reduce((sum, val) => sum + val, 0);
++  return {
++    total,
++    average: total / data.length,
++    count: data.length
++  };
++}
++
++export function parseJSON(str) {
++  try { return JSON.parse(str); }
++  catch (e) { return null; }
++}`,
+                            language: 'javascript',
+                            id: 'file-src-utils-helpers-js'
+                        },
+                        {
+                            path: 'src/legacy/oldComponent.jsx',
+                            changeType: 'deleted',
+                            linesAdded: 0,
+                            linesRemoved: 67,
+                            diffContent: `@@ -1,67 +0,0 @@
+-import React from 'react';
+-
+-/**
+- * @deprecated This component is no longer used
+- */
+-export default function OldComponent() {
+-  return (
+-    <div className="old-component">
+-      <h2>Legacy Feature</h2>
+-      <p>This has been replaced by the new Dashboard</p>
+-    </div>
+-  );
+-}`,
+                            language: 'javascript',
+                            id: 'file-src-legacy-oldComponent-jsx'
+                        }
+                    ]
+                });
+            }, 500);
+        }
+
+        function testEmptyChanges() {
+            chatInterface.addMessage('Checking for file changes...', 'ai');
+
+            setTimeout(() => {
+                chatInterface.addFileChangeSummary({
+                    files: []
+                });
+            }, 500);
+        }
+
+        function testLargeChanges() {
+            chatInterface.addMessage('Showing extensive file changes from major refactor...', 'ai');
+
+            setTimeout(() => {
+                chatInterface.addFileChangeSummary({
+                    files: [
+                        {
+                            path: 'src/api/client.ts',
+                            changeType: 'created',
+                            linesAdded: 156,
+                            linesRemoved: 0,
+                            diffContent: `@@ -0,0 +1,156 @@
++import axios from 'axios';
++
++export class APIClient {
++  constructor(baseURL: string) {
++    this.client = axios.create({ baseURL });
++  }
++
++  async get(endpoint: string) {
++    return this.client.get(endpoint);
++  }
++}`,
+                            language: 'typescript',
+                            id: 'file-src-api-client-ts'
+                        },
+                        {
+                            path: 'src/components/MetricsPanel.tsx',
+                            changeType: 'modified',
+                            linesAdded: 89,
+                            linesRemoved: 34,
+                            diffContent: `@@ -15,12 +15,25 @@ import { MetricsData } from '../types';
+-export function MetricsPanel(props) {
++export function MetricsPanel({ data, onRefresh }: MetricsPanelProps) {
++  const [loading, setLoading] = useState(false);
++
++  const handleRefresh = async () => {
++    setLoading(true);
++    await onRefresh();
++    setLoading(false);
++  };
++
+   return (
+-    <div className="metrics">
+-      {props.data.map(item => <div>{item}</div>)}
++    <div className="metrics-panel">
++      <button onClick={handleRefresh} disabled={loading}>
++        Refresh
++      </button>
++      {data.map(item => (
++        <MetricCard key={item.id} data={item} />
++      ))}
+     </div>
+   );
+ }`,
+                            language: 'typescript',
+                            id: 'file-src-components-MetricsPanel-tsx'
+                        },
+                        {
+                            path: 'README.md',
+                            changeType: 'modified',
+                            linesAdded: 12,
+                            linesRemoved: 3,
+                            diffContent: `@@ -1,10 +1,19 @@
+ # Agent Dashboard
+
+-A simple dashboard for agent monitoring.
++A comprehensive dashboard for monitoring AI agent performance and metrics.
++
++## Features
++
++- Real-time metrics tracking
++- File change summaries
++- Interactive chat interface
++- Syntax-highlighted code blocks
+
+ ## Installation
+
++\`\`\`bash
+ npm install
++npm start
++\`\`\``,
+                            language: 'markdown',
+                            id: 'file-README-md'
+                        },
+                        {
+                            path: 'tests/setup.js',
+                            changeType: 'deleted',
+                            linesAdded: 0,
+                            linesRemoved: 45,
+                            diffContent: `@@ -1,45 +0,0 @@
+-// Old test setup - migrated to setup.ts
+-const { configure } = require('@testing-library/react');
+-
+-configure({ testIdAttribute: 'data-testid' });`,
+                            language: 'javascript',
+                            id: 'file-tests-setup-js'
+                        }
+                    ]
+                });
+            }, 500);
+        }
+
+        function clearChat() {
+            chatInterface.clearMessages();
+        }
+    </script>
+</body>
+</html>

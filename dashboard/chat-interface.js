@@ -155,19 +155,34 @@ class ChatInterface {
         }, 800);
     }
 
-    addMessage(text, sender, type = 'message') {
+    addMessage(text, sender, type = 'message', metadata = null) {
         const message = {
             id: Date.now(),
             text,
             sender,
             timestamp: new Date(),
-            type: type // 'message', 'system', 'error', etc.
+            type: type, // 'message', 'system', 'error', 'file-changes', etc.
+            metadata: metadata // Additional data (e.g., file changes)
         };
 
         this.messages.push(message);
         this.history.saveMessages(this.messages);
         this.renderMessage(message);
         this.scrollToBottom();
+    }
+
+    /**
+     * Add a file change summary message
+     * @param {Object} changeData - File change data with files array
+     */
+    addFileChangeSummary(changeData) {
+        if (!window.fileChangeSummary) {
+            console.error('FileChangeSummary instance not available');
+            return;
+        }
+
+        const summaryHtml = window.fileChangeSummary.createSummary(changeData);
+        this.addMessage(summaryHtml, 'ai', 'file-changes', changeData);
     }
 
     renderMessage(message) {
@@ -188,19 +203,25 @@ class ChatInterface {
             minute: '2-digit'
         });
 
-        // Parse message for code blocks and render appropriately
-        const messageContent = this.parseMessageContent(message.text);
-
         let contentHtml = '';
-        messageContent.forEach(part => {
-            if (part.type === 'text') {
-                contentHtml += `<div class="chat-message-content">${this.escapeHtml(part.content)}</div>`;
-            } else if (part.type === 'code') {
-                contentHtml += this.renderCodeBlock(part.content, part.language, part.filePath);
-            } else if (part.type === 'diff') {
-                contentHtml += this.renderDiffBlock(part.content, part.language, part.filePath);
-            }
-        });
+
+        // Handle file-changes type separately
+        if (message.type === 'file-changes') {
+            contentHtml = message.text; // Already HTML from FileChangeSummary
+        } else {
+            // Parse message for code blocks and render appropriately
+            const messageContent = this.parseMessageContent(message.text);
+
+            messageContent.forEach(part => {
+                if (part.type === 'text') {
+                    contentHtml += `<div class="chat-message-content">${this.escapeHtml(part.content)}</div>`;
+                } else if (part.type === 'code') {
+                    contentHtml += this.renderCodeBlock(part.content, part.language, part.filePath);
+                } else if (part.type === 'diff') {
+                    contentHtml += this.renderDiffBlock(part.content, part.language, part.filePath);
+                }
+            });
+        }
 
         content.innerHTML = contentHtml + `<div class="chat-timestamp">${timeStr}</div>`;
 
@@ -425,6 +446,46 @@ class ChatInterface {
 
         if ((lower.includes('change') || lower.includes('diff') || lower.includes('modify')) && lower.includes('code')) {
             return 'Here\'s a code change example:\n\n```diff\n@example.py\n- def old_function():\n-     return "old value"\n+ def new_function():\n+     return "new value"\n+     # Added new functionality\n```\n\nThe diff shows additions (green +) and deletions (red -).';
+        }
+
+        if (lower.includes('file') && (lower.includes('change') || lower.includes('summary'))) {
+            // Trigger file change summary demo
+            setTimeout(() => {
+                if (window.chatInterface && window.fileChangeSummary) {
+                    window.chatInterface.addFileChangeSummary({
+                        files: [
+                            {
+                                path: 'src/components/Dashboard.tsx',
+                                changeType: 'modified',
+                                linesAdded: 42,
+                                linesRemoved: 15,
+                                diffContent: `@@ -10,7 +10,7 @@ import React from 'react';\n-const Dashboard = () => {\n+const Dashboard: React.FC = () => {\n   return (\n-    <div className="dashboard">\n+    <div className="dashboard-container">\n+      <h1>Agent Dashboard</h1>\n       <MetricsPanel />\n     </div>\n   );`,
+                                language: 'typescript',
+                                id: 'file-src-components-Dashboard-tsx'
+                            },
+                            {
+                                path: 'src/utils/helpers.js',
+                                changeType: 'created',
+                                linesAdded: 23,
+                                linesRemoved: 0,
+                                diffContent: `@@ -0,0 +1,23 @@\n+export function formatDate(date) {\n+  return new Date(date).toLocaleDateString();\n+}\n+\n+export function calculateMetrics(data) {\n+  const total = data.reduce((sum, val) => sum + val, 0);\n+  return {\n+    total,\n+    average: total / data.length,\n+    count: data.length\n+  };\n+}`,
+                                language: 'javascript',
+                                id: 'file-src-utils-helpers-js'
+                            },
+                            {
+                                path: 'src/legacy/oldComponent.jsx',
+                                changeType: 'deleted',
+                                linesAdded: 0,
+                                linesRemoved: 67,
+                                diffContent: `@@ -1,67 +0,0 @@\n-import React from 'react';\n-\n-// This component is deprecated\n-export default function OldComponent() {\n-  return <div>Legacy</div>;\n-}`,
+                                language: 'javascript',
+                                id: 'file-src-legacy-oldComponent-jsx'
+                            }
+                        ]
+                    });
+                }
+            }, 100);
+            return 'I\'ll show you a file change summary...';
         }
 
         if (lower.includes('status') || lower.includes('how')) {
