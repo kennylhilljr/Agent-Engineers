@@ -74,6 +74,8 @@ from aiohttp import web, WSMsgType
 from aiohttp.web import Request, Response, WebSocketResponse, middleware
 from aiohttp_cors import ResourceOptions, setup as cors_setup
 
+from dashboard.collector import AgentMetricsCollector
+from dashboard.metrics import AgentEvent
 from dashboard.metrics_store import MetricsStore
 from dashboard.logging_config import setup_logging, get_logger, LoggingMiddleware
 from dashboard.performance_metrics import metrics_collector, timed_operation, increment_counter, set_gauge
@@ -223,10 +225,23 @@ class DashboardServer:
             metrics_dir=self.metrics_dir
         )
 
+        # Initialize metrics collector for event broadcasting
+        self.collector = AgentMetricsCollector(
+            project_name=project_name,
+            metrics_dir=self.metrics_dir
+        )
+
+        # Subscribe to collector events for real-time broadcasting
+        self.collector.subscribe(self._on_collector_event)
+
         # WebSocket connections tracking
         self.websockets: Set[WebSocketResponse] = set()
         self.broadcast_task: Optional[asyncio.Task] = None
         self.broadcast_interval = 5  # seconds
+
+        # Event queue for immediate broadcasts
+        self.event_queue: asyncio.Queue = asyncio.Queue()
+        self.event_broadcast_task: Optional[asyncio.Task] = None
 
         # Create app with middlewares
         self.app = web.Application(middlewares=[error_middleware, cors_middleware])
@@ -236,6 +251,7 @@ class DashboardServer:
 
         # Setup WebSocket broadcasting
         self.app.on_startup.append(self._start_broadcast)
+        self.app.on_startup.append(self._start_event_broadcast)
         self.app.on_cleanup.append(self._cleanup_websockets)
 
         logger.info(f"Dashboard server initialized for project: {project_name}")
@@ -838,22 +854,92 @@ class DashboardServer:
             except Exception as e:
                 logger.error(f"Error in broadcast loop: {e}")
 
+    def _on_collector_event(self, event_type: str, event: AgentEvent) -> None:
+        """Callback for collector events.
+
+        This is called synchronously by the collector. We queue the event
+        for async broadcasting to avoid blocking the collector.
+
+        Args:
+            event_type: Type of event ("task_started", "task_completed", "task_failed")
+            event: The event data
+        """
+        try:
+            # Queue the event for async broadcasting
+            self.event_queue.put_nowait((event_type, event))
+        except Exception as e:
+            logger.error(f"Error queueing collector event: {e}")
+
+    async def _broadcast_collector_events(self):
+        """Process and broadcast collector events to WebSocket clients."""
+        while True:
+            try:
+                # Wait for events from the collector
+                event_type, event = await self.event_queue.get()
+
+                if not self.websockets:
+                    continue
+
+                # Prepare broadcast message
+                message = {
+                    'type': 'agent_event',
+                    'event_type': event_type,
+                    'timestamp': datetime.utcnow().isoformat() + 'Z',
+                    'event': event
+                }
+
+                # Broadcast to all connected clients
+                disconnected = set()
+                for ws in self.websockets:
+                    try:
+                        await ws.send_json(message)
+                        logger.info(f"Broadcast {event_type} event to WebSocket {id(ws)}")
+                    except Exception as e:
+                        logger.error(f"Error broadcasting event to WebSocket {id(ws)}: {e}")
+                        disconnected.add(ws)
+
+                # Remove disconnected clients
+                self.websockets -= disconnected
+                if disconnected:
+                    logger.info(f"Removed {len(disconnected)} disconnected WebSocket clients")
+
+            except asyncio.CancelledError:
+                logger.info("Event broadcast task cancelled")
+                break
+            except Exception as e:
+                logger.error(f"Error in event broadcast loop: {e}")
+
     async def _start_broadcast(self, app):
         """Start the periodic metrics broadcast task."""
         self.broadcast_task = asyncio.create_task(self._broadcast_metrics())
         logger.info(f"WebSocket broadcast started (interval: {self.broadcast_interval}s)")
 
+    async def _start_event_broadcast(self, app):
+        """Start the event broadcast task for real-time updates."""
+        self.event_broadcast_task = asyncio.create_task(self._broadcast_collector_events())
+        logger.info("Real-time event broadcast started")
+
     async def _cleanup_websockets(self, app):
         """Clean up all WebSocket connections on shutdown."""
         logger.info("Cleaning up WebSocket connections...")
 
-        # Cancel broadcast task
+        # Cancel broadcast tasks
         if self.broadcast_task:
             self.broadcast_task.cancel()
             try:
                 await self.broadcast_task
             except asyncio.CancelledError:
                 pass
+
+        if self.event_broadcast_task:
+            self.event_broadcast_task.cancel()
+            try:
+                await self.event_broadcast_task
+            except asyncio.CancelledError:
+                pass
+
+        # Unsubscribe from collector events
+        self.collector.unsubscribe(self._on_collector_event)
 
         # Close all active connections
         for ws in self.websockets:

@@ -28,7 +28,7 @@ import time
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Callable, Literal, Optional
 
 from dashboard.metrics import AgentEvent, AgentProfile, DashboardState, FileChange, SessionSummary
 from dashboard.metrics_store import MetricsStore
@@ -361,6 +361,9 @@ class AgentMetricsCollector:
         # Active session tracking
         self._active_sessions: dict[str, dict] = {}
 
+        # Event broadcasting callbacks
+        self._event_callbacks: list[Callable[[str, AgentEvent], None]] = []
+
     def start_session(
         self,
         session_type: Literal["initializer", "continuation"] = "initializer"
@@ -486,6 +489,28 @@ class AgentMetricsCollector:
             started_at=started_at,
         )
 
+        # Create initial event for "task_started" broadcast
+        initial_event: AgentEvent = {
+            "event_id": event_id,
+            "agent_name": agent_name,
+            "session_id": session_id,
+            "ticket_key": ticket_key,
+            "started_at": started_at,
+            "ended_at": "",  # Not ended yet
+            "duration_seconds": 0.0,
+            "status": "success",  # Optimistic status
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "estimated_cost_usd": 0.0,
+            "artifacts": [],
+            "error_message": "",
+            "model_used": model_used,
+        }
+
+        # Broadcast task started
+        self._broadcast_event("task_started", initial_event)
+
         try:
             # Yield tracker to caller
             yield tracker
@@ -499,6 +524,12 @@ class AgentMetricsCollector:
             # Always record the event (success or failure)
             event = tracker.finalize()
             self._record_event(event, session_id)
+
+            # Broadcast task completion or failure
+            if event["status"] == "success":
+                self._broadcast_event("task_completed", event)
+            else:
+                self._broadcast_event("task_failed", event)
 
             # End temporary session
             if temp_session:
@@ -554,6 +585,47 @@ class AgentMetricsCollector:
             Current DashboardState
         """
         return self.store.load()
+
+    def subscribe(self, callback: Callable[[str, AgentEvent], None]) -> None:
+        """Subscribe to agent event notifications.
+
+        The callback will be invoked whenever an agent event is recorded.
+        Callbacks receive the event type and the event data.
+
+        Event types:
+        - "task_started": When an agent task begins
+        - "task_completed": When an agent task finishes successfully
+        - "task_failed": When an agent task fails
+
+        Args:
+            callback: Function that takes (event_type: str, event: AgentEvent)
+        """
+        if callback not in self._event_callbacks:
+            self._event_callbacks.append(callback)
+
+    def unsubscribe(self, callback: Callable[[str, AgentEvent], None]) -> None:
+        """Unsubscribe from agent event notifications.
+
+        Args:
+            callback: Previously registered callback function
+        """
+        if callback in self._event_callbacks:
+            self._event_callbacks.remove(callback)
+
+    def _broadcast_event(self, event_type: str, event: AgentEvent) -> None:
+        """Broadcast an event to all registered callbacks.
+
+        Args:
+            event_type: Type of event ("task_started", "task_completed", "task_failed")
+            event: The event data
+        """
+        for callback in self._event_callbacks:
+            try:
+                callback(event_type, event)
+            except Exception as e:
+                # Don't let callback errors break the collector
+                import logging
+                logging.error(f"Error in event callback: {e}")
 
 
 def capture_git_file_changes(repo_path: Optional[Path] = None) -> list[FileChange]:
