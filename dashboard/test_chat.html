@@ -3,10 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat Interface Test - AI-68 & AI-70</title>
-    <!-- Highlight.js for syntax highlighting (AI-70) -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <title>Chat Interface Test - AI-68</title>
     <style>
         * {
             margin: 0;
@@ -173,6 +170,68 @@
             margin-top: 4px;
         }
 
+        /* Provider Selector Styles */
+        .provider-selector-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            padding: 12px;
+            background: rgba(15, 23, 42, 0.4);
+            border-radius: 8px;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .provider-selector-label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #94a3b8;
+            white-space: nowrap;
+        }
+
+        .provider-selector {
+            flex: 1;
+            padding: 8px 12px;
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            border-radius: 8px;
+            color: #f1f5f9;
+            font-size: 0.9rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .provider-selector:hover {
+            border-color: #3b82f6;
+            background: rgba(15, 23, 42, 0.9);
+        }
+
+        .provider-selector:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+        }
+
+        .provider-selector option {
+            background: #1e293b;
+            color: #f1f5f9;
+            padding: 8px;
+        }
+
+        .provider-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
         .chat-input-area {
             display: flex;
             gap: 8px;
@@ -272,188 +331,6 @@
                 opacity: 1;
             }
         }
-
-        /* Code Block Styling (AI-70) */
-        .code-block-wrapper {
-            margin: 8px 0;
-            max-width: 90%;
-        }
-
-        .code-block-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 12px;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 6px 6px 0 0;
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            border-bottom: none;
-        }
-
-        .code-block-language {
-            font-size: 0.85rem;
-            color: #94a3b8;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .code-block-filepath {
-            font-size: 0.8rem;
-            color: #64748b;
-            font-family: monospace;
-            max-width: 300px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .copy-button {
-            padding: 6px 12px;
-            background: rgba(59, 130, 246, 0.2);
-            color: #60a5fa;
-            border: 1px solid rgba(59, 130, 246, 0.3);
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.8rem;
-            font-weight: 600;
-            transition: all 0.2s ease;
-        }
-
-        .copy-button:hover {
-            background: rgba(59, 130, 246, 0.3);
-            border-color: rgba(59, 130, 246, 0.5);
-        }
-
-        .copy-button.copied {
-            background: rgba(16, 185, 129, 0.2);
-            color: #10b981;
-            border-color: rgba(16, 185, 129, 0.3);
-        }
-
-        .code-block {
-            background: #1e1e1e;
-            color: #e0e0e0;
-            padding: 12px;
-            overflow-x: auto;
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            border-radius: 0 0 6px 6px;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-            font-size: 0.9rem;
-            line-height: 1.5;
-        }
-
-        .code-block pre {
-            margin: 0;
-            white-space: pre;
-        }
-
-        .code-block code {
-            display: block;
-        }
-
-        /* Syntax Highlighting (Atom One Dark theme via highlight.js) */
-        .hljs {
-            color: #abb2bf;
-        }
-
-        .hljs-string,
-        .hljs-attr,
-        .hljs-template-variable {
-            color: #98c379;
-        }
-
-        .hljs-keyword,
-        .hljs-selector-tag,
-        .hljs-literal,
-        .hljs-section,
-        .hljs-variable,
-        .hljs-name {
-            color: #c678dd;
-        }
-
-        .hljs-number,
-        .hljs-attr {
-            color: #d19a66;
-        }
-
-        .hljs-title,
-        .hljs-type {
-            color: #61afef;
-        }
-
-        .hljs-function,
-        .hljs-method {
-            color: #61afef;
-        }
-
-        .hljs-comment,
-        .hljs-quote {
-            color: #5c6370;
-            font-style: italic;
-        }
-
-        .hljs-tag {
-            color: #e06c75;
-        }
-
-        .hljs-attr {
-            color: #e06c75;
-        }
-
-        /* Diff Block Styling */
-        .code-block-diff {
-            background: #1e1e1e;
-        }
-
-        .code-block-diff .code-block {
-            background: #1e1e1e;
-            border-radius: 0 0 6px 6px;
-        }
-
-        .diff-line {
-            display: flex;
-            padding: 2px 8px;
-        }
-
-        .diff-line.added {
-            background: rgba(16, 185, 129, 0.15);
-            color: #a6e3a1;
-        }
-
-        .diff-line.deleted {
-            background: rgba(239, 68, 68, 0.15);
-            color: #f87171;
-        }
-
-        .diff-line.neutral {
-            background: transparent;
-        }
-
-        .diff-indicator {
-            display: inline-block;
-            width: 20px;
-            margin-right: 4px;
-            text-align: center;
-            color: #64748b;
-            font-weight: bold;
-            flex-shrink: 0;
-        }
-
-        .diff-line.added .diff-indicator {
-            color: #10b981;
-        }
-
-        .diff-line.deleted .diff-indicator {
-            color: #ef4444;
-        }
-
-        .diff-content {
-            flex: 1;
-            white-space: pre;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-        }
     </style>
 </head>
 <body>
@@ -474,6 +351,25 @@
             </div>
             <div class="card-content">
                 <div id="chat-container" class="chat-container">
+                    <div class="provider-selector-container">
+                        <label for="ai-provider-selector" class="provider-selector-label">
+                            AI Provider:
+                        </label>
+                        <select
+                            id="ai-provider-selector"
+                            class="provider-selector"
+                            data-testid="ai-provider-selector"
+                            aria-label="Select AI Provider"
+                        >
+                            <option value="claude" data-testid="provider-option-claude">Claude (Haiku 4.5, Sonnet 4.5, Opus 4.6)</option>
+                            <option value="chatgpt" data-testid="provider-option-chatgpt">ChatGPT (GPT-4o, o1, o3-mini, o4-mini)</option>
+                            <option value="gemini" data-testid="provider-option-gemini">Gemini (2.5 Flash, 2.5 Pro, 2.0 Flash)</option>
+                            <option value="groq" data-testid="provider-option-groq">Groq (Llama 3.3 70B, Mixtral 8x7B)</option>
+                            <option value="kimi" data-testid="provider-option-kimi">KIMI (Moonshot 2M context)</option>
+                            <option value="windsurf" data-testid="provider-option-windsurf">Windsurf (Cascade)</option>
+                        </select>
+                        <span class="provider-badge" id="provider-badge" data-testid="provider-badge">Claude</span>
+                    </div>
                     <div id="chat-messages" class="chat-messages">
                         <div class="chat-welcome">
                             <p>Welcome to the Agent Dashboard Chat. Ask me anything about your agent status, metrics, or general questions!</p>
@@ -505,9 +401,237 @@
         </div>
     </div>
 
-    <!-- Chat Interface Module (AI-68/AI-70) -->
-    <script src="./chat-interface.js"></script>
     <script>
+        class ChatInterface {
+            constructor() {
+                this.messagesContainer = document.getElementById('chat-messages');
+                this.input = document.getElementById('chat-input');
+                this.sendBtn = document.getElementById('chat-send-btn');
+                this.providerSelector = document.getElementById('ai-provider-selector');
+                this.providerBadge = document.getElementById('provider-badge');
+                this.messages = [];
+                this.selectedProvider = 'claude';
+                this.init();
+            }
+
+            init() {
+                if (!this.input || !this.sendBtn) {
+                    console.warn('Chat interface elements not found');
+                    return;
+                }
+
+                // Load saved provider from sessionStorage
+                this.loadSavedProvider();
+
+                // Set up event listeners
+                this.sendBtn.addEventListener('click', () => this.sendMessage());
+                this.input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        this.sendMessage();
+                    }
+                });
+
+                if (this.providerSelector) {
+                    this.providerSelector.addEventListener('change', (e) => this.handleProviderChange(e));
+                }
+            }
+
+            loadSavedProvider() {
+                try {
+                    const savedProvider = sessionStorage.getItem('selectedAIProvider');
+                    if (savedProvider) {
+                        this.selectedProvider = savedProvider;
+                        if (this.providerSelector) {
+                            this.providerSelector.value = savedProvider;
+                        }
+                        this.updateProviderBadge(savedProvider);
+                    } else {
+                        // Default is Claude
+                        this.updateProviderBadge('claude');
+                    }
+                } catch (error) {
+                    console.warn('Could not load saved provider:', error);
+                }
+            }
+
+            handleProviderChange(event) {
+                const newProvider = event.target.value;
+                this.selectedProvider = newProvider;
+
+                // Save to sessionStorage
+                try {
+                    sessionStorage.setItem('selectedAIProvider', newProvider);
+                } catch (error) {
+                    console.warn('Could not save provider to sessionStorage:', error);
+                }
+
+                // Update badge
+                this.updateProviderBadge(newProvider);
+
+                console.log(`Provider switched to: ${newProvider}`);
+            }
+
+            updateProviderBadge(provider) {
+                if (!this.providerBadge) return;
+
+                const providerNames = {
+                    'claude': 'Claude',
+                    'chatgpt': 'ChatGPT',
+                    'gemini': 'Gemini',
+                    'groq': 'Groq',
+                    'kimi': 'KIMI',
+                    'windsurf': 'Windsurf'
+                };
+
+                this.providerBadge.textContent = providerNames[provider] || provider;
+            }
+
+            getSelectedProvider() {
+                return this.selectedProvider;
+            }
+
+            sendMessage() {
+                const text = this.input.value.trim();
+                if (!text) return;
+
+                const provider = this.selectedProvider;
+                this.addMessage(text, 'user', provider);
+                this.input.value = '';
+                this.showLoadingIndicator();
+                setTimeout(() => {
+                    this.removeLoadingIndicator();
+                    this.addMessage(this.generateAIResponse(text, provider), 'ai', provider);
+                }, 800);
+            }
+
+            addMessage(text, sender, provider = null) {
+                const message = {
+                    id: Date.now(),
+                    text,
+                    sender,
+                    provider: provider || this.selectedProvider,
+                    timestamp: new Date()
+                };
+
+                this.messages.push(message);
+                this.renderMessage(message);
+                this.scrollToBottom();
+            }
+
+            renderMessage(message) {
+                const welcome = this.messagesContainer.querySelector('.chat-welcome');
+                if (welcome && this.messages.length === 1) {
+                    welcome.remove();
+                }
+
+                const div = document.createElement('div');
+                div.className = `chat-message ${message.sender}`;
+                div.setAttribute('data-testid', `chat-message-${message.sender}`);
+                div.setAttribute('data-message-id', message.id);
+
+                const content = document.createElement('div');
+                const timeStr = message.timestamp.toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                content.innerHTML = `
+                    <div class="chat-message-content">${this.escapeHtml(message.text)}</div>
+                    <div class="chat-timestamp">${timeStr}</div>
+                `;
+
+                div.appendChild(content);
+                this.messagesContainer.appendChild(div);
+            }
+
+            showLoadingIndicator() {
+                const div = document.createElement('div');
+                div.className = 'chat-message ai';
+                div.id = 'chat-loading';
+                div.setAttribute('data-testid', 'chat-loading-indicator');
+
+                div.innerHTML = `
+                    <div class="chat-message-content">
+                        <div class="chat-loading">
+                            <div class="chat-loading-dot"></div>
+                            <div class="chat-loading-dot"></div>
+                            <div class="chat-loading-dot"></div>
+                        </div>
+                    </div>
+                `;
+
+                this.messagesContainer.appendChild(div);
+                this.scrollToBottom();
+            }
+
+            removeLoadingIndicator() {
+                const loading = document.getElementById('chat-loading');
+                if (loading) {
+                    loading.remove();
+                }
+            }
+
+            generateAIResponse(userMessage, provider) {
+                const lower = userMessage.toLowerCase();
+                const providerNames = {
+                    'claude': 'Claude',
+                    'chatgpt': 'ChatGPT',
+                    'gemini': 'Gemini',
+                    'groq': 'Groq',
+                    'kimi': 'KIMI',
+                    'windsurf': 'Windsurf'
+                };
+                const providerName = providerNames[provider] || provider;
+
+                if (lower.includes('status') || lower.includes('how')) {
+                    return `[${providerName}] Your agents are running smoothly. All systems are operational with 99.2% uptime.`;
+                }
+                if (lower.includes('metric') || lower.includes('performance')) {
+                    return `[${providerName}] Current metrics show strong performance: 94% success rate, avg response time 245ms.`;
+                }
+                if (lower.includes('error') || lower.includes('issue') || lower.includes('problem')) {
+                    return `[${providerName}] No critical errors detected. All monitoring systems are reporting normal status.`;
+                }
+                if (lower.includes('cost') || lower.includes('usage') || lower.includes('token')) {
+                    return `[${providerName}] Token usage is at 42% of daily allocation. Cost trending 8% below budget.`;
+                }
+                if (lower.includes('hello') || lower.includes('hi') || lower.includes('hey')) {
+                    return `[${providerName}] Hello! I'm here to help you with any questions about your agent dashboard.`;
+                }
+
+                return `[${providerName}] I understand. Based on your agent dashboard, everything is performing within expected parameters. Is there anything specific you'd like to know?`;
+            }
+
+            scrollToBottom() {
+                this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+            }
+
+            escapeHtml(text) {
+                const map = {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                };
+                return text.replace(/[&<>"']/g, m => map[m]);
+            }
+
+            getMessages() {
+                return this.messages;
+            }
+
+            clearMessages() {
+                this.messages = [];
+                this.messagesContainer.innerHTML = `
+                    <div class="chat-welcome">
+                        <p>Welcome to the Agent Dashboard Chat. Ask me anything about your agent status, metrics, or general questions!</p>
+                    </div>
+                `;
+            }
+        }
+
         // Initialize when ready
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
