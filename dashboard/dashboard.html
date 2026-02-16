@@ -1093,6 +1093,66 @@
             border: 1px solid rgba(59, 130, 246, 0.3);
         }
 
+        .model-selector-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            padding: 12px;
+            background: rgba(15, 23, 42, 0.4);
+            border-radius: 8px;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .model-selector-label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #94a3b8;
+            white-space: nowrap;
+        }
+
+        .model-selector {
+            flex: 1;
+            padding: 8px 12px;
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            border-radius: 8px;
+            color: #f1f5f9;
+            font-size: 0.9rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .model-selector:hover {
+            border-color: #3b82f6;
+            background: rgba(15, 23, 42, 0.9);
+        }
+
+        .model-selector:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+        }
+
+        .model-selector option {
+            background: #1e293b;
+            color: #f1f5f9;
+            padding: 8px;
+        }
+
+        .model-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: rgba(34, 197, 94, 0.15);
+            color: #4ade80;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
         .chat-input-area {
             display: flex;
             gap: 8px;
@@ -1351,14 +1411,28 @@
                         data-testid="ai-provider-selector"
                         aria-label="Select AI Provider"
                     >
-                        <option value="claude" data-testid="provider-option-claude">Claude (Haiku 4.5, Sonnet 4.5, Opus 4.6)</option>
-                        <option value="chatgpt" data-testid="provider-option-chatgpt">ChatGPT (GPT-4o, o1, o3-mini, o4-mini)</option>
-                        <option value="gemini" data-testid="provider-option-gemini">Gemini (2.5 Flash, 2.5 Pro, 2.0 Flash)</option>
-                        <option value="groq" data-testid="provider-option-groq">Groq (Llama 3.3 70B, Mixtral 8x7B)</option>
-                        <option value="kimi" data-testid="provider-option-kimi">KIMI (Moonshot 2M context)</option>
-                        <option value="windsurf" data-testid="provider-option-windsurf">Windsurf (Cascade)</option>
+                        <option value="claude" data-testid="provider-option-claude">Claude</option>
+                        <option value="chatgpt" data-testid="provider-option-chatgpt">ChatGPT</option>
+                        <option value="gemini" data-testid="provider-option-gemini">Gemini</option>
+                        <option value="groq" data-testid="provider-option-groq">Groq</option>
+                        <option value="kimi" data-testid="provider-option-kimi">KIMI</option>
+                        <option value="windsurf" data-testid="provider-option-windsurf">Windsurf</option>
                     </select>
                     <span class="provider-badge" id="provider-badge" data-testid="provider-badge">Claude</span>
+                </div>
+                <div class="model-selector-container">
+                    <label for="ai-model-selector" class="model-selector-label">
+                        Model:
+                    </label>
+                    <select
+                        id="ai-model-selector"
+                        class="model-selector"
+                        data-testid="ai-model-selector"
+                        aria-label="Select AI Model"
+                    >
+                        <!-- Options will be dynamically populated based on provider -->
+                    </select>
+                    <span class="model-badge" id="model-badge" data-testid="model-badge">Haiku 4.5</span>
                 </div>
                 <div id="chat-messages" class="chat-messages">
                     <div class="chat-welcome">
@@ -2593,8 +2667,41 @@
                 this.sendBtn = document.getElementById('chat-send-btn');
                 this.providerSelector = document.getElementById('ai-provider-selector');
                 this.providerBadge = document.getElementById('provider-badge');
+                this.modelSelector = document.getElementById('ai-model-selector');
+                this.modelBadge = document.getElementById('model-badge');
                 this.messages = [];
                 this.selectedProvider = 'claude';
+                this.selectedModel = 'haiku-4.5';
+
+                // Provider-Model mapping
+                this.providerModels = {
+                    'claude': [
+                        { id: 'haiku-4.5', name: 'Haiku 4.5', isDefault: true },
+                        { id: 'sonnet-4.5', name: 'Sonnet 4.5', isDefault: false },
+                        { id: 'opus-4.6', name: 'Opus 4.6', isDefault: false }
+                    ],
+                    'chatgpt': [
+                        { id: 'gpt-4o', name: 'GPT-4o', isDefault: true },
+                        { id: 'o1', name: 'o1', isDefault: false },
+                        { id: 'o3-mini', name: 'o3-mini', isDefault: false },
+                        { id: 'o4-mini', name: 'o4-mini', isDefault: false }
+                    ],
+                    'gemini': [
+                        { id: '2.5-flash', name: '2.5 Flash', isDefault: true },
+                        { id: '2.5-pro', name: '2.5 Pro', isDefault: false },
+                        { id: '2.0-flash', name: '2.0 Flash', isDefault: false }
+                    ],
+                    'groq': [
+                        { id: 'llama-3.3-70b', name: 'Llama 3.3 70B', isDefault: true },
+                        { id: 'mixtral-8x7b', name: 'Mixtral 8x7B', isDefault: false }
+                    ],
+                    'kimi': [
+                        { id: 'moonshot', name: 'Moonshot', isDefault: true }
+                    ],
+                    'windsurf': [
+                        { id: 'cascade', name: 'Cascade', isDefault: true }
+                    ]
+                };
 
                 this.init();
             }
@@ -2605,8 +2712,12 @@
                     return;
                 }
 
-                // Load saved provider from sessionStorage
+                // Load saved provider and model from sessionStorage
                 this.loadSavedProvider();
+                this.loadSavedModel();
+
+                // Populate model dropdown for current provider
+                this.updateModelDropdown(this.selectedProvider);
 
                 // Set up event listeners
                 this.sendBtn.addEventListener('click', () => this.sendMessage());
@@ -2619,6 +2730,10 @@
 
                 if (this.providerSelector) {
                     this.providerSelector.addEventListener('change', (e) => this.handleProviderChange(e));
+                }
+
+                if (this.modelSelector) {
+                    this.modelSelector.addEventListener('change', (e) => this.handleModelChange(e));
                 }
             }
 
@@ -2654,7 +2769,40 @@
                 // Update badge
                 this.updateProviderBadge(newProvider);
 
-                console.log(`Provider switched to: ${newProvider}`);
+                // Update model dropdown for new provider
+                this.updateModelDropdown(newProvider);
+
+                // Set default model for new provider
+                const defaultModel = this.getDefaultModel(newProvider);
+                this.selectedModel = defaultModel;
+                this.modelSelector.value = defaultModel;
+                this.updateModelBadge(defaultModel);
+
+                // Save model to sessionStorage
+                try {
+                    sessionStorage.setItem('selectedAIModel', defaultModel);
+                } catch (error) {
+                    console.warn('Could not save model to sessionStorage:', error);
+                }
+
+                console.log(`Provider switched to: ${newProvider}, Model: ${defaultModel}`);
+            }
+
+            handleModelChange(event) {
+                const newModel = event.target.value;
+                this.selectedModel = newModel;
+
+                // Save to sessionStorage
+                try {
+                    sessionStorage.setItem('selectedAIModel', newModel);
+                } catch (error) {
+                    console.warn('Could not save model to sessionStorage:', error);
+                }
+
+                // Update badge
+                this.updateModelBadge(newModel);
+
+                console.log(`Model switched to: ${newModel}`);
             }
 
             updateProviderBadge(provider) {
@@ -2672,8 +2820,88 @@
                 this.providerBadge.textContent = providerNames[provider] || provider;
             }
 
+            updateModelBadge(modelId) {
+                if (!this.modelBadge) return;
+
+                // Find model name from current provider's models
+                const models = this.providerModels[this.selectedProvider] || [];
+                const model = models.find(m => m.id === modelId);
+
+                if (model) {
+                    this.modelBadge.textContent = model.name;
+                } else {
+                    this.modelBadge.textContent = modelId;
+                }
+            }
+
+            updateModelDropdown(provider) {
+                if (!this.modelSelector) return;
+
+                const models = this.providerModels[provider] || [];
+
+                // Clear existing options
+                this.modelSelector.innerHTML = '';
+
+                // Populate with models for this provider
+                models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model.id;
+                    option.textContent = model.name;
+                    option.setAttribute('data-testid', `model-option-${model.id}`);
+                    if (model.isDefault) {
+                        option.setAttribute('data-default', 'true');
+                    }
+                    this.modelSelector.appendChild(option);
+                });
+            }
+
+            getDefaultModel(provider) {
+                const models = this.providerModels[provider] || [];
+                const defaultModel = models.find(m => m.isDefault);
+                return defaultModel ? defaultModel.id : (models[0] ? models[0].id : null);
+            }
+
+            loadSavedModel() {
+                try {
+                    const savedModel = sessionStorage.getItem('selectedAIModel');
+                    if (savedModel) {
+                        // Verify model is valid for current provider
+                        const models = this.providerModels[this.selectedProvider] || [];
+                        const modelExists = models.find(m => m.id === savedModel);
+
+                        if (modelExists) {
+                            this.selectedModel = savedModel;
+                            if (this.modelSelector) {
+                                this.modelSelector.value = savedModel;
+                            }
+                            this.updateModelBadge(savedModel);
+                        } else {
+                            // Use default model if saved model not valid for current provider
+                            const defaultModel = this.getDefaultModel(this.selectedProvider);
+                            this.selectedModel = defaultModel;
+                            this.updateModelBadge(defaultModel);
+                        }
+                    } else {
+                        // No saved model, use default
+                        const defaultModel = this.getDefaultModel(this.selectedProvider);
+                        this.selectedModel = defaultModel;
+                        this.updateModelBadge(defaultModel);
+                    }
+                } catch (error) {
+                    console.warn('Could not load saved model:', error);
+                }
+            }
+
             getSelectedProvider() {
                 return this.selectedProvider;
+            }
+
+            getSelectedModel() {
+                return this.selectedModel;
+            }
+
+            getProviderModels(provider) {
+                return this.providerModels[provider] || [];
             }
 
             sendMessage() {
@@ -2681,24 +2909,26 @@
                 if (!text) return;
 
                 const provider = this.selectedProvider;
+                const model = this.selectedModel;
                 // Add user message
-                this.addMessage(text, 'user', provider);
+                this.addMessage(text, 'user', provider, model);
                 this.input.value = '';
 
                 // Simulate AI response
                 this.showLoadingIndicator();
                 setTimeout(() => {
                     this.removeLoadingIndicator();
-                    this.addMessage(this.generateAIResponse(text, provider), 'ai', provider);
+                    this.addMessage(this.generateAIResponse(text, provider, model), 'ai', provider, model);
                 }, 800);
             }
 
-            addMessage(text, sender, provider = null) {
+            addMessage(text, sender, provider = null, model = null) {
                 const message = {
                     id: Date.now(),
                     text,
                     sender,
                     provider: provider || this.selectedProvider,
+                    model: model || this.selectedModel,
                     timestamp: new Date()
                 };
 
@@ -2761,7 +2991,7 @@
                 }
             }
 
-            generateAIResponse(userMessage, provider) {
+            generateAIResponse(userMessage, provider, model) {
                 // Simple response generation based on keywords
                 const lower = userMessage.toLowerCase();
                 const providerNames = {
@@ -2774,23 +3004,28 @@
                 };
                 const providerName = providerNames[provider] || provider;
 
+                // Get model name
+                const models = this.providerModels[provider] || [];
+                const modelObj = models.find(m => m.id === model);
+                const modelName = modelObj ? modelObj.name : model;
+
                 if (lower.includes('status') || lower.includes('how')) {
-                    return `[${providerName}] Your agents are running smoothly. All systems are operational with 99.2% uptime.`;
+                    return `[${providerName} - ${modelName}] Your agents are running smoothly. All systems are operational with 99.2% uptime.`;
                 }
                 if (lower.includes('metric') || lower.includes('performance')) {
-                    return `[${providerName}] Current metrics show strong performance: 94% success rate, avg response time 245ms.`;
+                    return `[${providerName} - ${modelName}] Current metrics show strong performance: 94% success rate, avg response time 245ms.`;
                 }
                 if (lower.includes('error') || lower.includes('issue') || lower.includes('problem')) {
-                    return `[${providerName}] No critical errors detected. All monitoring systems are reporting normal status.`;
+                    return `[${providerName} - ${modelName}] No critical errors detected. All monitoring systems are reporting normal status.`;
                 }
                 if (lower.includes('cost') || lower.includes('usage') || lower.includes('token')) {
-                    return `[${providerName}] Token usage is at 42% of daily allocation. Cost trending 8% below budget.`;
+                    return `[${providerName} - ${modelName}] Token usage is at 42% of daily allocation. Cost trending 8% below budget.`;
                 }
                 if (lower.includes('hello') || lower.includes('hi') || lower.includes('hey')) {
-                    return `[${providerName}] Hello! I'm here to help you with any questions about your agent dashboard.`;
+                    return `[${providerName} - ${modelName}] Hello! I'm here to help you with any questions about your agent dashboard.`;
                 }
 
-                return `[${providerName}] I understand. Based on your agent dashboard, everything is performing within expected parameters. Is there anything specific you'd like to know?`;
+                return `[${providerName} - ${modelName}] I understand. Based on your agent dashboard, everything is performing within expected parameters. Is there anything specific you'd like to know?`;
             }
 
             scrollToBottom() {
