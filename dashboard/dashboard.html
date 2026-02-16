@@ -113,6 +113,70 @@
             50% { opacity: 0.5; }
         }
 
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Activity Feed Styles - Enhanced for Real-Time Updates (Phase 2) */
+        .activity-item {
+            padding: 12px 16px;
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 8px;
+            border-left: 3px solid #3b82f6;
+            margin-bottom: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .activity-item:hover {
+            background: rgba(15, 23, 42, 0.8);
+            transform: translateX(4px);
+        }
+
+        .activity-item-recent {
+            background: rgba(59, 130, 246, 0.1);
+            border-left-color: #3b82f6;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
+        }
+
+        .activity-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .activity-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #f1f5f9;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .activity-ticket {
+            display: inline-flex;
+            padding: 2px 8px;
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #60a5fa;
+        }
+
+        .agent-chip-active {
+            border-color: rgba(59, 130, 246, 0.6) !important;
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.3) !important;
+        }
+
         /* Grid Layout */
         .dashboard-grid {
             display: grid;
@@ -2657,9 +2721,47 @@
                     try {
                         const message = JSON.parse(event.data);
 
-                        if (message.type === 'metrics_update') {
-                            console.log('Received metrics update via WebSocket');
-                            handleMetricsUpdate(message.data);
+                        // Handle different message types
+                        switch (message.type) {
+                            case 'metrics_update':
+                                console.log('Received metrics update via WebSocket');
+                                handleMetricsUpdate(message.data);
+                                break;
+
+                            case 'agent_status':
+                                console.log('Received agent status change:', message);
+                                handleAgentStatusChange(message);
+                                break;
+
+                            case 'agent_event':
+                                console.log('Received agent event:', message);
+                                handleAgentEvent(message);
+                                break;
+
+                            case 'reasoning':
+                                console.log('Received reasoning:', message);
+                                handleReasoning(message);
+                                break;
+
+                            case 'code_stream':
+                                console.log('Received code stream:', message);
+                                handleCodeStream(message);
+                                break;
+
+                            case 'chat_message':
+                                handleChatMessage(message);
+                                break;
+
+                            case 'control_ack':
+                                console.log('Received control ack:', message);
+                                break;
+
+                            case 'connection':
+                                console.log('WebSocket connection established:', message.message);
+                                break;
+
+                            default:
+                                console.log('Unknown message type:', message.type);
                         }
                     } catch (error) {
                         console.error('Error processing WebSocket message:', error);
@@ -2723,6 +2825,268 @@
             }
 
             updateConnectionStatus('disconnected', 'Disconnected');
+        }
+
+        // ==========================================
+        // Real-Time WebSocket Message Handlers (Phase 2: AI-127)
+        // ==========================================
+
+        // Store recent activity for live feed
+        const liveActivityFeed = [];
+        const MAX_LIVE_ACTIVITY = 50;
+
+        /**
+         * Handle agent status change message
+         * Updates agent chip status in real-time
+         */
+        function handleAgentStatusChange(message) {
+            const { agent_name, status, metadata, timestamp } = message;
+
+            console.log(`[REAL-TIME] Agent ${agent_name}: ${status}`, metadata);
+
+            // Update agent chip status visually
+            updateAgentChipStatus(agent_name, status, metadata);
+
+            // Add to live activity feed
+            addToLiveActivityFeed({
+                type: 'agent_status',
+                agent: agent_name,
+                status: status,
+                message: getStatusMessage(agent_name, status, metadata),
+                timestamp: timestamp,
+                metadata: metadata
+            });
+
+            // Play notification sound for status changes (optional)
+            if (status === 'running') {
+                playNotificationSound('start');
+            } else if (status === 'error') {
+                playNotificationSound('error');
+            }
+        }
+
+        /**
+         * Handle agent event message
+         * Shows new events in activity feed
+         */
+        function handleAgentEvent(message) {
+            const { agent_name, event_id, ticket_key, status, duration_seconds, tokens, cost_usd } = message;
+
+            console.log(`[REAL-TIME] Agent event: ${agent_name} completed ${ticket_key}`);
+
+            // Add to live activity feed
+            addToLiveActivityFeed({
+                type: 'agent_event',
+                agent: agent_name,
+                status: status,
+                message: `${agent_name} completed ${ticket_key} (${duration_seconds.toFixed(1)}s, ${tokens} tokens)`,
+                timestamp: message.timestamp,
+                metadata: { ticket_key, duration_seconds, tokens, cost_usd, status }
+            });
+        }
+
+        /**
+         * Handle orchestrator reasoning message
+         * Shows reasoning/decision-making process
+         */
+        function handleReasoning(message) {
+            const { content, source, context, timestamp } = message;
+
+            console.log(`[REAL-TIME] Reasoning from ${source}: ${content}`);
+
+            // Add to live activity feed
+            addToLiveActivityFeed({
+                type: 'reasoning',
+                agent: source,
+                message: content,
+                timestamp: timestamp,
+                metadata: context
+            });
+        }
+
+        /**
+         * Handle code stream message
+         * Shows live code generation (optional, for future enhancement)
+         */
+        function handleCodeStream(message) {
+            const { content, file_path, line_number, operation } = message;
+            console.log(`[CODE] ${operation} ${file_path}:${line_number}`);
+            // Future enhancement: show live code diff
+        }
+
+        /**
+         * Update agent chip visual status
+         */
+        function updateAgentChipStatus(agentName, status, metadata) {
+            const agentElements = document.querySelectorAll(`[data-agent-name="${agentName}"]`);
+
+            agentElements.forEach(element => {
+                // Update status badge
+                const statusBadge = element.querySelector('.task-status-badge');
+                if (statusBadge) {
+                    statusBadge.className = 'task-status-badge';
+
+                    if (status === 'running') {
+                        statusBadge.classList.add('status-in-progress');
+                        statusBadge.textContent = 'RUNNING';
+                    } else if (status === 'idle') {
+                        statusBadge.classList.add('status-completed');
+                        statusBadge.textContent = 'IDLE';
+                    } else if (status === 'error') {
+                        statusBadge.classList.add('status-pending');
+                        statusBadge.textContent = 'ERROR';
+                        statusBadge.style.color = '#ef4444';
+                        statusBadge.style.borderColor = '#ef4444';
+                    } else if (status === 'paused') {
+                        statusBadge.classList.add('status-pending');
+                        statusBadge.textContent = 'PAUSED';
+                    }
+                }
+
+                // Add visual pulse effect for running agents
+                if (status === 'running') {
+                    element.classList.add('agent-chip-active');
+                    element.style.animation = 'pulse 2s ease-in-out infinite';
+                } else {
+                    element.classList.remove('agent-chip-active');
+                    element.style.animation = '';
+                }
+            });
+        }
+
+        /**
+         * Add item to live activity feed
+         */
+        function addToLiveActivityFeed(activity) {
+            liveActivityFeed.unshift(activity); // Add to beginning
+
+            // Keep only recent activities
+            if (liveActivityFeed.length > MAX_LIVE_ACTIVITY) {
+                liveActivityFeed.pop();
+            }
+
+            // Re-render activity feed with live items at top
+            renderLiveActivityFeed();
+        }
+
+        /**
+         * Render live activity feed with real-time updates
+         */
+        function renderLiveActivityFeed() {
+            const feedElement = document.getElementById('activity-feed');
+            if (!feedElement) return;
+
+            if (liveActivityFeed.length === 0) {
+                feedElement.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #64748b;">
+                        <p>Waiting for agent activity...</p>
+                        <p style="font-size: 0.85rem; margin-top: 8px;">Real-time updates will appear here</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const html = liveActivityFeed.map((activity, index) => {
+                const time = new Date(activity.timestamp);
+                const timeAgo = formatTimeAgo(time);
+                const isRecent = index < 3; // Highlight recent 3 items
+
+                const typeColors = {
+                    'agent_status': '#3b82f6',
+                    'agent_event': '#10b981',
+                    'reasoning': '#8b5cf6',
+                    'code_stream': '#f59e0b'
+                };
+
+                const statusColors = {
+                    'running': '#3b82f6',
+                    'idle': '#10b981',
+                    'error': '#ef4444',
+                    'success': '#10b981',
+                    'paused': '#f59e0b'
+                };
+
+                const color = statusColors[activity.status] || typeColors[activity.type] || '#64748b';
+
+                return `
+                    <div class="activity-item ${isRecent ? 'activity-item-recent' : ''}"
+                         style="border-left: 3px solid ${color}; animation: ${isRecent ? 'fadeIn 0.5s ease-out' : 'none'};">
+                        <div class="activity-header">
+                            <div class="activity-title">
+                                <strong>${activity.agent || 'system'}</strong>
+                                ${activity.metadata?.ticket_key ? `<span class="activity-ticket">${activity.metadata.ticket_key}</span>` : ''}
+                            </div>
+                            <div class="activity-time" style="color: #64748b; font-size: 0.75rem;">
+                                ${timeAgo}
+                            </div>
+                        </div>
+                        <div class="activity-message" style="color: #cbd5e1; font-size: 0.9rem; margin-top: 4px;">
+                            ${activity.message}
+                        </div>
+                        ${activity.metadata?.duration_seconds ? `
+                            <div class="activity-metadata" style="margin-top: 6px; font-size: 0.8rem; color: #64748b;">
+                                ⏱️ ${activity.metadata.duration_seconds.toFixed(1)}s
+                                ${activity.metadata.tokens ? `• 🎫 ${activity.metadata.tokens} tokens` : ''}
+                                ${activity.metadata.cost_usd ? `• 💰 $${activity.metadata.cost_usd.toFixed(4)}` : ''}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+
+            feedElement.innerHTML = html;
+        }
+
+        /**
+         * Get human-readable status message
+         */
+        function getStatusMessage(agentName, status, metadata) {
+            const ticket = metadata?.ticket_key ? ` on ${metadata.ticket_key}` : '';
+
+            switch (status) {
+                case 'running':
+                    return `${agentName} started working${ticket}`;
+                case 'idle':
+                    if (metadata?.completion) {
+                        return `${agentName} completed work${ticket}`;
+                    }
+                    return `${agentName} finished${ticket}`;
+                case 'error':
+                    const error = metadata?.error ? `: ${metadata.error.substring(0, 100)}` : '';
+                    return `${agentName} encountered error${error}`;
+                case 'paused':
+                    return `${agentName} paused${ticket}`;
+                default:
+                    return `${agentName} status: ${status}`;
+            }
+        }
+
+        /**
+         * Format time ago (e.g., "2m ago", "just now")
+         */
+        function formatTimeAgo(date) {
+            const seconds = Math.floor((new Date() - date) / 1000);
+
+            if (seconds < 10) return 'just now';
+            if (seconds < 60) return `${seconds}s ago`;
+
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return `${minutes}m ago`;
+
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return `${hours}h ago`;
+
+            const days = Math.floor(hours / 24);
+            return `${days}d ago`;
+        }
+
+        /**
+         * Play notification sound (optional)
+         */
+        function playNotificationSound(type) {
+            // Optional: Add audio feedback for real-time events
+            // For now, just log
+            console.log(`[SOUND] ${type}`);
         }
 
         // Handle metrics update from WebSocket or HTTP
