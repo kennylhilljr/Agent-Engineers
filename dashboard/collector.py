@@ -30,7 +30,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal, Optional
 
-from dashboard.metrics import AgentEvent, AgentProfile, DashboardState, SessionSummary
+from dashboard.metrics import AgentEvent, AgentProfile, DashboardState, FileChange, SessionSummary
 from dashboard.metrics_store import MetricsStore
 
 
@@ -83,6 +83,7 @@ class AgentTracker:
         self.input_tokens = 0
         self.output_tokens = 0
         self.artifacts: list[str] = []
+        self.file_changes: list[FileChange] = []
         self.error_message = ""
         self.status: Literal["success", "error", "timeout", "blocked"] = "success"
 
@@ -109,6 +110,35 @@ class AgentTracker:
             artifact: Artifact identifier
         """
         self.artifacts.append(artifact)
+
+    def add_file_change(
+        self,
+        path: str,
+        change_type: Literal["created", "modified", "deleted"],
+        lines_added: int,
+        lines_removed: int,
+        language: str,
+        diff: str
+    ) -> None:
+        """Add a file change to this event.
+
+        Args:
+            path: File path relative to project root
+            change_type: Type of change (created, modified, deleted)
+            lines_added: Number of lines added
+            lines_removed: Number of lines removed
+            language: Programming language
+            diff: Git diff output for this file
+        """
+        file_change: FileChange = {
+            "path": path,
+            "change_type": change_type,
+            "lines_added": lines_added,
+            "lines_removed": lines_removed,
+            "language": language,
+            "diff": diff,
+        }
+        self.file_changes.append(file_change)
 
     def set_error(self, error_message: str) -> None:
         """Mark this event as an error.
@@ -152,6 +182,7 @@ class AgentTracker:
             "artifacts": self.artifacts,
             "error_message": self.error_message,
             "model_used": self.model_used,
+            "file_changes": self.file_changes,
         }
 
         return event
@@ -523,3 +554,150 @@ class AgentMetricsCollector:
             Current DashboardState
         """
         return self.store.load()
+
+
+def capture_git_file_changes(repo_path: Optional[Path] = None) -> list[FileChange]:
+    """Capture file changes from git diff.
+
+    This function runs git commands to detect files that have been created,
+    modified, or deleted, and captures the diff for each file.
+
+    Args:
+        repo_path: Path to git repository (defaults to current directory)
+
+    Returns:
+        List of FileChange objects with diff data
+    """
+    import subprocess
+    import re
+
+    if repo_path is None:
+        repo_path = Path.cwd()
+
+    file_changes: list[FileChange] = []
+
+    try:
+        # Get list of changed files with their status
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+
+        if not result.stdout.strip():
+            return file_changes
+
+        # Parse git status output
+        for line in result.stdout.strip().split('\n'):
+            if not line.strip():
+                continue
+
+            status = line[:2]
+            file_path = line[3:].strip()
+
+            # Determine change type
+            change_type: Literal["created", "modified", "deleted"]
+            if status.strip() == 'D' or status.strip() == 'AD':
+                change_type = "deleted"
+            elif status.strip() in ['A', 'AM', '??']:
+                change_type = "created"
+            else:
+                change_type = "modified"
+
+            # Get diff for the file
+            try:
+                if change_type == "deleted":
+                    # For deleted files, show the last version
+                    diff_result = subprocess.run(
+                        ["git", "diff", "HEAD", "--", file_path],
+                        cwd=repo_path,
+                        capture_output=True,
+                        text=True
+                    )
+                elif change_type == "created":
+                    # For new files, show full content
+                    diff_result = subprocess.run(
+                        ["git", "diff", "--no-index", "/dev/null", file_path],
+                        cwd=repo_path,
+                        capture_output=True,
+                        text=True
+                    )
+                else:
+                    # For modified files, show diff
+                    diff_result = subprocess.run(
+                        ["git", "diff", "HEAD", "--", file_path],
+                        cwd=repo_path,
+                        capture_output=True,
+                        text=True
+                    )
+
+                diff_text = diff_result.stdout
+
+                # Count lines added and removed
+                lines_added = len([l for l in diff_text.split('\n') if l.startswith('+')])
+                lines_removed = len([l for l in diff_text.split('\n') if l.startswith('-')])
+
+                # Detect language from file extension
+                language = _detect_language(file_path)
+
+                file_change: FileChange = {
+                    "path": file_path,
+                    "change_type": change_type,
+                    "lines_added": lines_added,
+                    "lines_removed": lines_removed,
+                    "language": language,
+                    "diff": diff_text,
+                }
+
+                file_changes.append(file_change)
+
+            except subprocess.CalledProcessError:
+                # Skip files that can't be diffed
+                continue
+
+    except subprocess.CalledProcessError:
+        # Git command failed - not in a git repo or other error
+        pass
+
+    return file_changes
+
+
+def _detect_language(file_path: str) -> str:
+    """Detect programming language from file extension.
+
+    Args:
+        file_path: Path to the file
+
+    Returns:
+        Language name (lowercase)
+    """
+    ext_map = {
+        '.py': 'python',
+        '.js': 'javascript',
+        '.ts': 'typescript',
+        '.tsx': 'typescript',
+        '.jsx': 'javascript',
+        '.html': 'html',
+        '.css': 'css',
+        '.scss': 'scss',
+        '.java': 'java',
+        '.cpp': 'cpp',
+        '.c': 'c',
+        '.go': 'go',
+        '.rs': 'rust',
+        '.rb': 'ruby',
+        '.php': 'php',
+        '.swift': 'swift',
+        '.kt': 'kotlin',
+        '.md': 'markdown',
+        '.json': 'json',
+        '.yaml': 'yaml',
+        '.yml': 'yaml',
+        '.xml': 'xml',
+        '.sh': 'bash',
+    }
+
+    ext = Path(file_path).suffix.lower()
+    return ext_map.get(ext, 'text')
