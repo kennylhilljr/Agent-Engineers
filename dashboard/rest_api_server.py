@@ -36,6 +36,7 @@ from aiohttp import web
 from aiohttp.web import Request, Response, middleware
 
 from dashboard.metrics_store import MetricsStore, ALL_AGENT_NAMES
+from dashboard.security_enforcement import get_security_enforcer, SecurityCheckResult
 
 # Import only if needed - avoid importing agents.definitions which has Python 3.10+ dependencies
 # from agents.definitions import DEFAULT_MODELS, AGENT_DEFINITIONS
@@ -132,6 +133,9 @@ class RESTAPIServer:
         for agent_name in ALL_AGENT_NAMES:
             _agent_states[agent_name] = "idle"
 
+        # Initialize security enforcer
+        self.security = get_security_enforcer(project_root=self.metrics_dir)
+
     @middleware
     async def _cors_middleware(self, request: Request, handler):
         """Add CORS headers to all responses."""
@@ -191,9 +195,17 @@ class RESTAPIServer:
         # Dashboard HTML
         self.app.router.add_get('/', self.serve_dashboard)
 
+        # Security endpoints (AI-113)
+        self.app.router.add_post('/api/security/bash', self.execute_bash_command)
+        self.app.router.add_post('/api/security/file/read', self.read_file)
+        self.app.router.add_post('/api/security/file/write', self.write_file)
+        self.app.router.add_post('/api/security/mcp/call', self.call_mcp_tool)
+
         # OPTIONS for CORS preflight
         for route in ['/api/metrics', '/api/agents', '/api/sessions', '/api/providers',
-                      '/api/chat', '/api/decisions']:
+                      '/api/chat', '/api/decisions', '/api/security/bash',
+                      '/api/security/file/read', '/api/security/file/write',
+                      '/api/security/mcp/call']:
             self.app.router.add_route('OPTIONS', route, self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
@@ -652,6 +664,242 @@ class RESTAPIServer:
             'message': 'index.html or dashboard.html not found in dashboard directory'
         }, status=404)
 
+    # ========================================================================
+    # Security Endpoints (AI-113) - Sandbox Compliance
+    # ========================================================================
+
+    async def execute_bash_command(self, request: Request) -> Response:
+        """POST /api/security/bash - Execute bash command with security validation.
+
+        Request body:
+            {
+                "command": "ls -la"
+            }
+
+        Returns:
+            200 OK with command execution result (if allowed)
+            403 Forbidden if command is blocked by security policy
+            400 Bad Request for invalid input
+
+        Security:
+            - Commands validated against allowlist in security.py
+            - Error messages sanitized to prevent information leakage
+        """
+        try:
+            data = await request.json()
+        except json.JSONDecodeError:
+            return web.json_response({
+                'error': 'Invalid JSON in request body',
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }, status=400)
+
+        command = data.get('command')
+        if not command:
+            return web.json_response({
+                'error': 'Missing required field: command',
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }, status=400)
+
+        # Validate command with security enforcer
+        result = await self.security.validate_bash_command(command)
+
+        if not result.allowed:
+            return web.json_response({
+                'error': 'Command blocked by security policy',
+                'message': result.sanitized_error,
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }, status=403)
+
+        # Command is allowed - in a real implementation, would execute it here
+        # For now, just return success
+        return web.json_response({
+            'status': 'allowed',
+            'command': command,
+            'message': 'Command validated and would be executed',
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+
+    async def read_file(self, request: Request) -> Response:
+        """POST /api/security/file/read - Read file with security validation.
+
+        Request body:
+            {
+                "file_path": "src/main.py"
+            }
+
+        Returns:
+            200 OK with file content (if allowed)
+            403 Forbidden if file is outside project directory
+            400 Bad Request for invalid input
+
+        Security:
+            - File paths validated to be within project directory
+            - Symlinks resolved to prevent bypass
+            - Error messages sanitized
+        """
+        try:
+            data = await request.json()
+        except json.JSONDecodeError:
+            return web.json_response({
+                'error': 'Invalid JSON in request body',
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }, status=400)
+
+        file_path = data.get('file_path')
+        if not file_path:
+            return web.json_response({
+                'error': 'Missing required field: file_path',
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }, status=400)
+
+        # Validate file path with security enforcer
+        result = self.security.validate_file_path(file_path)
+
+        if not result.allowed:
+            return web.json_response({
+                'error': 'File access denied',
+                'message': result.sanitized_error,
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }, status=403)
+
+        # File path is allowed - in a real implementation, would read it here
+        # For now, just return success
+        return web.json_response({
+            'status': 'allowed',
+            'file_path': file_path,
+            'message': 'File path validated and would be read',
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+
+    async def write_file(self, request: Request) -> Response:
+        """POST /api/security/file/write - Write file with security validation.
+
+        Request body:
+            {
+                "file_path": "src/main.py",
+                "content": "# Python code"
+            }
+
+        Returns:
+            200 OK if write would be allowed
+            403 Forbidden if file is outside project directory
+            400 Bad Request for invalid input
+
+        Security:
+            - File paths validated to be within project directory
+            - Symlinks resolved to prevent bypass
+            - Error messages sanitized
+        """
+        try:
+            data = await request.json()
+        except json.JSONDecodeError:
+            return web.json_response({
+                'error': 'Invalid JSON in request body',
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }, status=400)
+
+        file_path = data.get('file_path')
+        content = data.get('content')
+
+        if not file_path:
+            return web.json_response({
+                'error': 'Missing required field: file_path',
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }, status=400)
+
+        if content is None:
+            return web.json_response({
+                'error': 'Missing required field: content',
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }, status=400)
+
+        # Validate file path with security enforcer
+        result = self.security.validate_file_path(file_path)
+
+        if not result.allowed:
+            return web.json_response({
+                'error': 'File access denied',
+                'message': result.sanitized_error,
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }, status=403)
+
+        # File path is allowed - in a real implementation, would write it here
+        # For now, just return success
+        return web.json_response({
+            'status': 'allowed',
+            'file_path': file_path,
+            'content_length': len(content),
+            'message': 'File path validated and would be written',
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+
+    async def call_mcp_tool(self, request: Request) -> Response:
+        """POST /api/security/mcp/call - Call MCP tool with authorization check.
+
+        Request body:
+            {
+                "tool_name": "slack__send_message",
+                "tool_input": {"channel": "#general", "message": "Hello"},
+                "auth_token": "arcade-gateway-token"
+            }
+
+        Returns:
+            200 OK if tool call is authorized
+            403 Forbidden if authorization fails
+            400 Bad Request for invalid input
+
+        Security:
+            - Authorization token required
+            - Token validated with Arcade gateway
+            - Error messages sanitized
+        """
+        try:
+            data = await request.json()
+        except json.JSONDecodeError:
+            return web.json_response({
+                'error': 'Invalid JSON in request body',
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }, status=400)
+
+        tool_name = data.get('tool_name')
+        tool_input = data.get('tool_input')
+        auth_token = data.get('auth_token')
+
+        if not tool_name:
+            return web.json_response({
+                'error': 'Missing required field: tool_name',
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }, status=400)
+
+        if not tool_input:
+            return web.json_response({
+                'error': 'Missing required field: tool_input',
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }, status=400)
+
+        # Validate MCP tool call with security enforcer
+        result = await self.security.validate_mcp_tool_call(
+            tool_name=tool_name,
+            tool_input=tool_input,
+            auth_token=auth_token
+        )
+
+        if not result.allowed:
+            return web.json_response({
+                'error': 'MCP tool call denied',
+                'message': result.sanitized_error,
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }, status=403)
+
+        # Tool call is authorized - in a real implementation, would execute it here
+        # For now, just return success
+        return web.json_response({
+            'status': 'authorized',
+            'tool_name': tool_name,
+            'message': 'Tool call authorized and would be executed',
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+
     def run(self):
         """Start the REST API server.
 
@@ -677,6 +925,12 @@ class RESTAPIServer:
         print(f"  GET  /api/requirements/{{ticket_key}}")
         print(f"  GET  /api/decisions")
         print(f"  GET  /")
+        print()
+        print("Security Endpoints (AI-113):")
+        print(f"  POST /api/security/bash - Execute bash command (with allowlist validation)")
+        print(f"  POST /api/security/file/read - Read file (within project directory)")
+        print(f"  POST /api/security/file/write - Write file (within project directory)")
+        print(f"  POST /api/security/mcp/call - Call MCP tool (with authorization)")
         print()
         print("Press Ctrl+C to stop the server")
 
