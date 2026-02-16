@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>BRIDGE_INTERFACE</title>
+<style>
+body {font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; line-height: 1.6;}
+code {background: #f6f8fa; padding: 2px 6px; border-radius: 3px;}
+pre {background: #f6f8fa; padding: 16px; border-radius: 6px; overflow-x: auto;}
+pre code {background: none; padding: 0;}
+h1, h2, h3 {color: #667eea;}
+a {color: #667eea;}
+table {border-collapse: collapse; width: 100%;}
+th, td {border: 1px solid #ddd; padding: 12px;}
+th {background: #667eea; color: white;}
+</style></head><body>
+<div style="background: #f6f8fa; padding: 10px; margin-bottom: 20px; border-radius: 6px;">
+<a href="index.html">← Back to Documentation Home</a>
+</div>
+<h1 id="ai-provider-bridge-interface-documentation">AI Provider Bridge Interface Documentation</h1>
+<p>This document specifies the standard interface for AI provider bridges and provides implementation examples.</p>
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol>
+<li><a href="#overview">Overview</a></li>
+<li><a href="#bridge-interface-specification">Bridge Interface Specification</a></li>
+<li><a href="#implementation-guide">Implementation Guide</a></li>
+<li><a href="#existing-bridges">Existing Bridges</a></li>
+<li><a href="#creating-a-new-bridge">Creating a New Bridge</a></li>
+<li><a href="#testing-bridges">Testing Bridges</a></li>
+</ol>
+<h2 id="overview">Overview</h2>
+<p>AI provider bridges enable the Agent Dashboard to integrate with multiple AI providers (OpenAI, Google Gemini, Groq, etc.) through a unified interface. Each bridge translates between the provider's API and the common bridge interface.</p>
+<h3 id="architecture">Architecture</h3>
+<pre><code>Orchestrator
+    ↓
+Bridge Interface (Common API)
+    ↓
+    ├── OpenAI Bridge → OpenAI API
+    ├── Gemini Bridge → Google Gemini API
+    ├── Groq Bridge → Groq API
+    ├── KIMI Bridge → Moonshot API
+    └── Windsurf Bridge → Windsurf CLI/Docker
+</code></pre>
+<h3 id="design-principles">Design Principles</h3>
+<ol>
+<li><strong>Consistent Interface</strong>: All bridges expose the same core methods</li>
+<li><strong>Provider Flexibility</strong>: Each bridge handles provider-specific quirks</li>
+<li><strong>Async Support</strong>: Bridges support both sync and async operations</li>
+<li><strong>Error Handling</strong>: Consistent error types across providers</li>
+<li><strong>Configuration</strong>: Environment-based configuration</li>
+</ol>
+<h2 id="bridge-interface-specification">Bridge Interface Specification</h2>
+<h3 id="required-classes">Required Classes</h3>
+<h4 id="1-session-class">1. Session Class</h4>
+<p>Manages conversation state with the AI provider.</p>
+<pre><code class="language-python">from dataclasses import dataclass, field
+
+@dataclass
+class ChatMessage:
+    &quot;&quot;&quot;A single message in a conversation.
+
+    Attributes:
+        role: Message role (system, user, assistant)
+        content: Message text content
+    &quot;&quot;&quot;
+    role: str
+    content: str
+
+@dataclass
+class ChatSession:
+    &quot;&quot;&quot;A conversation session with an AI provider.
+
+    Attributes:
+        model: Model identifier (e.g., &quot;gpt-4o&quot;, &quot;gemini-2.5-flash&quot;)
+        messages: Conversation history
+        session_id: Optional provider-specific session ID
+
+    Example:
+        &gt;&gt;&gt; session = ChatSession(model=&quot;gpt-4o&quot;)
+        &gt;&gt;&gt; session.add_message(&quot;user&quot;, &quot;Hello!&quot;)
+        &gt;&gt;&gt; session.add_message(&quot;assistant&quot;, &quot;Hi there!&quot;)
+    &quot;&quot;&quot;
+    model: str
+    messages: list[ChatMessage] = field(default_factory=list)
+    session_id: str | None = None
+
+    def add_message(self, role: str, content: str) -&gt; None:
+        &quot;&quot;&quot;Add a message to the conversation.
+
+        Args:
+            role: Message role (system, user, assistant)
+            content: Message text
+        &quot;&quot;&quot;
+        self.messages.append(ChatMessage(role=role, content=content))
+
+    def to_provider_format(self) -&gt; list[dict]:
+        &quot;&quot;&quot;Convert messages to provider-specific format.
+
+        Returns:
+            List of message dictionaries for the provider API
+        &quot;&quot;&quot;
+        return [{&quot;role&quot;: m.role, &quot;content&quot;: m.content} for m in self.messages]
+</code></pre>
+<h4 id="2-response-class">2. Response Class</h4>
+<p>Represents a response from the AI provider.</p>
+<pre><code class="language-python">from dataclasses import dataclass
+
+@dataclass
+class ChatResponse:
+    &quot;&quot;&quot;Response from an AI provider.
+
+    Attributes:
+        content: Response text content
+        model: Model that generated the response
+        usage: Token usage statistics (provider-specific)
+        finish_reason: Reason the model stopped (stop, length, etc.)
+
+    Example:
+        &gt;&gt;&gt; response = ChatResponse(
+        ...     content=&quot;Hello! How can I help?&quot;,
+        ...     model=&quot;gpt-4o&quot;,
+        ...     usage={&quot;prompt_tokens&quot;: 10, &quot;completion_tokens&quot;: 5},
+        ...     finish_reason=&quot;stop&quot;
+        ... )
+    &quot;&quot;&quot;
+    content: str
+    model: str
+    usage: dict | None = None
+    finish_reason: str | None = None
+</code></pre>
+<h4 id="3-bridge-class">3. Bridge Class</h4>
+<p>Main bridge interface.</p>
+<pre><code class="language-python">from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
+
+class AIBridge(ABC):
+    &quot;&quot;&quot;Abstract base class for AI provider bridges.
+
+    Subclasses must implement:
+    - create_session()
+    - send_message()
+    - send_message_async()
+    - stream_response() (optional but recommended)
+    &quot;&quot;&quot;
+
+    @classmethod
+    @abstractmethod
+    def from_env(cls) -&gt; &quot;AIBridge&quot;:
+        &quot;&quot;&quot;Create bridge from environment variables.
+
+        Returns:
+            Configured bridge instance
+
+        Raises:
+            ValueError: If required environment variables are missing
+            ImportError: If required packages are not installed
+
+        Example:
+            &gt;&gt;&gt; bridge = MyBridge.from_env()
+        &quot;&quot;&quot;
+        pass
+
+    @abstractmethod
+    def create_session(
+        self,
+        model: str | None = None,
+        system_prompt: str | None = None
+    ) -&gt; ChatSession:
+        &quot;&quot;&quot;Create a new chat session.
+
+        Args:
+            model: Model identifier (uses default if None)
+            system_prompt: Optional system message to start conversation
+
+        Returns:
+            New ChatSession instance
+
+        Example:
+            &gt;&gt;&gt; session = bridge.create_session(
+            ...     model=&quot;gpt-4o&quot;,
+            ...     system_prompt=&quot;You are a helpful assistant&quot;
+            ... )
+        &quot;&quot;&quot;
+        pass
+
+    @abstractmethod
+    def send_message(
+        self,
+        session: ChatSession,
+        message: str
+    ) -&gt; ChatResponse:
+        &quot;&quot;&quot;Send a message synchronously.
+
+        Args:
+            session: Active chat session
+            message: User message to send
+
+        Returns:
+            ChatResponse with model's reply
+
+        Raises:
+            ConnectionError: If provider API is unreachable
+            ValueError: If request is invalid
+
+        Example:
+            &gt;&gt;&gt; response = bridge.send_message(session, &quot;Hello!&quot;)
+            &gt;&gt;&gt; print(response.content)
+        &quot;&quot;&quot;
+        pass
+
+    @abstractmethod
+    async def send_message_async(
+        self,
+        session: ChatSession,
+        message: str
+    ) -&gt; ChatResponse:
+        &quot;&quot;&quot;Send a message asynchronously.
+
+        Args:
+            session: Active chat session
+            message: User message to send
+
+        Returns:
+            ChatResponse with model's reply
+
+        Raises:
+            ConnectionError: If provider API is unreachable
+            ValueError: If request is invalid
+
+        Example:
+            &gt;&gt;&gt; response = await bridge.send_message_async(session, &quot;Hello!&quot;)
+        &quot;&quot;&quot;
+        pass
+
+    async def stream_response(
+        self,
+        session: ChatSession,
+        message: str
+    ) -&gt; AsyncIterator[str]:
+        &quot;&quot;&quot;Stream response tokens as they're generated.
+
+        Optional but recommended for better UX.
+
+        Args:
+            session: Active chat session
+            message: User message to send
+
+        Yields:
+            Response text tokens as they arrive
+
+        Example:
+            &gt;&gt;&gt; async for token in bridge.stream_response(session, &quot;Count to 10&quot;):
+            ...     print(token, end=&quot;&quot;, flush=True)
+        &quot;&quot;&quot;
+        # Default implementation: yield full response at once
+        response = await self.send_message_async(session, message)
+        yield response.content
+
+    def get_auth_info(self) -&gt; dict[str, str]:
+        &quot;&quot;&quot;Get authentication configuration info.
+
+        Returns:
+            Dictionary with auth status and configuration
+
+        Example:
+            &gt;&gt;&gt; info = bridge.get_auth_info()
+            &gt;&gt;&gt; print(info[&quot;auth_type&quot;])
+            &gt;&gt;&gt; print(info[&quot;api_key_set&quot;])
+        &quot;&quot;&quot;
+        return {
+            &quot;auth_type&quot;: &quot;unknown&quot;,
+            &quot;status&quot;: &quot;not_configured&quot;
+        }
+</code></pre>
+<h2 id="implementation-guide">Implementation Guide</h2>
+<h3 id="step-1-create-bridge-module">Step 1: Create Bridge Module</h3>
+<p>Create a new file in <code>bridges/</code>:</p>
+<pre><code class="language-python"># bridges/my_provider_bridge.py
+&quot;&quot;&quot;
+My Provider Bridge Module
+=========================
+Connects to MyProvider AI service.
+
+Environment Variables:
+    MY_PROVIDER_API_KEY: API key for MyProvider
+    MY_PROVIDER_MODEL: Default model (default: my-model-1)
+&quot;&quot;&quot;
+
+import os
+from dataclasses import dataclass, field
+from collections.abc import AsyncIterator
+
+# Import provider SDK
+try:
+    from my_provider import Client, AsyncClient
+except ImportError:
+    Client = None
+    AsyncClient = None
+</code></pre>
+<h3 id="step-2-implement-session-and-response">Step 2: Implement Session and Response</h3>
+<pre><code class="language-python">@dataclass
+class ChatMessage:
+    role: str
+    content: str
+
+@dataclass
+class ChatSession:
+    model: str
+    messages: list[ChatMessage] = field(default_factory=list)
+    session_id: str | None = None
+
+    def add_message(self, role: str, content: str) -&gt; None:
+        self.messages.append(ChatMessage(role=role, content=content))
+
+    def to_provider_messages(self) -&gt; list[dict]:
+        &quot;&quot;&quot;Convert to provider-specific format.&quot;&quot;&quot;
+        return [
+            {
+                &quot;role&quot;: m.role,
+                &quot;content&quot;: m.content
+            }
+            for m in self.messages
+        ]
+
+@dataclass
+class ChatResponse:
+    content: str
+    model: str
+    usage: dict | None = None
+    finish_reason: str | None = None
+</code></pre>
+<h3 id="step-3-implement-bridge-class">Step 3: Implement Bridge Class</h3>
+<pre><code class="language-python">class MyProviderBridge:
+    &quot;&quot;&quot;Bridge for MyProvider AI service.&quot;&quot;&quot;
+
+    def __init__(self, api_key: str):
+        &quot;&quot;&quot;Initialize bridge.
+
+        Args:
+            api_key: MyProvider API key
+
+        Raises:
+            ImportError: If my_provider package not installed
+        &quot;&quot;&quot;
+        if Client is None or AsyncClient is None:
+            raise ImportError(
+                &quot;my_provider package not installed. &quot;
+                &quot;Run: pip install my-provider-sdk&quot;
+            )
+
+        self.api_key = api_key
+        self._client = Client(api_key=api_key)
+        self._async_client = AsyncClient(api_key=api_key)
+
+    @classmethod
+    def from_env(cls) -&gt; &quot;MyProviderBridge&quot;:
+        &quot;&quot;&quot;Create bridge from environment variables.
+
+        Returns:
+            Configured MyProviderBridge
+
+        Raises:
+            ValueError: If MY_PROVIDER_API_KEY not set
+
+        Example:
+            &gt;&gt;&gt; bridge = MyProviderBridge.from_env()
+        &quot;&quot;&quot;
+        api_key = os.environ.get(&quot;MY_PROVIDER_API_KEY&quot;, &quot;&quot;)
+        if not api_key:
+            raise ValueError(
+                &quot;MY_PROVIDER_API_KEY not set. &quot;
+                &quot;Get your key from https://myprovider.com/keys&quot;
+            )
+        return cls(api_key=api_key)
+
+    def create_session(
+        self,
+        model: str | None = None,
+        system_prompt: str | None = None
+    ) -&gt; ChatSession:
+        &quot;&quot;&quot;Create a new chat session.
+
+        Args:
+            model: Model name (uses MY_PROVIDER_MODEL if None)
+            system_prompt: Optional system message
+
+        Returns:
+            New ChatSession
+
+        Example:
+            &gt;&gt;&gt; session = bridge.create_session(
+            ...     model=&quot;my-model-1&quot;,
+            ...     system_prompt=&quot;You are helpful&quot;
+            ... )
+        &quot;&quot;&quot;
+        model_name = model or os.environ.get(
+            &quot;MY_PROVIDER_MODEL&quot;,
+            &quot;my-model-1&quot;
+        )
+        session = ChatSession(model=model_name)
+
+        if system_prompt:
+            session.add_message(&quot;system&quot;, system_prompt)
+
+        return session
+
+    def send_message(
+        self,
+        session: ChatSession,
+        message: str
+    ) -&gt; ChatResponse:
+        &quot;&quot;&quot;Send a message synchronously.
+
+        Args:
+            session: Active chat session
+            message: User message
+
+        Returns:
+            ChatResponse with model reply
+
+        Example:
+            &gt;&gt;&gt; response = bridge.send_message(session, &quot;Hello!&quot;)
+            &gt;&gt;&gt; print(response.content)
+        &quot;&quot;&quot;
+        session.add_message(&quot;user&quot;, message)
+
+        # Call provider API
+        response = self._client.chat.create(
+            model=session.model,
+            messages=session.to_provider_messages()
+        )
+
+        # Extract response
+        content = response.choices[0].message.content
+        session.add_message(&quot;assistant&quot;, content)
+
+        return ChatResponse(
+            content=content,
+            model=response.model,
+            usage={
+                &quot;prompt_tokens&quot;: response.usage.prompt_tokens,
+                &quot;completion_tokens&quot;: response.usage.completion_tokens,
+                &quot;total_tokens&quot;: response.usage.total_tokens
+            },
+            finish_reason=response.choices[0].finish_reason
+        )
+
+    async def send_message_async(
+        self,
+        session: ChatSession,
+        message: str
+    ) -&gt; ChatResponse:
+        &quot;&quot;&quot;Send a message asynchronously.
+
+        Args:
+            session: Active chat session
+            message: User message
+
+        Returns:
+            ChatResponse with model reply
+
+        Example:
+            &gt;&gt;&gt; response = await bridge.send_message_async(session, &quot;Hi!&quot;)
+        &quot;&quot;&quot;
+        session.add_message(&quot;user&quot;, message)
+
+        # Call provider API asynchronously
+        response = await self._async_client.chat.create(
+            model=session.model,
+            messages=session.to_provider_messages()
+        )
+
+        content = response.choices[0].message.content
+        session.add_message(&quot;assistant&quot;, content)
+
+        return ChatResponse(
+            content=content,
+            model=response.model,
+            usage={
+                &quot;prompt_tokens&quot;: response.usage.prompt_tokens,
+                &quot;completion_tokens&quot;: response.usage.completion_tokens,
+                &quot;total_tokens&quot;: response.usage.total_tokens
+            },
+            finish_reason=response.choices[0].finish_reason
+        )
+
+    async def stream_response(
+        self,
+        session: ChatSession,
+        message: str
+    ) -&gt; AsyncIterator[str]:
+        &quot;&quot;&quot;Stream response tokens.
+
+        Args:
+            session: Active chat session
+            message: User message
+
+        Yields:
+            Response tokens as they arrive
+
+        Example:
+            &gt;&gt;&gt; async for token in bridge.stream_response(session, &quot;Hi!&quot;):
+            ...     print(token, end=&quot;&quot;, flush=True)
+        &quot;&quot;&quot;
+        session.add_message(&quot;user&quot;, message)
+
+        stream = await self._async_client.chat.create(
+            model=session.model,
+            messages=session.to_provider_messages(),
+            stream=True
+        )
+
+        full_content = &quot;&quot;
+        async for chunk in stream:
+            if chunk.choices[0].delta.content:
+                token = chunk.choices[0].delta.content
+                full_content += token
+                yield token
+
+        session.add_message(&quot;assistant&quot;, full_content)
+
+    def get_auth_info(self) -&gt; dict[str, str]:
+        &quot;&quot;&quot;Get authentication info.
+
+        Returns:
+            Auth configuration details
+
+        Example:
+            &gt;&gt;&gt; info = bridge.get_auth_info()
+            &gt;&gt;&gt; print(info)
+        &quot;&quot;&quot;
+        return {
+            &quot;auth_type&quot;: &quot;api_key&quot;,
+            &quot;api_key_set&quot;: &quot;yes&quot; if self.api_key else &quot;no&quot;,
+            &quot;api_key_prefix&quot;: self.api_key[:8] + &quot;...&quot; if len(self.api_key) &gt; 8 else &quot;&quot;,
+            &quot;default_model&quot;: os.environ.get(&quot;MY_PROVIDER_MODEL&quot;, &quot;my-model-1&quot;)
+        }
+</code></pre>
+<h3 id="step-4-create-cli-tool">Step 4: Create CLI Tool</h3>
+<pre><code class="language-python"># scripts/my_provider_cli.py
+&quot;&quot;&quot;
+MyProvider CLI Tool
+===================
+Standalone CLI for interacting with MyProvider.
+&quot;&quot;&quot;
+
+import asyncio
+import argparse
+from bridges.my_provider_bridge import MyProviderBridge
+
+async def main():
+    parser = argparse.ArgumentParser(description=&quot;MyProvider CLI&quot;)
+    parser.add_argument(&quot;--query&quot;, help=&quot;Single query mode&quot;)
+    parser.add_argument(&quot;--model&quot;, help=&quot;Model to use&quot;)
+    parser.add_argument(&quot;--stream&quot;, action=&quot;store_true&quot;, help=&quot;Stream response&quot;)
+    parser.add_argument(&quot;--status&quot;, action=&quot;store_true&quot;, help=&quot;Show auth status&quot;)
+    args = parser.parse_args()
+
+    try:
+        bridge = MyProviderBridge.from_env()
+
+        if args.status:
+            info = bridge.get_auth_info()
+            print(&quot;MyProvider Status:&quot;)
+            for key, value in info.items():
+                print(f&quot;  {key}: {value}&quot;)
+            return
+
+        session = bridge.create_session(model=args.model)
+
+        if args.query:
+            # Single query
+            if args.stream:
+                async for token in bridge.stream_response(session, args.query):
+                    print(token, end=&quot;&quot;, flush=True)
+                print()
+            else:
+                response = await bridge.send_message_async(session, args.query)
+                print(response.content)
+        else:
+            # Interactive REPL
+            print(&quot;MyProvider CLI (type 'exit' to quit)&quot;)
+            while True:
+                query = input(&quot;\n&gt; &quot;)
+                if query.lower() in (&quot;exit&quot;, &quot;quit&quot;):
+                    break
+
+                if args.stream:
+                    async for token in bridge.stream_response(session, query):
+                        print(token, end=&quot;&quot;, flush=True)
+                    print()
+                else:
+                    response = await bridge.send_message_async(session, query)
+                    print(response.content)
+
+    except Exception as e:
+        print(f&quot;Error: {e}&quot;)
+        return 1
+
+if __name__ == &quot;__main__&quot;:
+    asyncio.run(main())
+</code></pre>
+<h2 id="existing-bridges">Existing Bridges</h2>
+<h3 id="openai-bridge">OpenAI Bridge</h3>
+<p>Located in <code>bridges/openai_bridge.py</code></p>
+<p><strong>Features:</strong>
+- Two auth modes: Codex OAuth and Session Token
+- Models: GPT-4o, o1, o3-mini, o4-mini
+- Full streaming support
+- Token usage tracking</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-python">from bridges.openai_bridge import OpenAIBridge
+
+bridge = OpenAIBridge.from_env()
+session = bridge.create_session(model=&quot;gpt-4o&quot;)
+response = bridge.send_message(session, &quot;Hello!&quot;)
+</code></pre>
+<h3 id="gemini-bridge">Gemini Bridge</h3>
+<p>Located in <code>bridges/gemini_bridge.py</code></p>
+<p><strong>Features:</strong>
+- Three auth modes: CLI OAuth, API Key, Vertex AI
+- Models: Gemini 2.5 Flash/Pro, 2.0 Flash
+- Large context windows (1M tokens)
+- Search grounding support</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-python">from bridges.gemini_bridge import GeminiBridge
+
+bridge = GeminiBridge.from_env()
+session = bridge.create_session(model=&quot;gemini-2.5-flash&quot;)
+response = bridge.send_message(session, &quot;Analyze this...&quot;)
+</code></pre>
+<h3 id="groq-bridge">Groq Bridge</h3>
+<p>Located in <code>bridges/groq_bridge.py</code></p>
+<p><strong>Features:</strong>
+- Ultra-fast LPU inference
+- Open-source models (Llama, Mixtral, Gemma)
+- OpenAI-compatible API
+- Generous free tier</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-python">from bridges.groq_bridge import GroqBridge
+
+bridge = GroqBridge.from_env()
+session = bridge.create_session(model=&quot;llama-3.3-70b-versatile&quot;)
+response = bridge.send_message(session, &quot;Quick task&quot;)
+</code></pre>
+<h2 id="creating-a-new-bridge">Creating a New Bridge</h2>
+<h3 id="checklist">Checklist</h3>
+<ul>
+<li>[ ] Create bridge module in <code>bridges/</code></li>
+<li>[ ] Implement required classes (Session, Response, Bridge)</li>
+<li>[ ] Add environment variable configuration</li>
+<li>[ ] Create CLI tool in <code>scripts/</code></li>
+<li>[ ] Write unit tests in <code>tests/</code></li>
+<li>[ ] Add integration tests</li>
+<li>[ ] Document in this file</li>
+<li>[ ] Add to main README.md</li>
+<li>[ ] Update requirements.txt</li>
+</ul>
+<h3 id="template">Template</h3>
+<p>Use the implementation guide above as a template. Key points:</p>
+<ol>
+<li><strong>Consistent naming</strong>: Use <code>{Provider}Bridge</code> class name</li>
+<li><strong>Error handling</strong>: Provide helpful error messages</li>
+<li><strong>Environment config</strong>: Document all env vars</li>
+<li><strong>Type hints</strong>: Use comprehensive type annotations</li>
+<li><strong>Docstrings</strong>: Include examples in all docstrings</li>
+<li><strong>Async support</strong>: Implement both sync and async methods</li>
+</ol>
+<h2 id="testing-bridges">Testing Bridges</h2>
+<h3 id="unit-tests">Unit Tests</h3>
+<pre><code class="language-python"># tests/test_my_provider_bridge.py
+import pytest
+from bridges.my_provider_bridge import MyProviderBridge
+
+def test_create_session():
+    &quot;&quot;&quot;Test session creation.&quot;&quot;&quot;
+    bridge = MyProviderBridge(api_key=&quot;test-key&quot;)
+    session = bridge.create_session(model=&quot;my-model-1&quot;)
+
+    assert session.model == &quot;my-model-1&quot;
+    assert len(session.messages) == 0
+
+def test_create_session_with_system_prompt():
+    &quot;&quot;&quot;Test session with system prompt.&quot;&quot;&quot;
+    bridge = MyProviderBridge(api_key=&quot;test-key&quot;)
+    session = bridge.create_session(
+        system_prompt=&quot;You are helpful&quot;
+    )
+
+    assert len(session.messages) == 1
+    assert session.messages[0].role == &quot;system&quot;
+
+@pytest.mark.asyncio
+async def test_send_message_async():
+    &quot;&quot;&quot;Test async message sending.&quot;&quot;&quot;
+    bridge = MyProviderBridge.from_env()
+    session = bridge.create_session()
+
+    response = await bridge.send_message_async(session, &quot;Test&quot;)
+
+    assert response.content
+    assert response.model
+    assert len(session.messages) == 2  # user + assistant
+</code></pre>
+<h3 id="integration-tests">Integration Tests</h3>
+<pre><code class="language-python"># tests/test_my_provider_integration.py
+import pytest
+from bridges.my_provider_bridge import MyProviderBridge
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_full_conversation():
+    &quot;&quot;&quot;Test a full conversation flow.&quot;&quot;&quot;
+    bridge = MyProviderBridge.from_env()
+    session = bridge.create_session(
+        system_prompt=&quot;You are a math tutor&quot;
+    )
+
+    # First message
+    response1 = await bridge.send_message_async(
+        session,
+        &quot;What is 2+2?&quot;
+    )
+    assert &quot;4&quot; in response1.content
+
+    # Follow-up
+    response2 = await bridge.send_message_async(
+        session,
+        &quot;And what is that plus 3?&quot;
+    )
+    assert &quot;7&quot; in response2.content
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_streaming():
+    &quot;&quot;&quot;Test streaming response.&quot;&quot;&quot;
+    bridge = MyProviderBridge.from_env()
+    session = bridge.create_session()
+
+    tokens = []
+    async for token in bridge.stream_response(session, &quot;Count to 5&quot;):
+        tokens.append(token)
+
+    full_response = &quot;&quot;.join(tokens)
+    assert full_response
+    assert len(tokens) &gt; 1  # Should stream multiple tokens
+</code></pre>
+<h2 id="best-practices">Best Practices</h2>
+<ol>
+<li><strong>Error Messages</strong>: Provide actionable error messages</li>
+<li><strong>Rate Limiting</strong>: Handle provider rate limits gracefully</li>
+<li><strong>Retries</strong>: Implement exponential backoff for transient errors</li>
+<li><strong>Logging</strong>: Log API calls for debugging</li>
+<li><strong>Caching</strong>: Cache authentication tokens when possible</li>
+<li><strong>Testing</strong>: Test both happy path and error cases</li>
+<li><strong>Documentation</strong>: Keep docstrings updated with examples</li>
+</ol>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<h3 id="common-issues">Common Issues</h3>
+<p><strong>ImportError: Package not installed</strong></p>
+<pre><code class="language-bash">pip install &lt;provider-sdk&gt;
+</code></pre>
+<p><strong>ValueError: API key not set</strong></p>
+<pre><code class="language-bash">export MY_PROVIDER_API_KEY=your-key-here
+</code></pre>
+<p><strong>ConnectionError: API unreachable</strong>
+- Check internet connection
+- Verify API endpoint URL
+- Check provider status page</p>
+<p><strong>Rate limit errors</strong>
+- Add exponential backoff
+- Use provider's rate limit headers
+- Implement request queuing</p>
+<h2 id="additional-resources">Additional Resources</h2>
+<ul>
+<li><a href="DEVELOPER_GUIDE.md">Developer Guide</a></li>
+<li><a href="api/index.html">API Documentation</a></li>
+<li><a href="../examples/">Provider Integration Examples</a></li>
+</ul>
+</body></html>
