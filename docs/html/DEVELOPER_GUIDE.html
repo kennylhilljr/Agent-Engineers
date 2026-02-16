@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>DEVELOPER_GUIDE</title>
+<style>
+body {font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; line-height: 1.6;}
+code {background: #f6f8fa; padding: 2px 6px; border-radius: 3px;}
+pre {background: #f6f8fa; padding: 16px; border-radius: 6px; overflow-x: auto;}
+pre code {background: none; padding: 0;}
+h1, h2, h3 {color: #667eea;}
+a {color: #667eea;}
+table {border-collapse: collapse; width: 100%;}
+th, td {border: 1px solid #ddd; padding: 12px;}
+th {background: #667eea; color: white;}
+</style></head><body>
+<div style="background: #f6f8fa; padding: 10px; margin-bottom: 20px; border-radius: 6px;">
+<a href="index.html">← Back to Documentation Home</a>
+</div>
+<h1 id="agent-dashboard-developer-guide">Agent Dashboard Developer Guide</h1>
+<p>This guide provides comprehensive instructions for developers working with the Agent Dashboard system.</p>
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol>
+<li><a href="#getting-started">Getting Started</a></li>
+<li><a href="#architecture-overview">Architecture Overview</a></li>
+<li><a href="#core-modules">Core Modules</a></li>
+<li><a href="#working-with-agents">Working with Agents</a></li>
+<li><a href="#ai-provider-bridges">AI Provider Bridges</a></li>
+<li><a href="#common-development-tasks">Common Development Tasks</a></li>
+<li><a href="#testing-guide">Testing Guide</a></li>
+<li><a href="#security-considerations">Security Considerations</a></li>
+</ol>
+<h2 id="getting-started">Getting Started</h2>
+<h3 id="prerequisites">Prerequisites</h3>
+<ul>
+<li>Python 3.11 or higher</li>
+<li>Node.js 18+ (for MCP servers and Playwright)</li>
+<li>Git</li>
+<li>Virtual environment tool (venv or uv)</li>
+</ul>
+<h3 id="initial-setup">Initial Setup</h3>
+<pre><code class="language-bash"># Clone the repository
+git clone &lt;repository-url&gt;
+cd agent-dashboard
+
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Install development dependencies
+pip install -r requirements-dev.txt
+
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your API keys and configuration
+</code></pre>
+<h3 id="environment-configuration">Environment Configuration</h3>
+<p>Key environment variables:</p>
+<pre><code class="language-bash"># Arcade MCP Gateway (Required)
+ARCADE_API_KEY=your_arcade_api_key
+ARCADE_GATEWAY_SLUG=your_gateway_slug
+ARCADE_USER_ID=your_email@example.com
+
+# Model Selection (Optional)
+ORCHESTRATOR_MODEL=haiku  # haiku, sonnet, or opus
+CODING_AGENT_MODEL=sonnet
+LINEAR_AGENT_MODEL=haiku
+GITHUB_AGENT_MODEL=haiku
+SLACK_AGENT_MODEL=haiku
+
+# GitHub Integration (Optional)
+GITHUB_REPO=owner/repo-name
+
+# Slack Integration (Optional)
+SLACK_CHANNEL=channel-name
+SLACK_BOT_TOKEN=xoxb-your-token
+
+# AI Provider Bridges (Optional)
+CHATGPT_AUTH_TYPE=codex-oauth  # or session-token
+OPENAI_API_KEY=your_openai_key
+GEMINI_AUTH_TYPE=cli-oauth  # or api-key or vertex-ai
+GROQ_API_KEY=your_groq_key
+KIMI_API_KEY=your_kimi_key
+</code></pre>
+<h2 id="architecture-overview">Architecture Overview</h2>
+<h3 id="system-architecture">System Architecture</h3>
+<p>The Agent Dashboard uses a multi-agent orchestration pattern:</p>
+<pre><code>Orchestrator (Haiku/Sonnet/Opus)
+├── Linear Agent (Issue tracking)
+├── Coding Agent (Implementation)
+├── GitHub Agent (Version control)
+├── PR Reviewer Agent (Code review)
+├── Slack Agent (Notifications)
+└── AI Provider Agents
+    ├── ChatGPT Agent
+    ├── Gemini Agent
+    ├── Groq Agent
+    ├── KIMI Agent
+    └── Windsurf Agent
+</code></pre>
+<h3 id="key-concepts">Key Concepts</h3>
+<ol>
+<li><strong>Orchestrator</strong>: Central coordinator that delegates tasks to specialized agents</li>
+<li><strong>Sub-Agents</strong>: Specialized agents with focused responsibilities</li>
+<li><strong>MCP Servers</strong>: Model Context Protocol servers for external integrations</li>
+<li><strong>Bridges</strong>: Adapters for external AI providers</li>
+<li><strong>Security Hooks</strong>: Pre-tool-use validation for bash commands</li>
+</ol>
+<h2 id="core-modules">Core Modules</h2>
+<h3 id="clientpy-claude-sdk-client-configuration">client.py - Claude SDK Client Configuration</h3>
+<p>The <code>client</code> module configures the Claude Agent SDK client with security settings and MCP servers.</p>
+<h4 id="example-creating-a-client">Example: Creating a Client</h4>
+<pre><code class="language-python">from pathlib import Path
+from client import create_client
+
+# Create a client for a project
+project_dir = Path(&quot;./my-project&quot;)
+client = create_client(
+    project_dir=project_dir,
+    model=&quot;claude-sonnet-4-5-20250929&quot;,
+    cwd=None,  # Optional: override working directory
+    agent_overrides=None  # Optional: custom agent definitions
+)
+
+# Use the client in an async context
+async with client:
+    await client.query(&quot;Implement feature X&quot;)
+    async for msg in client.receive_response():
+        # Process messages
+        pass
+</code></pre>
+<h4 id="security-configuration">Security Configuration</h4>
+<p>The client automatically configures three security layers:</p>
+<ol>
+<li><strong>Sandbox</strong>: OS-level bash command isolation</li>
+<li><strong>Permissions</strong>: File operations restricted to project directory</li>
+<li><strong>Security Hooks</strong>: Bash command allowlist validation</li>
+</ol>
+<pre><code class="language-python">from client import create_security_settings, write_security_settings
+
+# Create security settings
+settings = create_security_settings()
+
+# Write to project directory
+settings_file = write_security_settings(project_dir, settings)
+</code></pre>
+<h3 id="agentpy-agent-session-logic">agent.py - Agent Session Logic</h3>
+<p>The <code>agent</code> module provides core functions for running autonomous coding sessions.</p>
+<h4 id="example-running-an-agent-session">Example: Running an Agent Session</h4>
+<pre><code class="language-python">import asyncio
+from pathlib import Path
+from client import create_client
+from agent import run_agent_session
+
+async def main():
+    project_dir = Path(&quot;./my-project&quot;)
+    client = create_client(project_dir, &quot;claude-sonnet-4-5-20250929&quot;)
+
+    async with client:
+        result = await run_agent_session(
+            client=client,
+            message=&quot;Implement the login feature&quot;,
+            project_dir=project_dir
+        )
+
+        if result.status == &quot;complete&quot;:
+            print(&quot;Project complete!&quot;)
+        elif result.status == &quot;error&quot;:
+            print(f&quot;Error: {result.response}&quot;)
+        else:
+            print(&quot;Session completed, ready to continue&quot;)
+
+asyncio.run(main())
+</code></pre>
+<h4 id="running-the-autonomous-loop">Running the Autonomous Loop</h4>
+<pre><code class="language-python">from agent import run_autonomous_agent
+
+async def main():
+    await run_autonomous_agent(
+        project_dir=Path(&quot;./my-project&quot;),
+        model=&quot;claude-sonnet-4-5-20250929&quot;,
+        max_iterations=5  # Optional: limit iterations
+    )
+
+asyncio.run(main())
+</code></pre>
+<h3 id="securitypy-bash-command-validation">security.py - Bash Command Validation</h3>
+<p>The <code>security</code> module implements allowlist-based command validation.</p>
+<h4 id="example-custom-command-validation">Example: Custom Command Validation</h4>
+<pre><code class="language-python">from security import validate_bash_command, ALLOWED_COMMANDS
+
+# Add custom commands to allowlist
+ALLOWED_COMMANDS.add(&quot;my-custom-tool&quot;)
+
+# Validate a command
+result = validate_bash_command(&quot;ls -la&quot;)
+if result.allowed:
+    print(&quot;Command allowed&quot;)
+else:
+    print(f&quot;Command blocked: {result.reason}&quot;)
+</code></pre>
+<h4 id="understanding-the-security-hook">Understanding the Security Hook</h4>
+<pre><code class="language-python">from claude_agent_sdk import PreToolUseHookInput
+from security import bash_security_hook
+
+# The security hook is called before bash commands execute
+hook_input = PreToolUseHookInput(
+    tool_use_id=&quot;tool_123&quot;,
+    tool_name=&quot;Bash&quot;,
+    tool_input={&quot;command&quot;: &quot;rm -rf /&quot;}
+)
+
+response = bash_security_hook(hook_input, None)
+# Response will block dangerous commands
+</code></pre>
+<h3 id="promptspy-prompt-template-management">prompts.py - Prompt Template Management</h3>
+<p>The <code>prompts</code> module handles loading and managing prompt templates.</p>
+<h4 id="example-working-with-prompts">Example: Working with Prompts</h4>
+<pre><code class="language-python">from pathlib import Path
+from prompts import (
+    load_prompt,
+    get_initializer_task,
+    get_continuation_task,
+    copy_spec_to_project
+)
+
+# Load a custom prompt
+custom_prompt = load_prompt(&quot;my_custom_prompt&quot;)
+
+# Get initialization task
+init_task = get_initializer_task(Path(&quot;./my-project&quot;))
+
+# Get continuation task
+cont_task = get_continuation_task(Path(&quot;./my-project&quot;))
+
+# Copy spec file to project
+copy_spec_to_project(Path(&quot;./my-project&quot;))
+</code></pre>
+<h2 id="working-with-agents">Working with Agents</h2>
+<h3 id="agent-definitions">Agent Definitions</h3>
+<p>Agents are defined in <code>agents/definitions.py</code>:</p>
+<pre><code class="language-python">from agents.definitions import AGENT_DEFINITIONS
+
+# Access specific agent
+linear_agent = AGENT_DEFINITIONS[&quot;linear&quot;]
+print(f&quot;Linear agent model: {linear_agent['model']}&quot;)
+print(f&quot;Linear agent prompt: {linear_agent['system_prompt']}&quot;)
+</code></pre>
+<h3 id="creating-custom-agents">Creating Custom Agents</h3>
+<pre><code class="language-python">from agents.definitions import create_agent_definition
+
+# Define a custom agent
+custom_agent = create_agent_definition(
+    name=&quot;custom&quot;,
+    model=&quot;claude-sonnet-4-5-20250929&quot;,
+    prompt_file=&quot;custom_agent_prompt&quot;
+)
+
+# Use in client
+agent_overrides = {
+    **AGENT_DEFINITIONS,
+    &quot;custom&quot;: custom_agent
+}
+
+client = create_client(
+    project_dir=project_dir,
+    model=&quot;haiku&quot;,
+    agent_overrides=agent_overrides
+)
+</code></pre>
+<h3 id="delegating-to-sub-agents">Delegating to Sub-Agents</h3>
+<p>Within an orchestrator prompt or agent implementation:</p>
+<pre><code class="language-markdown">Use the Task tool to delegate to specialized agents:
+
+- `Task(agent=&quot;linear&quot;, task=&quot;Create issue for feature X&quot;)`
+- `Task(agent=&quot;coding&quot;, task=&quot;Implement feature X&quot;)`
+- `Task(agent=&quot;github&quot;, task=&quot;Create PR for feature X&quot;)`
+- `Task(agent=&quot;slack&quot;, task=&quot;Notify team about feature X&quot;)`
+</code></pre>
+<h2 id="ai-provider-bridges">AI Provider Bridges</h2>
+<h3 id="chatgpt-bridge">ChatGPT Bridge</h3>
+<p>The ChatGPT bridge provides access to OpenAI models.</p>
+<h4 id="example-using-chatgpt-bridge">Example: Using ChatGPT Bridge</h4>
+<pre><code class="language-python">from bridges.openai_bridge import OpenAIBridge
+
+# Create bridge from environment
+bridge = OpenAIBridge.from_env()
+
+# Create session
+session = bridge.create_session(
+    model=&quot;gpt-4o&quot;,
+    system_prompt=&quot;You are a helpful coding assistant&quot;
+)
+
+# Send message
+response = bridge.send_message(session, &quot;Explain async/await in Python&quot;)
+print(response.content)
+
+# Check authentication status
+auth_info = bridge.get_auth_info()
+print(auth_info)
+</code></pre>
+<h4 id="async-usage">Async Usage</h4>
+<pre><code class="language-python">import asyncio
+
+async def main():
+    bridge = OpenAIBridge.from_env()
+    session = bridge.create_session(model=&quot;gpt-4o&quot;)
+
+    # Async send
+    response = await bridge.send_message_async(session, &quot;Hello!&quot;)
+    print(response.content)
+
+    # Streaming
+    async for token in bridge.stream_response(session, &quot;Count to 10&quot;):
+        print(token, end=&quot;&quot;, flush=True)
+
+asyncio.run(main())
+</code></pre>
+<h3 id="gemini-bridge">Gemini Bridge</h3>
+<pre><code class="language-python">from bridges.gemini_bridge import GeminiBridge
+
+# Create bridge
+bridge = GeminiBridge.from_env()
+
+# Create session
+session = bridge.create_session(model=&quot;gemini-2.5-flash&quot;)
+
+# Send message
+response = bridge.send_message(session, &quot;Analyze this code...&quot;)
+print(response.content)
+</code></pre>
+<h3 id="groq-bridge">Groq Bridge</h3>
+<pre><code class="language-python">from bridges.groq_bridge import GroqBridge
+
+# Create bridge
+bridge = GroqBridge.from_env()
+
+# Create session
+session = bridge.create_session(model=&quot;llama-3.3-70b-versatile&quot;)
+
+# Ultra-fast inference
+response = bridge.send_message(session, &quot;Quick task...&quot;)
+</code></pre>
+<h2 id="common-development-tasks">Common Development Tasks</h2>
+<h3 id="task-1-add-a-new-agent">Task 1: Add a New Agent</h3>
+<ol>
+<li>Create prompt file in <code>prompts/</code>:</li>
+</ol>
+<pre><code class="language-bash">touch prompts/my_agent_prompt.md
+</code></pre>
+<ol>
+<li>Add agent definition in <code>agents/definitions.py</code>:</li>
+</ol>
+<pre><code class="language-python">&quot;my_agent&quot;: {
+    &quot;model&quot;: get_agent_model(&quot;MY_AGENT_MODEL&quot;, &quot;haiku&quot;),
+    &quot;system_prompt&quot;: load_agent_prompt(&quot;my_agent_prompt&quot;),
+    &quot;allowed_tools&quot;: [
+        &quot;Read&quot;, &quot;Write&quot;, &quot;Edit&quot;, &quot;Bash&quot;, &quot;Glob&quot;, &quot;Grep&quot;
+    ]
+}
+</code></pre>
+<ol>
+<li>Use in orchestrator:</li>
+</ol>
+<pre><code class="language-markdown">Task(agent=&quot;my_agent&quot;, task=&quot;Do something&quot;)
+</code></pre>
+<h3 id="task-2-customize-security-rules">Task 2: Customize Security Rules</h3>
+<p>Edit <code>security.py</code> to add allowed commands:</p>
+<pre><code class="language-python">ALLOWED_COMMANDS.add(&quot;my-tool&quot;)
+ALLOWED_COMMANDS.add(&quot;another-command&quot;)
+
+# Add validation for specific commands
+def validate_my_tool(args: list[str]) -&gt; ValidationResult:
+    if &quot;--dangerous-flag&quot; in args:
+        return ValidationResult(False, &quot;Dangerous flag not allowed&quot;)
+    return ValidationResult(True)
+</code></pre>
+<h3 id="task-3-add-custom-metrics">Task 3: Add Custom Metrics</h3>
+<p>Create a metrics collector:</p>
+<pre><code class="language-python">from dashboard.metrics import MetricsCollector
+
+collector = MetricsCollector()
+collector.record_event(&quot;custom_event&quot;, {&quot;data&quot;: &quot;value&quot;})
+collector.save()
+</code></pre>
+<h3 id="task-4-integrate-new-ai-provider">Task 4: Integrate New AI Provider</h3>
+<ol>
+<li>Create bridge in <code>bridges/</code>:</li>
+</ol>
+<pre><code class="language-python"># bridges/my_provider_bridge.py
+class MyProviderBridge:
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+
+    def create_session(self, model: str) -&gt; Session:
+        return Session(model=model)
+
+    def send_message(self, session: Session, message: str) -&gt; Response:
+        # Implementation
+        pass
+</code></pre>
+<ol>
+<li>Add environment configuration</li>
+<li>Create CLI tool in <code>scripts/</code></li>
+<li>Document in integration guide</li>
+</ol>
+<h3 id="task-5-create-custom-prompt-template">Task 5: Create Custom Prompt Template</h3>
+<ol>
+<li>Create template file:</li>
+</ol>
+<pre><code class="language-bash">cat &gt; prompts/my_task.md &lt;&lt; 'EOF'
+# My Custom Task
+
+You are working on project: {project_dir}
+
+Your task is to:
+1. First step
+2. Second step
+3. Third step
+
+Context: {additional_context}
+EOF
+</code></pre>
+<ol>
+<li>Load in code:</li>
+</ol>
+<pre><code class="language-python">from prompts import load_prompt
+
+template = load_prompt(&quot;my_task&quot;)
+prompt = template.format(
+    project_dir=&quot;/path/to/project&quot;,
+    additional_context=&quot;Some context&quot;
+)
+</code></pre>
+<h2 id="testing-guide">Testing Guide</h2>
+<h3 id="running-tests">Running Tests</h3>
+<pre><code class="language-bash"># Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=. --cov-report=html
+
+# Run specific test file
+pytest tests/test_security.py
+
+# Run specific test
+pytest tests/test_security.py::test_validate_bash_command
+</code></pre>
+<h3 id="writing-tests">Writing Tests</h3>
+<p>Example test structure:</p>
+<pre><code class="language-python">import pytest
+from pathlib import Path
+from client import create_client, create_security_settings
+
+def test_create_security_settings():
+    &quot;&quot;&quot;Test security settings creation.&quot;&quot;&quot;
+    settings = create_security_settings()
+
+    assert settings[&quot;sandbox&quot;][&quot;enabled&quot;] is False
+    assert settings[&quot;permissions&quot;][&quot;defaultMode&quot;] == &quot;acceptEdits&quot;
+    assert &quot;Bash(*)&quot; in settings[&quot;permissions&quot;][&quot;allow&quot;]
+
+@pytest.mark.asyncio
+async def test_agent_session():
+    &quot;&quot;&quot;Test running an agent session.&quot;&quot;&quot;
+    project_dir = Path(&quot;./test-project&quot;)
+    client = create_client(project_dir, &quot;haiku&quot;)
+
+    async with client:
+        # Test implementation
+        pass
+</code></pre>
+<h3 id="integration-tests">Integration Tests</h3>
+<pre><code class="language-bash"># Run integration tests
+pytest tests/test_integration*.py -v
+
+# Run with Playwright
+pytest tests/test_playwright_*.py --headed
+</code></pre>
+<h2 id="security-considerations">Security Considerations</h2>
+<h3 id="defense-in-depth">Defense in Depth</h3>
+<p>The system implements multiple security layers:</p>
+<ol>
+<li><strong>OS Sandbox</strong>: Bash commands run in isolated environment</li>
+<li><strong>File Permissions</strong>: Operations restricted to project directory</li>
+<li><strong>Command Allowlist</strong>: Only approved commands can execute</li>
+<li><strong>Extra Validation</strong>: Sensitive commands get additional checks</li>
+</ol>
+<h3 id="best-practices">Best Practices</h3>
+<ol>
+<li><strong>Never disable security hooks</strong> in production</li>
+<li><strong>Audit ALLOWED_COMMANDS</strong> regularly</li>
+<li><strong>Validate all user input</strong> before passing to agents</li>
+<li><strong>Use read-only mode</strong> when possible</li>
+<li><strong>Monitor agent actions</strong> through logging</li>
+</ol>
+<h3 id="sensitive-command-handling">Sensitive Command Handling</h3>
+<pre><code class="language-python"># Dangerous commands require extra validation
+COMMANDS_NEEDING_EXTRA_VALIDATION = {
+    &quot;pkill&quot;,    # Process termination
+    &quot;chmod&quot;,    # Permission changes
+    &quot;rm&quot;,       # File deletion
+    &quot;git&quot;,      # Version control
+    &quot;init.sh&quot;   # Script execution
+}
+</code></pre>
+<h3 id="api-key-management">API Key Management</h3>
+<pre><code class="language-bash"># Never commit .env files
+echo &quot;.env&quot; &gt;&gt; .gitignore
+
+# Use environment-specific configurations
+cp .env.example .env.development
+cp .env.example .env.production
+
+# Rotate keys regularly
+# Use secrets management in production (AWS Secrets Manager, etc.)
+</code></pre>
+<h2 id="additional-resources">Additional Resources</h2>
+<ul>
+<li><a href="api/index.html">API Documentation</a> - Generated API docs</li>
+<li><a href="BRIDGE_INTERFACE.md">Bridge Interface Documentation</a> - AI provider bridge specs</li>
+<li><a href="architecture/">Architecture Diagrams</a> - System architecture diagrams</li>
+<li><a href="../CONTRIBUTING.md">Contributing Guide</a> - How to contribute</li>
+</ul>
+<h2 id="support">Support</h2>
+<p>For questions or issues:</p>
+<ol>
+<li>Check the <a href="api/index.html">API Documentation</a></li>
+<li>Search existing <a href="https://github.com/your-org/agent-dashboard/issues">GitHub Issues</a></li>
+<li>Join the community Slack channel</li>
+<li>Read the main <a href="../README.md">README.md</a></li>
+</ol>
+<h2 id="changelog">Changelog</h2>
+<p>See <a href="../CHANGELOG.md">CHANGELOG.md</a> for version history and updates.</p>
+</body></html>
