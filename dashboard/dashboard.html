@@ -1031,6 +1031,68 @@
             margin-top: 4px;
         }
 
+        /* Provider Selector Styles */
+        .provider-selector-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            padding: 12px;
+            background: rgba(15, 23, 42, 0.4);
+            border-radius: 8px;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .provider-selector-label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #94a3b8;
+            white-space: nowrap;
+        }
+
+        .provider-selector {
+            flex: 1;
+            padding: 8px 12px;
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            border-radius: 8px;
+            color: #f1f5f9;
+            font-size: 0.9rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .provider-selector:hover {
+            border-color: #3b82f6;
+            background: rgba(15, 23, 42, 0.9);
+        }
+
+        .provider-selector:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+        }
+
+        .provider-selector option {
+            background: #1e293b;
+            color: #f1f5f9;
+            padding: 8px;
+        }
+
+        .provider-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
         .chat-input-area {
             display: flex;
             gap: 8px;
@@ -1136,225 +1198,6 @@
                 opacity: 1;
             }
         }
-
-        /* File Change Summary Component */
-        .file-changes-container {
-            margin-top: 12px;
-        }
-
-        .file-changes-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid rgba(148, 163, 184, 0.15);
-        }
-
-        .file-changes-stats {
-            display: flex;
-            gap: 20px;
-            font-size: 0.85rem;
-        }
-
-        .file-stat {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .file-stat-icon {
-            width: 16px;
-            height: 16px;
-            border-radius: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.7rem;
-        }
-
-        .file-stat-icon.created { background: rgba(16, 185, 129, 0.2); color: #10b981; }
-        .file-stat-icon.modified { background: rgba(96, 165, 250, 0.2); color: #60a5fa; }
-        .file-stat-icon.deleted { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
-
-        .file-stat-label {
-            color: #94a3b8;
-        }
-
-        .file-stat-value {
-            color: #f1f5f9;
-            font-weight: 600;
-        }
-
-        .file-changes-list {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .file-change-item {
-            background: rgba(15, 23, 42, 0.3);
-            border: 1px solid rgba(148, 163, 184, 0.15);
-            border-radius: 8px;
-            overflow: hidden;
-            transition: all 0.2s ease;
-        }
-
-        .file-change-item:hover {
-            border-color: rgba(148, 163, 184, 0.3);
-        }
-
-        .file-change-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 16px;
-            cursor: pointer;
-            user-select: none;
-        }
-
-        .file-change-header:hover {
-            background: rgba(15, 23, 42, 0.5);
-        }
-
-        .file-change-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            flex: 1;
-        }
-
-        .file-change-type-badge {
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .file-change-type-badge.created {
-            background: rgba(16, 185, 129, 0.15);
-            color: #10b981;
-            border: 1px solid rgba(16, 185, 129, 0.3);
-        }
-
-        .file-change-type-badge.modified {
-            background: rgba(96, 165, 250, 0.15);
-            color: #60a5fa;
-            border: 1px solid rgba(96, 165, 250, 0.3);
-        }
-
-        .file-change-type-badge.deleted {
-            background: rgba(239, 68, 68, 0.15);
-            color: #ef4444;
-            border: 1px solid rgba(239, 68, 68, 0.3);
-        }
-
-        .file-path {
-            font-family: 'Monaco', 'Courier New', monospace;
-            font-size: 0.85rem;
-            color: #f1f5f9;
-            flex: 1;
-        }
-
-        .file-change-stats {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 0.8rem;
-            margin-right: 8px;
-        }
-
-        .lines-added {
-            color: #10b981;
-        }
-
-        .lines-removed {
-            color: #ef4444;
-        }
-
-        .expand-icon {
-            width: 20px;
-            height: 20px;
-            color: #94a3b8;
-            transition: transform 0.2s ease;
-        }
-
-        .expand-icon.expanded {
-            transform: rotate(180deg);
-        }
-
-        .file-diff-content {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease;
-        }
-
-        .file-diff-content.expanded {
-            max-height: 600px;
-            overflow-y: auto;
-        }
-
-        .diff-viewer {
-            padding: 16px;
-            background: rgba(0, 0, 0, 0.3);
-            border-top: 1px solid rgba(148, 163, 184, 0.15);
-            font-family: 'Monaco', 'Courier New', monospace;
-            font-size: 0.75rem;
-            line-height: 1.5;
-        }
-
-        .diff-line {
-            display: flex;
-            padding: 2px 8px;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-
-        .diff-line-number {
-            min-width: 50px;
-            color: #64748b;
-            user-select: none;
-            text-align: right;
-            padding-right: 12px;
-        }
-
-        .diff-line-content {
-            flex: 1;
-        }
-
-        .diff-line.added {
-            background: rgba(16, 185, 129, 0.1);
-            color: #10b981;
-        }
-
-        .diff-line.removed {
-            background: rgba(239, 68, 68, 0.1);
-            color: #ef4444;
-        }
-
-        .diff-line.context {
-            color: #cbd5e1;
-        }
-
-        .diff-line.header {
-            background: rgba(96, 165, 250, 0.1);
-            color: #60a5fa;
-            font-weight: 600;
-        }
-
-        .file-changes-empty {
-            text-align: center;
-            padding: 40px 20px;
-            color: #64748b;
-        }
-
-        .file-changes-empty svg {
-            width: 48px;
-            height: 48px;
-            margin: 0 auto 16px;
-            opacity: 0.5;
-        }
     </style>
 </head>
 <body>
@@ -1439,27 +1282,6 @@
                 </div>
             </div>
 
-            <!-- File Change Summary (Code Activity) -->
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">
-                        <svg class="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                        </svg>
-                        Code Activity - File Changes
-                    </h2>
-                </div>
-                <div id="file-changes-container" class="file-changes-container" data-testid="file-changes-container">
-                    <div class="loading">
-                        <div class="loading-spinner"></div>
-                        <p>Loading file changes...</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Performance Charts Row -->
-        <div class="dashboard-grid">
             <!-- Performance Metrics Chart -->
             <div class="card">
                 <div class="card-header">
@@ -1519,6 +1341,25 @@
                 </h2>
             </div>
             <div id="chat-container" class="chat-container">
+                <div class="provider-selector-container">
+                    <label for="ai-provider-selector" class="provider-selector-label">
+                        AI Provider:
+                    </label>
+                    <select
+                        id="ai-provider-selector"
+                        class="provider-selector"
+                        data-testid="ai-provider-selector"
+                        aria-label="Select AI Provider"
+                    >
+                        <option value="claude" data-testid="provider-option-claude">Claude (Haiku 4.5, Sonnet 4.5, Opus 4.6)</option>
+                        <option value="chatgpt" data-testid="provider-option-chatgpt">ChatGPT (GPT-4o, o1, o3-mini, o4-mini)</option>
+                        <option value="gemini" data-testid="provider-option-gemini">Gemini (2.5 Flash, 2.5 Pro, 2.0 Flash)</option>
+                        <option value="groq" data-testid="provider-option-groq">Groq (Llama 3.3 70B, Mixtral 8x7B)</option>
+                        <option value="kimi" data-testid="provider-option-kimi">KIMI (Moonshot 2M context)</option>
+                        <option value="windsurf" data-testid="provider-option-windsurf">Windsurf (Cascade)</option>
+                    </select>
+                    <span class="provider-badge" id="provider-badge" data-testid="provider-badge">Claude</span>
+                </div>
                 <div id="chat-messages" class="chat-messages">
                     <div class="chat-welcome">
                         <p>Welcome to the Agent Dashboard Chat. Ask me anything about your agent status, metrics, or general questions!</p>
@@ -2109,163 +1950,6 @@
                     </div>
                 `;
             }).join('');
-        }
-
-        // File Change Summary Rendering
-        function renderFileChanges(events) {
-            const container = document.getElementById('file-changes-container');
-            if (!container) return;
-
-            // Find the most recent coding event with file changes
-            const codingEvents = (events || []).filter(e =>
-                e.agent_name === 'coding' &&
-                e.file_changes &&
-                e.file_changes.length > 0
-            );
-
-            if (codingEvents.length === 0) {
-                container.innerHTML = `
-                    <div class="file-changes-empty" data-testid="file-changes-empty">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                        </svg>
-                        <p>No file changes yet</p>
-                        <p style="font-size: 0.8rem; margin-top: 8px;">File changes will appear here after a coding task completes</p>
-                    </div>
-                `;
-                return;
-            }
-
-            // Get the most recent event with file changes
-            const latestEvent = codingEvents[codingEvents.length - 1];
-            const fileChanges = latestEvent.file_changes || [];
-
-            // Calculate totals
-            const created = fileChanges.filter(f => f.change_type === 'created').length;
-            const modified = fileChanges.filter(f => f.change_type === 'modified').length;
-            const deleted = fileChanges.filter(f => f.change_type === 'deleted').length;
-            const totalAdded = fileChanges.reduce((sum, f) => sum + f.lines_added, 0);
-            const totalRemoved = fileChanges.reduce((sum, f) => sum + f.lines_removed, 0);
-
-            // Render header with stats
-            let html = `
-                <div class="file-changes-header">
-                    <div class="file-changes-stats">
-                        <div class="file-stat">
-                            <div class="file-stat-icon created">+</div>
-                            <span class="file-stat-label">Created:</span>
-                            <span class="file-stat-value" data-testid="files-created-count">${created}</span>
-                        </div>
-                        <div class="file-stat">
-                            <div class="file-stat-icon modified">~</div>
-                            <span class="file-stat-label">Modified:</span>
-                            <span class="file-stat-value" data-testid="files-modified-count">${modified}</span>
-                        </div>
-                        <div class="file-stat">
-                            <div class="file-stat-icon deleted">-</div>
-                            <span class="file-stat-label">Deleted:</span>
-                            <span class="file-stat-value" data-testid="files-deleted-count">${deleted}</span>
-                        </div>
-                        <div class="file-stat">
-                            <span class="file-stat-label">Lines:</span>
-                            <span class="file-stat-value">
-                                <span class="lines-added" data-testid="total-lines-added">+${totalAdded}</span>
-                                <span style="color: #94a3b8;"> / </span>
-                                <span class="lines-removed" data-testid="total-lines-removed">-${totalRemoved}</span>
-                            </span>
-                        </div>
-                    </div>
-                </div>
-                <div class="file-changes-list">
-            `;
-
-            // Render each file change
-            fileChanges.forEach((file, index) => {
-                const changeTypeClass = file.change_type;
-                const changeTypeLabel = file.change_type.charAt(0).toUpperCase() + file.change_type.slice(1);
-                const fileId = `file-${index}`;
-
-                html += `
-                    <div class="file-change-item" data-testid="file-change-item">
-                        <div class="file-change-header" onclick="toggleFileDiff('${fileId}')">
-                            <div class="file-change-info">
-                                <span class="file-change-type-badge ${changeTypeClass}" data-testid="file-change-type">${changeTypeLabel}</span>
-                                <span class="file-path" data-testid="file-path">${escapeHtml(file.path)}</span>
-                            </div>
-                            <div class="file-change-stats">
-                                ${file.lines_added > 0 ? `<span class="lines-added">+${file.lines_added}</span>` : ''}
-                                ${file.lines_removed > 0 ? `<span class="lines-removed">-${file.lines_removed}</span>` : ''}
-                            </div>
-                            <svg class="expand-icon" id="${fileId}-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                            </svg>
-                        </div>
-                        <div class="file-diff-content" id="${fileId}-content" data-testid="file-diff-content">
-                            <div class="diff-viewer">
-                                ${renderDiff(file.diff, file.language)}
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-
-            html += '</div>';
-            container.innerHTML = html;
-        }
-
-        function toggleFileDiff(fileId) {
-            const content = document.getElementById(`${fileId}-content`);
-            const icon = document.getElementById(`${fileId}-icon`);
-
-            if (content && icon) {
-                content.classList.toggle('expanded');
-                icon.classList.toggle('expanded');
-            }
-        }
-
-        function renderDiff(diffText, language) {
-            if (!diffText || diffText.trim() === '') {
-                return '<div class="diff-line context"><span class="diff-line-content">No diff available</span></div>';
-            }
-
-            const lines = diffText.split('\n');
-            let html = '';
-            let lineNumber = 0;
-
-            lines.forEach(line => {
-                let className = 'context';
-                let displayLine = line;
-
-                if (line.startsWith('@@')) {
-                    className = 'header';
-                } else if (line.startsWith('+') && !line.startsWith('+++')) {
-                    className = 'added';
-                    lineNumber++;
-                } else if (line.startsWith('-') && !line.startsWith('---')) {
-                    className = 'removed';
-                } else if (!line.startsWith('+++') && !line.startsWith('---')) {
-                    lineNumber++;
-                }
-
-                const lineNum = className === 'header' || line.startsWith('+++') || line.startsWith('---')
-                    ? ''
-                    : lineNumber || '';
-
-                html += `
-                    <div class="diff-line ${className}">
-                        <span class="diff-line-number">${lineNum}</span>
-                        <span class="diff-line-content">${escapeHtml(displayLine)}</span>
-                    </div>
-                `;
-            });
-
-            return html;
-        }
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
         }
 
         // Chart Functions
@@ -2864,7 +2548,6 @@
             renderAgentCards(data);
             renderProviderUsage(data);
             renderActivityFeed(data.events || []);
-            renderFileChanges(data.events || []);
 
             // Create charts
             if (data.agents && Object.keys(data.agents).length > 0) {
@@ -2903,113 +2586,17 @@
         // Chat Interface Implementation
         // ==========================================
 
-        /**
-         * Chat Message History Persistence - AI-69
-         * Manages localStorage for chat messages
-         */
-        class ChatMessageHistory {
-            constructor(storageKey = 'chat_message_history_session') {
-                this.storageKey = storageKey;
-                this.maxStorageSize = 10 * 1024 * 1024; // 10MB limit
-            }
-
-            saveMessages(messages) {
-                try {
-                    const data = JSON.stringify({
-                        version: '1.0',
-                        timestamp: new Date().toISOString(),
-                        messages: messages
-                    });
-
-                    if (data.length > this.maxStorageSize) {
-                        console.warn('Storage size exceeded, clearing old messages');
-                        // Keep only the last 50 messages if exceeds limit
-                        const trimmedMessages = messages.slice(-50);
-                        const trimmedData = JSON.stringify({
-                            version: '1.0',
-                            timestamp: new Date().toISOString(),
-                            messages: trimmedMessages
-                        });
-                        localStorage.setItem(this.storageKey, trimmedData);
-                        return trimmedMessages;
-                    }
-
-                    localStorage.setItem(this.storageKey, data);
-                    return messages;
-                } catch (error) {
-                    console.error('Failed to save messages to localStorage:', error);
-                    // Fallback: clear and retry with smaller dataset
-                    try {
-                        localStorage.removeItem(this.storageKey);
-                        const lastMessages = messages.slice(-25);
-                        localStorage.setItem(this.storageKey, JSON.stringify({
-                            version: '1.0',
-                            timestamp: new Date().toISOString(),
-                            messages: lastMessages
-                        }));
-                    } catch (retryError) {
-                        console.error('Failed to save even reduced message set:', retryError);
-                    }
-                }
-            }
-
-            loadMessages() {
-                try {
-                    const data = localStorage.getItem(this.storageKey);
-                    if (!data) return [];
-
-                    const parsed = JSON.parse(data);
-                    if (!parsed.messages || !Array.isArray(parsed.messages)) {
-                        return [];
-                    }
-
-                    // Restore timestamp as Date object
-                    return parsed.messages.map(msg => ({
-                        ...msg,
-                        timestamp: new Date(msg.timestamp)
-                    }));
-                } catch (error) {
-                    console.error('Failed to load messages from localStorage:', error);
-                    return [];
-                }
-            }
-
-            clearMessages() {
-                try {
-                    localStorage.removeItem(this.storageKey);
-                } catch (error) {
-                    console.error('Failed to clear messages from localStorage:', error);
-                }
-            }
-
-            getStorageInfo() {
-                try {
-                    const data = localStorage.getItem(this.storageKey);
-                    if (!data) return { isEmpty: true, messageCount: 0, sizeBytes: 0 };
-
-                    const parsed = JSON.parse(data);
-                    return {
-                        isEmpty: false,
-                        messageCount: (parsed.messages || []).length,
-                        sizeBytes: new Blob([data]).size,
-                        lastUpdated: parsed.timestamp
-                    };
-                } catch (error) {
-                    return { isEmpty: true, messageCount: 0, sizeBytes: 0, error: error.message };
-                }
-            }
-        }
-
         class ChatInterface {
             constructor() {
                 this.messagesContainer = document.getElementById('chat-messages');
                 this.input = document.getElementById('chat-input');
                 this.sendBtn = document.getElementById('chat-send-btn');
+                this.providerSelector = document.getElementById('ai-provider-selector');
+                this.providerBadge = document.getElementById('provider-badge');
                 this.messages = [];
-                this.history = new ChatMessageHistory();
+                this.selectedProvider = 'claude';
 
                 this.init();
-                this.loadPersistedMessages();
             }
 
             init() {
@@ -3018,6 +2605,10 @@
                     return;
                 }
 
+                // Load saved provider from sessionStorage
+                this.loadSavedProvider();
+
+                // Set up event listeners
                 this.sendBtn.addEventListener('click', () => this.sendMessage());
                 this.input.addEventListener('keypress', (e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -3025,51 +2616,93 @@
                         this.sendMessage();
                     }
                 });
+
+                if (this.providerSelector) {
+                    this.providerSelector.addEventListener('change', (e) => this.handleProviderChange(e));
+                }
             }
 
-            loadPersistedMessages() {
-                const persistedMessages = this.history.loadMessages();
-                if (persistedMessages.length > 0) {
-                    this.messages = persistedMessages;
-                    // Clear welcome message and render persisted messages
-                    const welcome = this.messagesContainer.querySelector('.chat-welcome');
-                    if (welcome) {
-                        welcome.remove();
+            loadSavedProvider() {
+                try {
+                    const savedProvider = sessionStorage.getItem('selectedAIProvider');
+                    if (savedProvider) {
+                        this.selectedProvider = savedProvider;
+                        if (this.providerSelector) {
+                            this.providerSelector.value = savedProvider;
+                        }
+                        this.updateProviderBadge(savedProvider);
+                    } else {
+                        // Default is Claude
+                        this.updateProviderBadge('claude');
                     }
-                    // Render all persisted messages
-                    persistedMessages.forEach(message => {
-                        this.renderMessage(message);
-                    });
+                } catch (error) {
+                    console.warn('Could not load saved provider:', error);
                 }
+            }
+
+            handleProviderChange(event) {
+                const newProvider = event.target.value;
+                this.selectedProvider = newProvider;
+
+                // Save to sessionStorage
+                try {
+                    sessionStorage.setItem('selectedAIProvider', newProvider);
+                } catch (error) {
+                    console.warn('Could not save provider to sessionStorage:', error);
+                }
+
+                // Update badge
+                this.updateProviderBadge(newProvider);
+
+                console.log(`Provider switched to: ${newProvider}`);
+            }
+
+            updateProviderBadge(provider) {
+                if (!this.providerBadge) return;
+
+                const providerNames = {
+                    'claude': 'Claude',
+                    'chatgpt': 'ChatGPT',
+                    'gemini': 'Gemini',
+                    'groq': 'Groq',
+                    'kimi': 'KIMI',
+                    'windsurf': 'Windsurf'
+                };
+
+                this.providerBadge.textContent = providerNames[provider] || provider;
+            }
+
+            getSelectedProvider() {
+                return this.selectedProvider;
             }
 
             sendMessage() {
                 const text = this.input.value.trim();
                 if (!text) return;
 
+                const provider = this.selectedProvider;
                 // Add user message
-                this.addMessage(text, 'user');
+                this.addMessage(text, 'user', provider);
                 this.input.value = '';
 
                 // Simulate AI response
                 this.showLoadingIndicator();
                 setTimeout(() => {
                     this.removeLoadingIndicator();
-                    this.addMessage(this.generateAIResponse(text), 'ai');
+                    this.addMessage(this.generateAIResponse(text, provider), 'ai', provider);
                 }, 800);
             }
 
-            addMessage(text, sender, type = 'message') {
+            addMessage(text, sender, provider = null) {
                 const message = {
                     id: Date.now(),
                     text,
                     sender,
-                    timestamp: new Date(),
-                    type: type // 'message', 'system', 'error', etc.
+                    provider: provider || this.selectedProvider,
+                    timestamp: new Date()
                 };
 
                 this.messages.push(message);
-                this.history.saveMessages(this.messages);
                 this.renderMessage(message);
                 this.scrollToBottom();
             }
@@ -3128,27 +2761,36 @@
                 }
             }
 
-            generateAIResponse(userMessage) {
+            generateAIResponse(userMessage, provider) {
                 // Simple response generation based on keywords
                 const lower = userMessage.toLowerCase();
+                const providerNames = {
+                    'claude': 'Claude',
+                    'chatgpt': 'ChatGPT',
+                    'gemini': 'Gemini',
+                    'groq': 'Groq',
+                    'kimi': 'KIMI',
+                    'windsurf': 'Windsurf'
+                };
+                const providerName = providerNames[provider] || provider;
 
                 if (lower.includes('status') || lower.includes('how')) {
-                    return 'Your agents are running smoothly. All systems are operational with 99.2% uptime.';
+                    return `[${providerName}] Your agents are running smoothly. All systems are operational with 99.2% uptime.`;
                 }
                 if (lower.includes('metric') || lower.includes('performance')) {
-                    return 'Current metrics show strong performance: 94% success rate, avg response time 245ms.';
+                    return `[${providerName}] Current metrics show strong performance: 94% success rate, avg response time 245ms.`;
                 }
                 if (lower.includes('error') || lower.includes('issue') || lower.includes('problem')) {
-                    return 'No critical errors detected. All monitoring systems are reporting normal status.';
+                    return `[${providerName}] No critical errors detected. All monitoring systems are reporting normal status.`;
                 }
                 if (lower.includes('cost') || lower.includes('usage') || lower.includes('token')) {
-                    return 'Token usage is at 42% of daily allocation. Cost trending 8% below budget.';
+                    return `[${providerName}] Token usage is at 42% of daily allocation. Cost trending 8% below budget.`;
                 }
                 if (lower.includes('hello') || lower.includes('hi') || lower.includes('hey')) {
-                    return 'Hello! I\'m here to help you with any questions about your agent dashboard.';
+                    return `[${providerName}] Hello! I'm here to help you with any questions about your agent dashboard.`;
                 }
 
-                return 'I understand. Based on your agent dashboard, everything is performing within expected parameters. Is there anything specific you\'d like to know?';
+                return `[${providerName}] I understand. Based on your agent dashboard, everything is performing within expected parameters. Is there anything specific you'd like to know?`;
             }
 
             scrollToBottom() {
@@ -3172,16 +2814,11 @@
 
             clearMessages() {
                 this.messages = [];
-                this.history.clearMessages();
                 this.messagesContainer.innerHTML = `
                     <div class="chat-welcome">
                         <p>Welcome to the Agent Dashboard Chat. Ask me anything about your agent status, metrics, or general questions!</p>
                     </div>
                 `;
-            }
-
-            getStorageInfo() {
-                return this.history.getStorageInfo();
             }
         }
 
