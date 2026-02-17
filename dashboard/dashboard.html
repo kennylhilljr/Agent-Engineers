@@ -1655,6 +1655,326 @@
             color: #10b981;
             border-color: rgba(16, 185, 129, 0.3);
         }
+
+        /* =====================================================================
+           AI-130: Agent Controls - Pause/Resume & Requirement Editing
+           ===================================================================== */
+
+        /* Global Controls Toolbar */
+        .agent-controls-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 20px;
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .agent-controls-toolbar-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #94a3b8;
+            margin-right: 8px;
+        }
+
+        .btn-control {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid;
+            transition: all 0.2s ease;
+            background: transparent;
+        }
+
+        .btn-pause {
+            color: #f59e0b;
+            border-color: rgba(245, 158, 11, 0.4);
+            background: rgba(245, 158, 11, 0.08);
+        }
+
+        .btn-pause:hover {
+            background: rgba(245, 158, 11, 0.2);
+            border-color: rgba(245, 158, 11, 0.7);
+            transform: translateY(-1px);
+        }
+
+        .btn-resume {
+            color: #10b981;
+            border-color: rgba(16, 185, 129, 0.4);
+            background: rgba(16, 185, 129, 0.08);
+        }
+
+        .btn-resume:hover {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: rgba(16, 185, 129, 0.7);
+            transform: translateY(-1px);
+        }
+
+        .btn-edit-req {
+            color: #a78bfa;
+            border-color: rgba(167, 139, 250, 0.4);
+            background: rgba(167, 139, 250, 0.08);
+        }
+
+        .btn-edit-req:hover {
+            background: rgba(167, 139, 250, 0.2);
+            border-color: rgba(167, 139, 250, 0.7);
+            transform: translateY(-1px);
+        }
+
+        /* Agent Controls Section */
+        .agent-controls-section {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-bottom: 24px;
+        }
+
+        .agent-controls-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .agent-controls-section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #f1f5f9;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .agent-controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 14px;
+        }
+
+        /* Individual Agent Control Card */
+        .agent-control-card {
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid rgba(148, 163, 184, 0.15);
+            border-radius: 10px;
+            padding: 14px 16px;
+            transition: all 0.2s ease;
+        }
+
+        .agent-control-card:hover {
+            border-color: rgba(148, 163, 184, 0.35);
+        }
+
+        .agent-control-card.is-paused {
+            border-color: rgba(245, 158, 11, 0.4);
+            background: rgba(245, 158, 11, 0.05);
+        }
+
+        .agent-control-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .agent-control-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+
+        .agent-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 9px;
+            border-radius: 5px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            border: 1px solid;
+        }
+
+        .agent-status-badge.status-running {
+            background: rgba(59, 130, 246, 0.1);
+            color: #60a5fa;
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        .agent-status-badge.status-paused {
+            background: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+            border-color: rgba(245, 158, 11, 0.4);
+        }
+
+        .agent-status-badge.status-idle {
+            background: rgba(148, 163, 184, 0.1);
+            color: #94a3b8;
+            border-color: rgba(148, 163, 184, 0.25);
+        }
+
+        .agent-control-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn-sm {
+            padding: 5px 11px;
+            font-size: 0.78rem;
+        }
+
+        /* Requirements Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: #1e293b;
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            border-radius: 14px;
+            padding: 28px;
+            width: 100%;
+            max-width: 560px;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #f1f5f9;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: #64748b;
+            font-size: 1.4rem;
+            cursor: pointer;
+            padding: 2px 8px;
+            border-radius: 6px;
+            transition: color 0.2s;
+        }
+
+        .modal-close:hover {
+            color: #f1f5f9;
+            background: rgba(148, 163, 184, 0.1);
+        }
+
+        .modal-agent-id {
+            display: inline-flex;
+            padding: 3px 10px;
+            background: rgba(59, 130, 246, 0.15);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 5px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #60a5fa;
+            margin-bottom: 14px;
+        }
+
+        .modal-label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #94a3b8;
+            margin-bottom: 8px;
+        }
+
+        .modal-textarea {
+            width: 100%;
+            min-height: 130px;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            border-radius: 8px;
+            padding: 12px;
+            color: #f1f5f9;
+            font-size: 0.9rem;
+            font-family: inherit;
+            resize: vertical;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .modal-textarea:focus {
+            border-color: rgba(99, 102, 241, 0.6);
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 18px;
+        }
+
+        .btn-secondary {
+            color: #94a3b8;
+            border-color: rgba(148, 163, 184, 0.3);
+            background: rgba(148, 163, 184, 0.05);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(148, 163, 184, 0.12);
+        }
+
+        .btn-primary {
+            color: #818cf8;
+            border-color: rgba(99, 102, 241, 0.4);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .btn-primary:hover {
+            background: rgba(99, 102, 241, 0.25);
+            border-color: rgba(99, 102, 241, 0.7);
+        }
+
+        .modal-success-msg {
+            display: none;
+            color: #10b981;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        .paused-count-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            background: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
     </style>
 </head>
 <body>
@@ -1677,6 +1997,59 @@
             <div class="loading">
                 <div class="loading-spinner"></div>
                 <p>Loading dashboard...</p>
+            </div>
+        </div>
+
+        <!-- AI-130: Agent Controls - Global Toolbar -->
+        <div class="agent-controls-toolbar" id="agent-controls-toolbar">
+            <span class="agent-controls-toolbar-title">Agent Controls</span>
+            <button class="btn-control btn-pause" id="btn-pause-all" onclick="pauseAllAgents()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+                </svg>
+                Pause All
+            </button>
+            <button class="btn-control btn-resume" id="btn-resume-all" onclick="resumeAllAgents()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="5,3 19,12 5,21"/>
+                </svg>
+                Resume All
+            </button>
+            <span id="paused-count-badge" style="display:none;" class="paused-count-badge"></span>
+        </div>
+
+        <!-- AI-130: Agent Control Cards Section -->
+        <div class="agent-controls-section" id="agent-controls-section">
+            <div class="agent-controls-section-header">
+                <span class="agent-controls-section-title">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/>
+                    </svg>
+                    Agent Pause / Resume Controls
+                </span>
+            </div>
+            <div class="agent-controls-grid" id="agent-controls-grid">
+                <div style="color: #64748b; font-size: 0.85rem; padding: 10px 0;">Loading agent controls...</div>
+            </div>
+        </div>
+
+        <!-- AI-130: Requirements Editor Modal -->
+        <div class="modal-overlay" id="requirements-modal" role="dialog" aria-modal="true">
+            <div class="modal">
+                <div class="modal-header">
+                    <span class="modal-title">Edit Requirements</span>
+                    <button class="modal-close" onclick="closeRequirementsModal()" aria-label="Close">&times;</button>
+                </div>
+                <div class="modal-agent-id" id="modal-agent-id-label"></div>
+                <label class="modal-label" for="requirements-textarea">Requirement Instructions</label>
+                <textarea class="modal-textarea" id="requirements-textarea"
+                          placeholder="Enter updated requirement text for this agent..."></textarea>
+                <div class="modal-success-msg" id="modal-success-msg">Requirements saved successfully!</div>
+                <div class="modal-footer">
+                    <button class="btn-control btn-secondary" onclick="closeRequirementsModal()">Cancel</button>
+                    <button class="btn-control btn-primary" onclick="saveRequirements()">Save Requirements</button>
+                </div>
             </div>
         </div>
 
@@ -4112,6 +4485,246 @@
             if (refreshTimer) clearInterval(refreshTimer);
             Object.values(charts).forEach(chart => chart && chart.destroy());
         });
+
+        // =====================================================================
+        // AI-130: Agent Controls - Pause/Resume & Requirement Editing
+        // =====================================================================
+
+        // State tracking for agent controls (agent_id -> {paused, requirements})
+        const agentControlState = {};
+        let requirementsModalAgentId = null;
+
+        /**
+         * Fetch all agent control states from the API and refresh the UI.
+         */
+        async function refreshAgentControls() {
+            try {
+                const response = await fetch('/api/agent-controls');
+                if (!response.ok) return;
+                const data = await response.json();
+                const controls = data.agent_controls || {};
+                Object.assign(agentControlState, controls);
+                renderAgentControlCards();
+                updatePausedCountBadge();
+            } catch (e) {
+                // silently skip if endpoint not available yet
+            }
+        }
+
+        /**
+         * Render per-agent control cards in the grid.
+         * Uses the agents from the current metrics state + agentControlState.
+         */
+        function renderAgentControlCards() {
+            const grid = document.getElementById('agent-controls-grid');
+            if (!grid) return;
+
+            // Collect known agent names from AGENT_META and agentControlState
+            const knownAgents = new Set([
+                ...Object.keys(AGENT_META),
+                ...Object.keys(agentControlState)
+            ]);
+
+            if (knownAgents.size === 0) {
+                grid.innerHTML = '<div style="color:#64748b;font-size:0.85rem;padding:10px 0;">No agents found.</div>';
+                return;
+            }
+
+            const cards = Array.from(knownAgents).map(agentId => {
+                const control = agentControlState[agentId] || { paused: false, requirements: '' };
+                const isPaused = control.paused;
+                const displayName = agentId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                const statusClass = isPaused ? 'status-paused' : 'status-idle';
+                const statusLabel = isPaused ? 'Paused' : 'Active';
+                const cardClass = isPaused ? 'agent-control-card is-paused' : 'agent-control-card';
+                const pauseIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
+                const resumeIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>`;
+                const editIcon = `<svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>`;
+
+                return `
+                    <div class="${cardClass}" data-agent-id="${agentId}" id="agent-ctrl-${agentId}">
+                        <div class="agent-control-card-header">
+                            <span class="agent-control-name">${displayName}</span>
+                            <span class="agent-status-badge ${statusClass}">${statusLabel}</span>
+                        </div>
+                        <div class="agent-control-actions">
+                            ${isPaused
+                                ? `<button class="btn-control btn-resume btn-sm" onclick="toggleAgentPause('${agentId}', false)">${resumeIcon} Resume</button>`
+                                : `<button class="btn-control btn-pause btn-sm" onclick="toggleAgentPause('${agentId}', true)">${pauseIcon} Pause</button>`
+                            }
+                            <button class="btn-control btn-edit-req btn-sm" onclick="openRequirementsModal('${agentId}')">${editIcon} Edit Requirements</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            grid.innerHTML = cards;
+        }
+
+        /**
+         * Pause or resume a single agent.
+         */
+        async function toggleAgentPause(agentId, shouldPause) {
+            const action = shouldPause ? 'pause' : 'resume';
+            try {
+                const response = await fetch(`/api/agents/${encodeURIComponent(agentId)}/${action}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (response.ok) {
+                    if (!agentControlState[agentId]) agentControlState[agentId] = { paused: false, requirements: '' };
+                    agentControlState[agentId].paused = shouldPause;
+                    renderAgentControlCards();
+                    updatePausedCountBadge();
+                }
+            } catch (e) {
+                console.error('Failed to toggle agent pause:', e);
+            }
+        }
+
+        /**
+         * Pause all agents via the global endpoint.
+         */
+        async function pauseAllAgents() {
+            try {
+                const response = await fetch('/api/agents/pause-all', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    const agentIds = data.agent_ids || [];
+                    agentIds.forEach(id => {
+                        if (!agentControlState[id]) agentControlState[id] = { paused: false, requirements: '' };
+                        agentControlState[id].paused = true;
+                    });
+                    renderAgentControlCards();
+                    updatePausedCountBadge();
+                }
+            } catch (e) {
+                console.error('Failed to pause all agents:', e);
+            }
+        }
+
+        /**
+         * Resume all agents via the global endpoint.
+         */
+        async function resumeAllAgents() {
+            try {
+                const response = await fetch('/api/agents/resume-all', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    const agentIds = data.agent_ids || [];
+                    agentIds.forEach(id => {
+                        if (!agentControlState[id]) agentControlState[id] = { paused: false, requirements: '' };
+                        agentControlState[id].paused = false;
+                    });
+                    renderAgentControlCards();
+                    updatePausedCountBadge();
+                }
+            } catch (e) {
+                console.error('Failed to resume all agents:', e);
+            }
+        }
+
+        /**
+         * Update the paused count badge in the toolbar.
+         */
+        function updatePausedCountBadge() {
+            const badge = document.getElementById('paused-count-badge');
+            if (!badge) return;
+            const pausedCount = Object.values(agentControlState).filter(c => c.paused).length;
+            if (pausedCount > 0) {
+                badge.textContent = `${pausedCount} paused`;
+                badge.style.display = 'inline-flex';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        /**
+         * Open the requirements editor modal for a given agent.
+         */
+        async function openRequirementsModal(agentId) {
+            requirementsModalAgentId = agentId;
+            const labelEl = document.getElementById('modal-agent-id-label');
+            const textarea = document.getElementById('requirements-textarea');
+            const successMsg = document.getElementById('modal-success-msg');
+
+            if (labelEl) labelEl.textContent = agentId;
+            if (successMsg) successMsg.style.display = 'none';
+
+            // Load current requirements from API
+            try {
+                const response = await fetch(`/api/agents/${encodeURIComponent(agentId)}/requirements`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (textarea) textarea.value = data.requirements || '';
+                } else {
+                    if (textarea) textarea.value = (agentControlState[agentId] || {}).requirements || '';
+                }
+            } catch (e) {
+                if (textarea) textarea.value = (agentControlState[agentId] || {}).requirements || '';
+            }
+
+            const modal = document.getElementById('requirements-modal');
+            if (modal) modal.classList.add('active');
+        }
+
+        /**
+         * Close the requirements editor modal.
+         */
+        function closeRequirementsModal() {
+            const modal = document.getElementById('requirements-modal');
+            if (modal) modal.classList.remove('active');
+            requirementsModalAgentId = null;
+        }
+
+        /**
+         * Save requirements from the modal textarea to the API.
+         */
+        async function saveRequirements() {
+            if (!requirementsModalAgentId) return;
+            const textarea = document.getElementById('requirements-textarea');
+            const successMsg = document.getElementById('modal-success-msg');
+            const requirements = textarea ? textarea.value : '';
+
+            try {
+                const response = await fetch(
+                    `/api/agents/${encodeURIComponent(requirementsModalAgentId)}/requirements`,
+                    {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ requirements })
+                    }
+                );
+                if (response.ok) {
+                    if (!agentControlState[requirementsModalAgentId]) {
+                        agentControlState[requirementsModalAgentId] = { paused: false, requirements: '' };
+                    }
+                    agentControlState[requirementsModalAgentId].requirements = requirements;
+                    if (successMsg) {
+                        successMsg.style.display = 'block';
+                        setTimeout(() => { successMsg.style.display = 'none'; }, 2000);
+                    }
+                    setTimeout(closeRequirementsModal, 1500);
+                }
+            } catch (e) {
+                console.error('Failed to save requirements:', e);
+            }
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('requirements-modal').addEventListener('click', function(e) {
+            if (e.target === this) closeRequirementsModal();
+        });
+
+        // Initialize agent controls on page load and refresh periodically
+        setTimeout(refreshAgentControls, 1000);
+        setInterval(refreshAgentControls, 15000);
     </script>
 </body>
 </html>
