@@ -760,6 +760,380 @@
         .agent-status-text.paused { color: var(--accent-yellow); }
         .agent-status-text.error { color: var(--accent-red); }
 
+        /* ========================================
+           AGENT DETAIL VIEW MODAL
+           ======================================== */
+        .agent-detail-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+        .agent-detail-overlay.open {
+            display: flex;
+        }
+        .agent-detail-panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            width: 100%;
+            max-width: 640px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.2s ease-out;
+        }
+        .agent-detail-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            background: var(--bg-secondary);
+            z-index: 1;
+        }
+        .agent-detail-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .agent-detail-name {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .agent-detail-model-badge {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: rgba(99, 102, 241, 0.15);
+            color: #6366f1;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+        }
+        .agent-detail-model-badge.haiku {
+            background: rgba(16, 185, 129, 0.12);
+            color: #10b981;
+            border-color: rgba(16, 185, 129, 0.25);
+        }
+        .agent-detail-model-badge.sonnet {
+            background: rgba(99, 102, 241, 0.12);
+            color: #6366f1;
+            border-color: rgba(99, 102, 241, 0.25);
+        }
+        .agent-detail-model-badge.opus {
+            background: rgba(245, 158, 11, 0.12);
+            color: #f59e0b;
+            border-color: rgba(245, 158, 11, 0.25);
+        }
+        .agent-detail-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 1.4rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            transition: all 0.15s ease;
+            line-height: 1;
+        }
+        .agent-detail-close:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+        .agent-detail-body {
+            padding: 1.25rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+        .agent-detail-description {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        /* Section */
+        .agent-detail-section {
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .agent-detail-section-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: var(--text-muted);
+            padding: 0.6rem 1rem;
+            background: rgba(0,0,0,0.15);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .agent-detail-section-body {
+            padding: 0.75rem 1rem;
+        }
+        /* Stats grid */
+        .agent-profile-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+            gap: 0.75rem;
+        }
+        .agent-profile-stat {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .agent-profile-stat-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .agent-profile-stat-value {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-family: monospace;
+        }
+        .agent-profile-stat-value.success {
+            color: var(--accent-green);
+        }
+        .agent-profile-stat-value.cost {
+            color: #f59e0b;
+        }
+        /* Contributions */
+        .agent-contributions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+            gap: 0.6rem;
+        }
+        .agent-contribution-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            padding: 0.5rem;
+            background: rgba(0,0,0,0.15);
+            border-radius: 6px;
+        }
+        .agent-contribution-icon {
+            font-size: 1.1rem;
+        }
+        .agent-contribution-value {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--accent-blue-light);
+            font-family: monospace;
+        }
+        .agent-contribution-label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            text-align: center;
+        }
+        /* Gamification */
+        .agent-gamification-row {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+        }
+        .agent-xp-block {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .agent-xp-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #f59e0b;
+            font-family: monospace;
+        }
+        .agent-xp-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        .agent-level-block {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 50px;
+        }
+        .agent-level-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--accent-blue-light);
+            font-family: monospace;
+        }
+        .agent-level-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        .agent-streak-block {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .agent-streak-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--accent-green);
+            font-family: monospace;
+        }
+        .agent-streak-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        .agent-achievements {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+        }
+        .agent-achievement-badge {
+            font-size: 0.72rem;
+            padding: 2px 8px;
+            border-radius: 12px;
+            background: rgba(245, 158, 11, 0.12);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.25);
+            font-weight: 500;
+        }
+        /* Strengths / Weaknesses */
+        .agent-traits-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+        }
+        .agent-traits-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+        .agent-traits-group-title {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 2px;
+        }
+        .agent-traits-group-title.strengths {
+            color: var(--accent-green);
+        }
+        .agent-traits-group-title.weaknesses {
+            color: var(--accent-red);
+        }
+        .agent-trait-item {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .agent-trait-item::before {
+            content: '•';
+            color: var(--text-muted);
+        }
+        /* Activity Item (ActivityItem component) */
+        .activity-item-detail {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.6rem;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(71, 85, 105, 0.3);
+            font-size: 0.82rem;
+        }
+        .activity-item-detail:last-child {
+            border-bottom: none;
+        }
+        .activity-item-status-icon {
+            flex-shrink: 0;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.6rem;
+            margin-top: 1px;
+        }
+        .activity-item-status-icon.success {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--accent-green);
+        }
+        .activity-item-status-icon.error {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--accent-red);
+        }
+        .activity-item-status-icon.timeout {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+        }
+        .activity-item-status-icon.blocked {
+            background: rgba(148, 163, 184, 0.2);
+            color: var(--text-muted);
+        }
+        .activity-item-content {
+            flex: 1;
+            min-width: 0;
+        }
+        .activity-item-ticket {
+            font-weight: 600;
+            color: var(--accent-blue-light);
+            font-family: monospace;
+            font-size: 0.78rem;
+        }
+        .activity-item-model {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+        }
+        .activity-item-tokens {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            font-family: monospace;
+        }
+        .activity-item-time {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            flex-shrink: 0;
+            text-align: right;
+        }
+        .agent-current-model-row {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0;
+        }
+        .agent-current-model-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        .agent-current-model-value {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .agent-no-events {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            text-align: center;
+            padding: 1rem;
+        }
+
         /* Tool Call Visualization */
         .tool-call-block {
             margin: 4px 0;
@@ -916,6 +1290,22 @@
                 </div>
             </section>
         </main>
+
+        <!-- Agent Detail View Modal -->
+        <div class="agent-detail-overlay" id="agent-detail-overlay" role="dialog" aria-modal="true" aria-labelledby="agent-detail-heading">
+            <div class="agent-detail-panel" id="agent-detail-panel">
+                <div class="agent-detail-header">
+                    <div class="agent-detail-title">
+                        <span class="agent-detail-name" id="agent-detail-heading">Agent Detail</span>
+                        <span class="agent-detail-model-badge" id="agent-detail-model-badge"></span>
+                    </div>
+                    <button class="agent-detail-close" id="agent-detail-close" aria-label="Close agent detail view">✕</button>
+                </div>
+                <div class="agent-detail-body" id="agent-detail-body">
+                    <!-- Content injected by openAgentDetail() -->
+                </div>
+            </div>
+        </div>
 
         <!-- Footer -->
         <footer class="footer">
@@ -1744,12 +2134,298 @@
             document.getElementById('footer-status').textContent = 'System Ready';
         }
 
+        // ========================================
+        // AGENT PROFILE DATA (Mock AgentProfile from metrics.py types)
+        // ========================================
+        const mockAgentProfiles = {
+            linear:          { total_invocations: 42, successful_invocations: 40, failed_invocations: 2, total_tokens: 85000, total_cost_usd: 0.34, total_duration_seconds: 190.5, commits_made: 0, prs_created: 0, prs_merged: 0, files_created: 0, files_modified: 0, lines_added: 0, lines_removed: 0, tests_written: 0, issues_created: 74, issues_completed: 15, messages_sent: 0, reviews_completed: 0, success_rate: 0.952, avg_duration_seconds: 4.5, avg_tokens_per_call: 2024, cost_per_success_usd: 0.0085, xp: 420, level: 5, current_streak: 8, best_streak: 12, achievements: ['first_blood', 'issue_master'], strengths: ['fast_execution', 'high_success_rate'], weaknesses: [], recent_events: [{ ticket_key: 'AI-145', status: 'success', model_used: 'haiku', total_tokens: 2100, started_at: '2026-02-17T07:00:00Z' }, { ticket_key: 'AI-144', status: 'success', model_used: 'haiku', total_tokens: 1850, started_at: '2026-02-17T06:30:00Z' }] },
+            coding:          { total_invocations: 31, successful_invocations: 28, failed_invocations: 3, total_tokens: 510000, total_cost_usd: 12.75, total_duration_seconds: 4650.0, commits_made: 0, prs_created: 0, prs_merged: 0, files_created: 45, files_modified: 120, lines_added: 8900, lines_removed: 1200, tests_written: 12, issues_created: 0, issues_completed: 0, messages_sent: 0, reviews_completed: 0, success_rate: 0.903, avg_duration_seconds: 150.0, avg_tokens_per_call: 16452, cost_per_success_usd: 0.455, xp: 930, level: 10, current_streak: 5, best_streak: 9, achievements: ['century_club', 'code_wizard', 'test_champion'], strengths: ['thorough_testing', 'quality_code'], weaknesses: ['slow', 'expensive'], recent_events: [{ ticket_key: 'AI-145', status: 'success', model_used: 'sonnet', total_tokens: 18000, started_at: '2026-02-17T07:00:00Z' }, { ticket_key: 'AI-144', status: 'success', model_used: 'sonnet', total_tokens: 15500, started_at: '2026-02-16T22:00:00Z' }] },
+            github:          { total_invocations: 18, successful_invocations: 18, failed_invocations: 0, total_tokens: 36000, total_cost_usd: 0.14, total_duration_seconds: 270.0, commits_made: 18, prs_created: 9, prs_merged: 9, files_created: 0, files_modified: 0, lines_added: 0, lines_removed: 0, tests_written: 0, issues_created: 0, issues_completed: 0, messages_sent: 0, reviews_completed: 0, success_rate: 1.0, avg_duration_seconds: 15.0, avg_tokens_per_call: 2000, cost_per_success_usd: 0.008, xp: 540, level: 6, current_streak: 18, best_streak: 18, achievements: ['perfect_day', 'first_blood', 'pr_machine'], strengths: ['fast_execution', 'high_success_rate', 'low_cost'], weaknesses: [], recent_events: [{ ticket_key: 'AI-145', status: 'success', model_used: 'haiku', total_tokens: 2000, started_at: '2026-02-17T07:10:00Z' }] },
+            slack:           { total_invocations: 0, successful_invocations: 0, failed_invocations: 0, total_tokens: 0, total_cost_usd: 0, total_duration_seconds: 0, commits_made: 0, prs_created: 0, prs_merged: 0, files_created: 0, files_modified: 0, lines_added: 0, lines_removed: 0, tests_written: 0, issues_created: 0, issues_completed: 0, messages_sent: 0, reviews_completed: 0, success_rate: 0, avg_duration_seconds: 0, avg_tokens_per_call: 0, cost_per_success_usd: 0, xp: 0, level: 1, current_streak: 0, best_streak: 0, achievements: [], strengths: [], weaknesses: [], recent_events: [] },
+            pr_reviewer:     { total_invocations: 9, successful_invocations: 9, failed_invocations: 0, total_tokens: 180000, total_cost_usd: 4.50, total_duration_seconds: 1350.0, commits_made: 0, prs_created: 0, prs_merged: 0, files_created: 0, files_modified: 0, lines_added: 0, lines_removed: 0, tests_written: 0, issues_created: 0, issues_completed: 0, messages_sent: 0, reviews_completed: 9, success_rate: 1.0, avg_duration_seconds: 150.0, avg_tokens_per_call: 20000, cost_per_success_usd: 0.50, xp: 450, level: 5, current_streak: 9, best_streak: 9, achievements: ['perfect_day', 'first_blood'], strengths: ['high_success_rate', 'thorough'], weaknesses: ['expensive'], recent_events: [{ ticket_key: 'AI-145', status: 'success', model_used: 'sonnet', total_tokens: 20000, started_at: '2026-02-17T07:15:00Z' }] },
+            ops:             { total_invocations: 25, successful_invocations: 23, failed_invocations: 2, total_tokens: 50000, total_cost_usd: 0.20, total_duration_seconds: 375.0, commits_made: 0, prs_created: 0, prs_merged: 0, files_created: 0, files_modified: 0, lines_added: 0, lines_removed: 0, tests_written: 0, issues_created: 0, issues_completed: 0, messages_sent: 25, reviews_completed: 0, success_rate: 0.92, avg_duration_seconds: 15.0, avg_tokens_per_call: 2000, cost_per_success_usd: 0.0087, xp: 575, level: 6, current_streak: 7, best_streak: 11, achievements: ['first_blood', 'messenger'], strengths: ['fast_execution', 'low_cost'], weaknesses: [], recent_events: [] },
+            coding_fast:     { total_invocations: 14, successful_invocations: 13, failed_invocations: 1, total_tokens: 56000, total_cost_usd: 0.22, total_duration_seconds: 840.0, commits_made: 0, prs_created: 0, prs_merged: 0, files_created: 8, files_modified: 22, lines_added: 1200, lines_removed: 300, tests_written: 3, issues_created: 0, issues_completed: 0, messages_sent: 0, reviews_completed: 0, success_rate: 0.929, avg_duration_seconds: 60.0, avg_tokens_per_call: 4000, cost_per_success_usd: 0.017, xp: 390, level: 4, current_streak: 3, best_streak: 7, achievements: ['first_blood'], strengths: ['fast_execution', 'low_cost'], weaknesses: [], recent_events: [] },
+            pr_reviewer_fast:{ total_invocations: 5, successful_invocations: 5, failed_invocations: 0, total_tokens: 25000, total_cost_usd: 0.10, total_duration_seconds: 300.0, commits_made: 0, prs_created: 0, prs_merged: 0, files_created: 0, files_modified: 0, lines_added: 0, lines_removed: 0, tests_written: 0, issues_created: 0, issues_completed: 0, messages_sent: 0, reviews_completed: 5, success_rate: 1.0, avg_duration_seconds: 60.0, avg_tokens_per_call: 5000, cost_per_success_usd: 0.02, xp: 250, level: 3, current_streak: 5, best_streak: 5, achievements: ['perfect_day'], strengths: ['high_success_rate', 'fast_execution'], weaknesses: [], recent_events: [] },
+            chatgpt:         { total_invocations: 0, successful_invocations: 0, failed_invocations: 0, total_tokens: 0, total_cost_usd: 0, total_duration_seconds: 0, commits_made: 0, prs_created: 0, prs_merged: 0, files_created: 0, files_modified: 0, lines_added: 0, lines_removed: 0, tests_written: 0, issues_created: 0, issues_completed: 0, messages_sent: 0, reviews_completed: 0, success_rate: 0, avg_duration_seconds: 0, avg_tokens_per_call: 0, cost_per_success_usd: 0, xp: 0, level: 1, current_streak: 0, best_streak: 0, achievements: [], strengths: [], weaknesses: [], recent_events: [] },
+            gemini:          { total_invocations: 0, successful_invocations: 0, failed_invocations: 0, total_tokens: 0, total_cost_usd: 0, total_duration_seconds: 0, commits_made: 0, prs_created: 0, prs_merged: 0, files_created: 0, files_modified: 0, lines_added: 0, lines_removed: 0, tests_written: 0, issues_created: 0, issues_completed: 0, messages_sent: 0, reviews_completed: 0, success_rate: 0, avg_duration_seconds: 0, avg_tokens_per_call: 0, cost_per_success_usd: 0, xp: 0, level: 1, current_streak: 0, best_streak: 0, achievements: [], strengths: [], weaknesses: [], recent_events: [] },
+            groq:            { total_invocations: 0, successful_invocations: 0, failed_invocations: 0, total_tokens: 0, total_cost_usd: 0, total_duration_seconds: 0, commits_made: 0, prs_created: 0, prs_merged: 0, files_created: 0, files_modified: 0, lines_added: 0, lines_removed: 0, tests_written: 0, issues_created: 0, issues_completed: 0, messages_sent: 0, reviews_completed: 0, success_rate: 0, avg_duration_seconds: 0, avg_tokens_per_call: 0, cost_per_success_usd: 0, xp: 0, level: 1, current_streak: 0, best_streak: 0, achievements: [], strengths: [], weaknesses: [], recent_events: [] },
+            kimi:            { total_invocations: 0, successful_invocations: 0, failed_invocations: 0, total_tokens: 0, total_cost_usd: 0, total_duration_seconds: 0, commits_made: 0, prs_created: 0, prs_merged: 0, files_created: 0, files_modified: 0, lines_added: 0, lines_removed: 0, tests_written: 0, issues_created: 0, issues_completed: 0, messages_sent: 0, reviews_completed: 0, success_rate: 0, avg_duration_seconds: 0, avg_tokens_per_call: 0, cost_per_success_usd: 0, xp: 0, level: 1, current_streak: 0, best_streak: 0, achievements: [], strengths: [], weaknesses: [], recent_events: [] },
+            windsurf:        { total_invocations: 0, successful_invocations: 0, failed_invocations: 0, total_tokens: 0, total_cost_usd: 0, total_duration_seconds: 0, commits_made: 0, prs_created: 0, prs_merged: 0, files_created: 0, files_modified: 0, lines_added: 0, lines_removed: 0, tests_written: 0, issues_created: 0, issues_completed: 0, messages_sent: 0, reviews_completed: 0, success_rate: 0, avg_duration_seconds: 0, avg_tokens_per_call: 0, cost_per_success_usd: 0, xp: 0, level: 1, current_streak: 0, best_streak: 0, achievements: [], strengths: [], weaknesses: [], recent_events: [] },
+        };
+
+        // Expose for testing
+        window.mockAgentProfiles = mockAgentProfiles;
+
+        // ========================================
+        // ACTIVITY ITEM COMPONENT
+        // ========================================
+        /**
+         * ActivityItem component: renders a single event in the agent event history.
+         * @param {Object} event - AgentEvent-like object with status, ticket_key, model_used, total_tokens, started_at
+         * @returns {string} HTML string for one activity entry
+         */
+        function ActivityItem(event) {
+            const statusClass = event.status || 'success';
+            const statusIconMap = { success: '✓', error: '✗', timeout: '⏱', blocked: '⊘' };
+            const statusIcon = statusIconMap[statusClass] || '○';
+            const ticketKey = escapeHtml(event.ticket_key || '—');
+            const model = escapeHtml(event.model_used || '');
+            const tokens = event.total_tokens ? formatCount(event.total_tokens) : '—';
+            let timeStr = '—';
+            if (event.started_at) {
+                try {
+                    const d = new Date(event.started_at);
+                    timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                } catch (e) {}
+            }
+            return `
+            <div class="activity-item-detail">
+                <span class="activity-item-status-icon ${statusClass}">${statusIcon}</span>
+                <div class="activity-item-content">
+                    <span class="activity-item-ticket">${ticketKey}</span>
+                    ${model ? `<span class="activity-item-model"> · ${model}</span>` : ''}
+                    <span class="activity-item-tokens"> · ${tokens} tokens</span>
+                </div>
+                <span class="activity-item-time">${timeStr}</span>
+            </div>`;
+        }
+
+        // Expose for testing
+        window.ActivityItem = ActivityItem;
+
+        // ========================================
+        // AGENT DETAIL VIEW FUNCTIONS
+        // ========================================
+
+        /**
+         * Open the agent detail panel for a given agent ID.
+         * Builds the full profile content and shows the modal.
+         * @param {string} agentId - The agent's id (e.g. 'coding', 'linear')
+         */
+        function openAgentDetail(agentId) {
+            const agent = state.agents.find(a => (a.id || a.name) === agentId);
+            if (!agent) return;
+
+            const profile = mockAgentProfiles[agentId] || {};
+            const overlay = document.getElementById('agent-detail-overlay');
+            const headingEl = document.getElementById('agent-detail-heading');
+            const modelBadgeEl = document.getElementById('agent-detail-model-badge');
+            const bodyEl = document.getElementById('agent-detail-body');
+            if (!overlay || !bodyEl) return;
+
+            const model = agent.model || 'haiku';
+            const agentName = agent.name || agentId;
+            const agentDesc = agent.description || '';
+
+            // Update header
+            if (headingEl) headingEl.textContent = agentName;
+            if (modelBadgeEl) {
+                modelBadgeEl.textContent = model;
+                modelBadgeEl.className = `agent-detail-model-badge ${model}`;
+            }
+
+            // --- Lifetime Stats Section ---
+            const totalInvocations = profile.total_invocations || 0;
+            const successRate = totalInvocations > 0 ? ((profile.success_rate || 0) * 100).toFixed(1) : '0.0';
+            const totalTokens = formatCount(profile.total_tokens || 0);
+            const totalCost = formatCost(profile.total_cost_usd || 0);
+            const avgDuration = (profile.avg_duration_seconds || 0).toFixed(1);
+
+            const lifetimeStatsHtml = `
+            <div class="agent-detail-section">
+                <div class="agent-detail-section-title">Lifetime Statistics</div>
+                <div class="agent-detail-section-body">
+                    <div class="agent-profile-stats-grid">
+                        <div class="agent-profile-stat">
+                            <span class="agent-profile-stat-label">Invocations</span>
+                            <span class="agent-profile-stat-value">${totalInvocations}</span>
+                        </div>
+                        <div class="agent-profile-stat">
+                            <span class="agent-profile-stat-label">Success Rate</span>
+                            <span class="agent-profile-stat-value success">${successRate}%</span>
+                        </div>
+                        <div class="agent-profile-stat">
+                            <span class="agent-profile-stat-label">Total Tokens</span>
+                            <span class="agent-profile-stat-value">${totalTokens}</span>
+                        </div>
+                        <div class="agent-profile-stat">
+                            <span class="agent-profile-stat-label">Total Cost</span>
+                            <span class="agent-profile-stat-value cost">${totalCost}</span>
+                        </div>
+                        <div class="agent-profile-stat">
+                            <span class="agent-profile-stat-label">Avg Duration</span>
+                            <span class="agent-profile-stat-value">${avgDuration}s</span>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+
+            // --- Contributions Section ---
+            const contributionsHtml = `
+            <div class="agent-detail-section">
+                <div class="agent-detail-section-title">Contributions</div>
+                <div class="agent-detail-section-body">
+                    <div class="agent-contributions-grid">
+                        <div class="agent-contribution-item">
+                            <span class="agent-contribution-icon">📝</span>
+                            <span class="agent-contribution-value">${profile.commits_made || 0}</span>
+                            <span class="agent-contribution-label">Commits</span>
+                        </div>
+                        <div class="agent-contribution-item">
+                            <span class="agent-contribution-icon">🔀</span>
+                            <span class="agent-contribution-value">${profile.prs_created || 0}</span>
+                            <span class="agent-contribution-label">PRs Created</span>
+                        </div>
+                        <div class="agent-contribution-item">
+                            <span class="agent-contribution-icon">📁</span>
+                            <span class="agent-contribution-value">${(profile.files_created || 0) + (profile.files_modified || 0)}</span>
+                            <span class="agent-contribution-label">Files</span>
+                        </div>
+                        <div class="agent-contribution-item">
+                            <span class="agent-contribution-icon">🎫</span>
+                            <span class="agent-contribution-value">${profile.issues_created || 0}</span>
+                            <span class="agent-contribution-label">Issues</span>
+                        </div>
+                        <div class="agent-contribution-item">
+                            <span class="agent-contribution-icon">💬</span>
+                            <span class="agent-contribution-value">${profile.messages_sent || 0}</span>
+                            <span class="agent-contribution-label">Messages</span>
+                        </div>
+                        <div class="agent-contribution-item">
+                            <span class="agent-contribution-icon">🔍</span>
+                            <span class="agent-contribution-value">${profile.reviews_completed || 0}</span>
+                            <span class="agent-contribution-label">Reviews</span>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+
+            // --- Gamification Section ---
+            const xp = profile.xp || 0;
+            const level = profile.level || 1;
+            const streak = profile.current_streak || 0;
+            const bestStreak = profile.best_streak || 0;
+            const achievements = profile.achievements || [];
+            const achievementsHtml = achievements.length > 0
+                ? achievements.map(a => `<span class="agent-achievement-badge">${escapeHtml(a.replace(/_/g, ' '))}</span>`).join('')
+                : '<span style="color:var(--text-muted);font-size:0.8rem">No achievements yet</span>';
+
+            const gamificationHtml = `
+            <div class="agent-detail-section">
+                <div class="agent-detail-section-title">Gamification</div>
+                <div class="agent-detail-section-body">
+                    <div class="agent-gamification-row">
+                        <div class="agent-xp-block">
+                            <span class="agent-xp-value">${xp.toLocaleString()}</span>
+                            <span class="agent-xp-label">XP</span>
+                        </div>
+                        <div class="agent-level-block">
+                            <span class="agent-level-value">${level}</span>
+                            <span class="agent-level-label">Level</span>
+                        </div>
+                        <div class="agent-streak-block">
+                            <span class="agent-streak-value">${streak} 🔥</span>
+                            <span class="agent-streak-label">Streak (best: ${bestStreak})</span>
+                        </div>
+                    </div>
+                    <div class="agent-achievements">${achievementsHtml}</div>
+                </div>
+            </div>`;
+
+            // --- Strengths & Weaknesses ---
+            const strengths = profile.strengths || [];
+            const weaknesses = profile.weaknesses || [];
+            const strengthsHtml = strengths.length > 0
+                ? strengths.map(s => `<div class="agent-trait-item">${escapeHtml(s.replace(/_/g, ' '))}</div>`).join('')
+                : '<div style="color:var(--text-muted);font-size:0.8rem">None detected</div>';
+            const weaknessesHtml = weaknesses.length > 0
+                ? weaknesses.map(w => `<div class="agent-trait-item">${escapeHtml(w.replace(/_/g, ' '))}</div>`).join('')
+                : '<div style="color:var(--text-muted);font-size:0.8rem">None detected</div>';
+
+            const traitsHtml = `
+            <div class="agent-detail-section">
+                <div class="agent-detail-section-title">Strengths &amp; Weaknesses</div>
+                <div class="agent-detail-section-body">
+                    <div class="agent-traits-row">
+                        <div class="agent-traits-group">
+                            <div class="agent-traits-group-title strengths">Strengths</div>
+                            ${strengthsHtml}
+                        </div>
+                        <div class="agent-traits-group">
+                            <div class="agent-traits-group-title weaknesses">Weaknesses</div>
+                            ${weaknessesHtml}
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+
+            // --- Current Model Assignment ---
+            const modelAssignmentHtml = `
+            <div class="agent-detail-section">
+                <div class="agent-detail-section-title">Model Assignment</div>
+                <div class="agent-detail-section-body">
+                    <div class="agent-current-model-row">
+                        <span class="agent-current-model-label">Current Model:</span>
+                        <span class="agent-current-model-value">${escapeHtml(model)}</span>
+                    </div>
+                </div>
+            </div>`;
+
+            // --- Recent Event History (last 20 events via ActivityItem) ---
+            const recentEvents = (profile.recent_events || []).slice(0, 20);
+            const eventsBodyHtml = recentEvents.length > 0
+                ? recentEvents.map(e => ActivityItem(e)).join('')
+                : '<div class="agent-no-events">No recent events</div>';
+
+            const historyHtml = `
+            <div class="agent-detail-section">
+                <div class="agent-detail-section-title">Recent Event History (last ${Math.min(recentEvents.length, 20)})</div>
+                <div class="agent-detail-section-body">${eventsBodyHtml}</div>
+            </div>`;
+
+            // Assemble full body
+            bodyEl.innerHTML = `
+                <p class="agent-detail-description">${escapeHtml(agentDesc)}</p>
+                ${lifetimeStatsHtml}
+                ${contributionsHtml}
+                ${gamificationHtml}
+                ${traitsHtml}
+                ${modelAssignmentHtml}
+                ${historyHtml}
+            `;
+
+            // Show overlay
+            overlay.classList.add('open');
+            document.body.style.overflow = 'hidden';
+
+            // Store current agent ID for reference
+            overlay.dataset.agentId = agentId;
+        }
+
+        /**
+         * Close the agent detail panel.
+         */
+        function closeAgentDetail() {
+            const overlay = document.getElementById('agent-detail-overlay');
+            if (overlay) {
+                overlay.classList.remove('open');
+                document.body.style.overflow = '';
+                delete overlay.dataset.agentId;
+            }
+        }
+
+        // Expose for testing
+        window.openAgentDetail = openAgentDetail;
+        window.closeAgentDetail = closeAgentDetail;
+
         function handleAgentClick(event) {
+            // Don't open detail if click is inside the active-task <details>
+            if (event.target.closest('.agent-active-task')) return;
             const agentItem = event.target.closest('.agent-item');
             if (!agentItem) return;
 
-            const agentName = agentItem.dataset.agent;
-            addMessage('system', `Agent details for: ${agentName}`);
+            const agentId = agentItem.dataset.agent;
+            openAgentDetail(agentId);
         }
 
         // ========================================
@@ -1795,6 +2471,15 @@
             document.getElementById('pause-all').addEventListener('click', handlePauseAll);
             document.getElementById('resume-all').addEventListener('click', handleResumeAll);
             document.getElementById('agent-list').addEventListener('click', handleAgentClick);
+
+            // Agent detail panel close handlers
+            document.getElementById('agent-detail-close').addEventListener('click', closeAgentDetail);
+            document.getElementById('agent-detail-overlay').addEventListener('click', function(e) {
+                if (e.target === this) closeAgentDetail();
+            });
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') closeAgentDetail();
+            });
 
             // Load provider status from API (non-blocking)
             loadProviderStatus();
