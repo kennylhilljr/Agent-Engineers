@@ -21,6 +21,7 @@ Requirements:
 
 import argparse
 import asyncio
+import json
 import logging
 import os
 import sys
@@ -101,6 +102,8 @@ class DashboardServer:
         self.app.router.add_get('/api/metrics', self.handle_metrics)
         self.app.router.add_get('/api/agents', self.handle_agents)
         self.app.router.add_get('/api/providers', self.handle_providers)
+        self.app.router.add_get('/api/providers/status', self.handle_providers_status)
+        self.app.router.add_post('/api/chat', self.handle_chat)
 
     def _setup_cors(self) -> None:
         """Set up CORS to allow browser access from any origin."""
@@ -277,6 +280,170 @@ class DashboardServer:
             "default_provider": "claude",
             "timestamp": datetime.utcnow().isoformat() + "Z"
         })
+
+    async def handle_providers_status(self, request: web.Request) -> web.Response:
+        """Get provider status in flat list format for the chat interface.
+
+        Returns provider info in a format compatible with the chat endpoint tests:
+        {
+            "providers": [
+                {"provider_id": "claude", "available": true, "has_api_key": true,
+                 "status": "active", "models": [...]}
+            ],
+            "total_providers": 6,
+            "active_providers": N,
+            "timestamp": "..."
+        }
+        """
+        import os as _os
+
+        provider_config = {
+            "claude": {
+                "name": "Claude",
+                "env_vars": ["ANTHROPIC_API_KEY"],
+                "models": ["haiku-4.5", "sonnet-4.5", "opus-4.6"],
+            },
+            "openai": {
+                "name": "ChatGPT",
+                "env_vars": ["OPENAI_API_KEY"],
+                "models": ["gpt-4o", "o1", "o3-mini", "o4-mini"],
+            },
+            "gemini": {
+                "name": "Gemini",
+                "env_vars": ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+                "models": ["2.5-flash", "2.5-pro", "2.0-flash"],
+            },
+            "groq": {
+                "name": "Groq",
+                "env_vars": ["GROQ_API_KEY"],
+                "models": ["llama-3.3-70b", "mixtral-8x7b"],
+            },
+            "kimi": {
+                "name": "KIMI",
+                "env_vars": ["KIMI_API_KEY", "MOONSHOT_API_KEY"],
+                "models": ["moonshot"],
+            },
+            "windsurf": {
+                "name": "Windsurf",
+                "env_vars": ["WINDSURF_API_KEY"],
+                "models": ["cascade"],
+            },
+        }
+
+        providers_list = []
+        active_count = 0
+
+        for provider_id, config in provider_config.items():
+            has_api_key = any(_os.environ.get(var) for var in config["env_vars"])
+            available = has_api_key
+            status = "active" if available else "unavailable"
+            if available:
+                active_count += 1
+
+            providers_list.append({
+                "provider_id": provider_id,
+                "name": config["name"],
+                "available": available,
+                "has_api_key": has_api_key,
+                "status": status,
+                "models": config["models"],
+            })
+
+        return web.json_response({
+            "providers": providers_list,
+            "total_providers": len(providers_list),
+            "active_providers": active_count,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        })
+
+    async def handle_chat(self, request: web.Request) -> web.StreamResponse:
+        """Stream chat response using Server-Sent Events (SSE).
+
+        Accepts POST JSON body:
+            {
+                "message": str (required),
+                "provider": str (default: "claude"),
+                "model": str (default: "sonnet-4.5"),
+                "session_id": str (optional),
+                "conversation_history": list (optional)
+            }
+
+        Returns:
+            SSE stream with events: text, tool_use, tool_result, done, error
+        """
+        # Parse request body
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response(
+                {"error": "Invalid JSON in request body"},
+                status=400
+            )
+
+        # Validate required fields
+        message = body.get("message")
+        if not message or not message.strip():
+            return web.json_response(
+                {"error": "message field is required and cannot be empty"},
+                status=400
+            )
+
+        provider = body.get("provider", "claude")
+        model = body.get("model", "sonnet-4.5")
+        conversation_history = body.get("conversation_history", [])
+        # session_id is accepted but not used server-side in this implementation
+        _session_id = body.get("session_id")
+
+        # Import chat handler (lazy import to avoid startup errors)
+        try:
+            from dashboard.chat_handler import stream_chat_response
+        except ImportError as e:
+            return web.json_response(
+                {"error": f"Chat handler not available: {str(e)}"},
+                status=503
+            )
+
+        # Set up SSE streaming response
+        response = web.StreamResponse(
+            status=200,
+            headers={
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+                "Access-Control-Allow-Origin": "*",
+            }
+        )
+        await response.prepare(request)
+
+        try:
+            async for chunk in stream_chat_response(
+                message=message,
+                provider=provider,
+                model=model,
+                conversation_history=conversation_history
+            ):
+                data = json.dumps(chunk)
+                await response.write(f"data: {data}\n\n".encode("utf-8"))
+
+                # Flush after done event
+                if chunk.get("type") == "done":
+                    break
+
+        except Exception as e:
+            logger.error(f"Error in chat stream: {e}")
+            error_chunk = {
+                "type": "error",
+                "content": f"Streaming error: {str(e)}",
+                "timestamp": datetime.utcnow().isoformat() + "Z"
+            }
+            try:
+                await response.write(f"data: {json.dumps(error_chunk)}\n\n".encode("utf-8"))
+                done_chunk = {"type": "done", "timestamp": datetime.utcnow().isoformat() + "Z"}
+                await response.write(f"data: {json.dumps(done_chunk)}\n\n".encode("utf-8"))
+            except Exception:
+                pass
+
+        return response
 
     def _generate_dashboard_html(self) -> str:
         """Generate the complete single-file HTML dashboard.
