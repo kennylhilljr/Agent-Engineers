@@ -7,10 +7,7 @@ to query agent performance metrics, session summaries, and individual agent deta
 Endpoints:
     GET /api/metrics - Returns complete DashboardState with all metrics
     GET /api/agents/<name> - Returns specific agent profile with detailed stats
-    GET /api/providers/status - Returns AI provider availability status (AI-73)
-    GET /health - Health check endpoint with detailed system status
-    GET /metrics - Prometheus-formatted metrics endpoint
-    GET /monitoring - Monitoring dashboard HTML page
+    GET /health - Health check endpoint
     WS  /ws - WebSocket endpoint for real-time metrics streaming
 
 CORS Configuration:
@@ -63,55 +60,29 @@ Usage:
 import argparse
 import asyncio
 import json
+import logging
 import os
-import psutil
 import re
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Set
 
+import aiohttp
 from aiohttp import web, WSMsgType
 from aiohttp.web import Request, Response, WebSocketResponse, middleware
 from aiohttp_cors import ResourceOptions, setup as cors_setup
 
-from dashboard.collector import AgentMetricsCollector
-from dashboard.metrics import AgentEvent
 from dashboard.metrics_store import MetricsStore
-from dashboard.logging_config import setup_logging, get_logger, LoggingMiddleware
-from dashboard.performance_metrics import metrics_collector, timed_operation, increment_counter, set_gauge
-from dashboard.config import get_config, DashboardConfig
 
-# Agent Controls State Store (AI-130)
-# Maintains pause/resume state and requirements for each agent
-agent_controls: dict = {}  # {agent_id: {"paused": bool, "requirements": str}}
-AGENT_CONTROLS_MAX_ENTRIES = 100  # Max number of agent entries to prevent unbounded memory growth
-AGENT_ID_PATTERN = re.compile(r'^[a-zA-Z0-9_-]+$')  # Only alphanumeric, underscore, dash
-REQUIREMENTS_MAX_LENGTH = 50_000  # Max length for requirements text
+# In-memory store for requirements (ticket_key -> requirement text)
+_requirements_store: dict = {}
 
-# Chat History State Store (AI-133)
-# Persists chat messages for the current server session (max 1000 messages)
-chat_history: list = []  # [{"id", "type", "content", "timestamp", "provider", "model"}]
-CHAT_HISTORY_MAX = 1000
-
-# Transparency State Store (AI-131)
-# Stores orchestrator reasoning events (max 100)
-reasoning_history: list = []  # [{"agent", "decision", "complexity", "reasoning", "timestamp"}]
-REASONING_HISTORY_MAX = 100
-
-# Provider Switch History Store (AI-74)
-# Records hot-swap events for analytics (max 50)
-provider_switch_history: list = []  # [{"from_provider", "to_provider", "timestamp", "message_count"}]
-PROVIDER_SWITCH_HISTORY_MAX = 50
-
-# Tool Call History Store (AI-78)
-# Records tool calls (linear, slack, etc.) with timing and status (max 50)
-tool_call_history: list = []  # [{"tool_name", "input", "result", "duration_ms", "status", "timestamp"}]
-TOOL_CALL_HISTORY_MAX = 50
-
-# Setup structured logging
-setup_logging(log_level=os.getenv("LOG_LEVEL", "INFO"))
-logger = get_logger(__name__)
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 # Get CORS allowed origins from environment
@@ -161,7 +132,7 @@ async def cors_middleware(request: Request, handler):
             # Default to first allowed origin if no match
             response.headers['Access-Control-Allow-Origin'] = allowed_list[0]
 
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, OPTIONS'
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
     response.headers['Access-Control-Allow-Credentials'] = 'true'
     return response
@@ -189,63 +160,111 @@ async def error_middleware(request: Request, handler):
         )
 
 
+async def update_linear_issue(issue_key: str, description: str) -> bool:
+    """Update a Linear issue description via the Linear GraphQL API.
+
+    Args:
+        issue_key: Linear issue key (e.g. 'AI-157')
+        description: New description text
+
+    Returns:
+        True if updated successfully, False otherwise
+
+    Raises:
+        Exception: If the API call fails
+    """
+    api_key = os.environ.get('LINEAR_API_KEY', '')
+    if not api_key:
+        return False
+
+    # Search for issue by identifier (e.g., "AI-157")
+    search_query = """
+    query SearchIssue($term: String!) {
+        issueSearch(term: $term, first: 1) {
+            nodes {
+                id
+                identifier
+            }
+        }
+    }
+    """
+
+    update_query = """
+    mutation UpdateIssue($id: String!, $description: String!) {
+        issueUpdate(id: $id, input: { description: $description }) {
+            success
+        }
+    }
+    """
+
+    async with aiohttp.ClientSession() as session:
+        headers = {
+            'Authorization': f'Bearer {api_key}',  # FIXED: Bearer prefix
+            'Content-Type': 'application/json'
+        }
+        # Search for issue by identifier
+        async with session.post(
+            'https://api.linear.app/graphql',
+            json={'query': search_query, 'variables': {'term': issue_key}},
+            headers=headers
+        ) as resp:
+            data = await resp.json()
+            nodes = data.get('data', {}).get('issueSearch', {}).get('nodes', [])
+            if not nodes:
+                logger.warning(f"Linear issue not found for key: {issue_key}")
+                return False
+            issue_id = nodes[0]['id']
+
+        # Update the issue description
+        async with session.post(
+            'https://api.linear.app/graphql',
+            json={'query': update_query, 'variables': {'id': issue_id, 'description': description}},
+            headers=headers
+        ) as resp:
+            result = await resp.json()
+            return result.get('data', {}).get('issueUpdate', {}).get('success', False)
+
+
 class DashboardServer:
     """HTTP server for Agent Status Dashboard metrics API.
 
     Provides REST endpoints for querying metrics data with CORS support.
     Uses MetricsStore for data persistence.
-
-    Configuration via environment variables (AI-111):
-        DASHBOARD_WEB_PORT: Port for the web dashboard server (default: 8420)
-        DASHBOARD_WS_PORT: Port for WebSocket connections (default: 8421)
-        DASHBOARD_HOST: Host to bind the dashboard server (default: 0.0.0.0)
-        DASHBOARD_AUTH_TOKEN: Bearer token for API authentication (default: none)
-        DASHBOARD_CORS_ORIGINS: Allowed CORS origins (default: *)
     """
 
     def __init__(
         self,
         project_name: str = "agent-status-dashboard",
         metrics_dir: Optional[Path] = None,
-        port: Optional[int] = None,
-        host: Optional[str] = None,
-        use_config: bool = True
+        port: int = 8080,
+        host: str = "127.0.0.1"
     ):
         """Initialize DashboardServer.
 
         Args:
             project_name: Project name for metrics store
             metrics_dir: Directory containing .agent_metrics.json
-            port: HTTP server port (overrides DASHBOARD_WEB_PORT env var)
-            host: HTTP server host (overrides DASHBOARD_HOST env var)
-            use_config: If True, load from environment variables via DashboardConfig
+            port: HTTP server port
+            host: HTTP server host (default: 127.0.0.1 for localhost-only access)
 
         Security Notes:
-            - Default host is 0.0.0.0 (all interfaces) - override with DASHBOARD_HOST
+            - Default host is 127.0.0.1 (localhost only) for security
+            - Use host="0.0.0.0" to bind to all network interfaces (WARNING: exposes server to network)
             - For production, use a reverse proxy (nginx/caddy) with proper TLS/SSL
-            - Set DASHBOARD_AUTH_TOKEN for API authentication
         """
         self.project_name = project_name
         self.metrics_dir = metrics_dir or Path.cwd()
+        self.port = port
+        self.host = host
 
-        # Load configuration from environment variables if use_config is True
-        if use_config:
-            config = get_config()
-
-            # Validate configuration
-            is_valid, error_msg = config.validate()
-            if not is_valid:
-                raise ValueError(f"Invalid dashboard configuration: {error_msg}")
-
-            # Use environment config unless overridden by parameters
-            self.port = port or config.web_port
-            self.host = host or config.host
-            self.config = config
-        else:
-            # Legacy mode: use provided port/host only
-            self.port = port or 8080
-            self.host = host or "127.0.0.1"
-            self.config = None
+        # Security warning for 0.0.0.0 binding
+        if host == "0.0.0.0":
+            logger.warning(
+                "SECURITY WARNING: Server is binding to 0.0.0.0 (all network interfaces). "
+                "This exposes the server to your network. "
+                "For production deployment, use a reverse proxy with TLS/SSL. "
+                "For local development, consider using 127.0.0.1 instead."
+            )
 
         # Initialize metrics store
         self.store = MetricsStore(
@@ -253,23 +272,10 @@ class DashboardServer:
             metrics_dir=self.metrics_dir
         )
 
-        # Initialize metrics collector for event broadcasting
-        self.collector = AgentMetricsCollector(
-            project_name=project_name,
-            metrics_dir=self.metrics_dir
-        )
-
-        # Subscribe to collector events for real-time broadcasting
-        self.collector.subscribe(self._on_collector_event)
-
         # WebSocket connections tracking
         self.websockets: Set[WebSocketResponse] = set()
         self.broadcast_task: Optional[asyncio.Task] = None
         self.broadcast_interval = 5  # seconds
-
-        # Event queue for immediate broadcasts
-        self.event_queue: asyncio.Queue = asyncio.Queue()
-        self.event_broadcast_task: Optional[asyncio.Task] = None
 
         # Create app with middlewares
         self.app = web.Application(middlewares=[error_middleware, cors_middleware])
@@ -279,7 +285,6 @@ class DashboardServer:
 
         # Setup WebSocket broadcasting
         self.app.on_startup.append(self._start_broadcast)
-        self.app.on_startup.append(self._start_event_broadcast)
         self.app.on_cleanup.append(self._cleanup_websockets)
 
         logger.info(f"Dashboard server initialized for project: {project_name}")
@@ -291,85 +296,20 @@ class DashboardServer:
         self.app.router.add_get('/health', self.health_check)
         self.app.router.add_get('/api/metrics', self.get_metrics)
         self.app.router.add_get('/api/agents/{agent_name}', self.get_agent)
-        self.app.router.add_get('/api/providers/status', self.get_provider_status)
         self.app.router.add_get('/ws', self.websocket_handler)
 
-        # Monitoring endpoints
-        self.app.router.add_get('/metrics', self.prometheus_metrics)
-        self.app.router.add_get('/monitoring', self.serve_monitoring_dashboard)
-        self.app.router.add_get('/api/system/status', self.system_status)
+        # Requirement sync endpoints
+        self.app.router.add_get('/api/requirements/{ticket_key}', self.get_requirement)
+        self.app.router.add_put('/api/requirements/{ticket_key}', self.put_requirement)
 
-        # Agent Controls endpoints (AI-130)
-        # Static routes must be registered BEFORE parameterized routes to avoid shadowing
-        self.app.router.add_post('/api/agents/pause-all', self.pause_all_agents)
-        self.app.router.add_post('/api/agents/resume-all', self.resume_all_agents)
-        self.app.router.add_get('/api/agent-controls', self.get_all_agent_controls)
-        self.app.router.add_post('/api/agents/{agent_id}/pause', self.pause_agent)
-        self.app.router.add_post('/api/agents/{agent_id}/resume', self.resume_agent)
-        self.app.router.add_get('/api/agents/{agent_id}/requirements', self.get_agent_requirements)
-        self.app.router.add_put('/api/agents/{agent_id}/requirements', self.update_agent_requirements)
-
-        # Chat History endpoints (AI-133)
-        self.app.router.add_get('/api/chat/history', self.get_chat_history)
-        self.app.router.add_post('/api/chat/history', self.post_chat_history)
-        self.app.router.add_delete('/api/chat/history', self.delete_chat_history)
-        self.app.router.add_route('OPTIONS', '/api/chat/history', self.handle_options)
-
-        # Provider Switch endpoint (AI-74)
-        self.app.router.add_post('/api/chat/provider-switch', self.post_provider_switch)
-        self.app.router.add_get('/api/chat/provider-switch', self.get_provider_switch_history)
-        self.app.router.add_route('OPTIONS', '/api/chat/provider-switch', self.handle_options)
-
-        # Transparency endpoints (AI-131)
-        self.app.router.add_post('/api/transparency/reasoning', self.post_transparency_reasoning)
-        self.app.router.add_get('/api/transparency/history', self.get_transparency_history)
-        self.app.router.add_delete('/api/transparency/history', self.delete_transparency_history)
-        self.app.router.add_post('/api/transparency/code-stream', self.post_transparency_code_stream)
-        self.app.router.add_route('OPTIONS', '/api/transparency/reasoning', self.handle_options)
-        self.app.router.add_route('OPTIONS', '/api/transparency/history', self.handle_options)
-        self.app.router.add_route('OPTIONS', '/api/transparency/code-stream', self.handle_options)
-
-        # Linear Integration endpoints (AI-75)
-        self.app.router.add_get('/api/integrations/linear/status', self.get_linear_status)
-        self.app.router.add_get('/api/integrations/linear/issues', self.get_linear_issues)
-        self.app.router.add_get('/api/integrations/linear/issue/{issue_key}', self.get_linear_issue)
-        self.app.router.add_post('/api/integrations/linear/query', self.post_linear_query)
-        self.app.router.add_route('OPTIONS', '/api/integrations/linear/status', self.handle_options)
-        self.app.router.add_route('OPTIONS', '/api/integrations/linear/issues', self.handle_options)
-        self.app.router.add_route('OPTIONS', '/api/integrations/linear/issue/{issue_key}', self.handle_options)
-        self.app.router.add_route('OPTIONS', '/api/integrations/linear/query', self.handle_options)
-
-        # Slack Integration endpoints (AI-76)
-        self.app.router.add_get('/api/integrations/slack/status', self.get_slack_status)
-        self.app.router.add_get('/api/integrations/slack/channels', self.get_slack_channels)
-        self.app.router.add_post('/api/integrations/slack/send', self.post_slack_send)
-        self.app.router.add_get('/api/integrations/slack/messages', self.get_slack_messages)
-        self.app.router.add_post('/api/integrations/slack/react', self.post_slack_react)
-        self.app.router.add_route('OPTIONS', '/api/integrations/slack/status', self.handle_options)
-        self.app.router.add_route('OPTIONS', '/api/integrations/slack/channels', self.handle_options)
-        self.app.router.add_route('OPTIONS', '/api/integrations/slack/send', self.handle_options)
-        self.app.router.add_route('OPTIONS', '/api/integrations/slack/messages', self.handle_options)
-        self.app.router.add_route('OPTIONS', '/api/integrations/slack/react', self.handle_options)
-
-        # Tool Call History endpoints (AI-78)
-        self.app.router.add_post('/api/tools/call', self.post_tool_call)
-        self.app.router.add_get('/api/tools/calls', self.get_tool_calls)
-        self.app.router.add_delete('/api/tools/calls', self.delete_tool_calls)
-        self.app.router.add_route('OPTIONS', '/api/tools/call', self.handle_options)
-        self.app.router.add_route('OPTIONS', '/api/tools/calls', self.handle_options)
+        # Reasoning broadcast endpoint (AI-158)
+        self.app.router.add_post('/api/reasoning', self.broadcast_reasoning)
 
         # OPTIONS for CORS preflight
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/agents/{agent_name}', self.handle_options)
-        self.app.router.add_route('OPTIONS', '/api/providers/status', self.handle_options)
-        self.app.router.add_route('OPTIONS', '/metrics', self.handle_options)
-        self.app.router.add_route('OPTIONS', '/api/system/status', self.handle_options)
-        self.app.router.add_route('OPTIONS', '/api/agents/pause-all', self.handle_options)
-        self.app.router.add_route('OPTIONS', '/api/agents/resume-all', self.handle_options)
-        self.app.router.add_route('OPTIONS', '/api/agent-controls', self.handle_options)
-        self.app.router.add_route('OPTIONS', '/api/agents/{agent_id}/pause', self.handle_options)
-        self.app.router.add_route('OPTIONS', '/api/agents/{agent_id}/resume', self.handle_options)
-        self.app.router.add_route('OPTIONS', '/api/agents/{agent_id}/requirements', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/requirements/{ticket_key}', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/reasoning', self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
         """Handle CORS preflight OPTIONS requests."""
@@ -386,94 +326,22 @@ class DashboardServer:
         raise web.HTTPNotFound(text='dashboard.html not found')
 
     async def health_check(self, request: Request) -> Response:
-        """Enhanced health check endpoint with detailed system status.
+        """Health check endpoint.
 
         Returns:
-            JSON response with comprehensive health information including:
-            - Service status
-            - System metrics (CPU, memory, disk)
-            - Metrics store status
-            - Performance metrics
-            - Uptime
+            JSON response with server status and metrics file info
         """
-        with timed_operation("health_check_duration"):
-            increment_counter("health_check_requests")
+        stats = self.store.get_stats()
 
-            try:
-                stats = self.store.get_stats()
-
-                # Get system metrics
-                cpu_percent = psutil.cpu_percent(interval=0.1)
-                memory = psutil.virtual_memory()
-                disk = psutil.disk_usage('/')
-
-                # Get performance metrics
-                perf_metrics = metrics_collector.get_metrics()
-
-                health_data = {
-                    'status': 'healthy',
-                    'timestamp': datetime.utcnow().isoformat() + 'Z',
-                    'version': '1.0.0',
-                    'project': self.project_name,
-
-                    # Service info
-                    'service': {
-                        'name': 'agent-dashboard',
-                        'uptime_seconds': perf_metrics.get('uptime_seconds', 0),
-                        'host': self.host,
-                        'port': self.port,
-                        'websocket_connections': len(self.websockets)
-                    },
-
-                    # System metrics
-                    'system': {
-                        'cpu_percent': round(cpu_percent, 2),
-                        'memory_percent': round(memory.percent, 2),
-                        'memory_used_mb': round(memory.used / (1024 * 1024), 2),
-                        'memory_total_mb': round(memory.total / (1024 * 1024), 2),
-                        'disk_percent': round(disk.percent, 2),
-                        'disk_used_gb': round(disk.used / (1024 * 1024 * 1024), 2),
-                        'disk_total_gb': round(disk.total / (1024 * 1024 * 1024), 2),
-                        'python_version': sys.version.split()[0]
-                    },
-
-                    # Metrics store status
-                    'metrics_store': {
-                        'metrics_file_exists': stats['metrics_file_exists'],
-                        'event_count': stats['event_count'],
-                        'session_count': stats['session_count'],
-                        'agent_count': stats['agent_count'],
-                        'metrics_file_size_bytes': stats.get('metrics_file_size_bytes', 0)
-                    },
-
-                    # Performance summary
-                    'performance': {
-                        'total_requests': perf_metrics.get('counters', {}).get('http_requests_total', [{}])[0].get('value', 0),
-                        'avg_response_time_ms': 0  # Will be populated from histograms
-                    }
-                }
-
-                # Calculate average response time from histogram
-                http_duration_hist = perf_metrics.get('histograms', {}).get('http_request_duration', [])
-                if http_duration_hist:
-                    hist = http_duration_hist[0]
-                    if hist.get('count', 0) > 0:
-                        health_data['performance']['avg_response_time_ms'] = round(hist.get('mean', 0) * 1000, 2)
-
-                increment_counter("health_check_success")
-                logger.info("Health check completed", extra={"status": "healthy"})
-
-                return web.json_response(health_data)
-
-            except Exception as e:
-                increment_counter("health_check_errors")
-                logger.error("Health check failed", exc_info=True, extra={"error": str(e)})
-
-                return web.json_response({
-                    'status': 'unhealthy',
-                    'timestamp': datetime.utcnow().isoformat() + 'Z',
-                    'error': str(e)
-                }, status=503)
+        return web.json_response({
+            'status': 'ok',
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'project': self.project_name,
+            'metrics_file_exists': stats['metrics_file_exists'],
+            'event_count': stats['event_count'],
+            'session_count': stats['session_count'],
+            'agent_count': stats['agent_count']
+        })
 
     async def get_metrics(self, request: Request) -> Response:
         """Get all metrics data.
@@ -589,269 +457,164 @@ class DashboardServer:
                 content_type='application/json'
             )
 
-    async def get_provider_status(self, request: Request) -> Response:
-        """Get AI provider availability status.
+    async def get_requirement(self, request: Request) -> Response:
+        """Get the current requirement text for a ticket.
 
-        Checks environment variables for API keys and returns status for each provider:
-        - available: API key configured and provider is reachable
-        - unconfigured: API key missing
-        - error: API key present but provider unreachable
+        Path Parameters:
+            ticket_key: Linear ticket key (e.g. 'AI-157')
 
         Returns:
-            JSON response with provider status information
+            JSON response with ticket_key and requirement text.
+            If no requirement is stored, returns an empty string.
         """
-        logger.info("GET /api/providers/status")
+        ticket_key = request.match_info['ticket_key']
+        logger.info(f"GET /api/requirements/{ticket_key}")
+
+        # Validate ticket_key format (e.g., AI-157)
+        if not re.match(r'^[A-Z]+-\d+$', ticket_key):
+            return web.json_response({'error': 'Invalid ticket key format'}, status=400)
+
+        requirement_text = _requirements_store.get(ticket_key, '')
+        return web.json_response({
+            'ticket_key': ticket_key,
+            'requirement': requirement_text,
+        })
+
+    async def put_requirement(self, request: Request) -> Response:
+        """Update the requirement text for a ticket, optionally syncing to Linear.
+
+        Path Parameters:
+            ticket_key: Linear ticket key (e.g. 'AI-157')
+
+        Request Body (JSON):
+            requirement (str): The updated requirement text
+            sync_to_linear (bool): If true, update the Linear issue description
+
+        Returns:
+            JSON response with success status and optional linear_synced flag.
+
+        Raises:
+            400: If request body is invalid JSON or missing 'requirement' field
+            500: If Linear API call fails when sync_to_linear is true
+        """
+        ticket_key = request.match_info['ticket_key']
+        logger.info(f"PUT /api/requirements/{ticket_key}")
+
+        # Validate ticket_key format (e.g., AI-157)
+        if not re.match(r'^[A-Z]+-\d+$', ticket_key):
+            return web.json_response({'error': 'Invalid ticket key format'}, status=400)
 
         try:
-            providers = {
-                'claude': {
-                    'env_var': 'ANTHROPIC_API_KEY',
-                    'name': 'Claude',
-                    'setup_instructions': 'Set ANTHROPIC_API_KEY environment variable with your Anthropic API key'
-                },
-                'chatgpt': {
-                    'env_var': 'OPENAI_API_KEY',
-                    'name': 'ChatGPT',
-                    'setup_instructions': 'Set OPENAI_API_KEY environment variable with your OpenAI API key'
-                },
-                'gemini': {
-                    'env_var': 'GOOGLE_API_KEY',
-                    'name': 'Gemini',
-                    'setup_instructions': 'Set GOOGLE_API_KEY environment variable with your Google AI API key'
-                },
-                'groq': {
-                    'env_var': 'GROQ_API_KEY',
-                    'name': 'Groq',
-                    'setup_instructions': 'Set GROQ_API_KEY environment variable with your Groq API key'
-                },
-                'kimi': {
-                    'env_var': 'KIMI_API_KEY',
-                    'name': 'KIMI',
-                    'setup_instructions': 'Set KIMI_API_KEY environment variable with your KIMI API key'
-                },
-                'windsurf': {
-                    'env_var': 'WINDSURF_API_KEY',
-                    'name': 'Windsurf',
-                    'setup_instructions': 'Set WINDSURF_API_KEY environment variable with your Windsurf API key'
-                }
-            }
-
-            status_data = {}
-            for provider_id, config in providers.items():
-                api_key = os.getenv(config['env_var'])
-
-                if provider_id == 'claude':
-                    # Claude is always available as default provider
-                    status = 'available'
-                elif api_key:
-                    # API key is configured
-                    # For now, we assume it's available if configured
-                    # In a real implementation, we would ping the API
-                    status = 'available'
-                else:
-                    # API key not configured
-                    status = 'unconfigured'
-
-                status_data[provider_id] = {
-                    'status': status,
-                    'name': config['name'],
-                    'configured': api_key is not None or provider_id == 'claude',
-                    'setup_instructions': config['setup_instructions'] if status == 'unconfigured' else None
-                }
-
-            return web.json_response({
-                'providers': status_data,
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            })
-
-        except Exception as e:
-            logger.error(f"Error checking provider status: {e}")
-            raise web.HTTPInternalServerError(
-                text=json.dumps({'error': str(e)}),
-                content_type='application/json'
+            body = await request.json()
+        except Exception:
+            return web.json_response(
+                {'error': 'Invalid JSON in request body'},
+                status=400,
             )
 
-    async def prometheus_metrics(self, request: Request) -> Response:
-        """Prometheus metrics endpoint.
+        if 'requirement' not in body:
+            return web.json_response(
+                {'error': 'Missing required field: requirement'},
+                status=400,
+            )
 
-        Returns metrics in Prometheus text format for scraping by Prometheus server.
+        requirement_text = body['requirement']
 
-        Returns:
-            Response with Prometheus-formatted metrics
-        """
-        with timed_operation("prometheus_export_duration"):
-            increment_counter("prometheus_scrapes")
+        if not isinstance(requirement_text, str):
+            return web.json_response({'error': 'requirement must be a string'}, status=400)
 
+        sync_to_linear = bool(body.get('sync_to_linear', False))
+
+        # Store locally (atomic in-memory update)
+        _requirements_store[ticket_key] = requirement_text
+        logger.info(f"Stored requirement for {ticket_key} ({len(requirement_text)} chars)")
+
+        linear_synced = False
+        if sync_to_linear:
+            linear_api_key = os.environ.get('LINEAR_API_KEY', '')
+            if not linear_api_key:
+                logger.warning("LINEAR_API_KEY not set — cannot sync to Linear")
+                return web.json_response(
+                    {
+                        'success': True,
+                        'ticket_key': ticket_key,
+                        'linear_synced': False,
+                        'linear_error': 'LINEAR_API_KEY environment variable is not set',
+                    },
+                    status=200,
+                )
             try:
-                # Export metrics in Prometheus format
-                metrics_text = metrics_collector.export_prometheus()
-
-                # Add custom metrics from dashboard state
-                state = self.store.load()
-
-                # Add dashboard-specific metrics
-                extra_metrics = []
-
-                # Total sessions
-                extra_metrics.append(f"# HELP dashboard_total_sessions Total number of sessions")
-                extra_metrics.append(f"# TYPE dashboard_total_sessions counter")
-                extra_metrics.append(f"dashboard_total_sessions {state['total_sessions']}")
-
-                # Total tokens
-                extra_metrics.append(f"# HELP dashboard_total_tokens Total tokens used")
-                extra_metrics.append(f"# TYPE dashboard_total_tokens counter")
-                extra_metrics.append(f"dashboard_total_tokens {state['total_tokens']}")
-
-                # Total cost
-                extra_metrics.append(f"# HELP dashboard_total_cost_usd Total cost in USD")
-                extra_metrics.append(f"# TYPE dashboard_total_cost_usd counter")
-                extra_metrics.append(f"dashboard_total_cost_usd {state['total_cost_usd']}")
-
-                # Agent metrics
-                for agent_name, agent_data in state['agents'].items():
-                    labels = f'{{agent="{agent_name}"}}'
-
-                    extra_metrics.append(f"# HELP agent_invocations_total Total invocations per agent")
-                    extra_metrics.append(f"# TYPE agent_invocations_total counter")
-                    extra_metrics.append(f"agent_invocations_total{labels} {agent_data['total_invocations']}")
-
-                    extra_metrics.append(f"# HELP agent_success_rate Success rate per agent")
-                    extra_metrics.append(f"# TYPE agent_success_rate gauge")
-                    extra_metrics.append(f"agent_success_rate{labels} {agent_data['success_rate']}")
-
-                # Combine metrics
-                full_metrics = metrics_text + "\n" + "\n".join(extra_metrics)
-
-                increment_counter("prometheus_scrapes_success")
-                logger.debug("Prometheus metrics exported")
-
-                return web.Response(
-                    text=full_metrics,
-                    content_type="text/plain; version=0.0.4"
+                linear_synced = await update_linear_issue(ticket_key, requirement_text)
+                logger.info(f"Linear sync successful for {ticket_key}")
+            except Exception as e:
+                logger.error(f"Linear API error for {ticket_key}: {e}")
+                return web.json_response(
+                    {
+                        'success': True,
+                        'ticket_key': ticket_key,
+                        'linear_synced': False,
+                        'linear_error': str(e),
+                    },
+                    status=200,
                 )
 
-            except Exception as e:
-                increment_counter("prometheus_scrapes_errors")
-                logger.error("Error exporting Prometheus metrics", exc_info=True, extra={"error": str(e)})
-                raise web.HTTPInternalServerError(text=f"Error exporting metrics: {str(e)}")
+        return web.json_response({
+            'success': True,
+            'ticket_key': ticket_key,
+            'linear_synced': linear_synced,
+        })
 
-    async def serve_monitoring_dashboard(self, request: Request) -> Response:
-        """Serve the monitoring dashboard HTML page.
+    async def broadcast_to_websockets(self, message: dict) -> None:
+        """Broadcast a JSON message to all connected WebSocket clients.
 
-        Returns:
-            Response with monitoring dashboard HTML
+        Args:
+            message: Dictionary to serialise and send to every active client.
+                     Disconnected clients are silently removed from the pool.
         """
-        increment_counter("monitoring_dashboard_views")
-
-        html_path = Path(__file__).parent / 'monitoring.html'
-        if html_path.exists():
-            logger.info("Serving monitoring dashboard")
-            return web.Response(
-                text=html_path.read_text(),
-                content_type='text/html',
-            )
-
-        logger.warning("Monitoring dashboard HTML not found")
-        raise web.HTTPNotFound(text='monitoring.html not found')
-
-    async def system_status(self, request: Request) -> Response:
-        """Get detailed system status information.
-
-        Returns:
-            JSON response with system metrics, logs, and alerts
-        """
-        with timed_operation("system_status_duration"):
-            increment_counter("system_status_requests")
-
+        disconnected = set()
+        for ws in self.websockets:
             try:
-                # Get system metrics
-                cpu_percent = psutil.cpu_percent(interval=0.1)
-                cpu_count = psutil.cpu_count()
-                memory = psutil.virtual_memory()
-                disk = psutil.disk_usage('/')
-
-                # Get network stats
-                net_io = psutil.net_io_counters()
-
-                # Get process info
-                process = psutil.Process()
-                process_memory = process.memory_info()
-
-                # Get performance metrics
-                perf_metrics = metrics_collector.get_metrics()
-
-                # Check for alerts
-                alerts = []
-                if cpu_percent > 80:
-                    alerts.append({
-                        "severity": "warning",
-                        "message": f"High CPU usage: {cpu_percent}%",
-                        "timestamp": datetime.utcnow().isoformat() + "Z"
-                    })
-                if memory.percent > 85:
-                    alerts.append({
-                        "severity": "warning",
-                        "message": f"High memory usage: {memory.percent}%",
-                        "timestamp": datetime.utcnow().isoformat() + "Z"
-                    })
-                if disk.percent > 90:
-                    alerts.append({
-                        "severity": "critical",
-                        "message": f"High disk usage: {disk.percent}%",
-                        "timestamp": datetime.utcnow().isoformat() + "Z"
-                    })
-
-                status_data = {
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
-                    "status": "healthy" if not alerts else "degraded",
-                    "alerts": alerts,
-
-                    "system": {
-                        "cpu": {
-                            "percent": round(cpu_percent, 2),
-                            "count": cpu_count,
-                            "load_average": list(psutil.getloadavg()) if hasattr(psutil, 'getloadavg') else []
-                        },
-                        "memory": {
-                            "percent": round(memory.percent, 2),
-                            "used_mb": round(memory.used / (1024 * 1024), 2),
-                            "total_mb": round(memory.total / (1024 * 1024), 2),
-                            "available_mb": round(memory.available / (1024 * 1024), 2)
-                        },
-                        "disk": {
-                            "percent": round(disk.percent, 2),
-                            "used_gb": round(disk.used / (1024 * 1024 * 1024), 2),
-                            "total_gb": round(disk.total / (1024 * 1024 * 1024), 2),
-                            "free_gb": round(disk.free / (1024 * 1024 * 1024), 2)
-                        },
-                        "network": {
-                            "bytes_sent": net_io.bytes_sent,
-                            "bytes_recv": net_io.bytes_recv,
-                            "packets_sent": net_io.packets_sent,
-                            "packets_recv": net_io.packets_recv
-                        }
-                    },
-
-                    "process": {
-                        "pid": process.pid,
-                        "memory_mb": round(process_memory.rss / (1024 * 1024), 2),
-                        "cpu_percent": round(process.cpu_percent(interval=0.1), 2),
-                        "num_threads": process.num_threads(),
-                        "num_fds": process.num_fds() if hasattr(process, 'num_fds') else None
-                    },
-
-                    "performance_metrics": perf_metrics
-                }
-
-                increment_counter("system_status_success")
-                logger.info("System status retrieved", extra={"alerts_count": len(alerts)})
-
-                return web.json_response(status_data)
-
+                await ws.send_json(message)
             except Exception as e:
-                increment_counter("system_status_errors")
-                logger.error("Error getting system status", exc_info=True, extra={"error": str(e)})
-                raise web.HTTPInternalServerError(text=json.dumps({'error': str(e)}))
+                logger.error(f"Error broadcasting to WebSocket {id(ws)}: {e}")
+                disconnected.add(ws)
+        self.websockets -= disconnected
+        if disconnected:
+            logger.info(f"Removed {len(disconnected)} disconnected WebSocket clients during broadcast")
+
+    async def broadcast_reasoning(self, request: Request) -> Response:
+        """POST /api/reasoning — broadcast a reasoning event to all WebSocket clients.
+
+        Expected JSON body::
+
+            {
+                "content": "<reasoning text>",
+                "ticket":  "<optional ticket key, e.g. AI-158>"
+            }
+
+        Returns:
+            JSON ``{"success": true}`` on success, or
+            ``{"error": "<message>", "status": 400}`` for malformed requests.
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        content = body.get('content', '')
+        ticket = body.get('ticket', '')
+
+        message = {
+            'type': 'reasoning',
+            'content': content,
+            'ticket': ticket,
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+        }
+
+        await self.broadcast_to_websockets(message)
+        logger.info(f"Reasoning event broadcast: ticket={ticket!r}, content_len={len(content)}")
+
+        return web.json_response({'success': True})
 
     async def websocket_handler(self, request: Request) -> WebSocketResponse:
         """WebSocket endpoint for real-time metrics streaming.
@@ -947,92 +710,22 @@ class DashboardServer:
             except Exception as e:
                 logger.error(f"Error in broadcast loop: {e}")
 
-    def _on_collector_event(self, event_type: str, event: AgentEvent) -> None:
-        """Callback for collector events.
-
-        This is called synchronously by the collector. We queue the event
-        for async broadcasting to avoid blocking the collector.
-
-        Args:
-            event_type: Type of event ("task_started", "task_completed", "task_failed")
-            event: The event data
-        """
-        try:
-            # Queue the event for async broadcasting
-            self.event_queue.put_nowait((event_type, event))
-        except Exception as e:
-            logger.error(f"Error queueing collector event: {e}")
-
-    async def _broadcast_collector_events(self):
-        """Process and broadcast collector events to WebSocket clients."""
-        while True:
-            try:
-                # Wait for events from the collector
-                event_type, event = await self.event_queue.get()
-
-                if not self.websockets:
-                    continue
-
-                # Prepare broadcast message
-                message = {
-                    'type': 'agent_event',
-                    'event_type': event_type,
-                    'timestamp': datetime.utcnow().isoformat() + 'Z',
-                    'event': event
-                }
-
-                # Broadcast to all connected clients
-                disconnected = set()
-                for ws in self.websockets:
-                    try:
-                        await ws.send_json(message)
-                        logger.info(f"Broadcast {event_type} event to WebSocket {id(ws)}")
-                    except Exception as e:
-                        logger.error(f"Error broadcasting event to WebSocket {id(ws)}: {e}")
-                        disconnected.add(ws)
-
-                # Remove disconnected clients
-                self.websockets -= disconnected
-                if disconnected:
-                    logger.info(f"Removed {len(disconnected)} disconnected WebSocket clients")
-
-            except asyncio.CancelledError:
-                logger.info("Event broadcast task cancelled")
-                break
-            except Exception as e:
-                logger.error(f"Error in event broadcast loop: {e}")
-
     async def _start_broadcast(self, app):
         """Start the periodic metrics broadcast task."""
         self.broadcast_task = asyncio.create_task(self._broadcast_metrics())
         logger.info(f"WebSocket broadcast started (interval: {self.broadcast_interval}s)")
 
-    async def _start_event_broadcast(self, app):
-        """Start the event broadcast task for real-time updates."""
-        self.event_broadcast_task = asyncio.create_task(self._broadcast_collector_events())
-        logger.info("Real-time event broadcast started")
-
     async def _cleanup_websockets(self, app):
         """Clean up all WebSocket connections on shutdown."""
         logger.info("Cleaning up WebSocket connections...")
 
-        # Cancel broadcast tasks
+        # Cancel broadcast task
         if self.broadcast_task:
             self.broadcast_task.cancel()
             try:
                 await self.broadcast_task
             except asyncio.CancelledError:
                 pass
-
-        if self.event_broadcast_task:
-            self.event_broadcast_task.cancel()
-            try:
-                await self.event_broadcast_task
-            except asyncio.CancelledError:
-                pass
-
-        # Unsubscribe from collector events
-        self.collector.unsubscribe(self._on_collector_event)
 
         # Close all active connections
         for ws in self.websockets:
@@ -1043,977 +736,6 @@ class DashboardServer:
 
         self.websockets.clear()
         logger.info("WebSocket cleanup complete")
-
-    # -------------------------------------------------------------------------
-    # Agent Controls - AI-130: Pause, Resume & Requirement Editing
-    # -------------------------------------------------------------------------
-
-    def _validate_agent_id(self, agent_id: str) -> Optional[Response]:
-        """Validate agent_id format. Returns error Response if invalid, else None."""
-        if not agent_id:
-            return web.json_response({'error': 'agent_id must not be empty'}, status=400)
-        if not AGENT_ID_PATTERN.match(agent_id):
-            return web.json_response(
-                {'error': 'agent_id must contain only alphanumeric characters, dashes, or underscores'},
-                status=400
-            )
-        return None
-
-    def _get_agent_control(self, agent_id: str) -> dict:
-        """Get or initialize control state for an agent.
-
-        Enforces a maximum of AGENT_CONTROLS_MAX_ENTRIES entries to prevent
-        unbounded memory growth from arbitrary agent IDs.
-        """
-        if agent_id not in agent_controls:
-            if len(agent_controls) >= AGENT_CONTROLS_MAX_ENTRIES:
-                logger.warning(
-                    f"agent_controls store at capacity ({AGENT_CONTROLS_MAX_ENTRIES}). "
-                    f"Rejecting new entry for agent_id: {agent_id}"
-                )
-                raise ValueError(
-                    f"Maximum number of agent control entries ({AGENT_CONTROLS_MAX_ENTRIES}) reached. "
-                    "Cannot add new agent."
-                )
-            agent_controls[agent_id] = {"paused": False, "requirements": ""}
-        return agent_controls[agent_id]
-
-    async def pause_agent(self, request: Request) -> Response:
-        """POST /api/agents/{agent_id}/pause - Pause a specific agent.
-
-        Stops the agent from accepting new delegations.
-
-        Returns:
-            200 OK with updated agent control state
-            400 Bad Request for invalid agent_id
-        """
-        agent_id = request.match_info['agent_id']
-        err = self._validate_agent_id(agent_id)
-        if err:
-            return err
-        try:
-            control = self._get_agent_control(agent_id)
-        except ValueError as e:
-            return web.json_response({'error': str(e)}, status=400)
-        control['paused'] = True
-        logger.info(f"Agent paused: {agent_id}")
-        return web.json_response({
-            'status': 'ok',
-            'agent_id': agent_id,
-            'paused': True,
-            'message': f'Agent {agent_id} has been paused',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        })
-
-    async def resume_agent(self, request: Request) -> Response:
-        """POST /api/agents/{agent_id}/resume - Resume a paused agent.
-
-        Allows the agent to accept new delegations again.
-
-        Returns:
-            200 OK with updated agent control state
-            400 Bad Request for invalid agent_id
-        """
-        agent_id = request.match_info['agent_id']
-        err = self._validate_agent_id(agent_id)
-        if err:
-            return err
-        try:
-            control = self._get_agent_control(agent_id)
-        except ValueError as e:
-            return web.json_response({'error': str(e)}, status=400)
-        control['paused'] = False
-        logger.info(f"Agent resumed: {agent_id}")
-        return web.json_response({
-            'status': 'ok',
-            'agent_id': agent_id,
-            'paused': False,
-            'message': f'Agent {agent_id} has been resumed',
-            'requirements': control.get('requirements', ''),
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        })
-
-    async def pause_all_agents(self, request: Request) -> Response:
-        """POST /api/agents/pause-all - Pause all agents.
-
-        Global control to stop all agents from accepting new delegations.
-
-        Returns:
-            200 OK with count of paused agents
-        """
-        state = self.store.load()
-        agent_names = list(state.get('agents', {}).keys())
-        for agent_id in agent_names:
-            control = self._get_agent_control(agent_id)
-            control['paused'] = True
-        logger.info(f"All agents paused: {len(agent_names)} agents")
-        return web.json_response({
-            'status': 'ok',
-            'paused_count': len(agent_names),
-            'agent_ids': agent_names,
-            'message': f'All {len(agent_names)} agents have been paused',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        })
-
-    async def resume_all_agents(self, request: Request) -> Response:
-        """POST /api/agents/resume-all - Resume all paused agents.
-
-        Global control to allow all agents to accept new delegations.
-
-        Returns:
-            200 OK with count of resumed agents
-        """
-        state = self.store.load()
-        agent_names = list(state.get('agents', {}).keys())
-        for agent_id in agent_names:
-            control = self._get_agent_control(agent_id)
-            control['paused'] = False
-        logger.info(f"All agents resumed: {len(agent_names)} agents")
-        return web.json_response({
-            'status': 'ok',
-            'resumed_count': len(agent_names),
-            'agent_ids': agent_names,
-            'message': f'All {len(agent_names)} agents have been resumed',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        })
-
-    async def get_agent_requirements(self, request: Request) -> Response:
-        """GET /api/agents/{agent_id}/requirements - Get current requirements for an agent.
-
-        Returns:
-            200 OK with current requirement text
-            400 Bad Request for invalid agent_id
-        """
-        agent_id = request.match_info['agent_id']
-        err = self._validate_agent_id(agent_id)
-        if err:
-            return err
-        try:
-            control = self._get_agent_control(agent_id)
-        except ValueError as e:
-            return web.json_response({'error': str(e)}, status=400)
-        return web.json_response({
-            'agent_id': agent_id,
-            'requirements': control.get('requirements', ''),
-            'paused': control.get('paused', False),
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        })
-
-    async def update_agent_requirements(self, request: Request) -> Response:
-        """PUT /api/agents/{agent_id}/requirements - Update requirements for an agent.
-
-        Request body:
-            {"requirements": "Updated requirement text"}
-
-        Returns:
-            200 OK with confirmation
-            400 Bad Request for invalid input
-        """
-        agent_id = request.match_info['agent_id']
-        err = self._validate_agent_id(agent_id)
-        if err:
-            return err
-        try:
-            data = await request.json()
-        except json.JSONDecodeError:
-            return web.json_response({'error': 'Invalid JSON'}, status=400)
-
-        requirements = data.get('requirements')
-        if requirements is None:
-            return web.json_response(
-                {'error': 'Missing required field: requirements'},
-                status=400
-            )
-
-        if len(requirements) > REQUIREMENTS_MAX_LENGTH:
-            return web.json_response(
-                {'error': f'Requirements text exceeds maximum length of {REQUIREMENTS_MAX_LENGTH} characters'},
-                status=400
-            )
-
-        try:
-            control = self._get_agent_control(agent_id)
-        except ValueError as e:
-            return web.json_response({'error': str(e)}, status=400)
-        control['requirements'] = requirements
-        logger.info(f"Requirements updated for agent {agent_id}: {len(requirements)} chars")
-        return web.json_response({
-            'status': 'ok',
-            'agent_id': agent_id,
-            'requirements': requirements,
-            'paused': control.get('paused', False),
-            'message': f'Requirements for {agent_id} updated successfully',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        })
-
-    async def get_all_agent_controls(self, request: Request) -> Response:
-        """GET /api/agent-controls - Get pause/resume state and requirements for all agents.
-
-        Returns:
-            200 OK with all agent control states
-        """
-        return web.json_response({
-            'agent_controls': agent_controls,
-            'total_agents': len(agent_controls),
-            'paused_count': sum(1 for c in agent_controls.values() if c.get('paused', False)),
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        })
-
-    # -------------------------------------------------------------------------
-    # Chat History - AI-133: Message History Persistence
-    # -------------------------------------------------------------------------
-
-    async def get_chat_history(self, request: Request) -> Response:
-        """GET /api/chat/history - Retrieve persisted message history (last 1000 messages).
-
-        Returns:
-            200 OK with list of chat messages
-        """
-        return web.json_response({
-            'messages': chat_history[-CHAT_HISTORY_MAX:],
-            'count': len(chat_history),
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        })
-
-    async def post_chat_history(self, request: Request) -> Response:
-        """POST /api/chat/history - Append message(s) to the history.
-
-        Request body:
-            Single message: {"id", "type": "user|ai|system", "content", "timestamp",
-                             "provider"?, "model"?}
-            OR array:        [{"id", "type", ...}, ...]
-
-        Returns:
-            200 OK with confirmation and updated count
-            400 Bad Request for invalid input
-        """
-        try:
-            data = await request.json()
-        except (json.JSONDecodeError, ValueError):
-            return web.json_response({'error': 'Invalid JSON'}, status=400)
-
-        # Accept single message or array
-        if isinstance(data, dict):
-            messages_to_add = [data]
-        elif isinstance(data, list):
-            messages_to_add = data
-        else:
-            return web.json_response({'error': 'Body must be a message object or array'}, status=400)
-
-        added = 0
-        for msg in messages_to_add:
-            if not isinstance(msg, dict):
-                continue
-            # Validate required fields
-            if 'content' not in msg or 'type' not in msg:
-                return web.json_response(
-                    {'error': 'Each message must have "type" and "content" fields'},
-                    status=400
-                )
-            if msg['type'] not in ('user', 'ai', 'system'):
-                return web.json_response(
-                    {'error': f'Invalid message type "{msg["type"]}". Must be user, ai, or system'},
-                    status=400
-                )
-            # Ensure required fields have defaults
-            entry = {
-                'id': msg.get('id', int(datetime.utcnow().timestamp() * 1000)),
-                'type': msg['type'],
-                'content': msg['content'],
-                'timestamp': msg.get('timestamp', datetime.utcnow().isoformat() + 'Z'),
-                'provider': msg.get('provider'),
-                'model': msg.get('model')
-            }
-            chat_history.append(entry)
-            added += 1
-
-        # Enforce server-side limit
-        if len(chat_history) > CHAT_HISTORY_MAX:
-            del chat_history[:len(chat_history) - CHAT_HISTORY_MAX]
-
-        logger.info(f"Chat history: added {added} message(s), total={len(chat_history)}")
-        return web.json_response({
-            'status': 'ok',
-            'added': added,
-            'total': len(chat_history),
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        })
-
-    async def delete_chat_history(self, request: Request) -> Response:
-        """DELETE /api/chat/history - Clear all persisted chat history.
-
-        Returns:
-            200 OK with confirmation
-        """
-        count = len(chat_history)
-        chat_history.clear()
-        logger.info(f"Chat history cleared: removed {count} messages")
-        return web.json_response({
-            'status': 'ok',
-            'cleared': count,
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        })
-
-    # -------------------------------------------------------------------------
-    # Provider Switch History - AI-74: Hot-Swap Providers Without Context Loss
-    # -------------------------------------------------------------------------
-
-    async def post_provider_switch(self, request: Request) -> Response:
-        """POST /api/chat/provider-switch - Record a provider switch event.
-
-        Request body:
-            {from_provider, to_provider, timestamp?, message_count?}
-
-        Returns:
-            200 OK with success and context_preserved flag
-            400 Bad Request for invalid input
-        """
-        try:
-            data = await request.json()
-        except (json.JSONDecodeError, ValueError):
-            return web.json_response({'error': 'Invalid JSON'}, status=400)
-
-        if not isinstance(data, dict):
-            return web.json_response({'error': 'Body must be a JSON object'}, status=400)
-
-        # Validate required fields
-        if 'from_provider' not in data or 'to_provider' not in data:
-            return web.json_response(
-                {'error': 'Missing required fields: from_provider, to_provider'},
-                status=400
-            )
-
-        entry = {
-            'from_provider': str(data['from_provider']),
-            'to_provider': str(data['to_provider']),
-            'timestamp': data.get('timestamp', datetime.utcnow().isoformat() + 'Z'),
-            'message_count': int(data.get('message_count', 0))
-        }
-
-        provider_switch_history.append(entry)
-
-        # Enforce max size
-        if len(provider_switch_history) > PROVIDER_SWITCH_HISTORY_MAX:
-            del provider_switch_history[:len(provider_switch_history) - PROVIDER_SWITCH_HISTORY_MAX]
-
-        logger.info(
-            f"AI-74: Provider switch recorded: {entry['from_provider']} -> {entry['to_provider']}, "
-            f"messages={entry['message_count']}"
-        )
-
-        return web.json_response({
-            'success': True,
-            'context_preserved': True,
-            'from_provider': entry['from_provider'],
-            'to_provider': entry['to_provider'],
-            'timestamp': entry['timestamp']
-        })
-
-    async def get_provider_switch_history(self, request: Request) -> Response:
-        """GET /api/chat/provider-switch - Retrieve provider switch history.
-
-        Returns:
-            200 OK with list of provider switch events
-        """
-        return web.json_response({
-            'switches': provider_switch_history[-PROVIDER_SWITCH_HISTORY_MAX:],
-            'count': len(provider_switch_history),
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        })
-
-    async def post_transparency_reasoning(self, request: Request) -> Response:
-        """POST /api/transparency/reasoning - Emit a reasoning event.
-
-        Request body:
-            {agent, decision, complexity, reasoning, timestamp?}
-
-        Broadcasts event to all WebSocket clients as type "reasoning".
-
-        Returns:
-            200 OK with the stored event
-            400 Bad Request for invalid input
-        """
-        try:
-            data = await request.json()
-        except (json.JSONDecodeError, ValueError):
-            return web.json_response({'error': 'Invalid JSON'}, status=400)
-
-        if not isinstance(data, dict):
-            return web.json_response({'error': 'Body must be a JSON object'}, status=400)
-
-        # Validate required fields
-        required = ('agent', 'decision', 'complexity', 'reasoning')
-        for field in required:
-            if field not in data:
-                return web.json_response(
-                    {'error': f'Missing required field: {field}'},
-                    status=400
-                )
-
-        entry = {
-            'agent': str(data['agent']),
-            'decision': str(data['decision']),
-            'complexity': str(data['complexity']),
-            'reasoning': str(data['reasoning']),
-            'timestamp': data.get('timestamp', datetime.utcnow().isoformat() + 'Z'),
-        }
-
-        # Store in memory
-        reasoning_history.append(entry)
-        if len(reasoning_history) > REASONING_HISTORY_MAX:
-            del reasoning_history[:len(reasoning_history) - REASONING_HISTORY_MAX]
-
-        # Broadcast to WebSocket clients
-        ws_message = {
-            'type': 'reasoning',
-            'timestamp': entry['timestamp'],
-            'agent': entry['agent'],
-            'decision': entry['decision'],
-            'complexity': entry['complexity'],
-            'reasoning': entry['reasoning'],
-        }
-        disconnected = set()
-        for ws in self.websockets:
-            try:
-                await ws.send_json(ws_message)
-            except Exception as e:
-                logger.error(f"Error broadcasting reasoning to WebSocket {id(ws)}: {e}")
-                disconnected.add(ws)
-        self.websockets -= disconnected
-
-        logger.info(f"Transparency reasoning emitted from agent={entry['agent']}, complexity={entry['complexity']}")
-        return web.json_response({'status': 'ok', 'event': entry})
-
-    async def get_transparency_history(self, request: Request) -> Response:
-        """GET /api/transparency/history - Get last 100 reasoning events.
-
-        Returns:
-            200 OK with list of reasoning events
-        """
-        return web.json_response({
-            'history': reasoning_history[-REASONING_HISTORY_MAX:],
-            'count': len(reasoning_history),
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        })
-
-    async def delete_transparency_history(self, request: Request) -> Response:
-        """DELETE /api/transparency/history - Clear all reasoning history.
-
-        Returns:
-            200 OK with confirmation
-        """
-        count = len(reasoning_history)
-        reasoning_history.clear()
-        logger.info(f"Transparency history cleared: removed {count} events")
-        return web.json_response({
-            'status': 'ok',
-            'cleared': count,
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        })
-
-    async def post_transparency_code_stream(self, request: Request) -> Response:
-        """POST /api/transparency/code-stream - Emit a live code streaming chunk.
-
-        Request body:
-            {agent_id, chunk, file_path, done}
-
-        Broadcasts event to all WebSocket clients as type "code_stream".
-
-        Returns:
-            200 OK
-            400 Bad Request for invalid input
-        """
-        try:
-            data = await request.json()
-        except (json.JSONDecodeError, ValueError):
-            return web.json_response({'error': 'Invalid JSON'}, status=400)
-
-        if not isinstance(data, dict):
-            return web.json_response({'error': 'Body must be a JSON object'}, status=400)
-
-        required = ('agent_id', 'chunk', 'file_path')
-        for field in required:
-            if field not in data:
-                return web.json_response(
-                    {'error': f'Missing required field: {field}'},
-                    status=400
-                )
-
-        ws_message = {
-            'type': 'code_stream',
-            'agent_id': str(data['agent_id']),
-            'chunk': str(data['chunk']),
-            'file_path': str(data['file_path']),
-            'done': bool(data.get('done', False)),
-            'timestamp': datetime.utcnow().isoformat() + 'Z',
-        }
-
-        disconnected = set()
-        for ws in self.websockets:
-            try:
-                await ws.send_json(ws_message)
-            except Exception as e:
-                logger.error(f"Error broadcasting code_stream to WebSocket {id(ws)}: {e}")
-                disconnected.add(ws)
-        self.websockets -= disconnected
-
-        logger.info(f"Transparency code-stream emitted: agent={ws_message['agent_id']}, file={ws_message['file_path']}, done={ws_message['done']}")
-        return web.json_response({'status': 'ok'})
-
-    # -------------------------------------------------------------------------
-    # Linear Integration - AI-75: Issue Queries and Management (stub/simulation)
-    # -------------------------------------------------------------------------
-
-    # Mock data for Linear issues simulation
-    _LINEAR_MOCK_ISSUES = [
-        {
-            "id": "linear-uuid-001",
-            "key": "AI-1",
-            "title": "Initial project setup and scaffolding",
-            "status": "Done",
-            "assignee": "Kenny H",
-            "priority": "High",
-            "description": "Set up the base project structure, CI/CD pipeline, and initial tooling."
-        },
-        {
-            "id": "linear-uuid-002",
-            "key": "AI-42",
-            "title": "Implement agent metrics collector",
-            "status": "In Progress",
-            "assignee": "Kenny H",
-            "priority": "High",
-            "description": "Build the metrics collector that aggregates agent performance data."
-        },
-        {
-            "id": "linear-uuid-003",
-            "key": "AI-68",
-            "title": "Chat interface with message thread",
-            "status": "Done",
-            "assignee": "Kenny H",
-            "priority": "Medium",
-            "description": "Implement chat interface for the dashboard with message history."
-        },
-        {
-            "id": "linear-uuid-004",
-            "key": "AI-73",
-            "title": "AI provider switcher with 6 providers",
-            "status": "Done",
-            "assignee": "Kenny H",
-            "priority": "Medium",
-            "description": "Support switching between Claude, ChatGPT, Gemini, Groq, KIMI, and Windsurf."
-        },
-        {
-            "id": "linear-uuid-005",
-            "key": "AI-75",
-            "title": "Linear Access - Issue Queries and Management",
-            "status": "In Progress",
-            "assignee": "Kenny H",
-            "priority": "High",
-            "description": "Integrate Linear MCP tools so users can query and manage issues from the chat interface."
-        },
-    ]
-
-    def _get_mock_issue(self, issue_key: str) -> Optional[dict]:
-        """Return mock issue data for the given key, or generate a placeholder."""
-        for issue in self._LINEAR_MOCK_ISSUES:
-            if issue["key"].upper() == issue_key.upper():
-                return issue
-        # Generate a placeholder for unknown keys
-        return {
-            "id": f"linear-uuid-{issue_key.lower().replace('-', '')}",
-            "key": issue_key.upper(),
-            "title": f"Issue {issue_key.upper()}",
-            "status": "Backlog",
-            "assignee": "Unassigned",
-            "priority": "Medium",
-            "description": f"No details found for {issue_key.upper()} in the mock data store."
-        }
-
-    async def get_linear_status(self, request: Request) -> Response:
-        """GET /api/integrations/linear/status - Check Linear connectivity.
-
-        Returns stub connectivity status for the Linear MCP integration.
-
-        Returns:
-            JSON response with connection status
-        """
-        logger.info("GET /api/integrations/linear/status")
-        return web.json_response({
-            "connected": True,
-            "tool_count": 39,
-            "service": "Linear",
-            "timestamp": datetime.utcnow().isoformat() + "Z"
-        })
-
-    async def get_linear_issues(self, request: Request) -> Response:
-        """GET /api/integrations/linear/issues - List issues with optional status filter.
-
-        Query Parameters:
-            status: Filter by status (e.g. 'In Progress', 'Done', 'Backlog')
-
-        Returns:
-            JSON response with list of issues
-        """
-        logger.info("GET /api/integrations/linear/issues")
-        status_filter = request.query.get("status", "").strip().lower()
-
-        if status_filter:
-            issues = [
-                i for i in self._LINEAR_MOCK_ISSUES
-                if i["status"].lower() == status_filter
-            ]
-        else:
-            issues = list(self._LINEAR_MOCK_ISSUES)
-
-        return web.json_response({
-            "issues": issues,
-            "count": len(issues),
-            "timestamp": datetime.utcnow().isoformat() + "Z"
-        })
-
-    async def get_linear_issue(self, request: Request) -> Response:
-        """GET /api/integrations/linear/issue/{issue_key} - Get issue details.
-
-        Path Parameters:
-            issue_key: Issue key such as AI-42
-
-        Returns:
-            JSON response with issue details
-        """
-        issue_key = request.match_info["issue_key"]
-        logger.info(f"GET /api/integrations/linear/issue/{issue_key}")
-
-        issue = self._get_mock_issue(issue_key)
-        return web.json_response({
-            "issue": issue,
-            "timestamp": datetime.utcnow().isoformat() + "Z"
-        })
-
-    async def post_linear_query(self, request: Request) -> Response:
-        """POST /api/integrations/linear/query - Route action to Linear MCP stub.
-
-        Request body:
-            {"action": "get_issue"|"list_issues"|"create_issue"|"transition_issue",
-             "params": {...}}
-
-        Returns:
-            JSON response with action result
-        """
-        logger.info("POST /api/integrations/linear/query")
-
-        try:
-            data = await request.json()
-        except (json.JSONDecodeError, ValueError):
-            return web.json_response({"error": "Invalid JSON"}, status=400)
-
-        if not isinstance(data, dict):
-            return web.json_response({"error": "Body must be a JSON object"}, status=400)
-
-        action = data.get("action", "").strip()
-        params = data.get("params", {})
-
-        if not action:
-            return web.json_response({"error": "Missing required field: action"}, status=400)
-
-        # Route to appropriate stub handler
-        if action == "get_issue":
-            issue_key = params.get("issue_key", "AI-1")
-            issue = self._get_mock_issue(issue_key)
-            result = {
-                "action": action,
-                "result": issue,
-                "summary": f"{issue['key']} is \"{issue['status']}\" — assigned to {issue['assignee']}"
-            }
-
-        elif action == "list_issues":
-            status_filter = params.get("status", "").strip().lower()
-            if status_filter:
-                issues = [i for i in self._LINEAR_MOCK_ISSUES if i["status"].lower() == status_filter]
-            else:
-                issues = list(self._LINEAR_MOCK_ISSUES)
-            result = {
-                "action": action,
-                "result": issues,
-                "summary": f"Found {len(issues)} issue(s)"
-            }
-
-        elif action == "create_issue":
-            title = params.get("title", "New Issue")
-            description = params.get("description", "")
-            new_issue = {
-                "id": f"linear-uuid-new-{int(datetime.utcnow().timestamp())}",
-                "key": "AI-NEW",
-                "title": title,
-                "status": "Backlog",
-                "assignee": "Unassigned",
-                "priority": params.get("priority", "Medium"),
-                "description": description
-            }
-            result = {
-                "action": action,
-                "result": new_issue,
-                "summary": f"Created issue \"{title}\" with key AI-NEW"
-            }
-
-        elif action == "transition_issue":
-            issue_key = params.get("issue_key", "AI-1")
-            new_status = params.get("status", "In Progress")
-            issue = self._get_mock_issue(issue_key)
-            issue = dict(issue)  # shallow copy
-            issue["status"] = new_status
-            result = {
-                "action": action,
-                "result": issue,
-                "summary": f"{issue['key']} transitioned to \"{new_status}\""
-            }
-
-        elif action == "get_board":
-            backlog = [i for i in self._LINEAR_MOCK_ISSUES if i["status"] == "Backlog"]
-            in_progress = [i for i in self._LINEAR_MOCK_ISSUES if i["status"] == "In Progress"]
-            done = [i for i in self._LINEAR_MOCK_ISSUES if i["status"] == "Done"]
-            result = {
-                "action": action,
-                "result": {
-                    "backlog": backlog,
-                    "in_progress": in_progress,
-                    "done": done
-                },
-                "summary": f"Board: {len(backlog)} backlog, {len(in_progress)} in progress, {len(done)} done"
-            }
-
-        else:
-            return web.json_response(
-                {"error": f"Unknown action: {action}. Supported: get_issue, list_issues, create_issue, transition_issue, get_board"},
-                status=400
-            )
-
-        return web.json_response({
-            "status": "ok",
-            "tool_name": f"linear_{action}",
-            **result,
-            "timestamp": datetime.utcnow().isoformat() + "Z"
-        })
-
-    # ------------------------------------------------------------------
-    # Slack Integration (AI-76) — mock/stub endpoints
-    # ------------------------------------------------------------------
-
-    _SLACK_MOCK_CHANNELS = [
-        {"id": "C001", "name": "#ai-cli-macz", "recent_messages": 12},
-        {"id": "C002", "name": "#general", "recent_messages": 47},
-        {"id": "C003", "name": "#random", "recent_messages": 8},
-    ]
-
-    _SLACK_MOCK_MESSAGES = [
-        {"id": "MSG001", "channel": "#general", "user": "alice", "text": "Good morning team!", "ts": "1708156800.000100"},
-        {"id": "MSG002", "channel": "#general", "user": "bob", "text": "Standup in 5 minutes", "ts": "1708157400.000200"},
-        {"id": "MSG003", "channel": "#general", "user": "carol", "text": "Deploying to staging now", "ts": "1708158000.000300"},
-        {"id": "MSG004", "channel": "#general", "user": "dave", "text": "All tests passing on main", "ts": "1708158600.000400"},
-        {"id": "MSG005", "channel": "#general", "user": "alice", "text": "Great work everyone!", "ts": "1708159200.000500"},
-    ]
-
-    async def get_slack_status(self, request: Request) -> Response:
-        """GET /api/integrations/slack/status - Check Slack connectivity.
-
-        Returns stub connectivity status for the Slack MCP integration.
-
-        Returns:
-            JSON response with connection status and channel list
-        """
-        logger.info("GET /api/integrations/slack/status")
-        return web.json_response({
-            "connected": True,
-            "tool_count": 8,
-            "channels": ["#ai-cli-macz", "#general", "#random"],
-            "service": "Slack",
-            "timestamp": datetime.utcnow().isoformat() + "Z"
-        })
-
-    async def get_slack_channels(self, request: Request) -> Response:
-        """GET /api/integrations/slack/channels - List channels with recent message counts.
-
-        Returns:
-            JSON response with list of channels
-        """
-        logger.info("GET /api/integrations/slack/channels")
-        return web.json_response({
-            "channels": self._SLACK_MOCK_CHANNELS,
-            "count": len(self._SLACK_MOCK_CHANNELS),
-            "timestamp": datetime.utcnow().isoformat() + "Z"
-        })
-
-    async def post_slack_send(self, request: Request) -> Response:
-        """POST /api/integrations/slack/send - Send a message to a channel.
-
-        Request body:
-            {"channel": "#general", "message": "Hello world"}
-
-        Returns:
-            JSON response with success and mock message_id
-        """
-        logger.info("POST /api/integrations/slack/send")
-        try:
-            data = await request.json()
-        except (json.JSONDecodeError, ValueError):
-            return web.json_response({"error": "Invalid JSON"}, status=400)
-
-        if not isinstance(data, dict):
-            return web.json_response({"error": "Body must be a JSON object"}, status=400)
-
-        channel = data.get("channel", "").strip()
-        message = data.get("message", "").strip()
-
-        if not channel:
-            return web.json_response({"error": "Missing required field: channel"}, status=400)
-        if not message:
-            return web.json_response({"error": "Missing required field: message"}, status=400)
-
-        import time
-        mock_message_id = f"MSG{int(time.time())}"
-        logger.info(f"Slack send mock: channel={channel}, message_id={mock_message_id}")
-        return web.json_response({
-            "success": True,
-            "message_id": mock_message_id,
-            "channel": channel,
-            "timestamp": datetime.utcnow().isoformat() + "Z"
-        })
-
-    async def get_slack_messages(self, request: Request) -> Response:
-        """GET /api/integrations/slack/messages - Get last 5 messages from a channel.
-
-        Query Parameters:
-            channel: Channel name (e.g. #general)
-
-        Returns:
-            JSON response with list of messages
-        """
-        channel = request.query.get("channel", "").strip()
-        logger.info(f"GET /api/integrations/slack/messages channel={channel!r}")
-
-        messages = self._SLACK_MOCK_MESSAGES
-        if channel:
-            # Normalise channel name for matching
-            norm = channel.lstrip("#").lower()
-            messages = [m for m in messages if m["channel"].lstrip("#").lower() == norm]
-
-        return web.json_response({
-            "messages": messages[:5],
-            "count": len(messages[:5]),
-            "channel": channel or "all",
-            "timestamp": datetime.utcnow().isoformat() + "Z"
-        })
-
-    async def post_slack_react(self, request: Request) -> Response:
-        """POST /api/integrations/slack/react - Add an emoji reaction to a message.
-
-        Request body:
-            {"channel": "#general", "message_id": "MSG001", "emoji": "thumbsup"}
-
-        Returns:
-            JSON response with success
-        """
-        logger.info("POST /api/integrations/slack/react")
-        try:
-            data = await request.json()
-        except (json.JSONDecodeError, ValueError):
-            return web.json_response({"error": "Invalid JSON"}, status=400)
-
-        if not isinstance(data, dict):
-            return web.json_response({"error": "Body must be a JSON object"}, status=400)
-
-        channel = data.get("channel", "").strip()
-        message_id = data.get("message_id", "").strip()
-        emoji = data.get("emoji", "").strip()
-
-        if not channel or not message_id or not emoji:
-            return web.json_response(
-                {"error": "Missing required fields: channel, message_id, emoji"},
-                status=400
-            )
-
-        logger.info(f"Slack react mock: channel={channel}, message_id={message_id}, emoji={emoji}")
-        return web.json_response({
-            "success": True,
-            "channel": channel,
-            "message_id": message_id,
-            "emoji": emoji,
-            "timestamp": datetime.utcnow().isoformat() + "Z"
-        })
-
-    # ------------------------------------------------------------------
-    # Tool Call History (AI-78) — record and retrieve tool calls
-    # ------------------------------------------------------------------
-
-    async def post_tool_call(self, request: Request) -> Response:
-        """POST /api/tools/call — Record a tool call.
-
-        Request body:
-            {tool_name, input, result, duration_ms?, status?, timestamp?}
-
-        Returns:
-            200 OK with stored entry
-            400 Bad Request for invalid input
-        """
-        try:
-            data = await request.json()
-        except (json.JSONDecodeError, ValueError):
-            return web.json_response({'error': 'Invalid JSON'}, status=400)
-
-        if not isinstance(data, dict):
-            return web.json_response({'error': 'Body must be a JSON object'}, status=400)
-
-        tool_name = data.get('tool_name', '').strip()
-        if not tool_name:
-            return web.json_response({'error': 'Missing required field: tool_name'}, status=400)
-
-        status_val = data.get('status', 'success')
-        if status_val not in ('success', 'error'):
-            return web.json_response(
-                {'error': "status must be 'success' or 'error'"},
-                status=400
-            )
-
-        entry = {
-            'tool_name': tool_name,
-            'input': data.get('input', {}),
-            'result': data.get('result', ''),
-            'duration_ms': data.get('duration_ms'),
-            'status': status_val,
-            'timestamp': data.get('timestamp', datetime.utcnow().isoformat() + 'Z'),
-        }
-        tool_call_history.append(entry)
-        if len(tool_call_history) > TOOL_CALL_HISTORY_MAX:
-            del tool_call_history[:len(tool_call_history) - TOOL_CALL_HISTORY_MAX]
-
-        logger.info(f"AI-78: Tool call recorded: {tool_name} status={status_val}")
-        return web.json_response({'status': 'ok', 'entry': entry})
-
-    async def get_tool_calls(self, request: Request) -> Response:
-        """GET /api/tools/calls — Retrieve last 50 tool calls.
-
-        Returns:
-            200 OK with list of tool calls
-        """
-        return web.json_response({
-            'calls': tool_call_history[-TOOL_CALL_HISTORY_MAX:],
-            'count': len(tool_call_history),
-            'timestamp': datetime.utcnow().isoformat() + 'Z',
-        })
-
-    async def delete_tool_calls(self, request: Request) -> Response:
-        """DELETE /api/tools/calls — Clear all tool call history.
-
-        Returns:
-            200 OK with count of cleared entries
-        """
-        count = len(tool_call_history)
-        tool_call_history.clear()
-        logger.info(f"AI-78: Tool call history cleared: removed {count} entries")
-        return web.json_response({
-            'status': 'ok',
-            'cleared': count,
-            'timestamp': datetime.utcnow().isoformat() + 'Z',
-        })
 
     def run(self):
         """Start the HTTP server with WebSocket support.
@@ -2051,26 +773,18 @@ class DashboardServer:
 def main():
     """CLI entry point for dashboard server."""
     parser = argparse.ArgumentParser(
-        description='Agent Status Dashboard HTTP Server (AI-111)',
+        description='Agent Status Dashboard HTTP Server',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Start server with environment variables (recommended)
-  DASHBOARD_WEB_PORT=8420 DASHBOARD_WS_PORT=8421 python -m dashboard.server
+  # Start server on default port 8080
+  python dashboard_server.py
 
-  # Start server with defaults
-  python -m dashboard.server
+  # Start server on custom port
+  python dashboard_server.py --port 8000
 
-  # Override environment with CLI args
-  python -m dashboard.server --port 9000 --host localhost
-
-Environment Variables (AI-111 Configuration):
-  DASHBOARD_WEB_PORT     - Port for web dashboard (default: 8420)
-  DASHBOARD_WS_PORT      - Port for WebSocket (default: 8421)
-  DASHBOARD_HOST         - Host to bind (default: 0.0.0.0)
-  DASHBOARD_AUTH_TOKEN   - Bearer token for authentication (default: none)
-  DASHBOARD_CORS_ORIGINS - Allowed CORS origins (default: *)
-  LOG_LEVEL              - Logging level (default: INFO)
+  # Specify custom metrics directory
+  python dashboard_server.py --metrics-dir /path/to/metrics
 
 API Endpoints:
   GET  /health                    - Health check
@@ -2089,15 +803,15 @@ A2UI Components:
     parser.add_argument(
         '--port',
         type=int,
-        default=None,
-        help='HTTP server port (overrides DASHBOARD_WEB_PORT env var)'
+        default=8080,
+        help='HTTP server port (default: 8080)'
     )
 
     parser.add_argument(
         '--host',
         type=str,
-        default=None,
-        help='HTTP server host (overrides DASHBOARD_HOST env var)'
+        default='127.0.0.1',
+        help='HTTP server host (default: 127.0.0.1 for localhost-only access; use 0.0.0.0 to expose to network)'
     )
 
     parser.add_argument(
@@ -2121,8 +835,7 @@ A2UI Components:
         project_name=args.project_name,
         metrics_dir=args.metrics_dir,
         port=args.port,
-        host=args.host,
-        use_config=True  # Load from environment variables
+        host=args.host
     )
 
     server.run()
