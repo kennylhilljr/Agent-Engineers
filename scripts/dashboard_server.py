@@ -53,6 +53,46 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8420
 DEFAULT_PROJECT_NAME = "agent-dashboard"
 
+# Provider configuration - single source of truth for all provider-related endpoints
+PROVIDER_CONFIG = {
+    "claude": {
+        "name": "Claude",
+        "env_vars": ["ANTHROPIC_API_KEY"],
+        "models": ["haiku-4.5", "sonnet-4.5", "opus-4.6"],
+        "default_model": "sonnet-4.5"
+    },
+    "openai": {
+        "name": "ChatGPT",
+        "env_vars": ["OPENAI_API_KEY"],
+        "models": ["gpt-4o", "o1", "o3-mini", "o4-mini"],
+        "default_model": "gpt-4o"
+    },
+    "gemini": {
+        "name": "Gemini",
+        "env_vars": ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+        "models": ["2.5-flash", "2.5-pro", "2.0-flash"],
+        "default_model": "2.5-flash"
+    },
+    "groq": {
+        "name": "Groq",
+        "env_vars": ["GROQ_API_KEY"],
+        "models": ["llama-3.3-70b", "mixtral-8x7b"],
+        "default_model": "llama-3.3-70b"
+    },
+    "kimi": {
+        "name": "KIMI",
+        "env_vars": ["KIMI_API_KEY", "MOONSHOT_API_KEY"],
+        "models": ["moonshot"],
+        "default_model": "moonshot"
+    },
+    "windsurf": {
+        "name": "Windsurf",
+        "env_vars": ["WINDSURF_API_KEY"],
+        "models": ["cascade"],
+        "default_model": "cascade"
+    }
+}
+
 
 class DashboardServer:
     """Async HTTP server for the Agent Status Dashboard.
@@ -219,51 +259,10 @@ class DashboardServer:
 
         Checks environment variables to determine which AI providers are available.
         Returns a JSON object with each provider's availability and models.
+        Uses module-level PROVIDER_CONFIG as single source of truth.
         """
-        import os
-
-        # Provider configuration with required env vars and model lists
-        provider_config = {
-            "claude": {
-                "name": "Claude",
-                "env_vars": ["ANTHROPIC_API_KEY"],
-                "models": ["haiku-4.5", "sonnet-4.5", "opus-4.6"],
-                "default_model": "sonnet-4.5"
-            },
-            "openai": {
-                "name": "ChatGPT",
-                "env_vars": ["OPENAI_API_KEY"],
-                "models": ["gpt-4o", "o1", "o3-mini", "o4-mini"],
-                "default_model": "gpt-4o"
-            },
-            "gemini": {
-                "name": "Gemini",
-                "env_vars": ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
-                "models": ["2.5-flash", "2.5-pro", "2.0-flash"],
-                "default_model": "2.5-flash"
-            },
-            "groq": {
-                "name": "Groq",
-                "env_vars": ["GROQ_API_KEY"],
-                "models": ["llama-3.3-70b", "mixtral-8x7b"],
-                "default_model": "llama-3.3-70b"
-            },
-            "kimi": {
-                "name": "KIMI",
-                "env_vars": ["KIMI_API_KEY", "MOONSHOT_API_KEY"],
-                "models": ["moonshot"],
-                "default_model": "moonshot"
-            },
-            "windsurf": {
-                "name": "Windsurf",
-                "env_vars": ["WINDSURF_API_KEY"],
-                "models": ["cascade"],
-                "default_model": "cascade"
-            }
-        }
-
         providers = {}
-        for provider_id, config in provider_config.items():
+        for provider_id, config in PROVIDER_CONFIG.items():
             # Check if any of the required env vars are set
             available = any(os.environ.get(var) for var in config["env_vars"])
             providers[provider_id] = {
@@ -284,7 +283,10 @@ class DashboardServer:
     async def handle_providers_status(self, request: web.Request) -> web.Response:
         """Get provider status in flat list format for the chat interface.
 
-        Returns provider info in a format compatible with the chat endpoint tests:
+        Returns provider info in a format compatible with the chat endpoint tests.
+        Uses module-level PROVIDER_CONFIG as single source of truth.
+
+        Response format:
         {
             "providers": [
                 {"provider_id": "claude", "available": true, "has_api_key": true,
@@ -295,46 +297,11 @@ class DashboardServer:
             "timestamp": "..."
         }
         """
-        import os as _os
-
-        provider_config = {
-            "claude": {
-                "name": "Claude",
-                "env_vars": ["ANTHROPIC_API_KEY"],
-                "models": ["haiku-4.5", "sonnet-4.5", "opus-4.6"],
-            },
-            "openai": {
-                "name": "ChatGPT",
-                "env_vars": ["OPENAI_API_KEY"],
-                "models": ["gpt-4o", "o1", "o3-mini", "o4-mini"],
-            },
-            "gemini": {
-                "name": "Gemini",
-                "env_vars": ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
-                "models": ["2.5-flash", "2.5-pro", "2.0-flash"],
-            },
-            "groq": {
-                "name": "Groq",
-                "env_vars": ["GROQ_API_KEY"],
-                "models": ["llama-3.3-70b", "mixtral-8x7b"],
-            },
-            "kimi": {
-                "name": "KIMI",
-                "env_vars": ["KIMI_API_KEY", "MOONSHOT_API_KEY"],
-                "models": ["moonshot"],
-            },
-            "windsurf": {
-                "name": "Windsurf",
-                "env_vars": ["WINDSURF_API_KEY"],
-                "models": ["cascade"],
-            },
-        }
-
         providers_list = []
         active_count = 0
 
-        for provider_id, config in provider_config.items():
-            has_api_key = any(_os.environ.get(var) for var in config["env_vars"])
+        for provider_id, config in PROVIDER_CONFIG.items():
+            has_api_key = any(os.environ.get(var) for var in config["env_vars"])
             available = has_api_key
             status = "active" if available else "unavailable"
             if available:
