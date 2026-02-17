@@ -2090,6 +2090,166 @@
             margin-left: 4px;
             user-select: none;
         }
+
+        /* Code Stream Block Styles (AI-163) */
+        .code-stream-block {
+            font-family: 'Courier New', Courier, monospace;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            border-radius: 6px;
+            margin: 8px 0;
+            background: rgba(10, 18, 35, 0.8);
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .code-stream-block.stream-complete {
+            border-color: rgba(16, 185, 129, 0.4);
+        }
+
+        .code-stream-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(20, 30, 50, 0.9);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+            gap: 8px;
+        }
+
+        .code-stream-header:hover {
+            background: rgba(30, 45, 70, 0.9);
+        }
+
+        .code-stream-file-path {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: #93c5fd;
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            letter-spacing: 0.02em;
+        }
+
+        .language-badge {
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 4px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            flex-shrink: 0;
+        }
+
+        .code-stream-status {
+            font-size: 0.7rem;
+            font-weight: 600;
+            flex-shrink: 0;
+            color: #f59e0b;
+        }
+
+        .code-stream-status.complete {
+            color: #10b981;
+        }
+
+        .code-stream-toggle {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            flex-shrink: 0;
+            transition: transform 0.2s ease;
+        }
+
+        .code-stream-block.expanded .code-stream-toggle {
+            transform: rotate(180deg);
+        }
+
+        .code-stream-content {
+            display: none;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+            border-top: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .code-stream-block.expanded .code-stream-content {
+            display: block;
+        }
+
+        .code-stream-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding: 4px 8px;
+            background: rgba(15, 23, 42, 0.6);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+            gap: 6px;
+        }
+
+        .code-copy-btn {
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 3px 10px;
+            border-radius: 4px;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            background: rgba(30, 41, 59, 0.9);
+            color: #94a3b8;
+            cursor: pointer;
+            letter-spacing: 0.04em;
+            transition: background 0.15s ease, color 0.15s ease;
+        }
+
+        .code-copy-btn:hover {
+            background: rgba(51, 65, 85, 0.9);
+            color: #60a5fa;
+            border-color: rgba(96, 165, 250, 0.4);
+        }
+
+        .code-copy-btn.copied {
+            color: #10b981;
+            border-color: rgba(16, 185, 129, 0.4);
+        }
+
+        .code-stream-pre {
+            margin: 0;
+            padding: 10px 12px;
+            font-size: 0.78rem;
+            line-height: 1.55;
+            background: transparent;
+            color: #e2e8f0;
+            white-space: pre;
+            word-break: normal;
+            overflow-wrap: normal;
+        }
+
+        /* Diff chunk coloring */
+        .code-chunk-addition {
+            background-color: rgba(34, 197, 94, 0.12);
+            color: #86efac;
+            display: block;
+        }
+
+        .code-chunk-deletion {
+            background-color: rgba(239, 68, 68, 0.12);
+            color: #fca5a5;
+            display: block;
+            text-decoration: line-through;
+        }
+
+        .code-chunk-context {
+            color: #e2e8f0;
+            display: block;
+        }
+
+        .code-stream-chunk-count {
+            font-size: 0.68rem;
+            color: #475569;
+            flex-shrink: 0;
+        }
     </style>
 </head>
 <body>
@@ -3489,6 +3649,9 @@
                         } else if (message.type === 'decision_logged') {
                             console.log('Received decision_logged event via WebSocket', message);
                             prependDecisionEntry(message.decision);
+                        } else if (message.type === 'code_stream') {
+                            console.log('Received code_stream event via WebSocket', message);
+                            renderCodeStreamBlock(message);
                         }
                     } catch (error) {
                         console.error('Error processing WebSocket message:', error);
@@ -3575,6 +3738,162 @@
             `;
 
             container.prepend(block);
+        }
+
+        // Render an agent thinking block in the activity feed (AI-159)
+        // Maps category icons: files=📁, changes=✏️, commands=⚙️, tests=✅
+        function renderAgentThinkingBlock(message) {
+            const container = document.getElementById('activity-feed') || document.body;
+            const category = message.category || 'files';
+            const categoryIcons = {files: '\uD83D\uDCC1', changes: '\u270F\uFE0F', commands: '\u2699\uFE0F', tests: '\u2705'};
+            const icon = categoryIcons[category] || '\uD83D\uDCC1';
+            const blockId = 'thinking-' + Date.now();
+            const agentLabel = message.agent ? message.agent.toUpperCase() : 'AGENT';
+            const ticketLabel = message.ticket ? ' \u2014 ' + message.ticket : '';
+
+            const block = document.createElement('div');
+            block.className = 'thinking-block';
+            block.dataset.category = category;
+            block.id = blockId;
+
+            const safeContent = (message.content || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+            block.innerHTML = `
+                <div class="thinking-header" onclick="(function(el){el.closest('.thinking-block').classList.toggle('expanded');})(this)">
+                    <span class="thinking-category-icon">${icon}</span>
+                    <span class="thinking-header-title">${agentLabel}${ticketLabel}</span>
+                    <span class="thinking-count">${category}</span>
+                    <span class="thinking-timestamp">${(message.timestamp || '').slice(11, 19)}</span>
+                    <span class="thinking-toggle">&#9660;</span>
+                </div>
+                <div class="thinking-content">
+                    <ul class="thinking-stream">
+                        <li class="thinking-stream-entry">${safeContent}</li>
+                    </ul>
+                </div>
+            `;
+
+            container.prepend(block);
+        }
+
+        // In-memory map of stream_id -> DOM block element (AI-163)
+        const _codeStreamBlocks = {};
+
+        // Render or update a code stream block in the activity feed (AI-163)
+        function renderCodeStreamBlock(message) {
+            const container = document.getElementById('activity-feed') || document.body;
+            const streamId = message.stream_id || ('cs-' + Date.now());
+            const filePath = message.file_path || 'unknown';
+            const language = message.language || 'text';
+            const chunkType = message.chunk_type || 'context';
+            const chunk = message.chunk || '';
+            const isFinal = !!message.is_final;
+
+            // Check if a block for this stream_id already exists
+            let block = _codeStreamBlocks[streamId];
+
+            if (!block) {
+                // Create new block
+                const blockId = 'code-stream-' + streamId.replace(/[^a-zA-Z0-9]/g, '-');
+                block = document.createElement('div');
+                block.className = 'code-stream-block';
+                block.id = blockId;
+                block.dataset.streamId = streamId;
+
+                block.innerHTML = `
+                    <div class="code-stream-header" onclick="(function(el){el.closest('.code-stream-block').classList.toggle('expanded');})(this)">
+                        <span class="code-stream-file-path" title="${filePath.replace(/"/g, '&quot;')}">${filePath.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
+                        <span class="language-badge">${language.replace(/</g, '&lt;')}</span>
+                        <span class="code-stream-status" data-status="streaming">STREAMING...</span>
+                        <span class="code-stream-chunk-count" data-stream-id="${streamId}">0 chunks</span>
+                        <span class="code-stream-toggle">&#9660;</span>
+                    </div>
+                    <div class="code-stream-content">
+                        <div class="code-stream-toolbar">
+                            <button class="code-copy-btn" onclick="copyCodeStream('${streamId}', this)">Copy</button>
+                        </div>
+                        <pre class="code-stream-pre" data-stream-id="${streamId}"></pre>
+                    </div>
+                `;
+
+                container.prepend(block);
+                _codeStreamBlocks[streamId] = block;
+            }
+
+            // Append the chunk to the pre element
+            const pre = block.querySelector('pre[data-stream-id="' + streamId + '"]');
+            if (pre && chunk) {
+                const span = document.createElement('span');
+                span.className = 'code-chunk-' + chunkType;
+                // Escape HTML in the chunk
+                span.textContent = chunk;
+                pre.appendChild(span);
+                // Auto-scroll to bottom
+                const content = block.querySelector('.code-stream-content');
+                if (content) {
+                    content.scrollTop = content.scrollHeight;
+                }
+            }
+
+            // Update chunk count
+            const countEl = block.querySelector('.code-stream-chunk-count[data-stream-id="' + streamId + '"]');
+            if (countEl) {
+                const pre2 = block.querySelector('pre[data-stream-id="' + streamId + '"]');
+                const chunkCount = pre2 ? pre2.querySelectorAll('span').length : 0;
+                countEl.textContent = chunkCount + ' chunk' + (chunkCount !== 1 ? 's' : '');
+            }
+
+            // Mark complete if is_final
+            if (isFinal) {
+                block.classList.add('stream-complete');
+                const statusEl = block.querySelector('.code-stream-status');
+                if (statusEl) {
+                    statusEl.textContent = '\u2713 COMPLETE';
+                    statusEl.classList.add('complete');
+                }
+                // Remove from active tracking
+                delete _codeStreamBlocks[streamId];
+            }
+        }
+
+        // Copy code stream content to clipboard
+        function copyCodeStream(streamId, btn) {
+            const blockId = 'code-stream-' + streamId.replace(/[^a-zA-Z0-9]/g, '-');
+            const block = document.getElementById(blockId) || Object.values(_codeStreamBlocks).find(b => b.dataset.streamId === streamId);
+            if (!block) return;
+
+            const pre = block.querySelector('pre[data-stream-id="' + streamId + '"]');
+            if (!pre) return;
+
+            const text = pre.textContent || '';
+            navigator.clipboard.writeText(text).then(() => {
+                if (btn) {
+                    btn.textContent = 'Copied!';
+                    btn.classList.add('copied');
+                    setTimeout(() => {
+                        btn.textContent = 'Copy';
+                        btn.classList.remove('copied');
+                    }, 2000);
+                }
+            }).catch(() => {
+                // Fallback for older browsers
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                if (btn) {
+                    btn.textContent = 'Copied!';
+                    btn.classList.add('copied');
+                    setTimeout(() => {
+                        btn.textContent = 'Copy';
+                        btn.classList.remove('copied');
+                    }, 2000);
+                }
+            });
         }
 
         // Handle metrics update from WebSocket or HTTP
