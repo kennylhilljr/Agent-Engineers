@@ -374,29 +374,91 @@ async def stream_mock_response(
         response_text += "• PR #25: feat: implement chat interface with message thread (AI-68) - **Merged**\n\n"
         response_text += "The repository is active with continuous improvements."
 
-    elif 'slack' in lower or 'message' in lower or 'channel' in lower:
-        yield {
-            'type': 'tool_use',
-            'tool_name': 'mcp__slack__conversations_history',
-            'tool_input': {'channel': '#agent-status'},
-            'tool_id': 'tool_mock_3',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-        await asyncio.sleep(0.3)
-
-        yield {
-            'type': 'tool_result',
-            'tool_id': 'tool_mock_3',
-            'result': {'messages': [
-                {'text': 'Agent dashboard chat interface is now live!', 'user': 'system'}
-            ]},
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-        await asyncio.sleep(0.2)
-
-        response_text = f"[{provider.upper()} - {model}] Latest Slack messages:\n\n"
-        response_text += "• Agent dashboard chat interface is now live!\n\n"
-        response_text += "Team communication is flowing smoothly."
+    elif 'slack' in lower or 'channel' in lower or 'send message' in lower or 'reaction' in lower or 'pin' in lower:
+        # Determine Slack operation based on keywords
+        if 'send' in lower or 'post' in lower or 'notify' in lower:
+            # Send message operation
+            yield {
+                'type': 'tool_use',
+                'tool_name': 'mcp__slack__conversations_add_message',
+                'tool_input': {'channel': '#agent-status', 'text': 'Status update from Agent Dashboard'},
+                'tool_id': 'tool_slack_send',
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+            await asyncio.sleep(0.3)
+            yield {
+                'type': 'tool_result',
+                'tool_id': 'tool_slack_send',
+                'result': {'ok': True, 'ts': '1234567890.123456', 'channel': '#agent-status'},
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+            await asyncio.sleep(0.2)
+            response_text = f"[{provider.upper()} - {model}] Message sent to #agent-status channel successfully."
+        elif 'list' in lower or 'channels' in lower:
+            # List channels operation
+            yield {
+                'type': 'tool_use',
+                'tool_name': 'mcp__slack__channels_list',
+                'tool_input': {'limit': 10},
+                'tool_id': 'tool_slack_list',
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+            await asyncio.sleep(0.3)
+            yield {
+                'type': 'tool_result',
+                'tool_id': 'tool_slack_list',
+                'result': {'channels': [
+                    {'id': 'C01', 'name': 'agent-status', 'is_member': True},
+                    {'id': 'C02', 'name': 'general', 'is_member': True}
+                ]},
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+            await asyncio.sleep(0.2)
+            response_text = f"[{provider.upper()} - {model}] Available Slack channels:\n\n"
+            response_text += "• #agent-status\n• #general\n\n"
+            response_text += "You are a member of 2 channels."
+        elif 'reaction' in lower or 'react' in lower or 'emoji' in lower:
+            # Reaction operation
+            yield {
+                'type': 'tool_use',
+                'tool_name': 'mcp__slack__conversations_replies',
+                'tool_input': {'channel': '#agent-status', 'ts': '1234567890.123456'},
+                'tool_id': 'tool_slack_react',
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+            await asyncio.sleep(0.3)
+            yield {
+                'type': 'tool_result',
+                'tool_id': 'tool_slack_react',
+                'result': {'ok': True},
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+            await asyncio.sleep(0.2)
+            response_text = f"[{provider.upper()} - {model}] Reaction added to message in #agent-status."
+        else:
+            # Default: fetch conversation history
+            yield {
+                'type': 'tool_use',
+                'tool_name': 'mcp__slack__conversations_history',
+                'tool_input': {'channel': '#agent-status', 'limit': 10},
+                'tool_id': 'tool_slack_history',
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+            await asyncio.sleep(0.3)
+            yield {
+                'type': 'tool_result',
+                'tool_id': 'tool_slack_history',
+                'result': {'messages': [
+                    {'text': 'Agent dashboard chat interface is now live!', 'user': 'system', 'ts': '1234567890.1'},
+                    {'text': 'All agents are operational.', 'user': 'bot', 'ts': '1234567890.2'}
+                ]},
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+            await asyncio.sleep(0.2)
+            response_text = f"[{provider.upper()} - {model}] Latest Slack messages in #agent-status:\n\n"
+            response_text += "• Agent dashboard chat interface is now live!\n"
+            response_text += "• All agents are operational.\n\n"
+            response_text += "Team communication is flowing smoothly."
 
     elif 'status' in lower:
         response_text = f"[{provider.upper()} - {model}] Your agents are running smoothly. All systems operational with 99.2% uptime."
