@@ -21,6 +21,8 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from exceptions import BridgeError, SecurityError
+
 try:
     import httpx
 except ImportError:
@@ -82,10 +84,19 @@ class CodexOAuthClient:
 
     def __init__(self, api_key: str | None = None):
         if OpenAI is None or AsyncOpenAI is None:
-            raise ImportError("openai package not installed. Run: pip install openai")
+            raise BridgeError(
+                message="openai package not installed. Run: pip install openai",
+                error_code="BRIDGE_UNSUPPORTED_PROVIDER",
+                provider="openai"
+            )
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
         if not self.api_key:
-            raise ValueError("OPENAI_API_KEY not set. Run 'codex' to sign in, or set manually.")
+            raise SecurityError(
+                message="OPENAI_API_KEY not set. Run 'codex' to sign in, or set manually.",
+                error_code="SECURITY_AUTH_MISSING",
+                auth_type="api_key",
+                details={"provider": "openai"}
+            )
         self._client = OpenAI(api_key=self.api_key)
         self._async_client = AsyncOpenAI(api_key=self.api_key)
 
@@ -175,13 +186,20 @@ class SessionTokenClient:
 
             self._CffiSession = CffiSession
         except ImportError:
-            raise ImportError(
-                "curl_cffi package not installed. Run: pip install curl_cffi\n"
-                "This is needed to bypass Cloudflare's TLS fingerprinting."
+            raise BridgeError(
+                message="curl_cffi package not installed. Run: pip install curl_cffi\n"
+                        "This is needed to bypass Cloudflare's TLS fingerprinting.",
+                error_code="BRIDGE_UNSUPPORTED_PROVIDER",
+                provider="openai"
             )
         self.session_token = session_token or os.environ.get("CHATGPT_SESSION_TOKEN", "")
         if not self.session_token:
-            raise ValueError("CHATGPT_SESSION_TOKEN not set.")
+            raise SecurityError(
+                message="CHATGPT_SESSION_TOKEN not set.",
+                error_code="SECURITY_AUTH_MISSING",
+                auth_type="session_token",
+                details={"provider": "openai"}
+            )
         self._access_token: str | None = None
         # Persistent session preserves Cloudflare cookies across requests
         self._http: object | None = None

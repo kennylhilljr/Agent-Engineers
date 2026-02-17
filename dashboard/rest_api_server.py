@@ -37,6 +37,7 @@ from aiohttp import web
 from aiohttp.web import Request, Response, middleware
 
 from dashboard.metrics_store import MetricsStore, ALL_AGENT_NAMES
+from exceptions import SecurityError
 
 # Import only if needed - avoid importing agents.definitions which has Python 3.10+ dependencies
 # from agents.definitions import DEFAULT_MODELS, AGENT_DEFINITIONS
@@ -101,10 +102,16 @@ def create_auth_middleware():
             logger.warning(
                 f"Authentication failed: Missing or invalid Authorization header from {request.remote}"
             )
+            error = SecurityError(
+                message="Missing or invalid Authorization header. Expected format: 'Authorization: Bearer <token>'",
+                error_code="SECURITY_AUTH_MISSING",
+                auth_type="bearer_token"
+            )
             return web.json_response(
                 {
                     "error": "Unauthorized",
-                    "message": "Missing or invalid Authorization header. Expected format: 'Authorization: Bearer <token>'"
+                    "message": error.message,
+                    **error.to_dict()
                 },
                 status=401
             )
@@ -116,10 +123,16 @@ def create_auth_middleware():
             logger.warning(
                 f"Authentication failed: Invalid token from {request.remote}"
             )
+            error = SecurityError(
+                message="Invalid authentication token",
+                error_code="SECURITY_TOKEN_INVALID",
+                auth_type="bearer_token"
+            )
             return web.json_response(
                 {
                     "error": "Unauthorized",
-                    "message": "Invalid authentication token"
+                    "message": error.message,
+                    **error.to_dict()
                 },
                 status=401
             )
