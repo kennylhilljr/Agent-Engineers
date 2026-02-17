@@ -1815,14 +1815,75 @@
             background: rgba(16, 185, 129, 0.3);
         }
         .agent-item { position: relative; }
+
+        /* Global Pause/Resume Controls Banner (AI-153) */
+        #global-pause-banner {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            background: rgba(245, 158, 11, 0.95);
+            color: #1a1a2e;
+            text-align: center;
+            padding: 10px 16px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            letter-spacing: 0.05em;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+        }
+        #global-pause-banner.visible {
+            display: block;
+        }
+        .global-control-buttons {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .global-control-btn {
+            padding: 4px 12px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-radius: 4px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: opacity 0.15s;
+        }
+        .global-control-btn.pause-all-btn {
+            background: rgba(245, 158, 11, 0.2);
+            border-color: rgba(245, 158, 11, 0.5);
+            color: #f59e0b;
+        }
+        .global-control-btn.pause-all-btn:hover {
+            background: rgba(245, 158, 11, 0.35);
+        }
+        .global-control-btn.resume-all-btn {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: rgba(16, 185, 129, 0.5);
+            color: #10b981;
+        }
+        .global-control-btn.resume-all-btn:hover {
+            background: rgba(16, 185, 129, 0.35);
+        }
     </style>
 </head>
 <body>
+    <!-- Global Pause Banner (AI-153) -->
+    <div id="global-pause-banner" role="alert" aria-live="assertive">
+        &#9646;&#9646; All agents paused — system is idle
+    </div>
     <!-- Dashboard Container -->
     <div class="dashboard-container">
         <!-- Header -->
         <header class="header">
             <div class="header-title">Agent Dashboard</div>
+            <div class="global-control-buttons" id="global-control-buttons">
+                <button class="global-control-btn pause-all-btn" id="pause-all-btn" title="Pause all agents">Pause All</button>
+                <button class="global-control-btn resume-all-btn" id="resume-all-btn" title="Resume all agents" style="display:none">Resume All</button>
+            </div>
             <div class="header-stats" id="global-metrics-bar" aria-label="Global Dashboard Metrics">
                 <div class="stat-item">
                     <span class="stat-label">Session</span>
@@ -3107,6 +3168,66 @@
         }
         window.isAgentPaused = isAgentPaused;
 
+        // ========================================
+        // GLOBAL PAUSE / RESUME ALL (AI-153)
+        // ========================================
+
+        /** Global pause flag: when true, orchestrator must not dispatch new delegations */
+        window.globalPaused = false;
+
+        /**
+         * Pauses all agents simultaneously. Sets globalPaused flag, marks all
+         * non-idle agents as paused, shows the banner, and updates the header buttons.
+         */
+        function pauseAll() {
+            window.globalPaused = true;
+            state.agents.forEach(function(agent) {
+                const id = agent.id || agent.name;
+                window.pausedAgents.add(id);
+                agent.status = 'paused';
+            });
+            const banner = document.getElementById('global-pause-banner');
+            if (banner) banner.classList.add('visible');
+            const pauseBtn = document.getElementById('pause-all-btn');
+            const resumeBtn = document.getElementById('resume-all-btn');
+            if (pauseBtn) pauseBtn.style.display = 'none';
+            if (resumeBtn) resumeBtn.style.display = '';
+            addSystemMessage('All agents paused — system is idle');
+            window.renderAgents();
+        }
+        window.pauseAll = pauseAll;
+
+        /**
+         * Resumes all paused agents. Clears globalPaused flag, restores all agents
+         * to idle, hides the banner, and updates the header buttons.
+         */
+        function resumeAll() {
+            window.globalPaused = false;
+            window.pausedAgents.clear();
+            state.agents.forEach(function(agent) {
+                agent.status = 'idle';
+            });
+            const banner = document.getElementById('global-pause-banner');
+            if (banner) banner.classList.remove('visible');
+            const pauseBtn = document.getElementById('pause-all-btn');
+            const resumeBtn = document.getElementById('resume-all-btn');
+            if (pauseBtn) pauseBtn.style.display = '';
+            if (resumeBtn) resumeBtn.style.display = 'none';
+            addSystemMessage('All agents resumed');
+            window.renderAgents();
+        }
+        window.resumeAll = resumeAll;
+
+        /**
+         * Returns true if the system is globally paused.
+         * Orchestrators should check this before dispatching delegations.
+         * @returns {boolean}
+         */
+        function isGloballyPaused() {
+            return window.globalPaused;
+        }
+        window.isGloballyPaused = isGloballyPaused;
+
         /**
          * Adds a system message to the chat feed without user interaction.
          * @param {string} text
@@ -4020,6 +4141,9 @@
 
             // Load orchestrator flow from API (non-blocking, falls back to mock)
             loadOrchestratorFlow();
+            // Global Pause All / Resume All controls (AI-153)
+            document.getElementById('pause-all-btn').addEventListener('click', pauseAll);
+            document.getElementById('resume-all-btn').addEventListener('click', resumeAll);
 
             // Load global metrics from /api/metrics
             loadGlobalMetrics();
