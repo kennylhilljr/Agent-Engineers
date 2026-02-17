@@ -13,6 +13,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markdown.min.js"></script>
+    <!-- highlight.js for chat code block rendering - AI-134 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <style>
         /* Reset and Base Styles */
         * {
@@ -1160,6 +1163,18 @@
             color: #64748b;
             margin-top: 4px;
         }
+
+        /* AI-134: Code Block Rendering Styles */
+        .code-block-wrapper { margin: 8px 0; border-radius: 8px; overflow: hidden; border: 1px solid #333; }
+        .code-block-header { display: flex; justify-content: space-between; align-items: center; padding: 4px 12px; background: #1e1e1e; font-size: 12px; }
+        .code-language-badge { color: #888; font-family: monospace; }
+        .code-file-path { color: #6b9bd2; font-size: 11px; flex: 1; padding: 0 8px; }
+        .copy-code-btn { background: #333; border: 1px solid #555; color: #ccc; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; }
+        .copy-code-btn:hover { background: #444; }
+        .copy-code-btn.copied { color: #4caf50; border-color: #4caf50; }
+        .diff-addition { background: rgba(0, 255, 0, 0.1); color: #4caf50; display: block; }
+        .diff-deletion { background: rgba(255, 0, 0, 0.1); color: #f44336; display: block; }
+        pre code.hljs { padding: 16px; font-size: 13px; }
 
         /* Provider Selector Styles */
         .provider-selector-container {
@@ -4197,8 +4212,13 @@
                     minute: '2-digit'
                 });
 
+                // AI-134: Use renderMessageContent for AI messages to enable syntax highlighting
+                const renderedContent = (message.sender === 'ai' || message.sender === 'system')
+                    ? this.renderMessageContent(message.text)
+                    : this.escapeHtml(message.text);
+
                 content.innerHTML = `
-                    <div class="chat-message-content">${this.escapeHtml(message.text)}</div>
+                    <div class="chat-message-content">${renderedContent}</div>
                     <div class="chat-timestamp">${timeStr}</div>
                 `;
 
@@ -4272,6 +4292,102 @@
 
             scrollToBottom() {
                 this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+            }
+
+            // ---------------------------------------------------------------
+            // AI-134: Code Block Rendering with Syntax Highlighting
+            // ---------------------------------------------------------------
+
+            /**
+             * Render message content, processing markdown code blocks with syntax
+             * highlighting, copy buttons, file path annotations, and diff coloring.
+             */
+            renderMessageContent(text) {
+                // Split on fenced code blocks: ```lang\ncode\n```
+                const codeBlockRegex = /```(\w*)\n?([\s\S]*?)```/g;
+                const parts = [];
+                let lastIndex = 0;
+                let match;
+                let codeBlockIndex = 0;
+
+                while ((match = codeBlockRegex.exec(text)) !== null) {
+                    // Text before this code block
+                    if (match.index > lastIndex) {
+                        const rawText = text.slice(lastIndex, match.index);
+                        parts.push(`<span class="chat-text-segment">${this.escapeHtml(rawText)}</span>`);
+                    }
+
+                    const language = match[1] || 'plaintext';
+                    const code = match[2];
+                    const isDiff = language === 'diff';
+
+                    // Extract file path from first line comment: // filepath: or # filepath:
+                    let filePath = null;
+                    let codeToHighlight = code;
+                    const filePathMatch = code.match(/^(?:\/\/|#)\s*filepath:\s*(.+)\n?/);
+                    if (filePathMatch) {
+                        filePath = filePathMatch[1].trim();
+                        codeToHighlight = code.slice(filePathMatch[0].length);
+                    }
+
+                    const codeId = `code-block-${Date.now()}-${codeBlockIndex++}`;
+
+                    // Build the header
+                    const langBadge = `<span class="code-language-badge" data-testid="code-language-badge">${this.escapeHtml(language)}</span>`;
+                    const filePathHtml = filePath
+                        ? `<span class="code-file-path" data-testid="code-file-path">${this.escapeHtml(filePath)}</span>`
+                        : '';
+                    const copyBtn = `<button class="copy-code-btn" data-testid="copy-code-btn" onclick="copyCodeToClipboard(this, '${codeId}')">Copy</button>`;
+                    const header = `<div class="code-block-header">${langBadge}${filePathHtml}${copyBtn}</div>`;
+
+                    // Build highlighted code content
+                    let codeContent;
+                    if (isDiff) {
+                        // Render diff with per-line coloring
+                        const lines = codeToHighlight.split('\n');
+                        const renderedLines = lines.map(line => {
+                            const escapedLine = this.escapeHtml(line);
+                            if (line.startsWith('+')) {
+                                return `<span class="diff-addition">${escapedLine}</span>`;
+                            } else if (line.startsWith('-')) {
+                                return `<span class="diff-deletion">${escapedLine}</span>`;
+                            } else {
+                                return `<span>${escapedLine}</span>`;
+                            }
+                        });
+                        codeContent = `<pre><code id="${codeId}" class="language-diff" data-testid="code-block-content">${renderedLines.join('\n')}</code></pre>`;
+                    } else {
+                        // Use highlight.js if available, otherwise escape
+                        let highlighted;
+                        try {
+                            if (typeof hljs !== 'undefined' && hljs.getLanguage(language)) {
+                                highlighted = hljs.highlight(codeToHighlight, { language }).value;
+                            } else if (typeof hljs !== 'undefined') {
+                                highlighted = hljs.highlightAuto(codeToHighlight).value;
+                            } else {
+                                highlighted = this.escapeHtml(codeToHighlight);
+                            }
+                        } catch (e) {
+                            highlighted = this.escapeHtml(codeToHighlight);
+                        }
+                        codeContent = `<pre><code id="${codeId}" class="hljs language-${this.escapeHtml(language)}" data-testid="code-block-content">${highlighted}</code></pre>`;
+                    }
+
+                    parts.push(`<div class="code-block-wrapper" data-testid="code-block-wrapper" data-language="${this.escapeHtml(language)}">${header}${codeContent}</div>`);
+                    lastIndex = match.index + match[0].length;
+                }
+
+                // Remaining text after last code block
+                if (lastIndex < text.length) {
+                    parts.push(`<span class="chat-text-segment">${this.escapeHtml(text.slice(lastIndex))}</span>`);
+                }
+
+                // If no code blocks, just escape and return
+                if (parts.length === 0) {
+                    return this.escapeHtml(text);
+                }
+
+                return parts.join('');
             }
 
             escapeHtml(text) {
@@ -4734,6 +4850,23 @@
         // State tracking for agent controls (agent_id -> {paused, requirements})
         const agentControlState = {};
         let requirementsModalAgentId = null;
+
+        /**
+         * AI-134: Copy code block content to clipboard.
+         * Called from onclick of copy buttons in rendered code blocks.
+         */
+        function copyCodeToClipboard(btn, codeId) {
+            const code = document.getElementById(codeId);
+            if (!code) return;
+            navigator.clipboard.writeText(code.textContent).then(() => {
+                btn.textContent = 'Copied!';
+                btn.classList.add('copied');
+                setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+            }).catch(() => {
+                // Fallback for environments without clipboard API
+                btn.textContent = 'Copy';
+            });
+        }
 
         /**
          * Escape HTML special characters to prevent XSS when inserting into innerHTML.
