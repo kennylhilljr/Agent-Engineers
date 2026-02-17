@@ -350,29 +350,134 @@ async def stream_mock_response(
         response_text += "• **AI-137**: Provider Status Indicators (Done)\n\n"
         response_text += "The chat interface implementation is progressing well!"
 
-    elif 'github' in lower or 'repo' in lower or 'pr' in lower:
-        yield {
-            'type': 'tool_use',
-            'tool_name': 'mcp__claude_ai_ai-cli-macz__Github_ListPullRequests',
-            'tool_input': {'repo': 'agent-dashboard', 'state': 'open'},
-            'tool_id': 'tool_mock_2',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-        await asyncio.sleep(0.3)
-
-        yield {
-            'type': 'tool_result',
-            'tool_id': 'tool_mock_2',
-            'result': {'pull_requests': [
-                {'number': 25, 'title': 'feat: implement chat interface with message thread (AI-68)', 'state': 'merged'}
-            ]},
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-        await asyncio.sleep(0.2)
-
-        response_text = f"[{provider.upper()} - {model}] Recent GitHub activity:\n\n"
-        response_text += "• PR #25: feat: implement chat interface with message thread (AI-68) - **Merged**\n\n"
-        response_text += "The repository is active with continuous improvements."
+    elif 'github' in lower or 'repo' in lower or 'pr' in lower or 'pull request' in lower or 'merge' in lower or 'commit' in lower or 'branch' in lower or 'diff' in lower:
+        # Determine GitHub operation based on keywords
+        if 'create' in lower and ('pr' in lower or 'pull request' in lower):
+            # Create PR operation
+            yield {
+                'type': 'tool_use',
+                'tool_name': 'mcp__arcade__Github_CreatePullRequest',
+                'tool_input': {'repo': 'Agent-Engineers', 'title': 'New feature', 'base': 'main'},
+                'tool_id': 'tool_github_create_pr',
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+            await asyncio.sleep(0.3)
+            yield {
+                'type': 'tool_result',
+                'tool_id': 'tool_github_create_pr',
+                'result': {'number': 66, 'title': 'New feature', 'state': 'open', 'html_url': 'https://github.com/kennylhilljr/Agent-Engineers/pull/66'},
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+            await asyncio.sleep(0.2)
+            response_text = f"[{provider.upper()} - {model}] Pull request created successfully.\n\n"
+            response_text += "• PR #66: New feature - **Open**\n\n"
+            response_text += "View at: https://github.com/kennylhilljr/Agent-Engineers/pull/66"
+        elif 'merge' in lower and ('pr' in lower or 'pull request' in lower):
+            # Merge PR operation
+            yield {
+                'type': 'tool_use',
+                'tool_name': 'mcp__arcade__Github_MergePullRequest',
+                'tool_input': {'repo': 'Agent-Engineers', 'pull_number': 65},
+                'tool_id': 'tool_github_merge_pr',
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+            await asyncio.sleep(0.3)
+            yield {
+                'type': 'tool_result',
+                'tool_id': 'tool_github_merge_pr',
+                'result': {'merged': True, 'sha': 'abc123', 'message': 'Pull Request successfully merged'},
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+            await asyncio.sleep(0.2)
+            response_text = f"[{provider.upper()} - {model}] Pull request merged successfully."
+        elif 'diff' in lower or 'review' in lower:
+            # Get PR diff / review
+            yield {
+                'type': 'tool_use',
+                'tool_name': 'mcp__arcade__Github_GetPullRequest',
+                'tool_input': {'repo': 'Agent-Engineers', 'pull_number': 65},
+                'tool_id': 'tool_github_get_pr',
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+            await asyncio.sleep(0.3)
+            yield {
+                'type': 'tool_result',
+                'tool_id': 'tool_github_get_pr',
+                'result': {'number': 65, 'title': 'feat(AI-140): Slack Access in Chat',
+                           'state': 'closed', 'merged': True,
+                           'additions': 655, 'deletions': 23, 'changed_files': 2},
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+            await asyncio.sleep(0.2)
+            response_text = f"[{provider.upper()} - {model}] PR #65 details:\n\n"
+            response_text += "• Title: feat(AI-140): Slack Access in Chat\n"
+            response_text += "• State: Merged\n"
+            response_text += "• Changes: +655 / -23 across 2 files"
+        elif 'issue' in lower and ('github' in lower or 'create' in lower):
+            # GitHub issues (not Linear)
+            yield {
+                'type': 'tool_use',
+                'tool_name': 'mcp__arcade__Github_ListIssues',
+                'tool_input': {'repo': 'Agent-Engineers', 'state': 'open'},
+                'tool_id': 'tool_github_issues',
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+            await asyncio.sleep(0.3)
+            yield {
+                'type': 'tool_result',
+                'tool_id': 'tool_github_issues',
+                'result': {'issues': []},
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+            await asyncio.sleep(0.2)
+            response_text = f"[{provider.upper()} - {model}] No open GitHub issues found."
+        elif 'repo' in lower or 'repository' in lower:
+            # Repository info
+            yield {
+                'type': 'tool_use',
+                'tool_name': 'mcp__arcade__Github_GetRepository',
+                'tool_input': {'owner': 'kennylhilljr', 'repo': 'Agent-Engineers'},
+                'tool_id': 'tool_github_repo',
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+            await asyncio.sleep(0.3)
+            yield {
+                'type': 'tool_result',
+                'tool_id': 'tool_github_repo',
+                'result': {'name': 'Agent-Engineers', 'description': 'Agent Dashboard',
+                           'stars': 12, 'forks': 2, 'open_issues': 0},
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+            await asyncio.sleep(0.2)
+            response_text = f"[{provider.upper()} - {model}] Repository: Agent-Engineers\n\n"
+            response_text += "• Stars: 12 | Forks: 2 | Open Issues: 0\n"
+            response_text += "• Description: Agent Dashboard"
+        else:
+            # Default: List PRs
+            yield {
+                'type': 'tool_use',
+                'tool_name': 'mcp__arcade__Github_ListPullRequests',
+                'tool_input': {'owner': 'kennylhilljr', 'repo': 'Agent-Engineers', 'state': 'open'},
+                'tool_id': 'tool_github_list_prs',
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+            await asyncio.sleep(0.3)
+            yield {
+                'type': 'tool_result',
+                'tool_id': 'tool_github_list_prs',
+                'result': {'pull_requests': [
+                    {'number': 63, 'title': 'feat(AI-138): Hot-Swap Provider', 'state': 'merged'},
+                    {'number': 64, 'title': 'feat(AI-139): Linear Access in Chat', 'state': 'merged'},
+                    {'number': 65, 'title': 'feat(AI-140): Slack Access in Chat', 'state': 'merged'},
+                ]},
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+            await asyncio.sleep(0.2)
+            response_text = f"[{provider.upper()} - {model}] Recent GitHub PRs:\n\n"
+            response_text += "• PR #63: feat(AI-138): Hot-Swap Provider - **Merged**\n"
+            response_text += "• PR #64: feat(AI-139): Linear Access in Chat - **Merged**\n"
+            response_text += "• PR #65: feat(AI-140): Slack Access in Chat - **Merged**\n\n"
+            response_text += "The repository is active with continuous improvements."
 
     elif 'slack' in lower or 'channel' in lower or 'send message' in lower or 'reaction' in lower or 'pin' in lower:
         # Determine Slack operation based on keywords
