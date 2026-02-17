@@ -1494,6 +1494,123 @@
             margin-bottom: 6px;
             font-weight: 600;
         }
+
+        /* Agent Thinking Block Styles (AI-159) */
+        .thinking-block {
+            font-family: 'Courier New', Courier, monospace;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            border-radius: 6px;
+            margin: 8px 0;
+            background: rgba(15, 23, 42, 0.6);
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .thinking-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(30, 41, 59, 0.8);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+            gap: 8px;
+        }
+
+        .thinking-header:hover {
+            background: rgba(51, 65, 85, 0.8);
+        }
+
+        .thinking-header-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #a78bfa;
+            letter-spacing: 0.04em;
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .thinking-category-icon {
+            font-size: 0.9rem;
+            flex-shrink: 0;
+        }
+
+        .thinking-toggle {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            flex-shrink: 0;
+            transition: transform 0.2s ease;
+        }
+
+        .thinking-block.expanded .thinking-toggle {
+            transform: rotate(180deg);
+        }
+
+        .thinking-content {
+            display: none;
+            padding: 10px 12px;
+            border-top: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .thinking-block.expanded .thinking-content {
+            display: block;
+        }
+
+        .thinking-stream {
+            font-size: 0.8rem;
+            color: #cbd5e1;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .thinking-stream-entry {
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.05);
+        }
+
+        .thinking-stream-entry:last-child {
+            border-bottom: none;
+        }
+
+        /* Category-specific colors */
+        .thinking-block[data-category="files"] .thinking-header {
+            border-left: 3px solid #3b82f6;
+        }
+
+        .thinking-block[data-category="files"] .thinking-header-title {
+            color: #60a5fa;
+        }
+
+        .thinking-block[data-category="changes"] .thinking-header {
+            border-left: 3px solid #f97316;
+        }
+
+        .thinking-block[data-category="changes"] .thinking-header-title {
+            color: #fb923c;
+        }
+
+        .thinking-block[data-category="commands"] .thinking-header {
+            border-left: 3px solid #a855f7;
+        }
+
+        .thinking-block[data-category="commands"] .thinking-header-title {
+            color: #c084fc;
+        }
+
+        .thinking-block[data-category="tests"] .thinking-header {
+            border-left: 3px solid #22c55e;
+        }
+
+        .thinking-block[data-category="tests"] .thinking-header-title {
+            color: #4ade80;
+        }
     </style>
 </head>
 <body>
@@ -2839,6 +2956,9 @@
                         } else if (message.type === 'reasoning') {
                             console.log('Received reasoning event via WebSocket', message);
                             renderReasoningBlock(message);
+                        } else if (message.type === 'agent_thinking') {
+                            console.log('Received agent_thinking event via WebSocket', message);
+                            renderAgentThinkingBlock(message);
                         }
                     } catch (error) {
                         console.error('Error processing WebSocket message:', error);
@@ -2925,6 +3045,74 @@
             `;
 
             container.prepend(block);
+        }
+
+        // Category icons for agent thinking (AI-159)
+        const THINKING_CATEGORY_ICONS = {
+            files:    '\uD83D\uDCC2',  // 📂
+            changes:  '\u270F\uFE0F',  // ✏️
+            commands: '\u26A1',        // ⚡
+            tests:    '\uD83E\uDDEA',  // 🧪
+        };
+
+        // Category labels for agent thinking (AI-159)
+        const THINKING_CATEGORY_LABELS = {
+            files:    'FILES READ',
+            changes:  'PLANNED CHANGES',
+            commands: 'COMMANDS',
+            tests:    'TESTS',
+        };
+
+        // Render an agent thinking block in the activity feed (AI-159)
+        // If a block already exists for the same agent+ticket+category, append content.
+        function renderAgentThinkingBlock(message) {
+            const container = document.getElementById('activity-feed') || document.body;
+            const agent    = message.agent    || 'agent';
+            const category = message.category || 'files';
+            const ticket   = message.ticket   || '';
+            const content  = message.content  || '';
+
+            // Build a stable ID so we can find an existing block for the same agent+ticket+category
+            const blockKey = 'thinking-' + agent.replace(/\W+/g, '_') + '-' + category +
+                             (ticket ? '-' + ticket.replace(/\W+/g, '_') : '');
+
+            let block = document.getElementById(blockKey);
+
+            if (!block) {
+                // Create a new thinking block
+                const icon  = THINKING_CATEGORY_ICONS[category]  || '\uD83D\uDD0D';
+                const label = THINKING_CATEGORY_LABELS[category] || category.toUpperCase();
+                const headerTitle = 'AGENT THINKING' +
+                                    (agent  ? ' \u2014 ' + agent.toUpperCase() : '') +
+                                    (ticket ? ' \u2014 ' + ticket : '');
+
+                block = document.createElement('div');
+                block.className = 'thinking-block';
+                block.id = blockKey;
+                block.setAttribute('data-category', category);
+
+                block.innerHTML = '<div class="thinking-header" onclick="(function(el){el.closest(\'.thinking-block\').classList.toggle(\'expanded\');})(this)">' +
+                    '<span class="thinking-category-icon">' + icon + '</span>' +
+                    '<span class="thinking-header-title">' + headerTitle + ' \u2014 ' + label + '</span>' +
+                    '<span class="thinking-toggle">&#9660;</span>' +
+                    '</div>' +
+                    '<div class="thinking-content">' +
+                    '<ul class="thinking-stream" id="' + blockKey + '-stream"></ul>' +
+                    '</div>';
+
+                container.prepend(block);
+            }
+
+            // Append the new content entry to the stream list
+            if (content) {
+                const stream = document.getElementById(blockKey + '-stream');
+                if (stream) {
+                    const entry = document.createElement('li');
+                    entry.className = 'thinking-stream-entry';
+                    entry.textContent = content;
+                    stream.appendChild(entry);
+                }
+            }
         }
 
         // Handle metrics update from WebSocket or HTTP

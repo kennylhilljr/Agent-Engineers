@@ -305,11 +305,15 @@ class DashboardServer:
         # Reasoning broadcast endpoint (AI-158)
         self.app.router.add_post('/api/reasoning', self.broadcast_reasoning)
 
+        # Agent thinking broadcast endpoint (AI-159)
+        self.app.router.add_post('/api/agent-thinking', self.broadcast_agent_thinking)
+
         # OPTIONS for CORS preflight
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/agents/{agent_name}', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/requirements/{ticket_key}', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/reasoning', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/agent-thinking', self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
         """Handle CORS preflight OPTIONS requests."""
@@ -613,6 +617,49 @@ class DashboardServer:
 
         await self.broadcast_to_websockets(message)
         logger.info(f"Reasoning event broadcast: ticket={ticket!r}, content_len={len(content)}")
+
+        return web.json_response({'success': True})
+
+    async def broadcast_agent_thinking(self, request: Request) -> Response:
+        """POST /api/agent-thinking — broadcast an agent thinking event to all WebSocket clients.
+
+        Expected JSON body::
+
+            {
+                "agent":    "<agent name, e.g. 'coding'>",
+                "category": "<one of: files|changes|commands|tests>",
+                "content":  "<thinking text>",
+                "ticket":   "<optional ticket key, e.g. 'AI-159'>"
+            }
+
+        Returns:
+            JSON ``{"success": true}`` on success, or
+            ``{"error": "<message>"}`` with status 400 for malformed requests.
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        agent = body.get('agent', '')
+        category = body.get('category', 'files')
+        content = body.get('content', '')
+        ticket = body.get('ticket', '')
+
+        message = {
+            'type': 'agent_thinking',
+            'agent': agent,
+            'category': category,
+            'content': content,
+            'ticket': ticket,
+            'timestamp': datetime.now().isoformat(),
+        }
+
+        await self.broadcast_to_websockets(message)
+        logger.info(
+            f"Agent thinking event broadcast: agent={agent!r}, category={category!r}, "
+            f"ticket={ticket!r}, content_len={len(content)}"
+        )
 
         return web.json_response({'success': True})
 
