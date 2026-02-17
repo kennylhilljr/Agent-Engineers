@@ -17,9 +17,11 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import signal
+import subprocess
 import sys
 import traceback
 from datetime import UTC, datetime
@@ -51,7 +53,7 @@ from daemon.worker_pool import (
 )
 from daemon.worktree import WorktreeError, WorktreeManager
 from progress import is_project_initialized
-from prompts import copy_spec_to_project, get_continuation_task, get_initializer_task
+from prompts import copy_spec_to_project, get_continuation_task, get_initializer_task, get_review_task
 
 load_dotenv()
 
@@ -154,6 +156,64 @@ class ScalableDaemon:
             traceback.print_exc()
             return False
 
+    def _poll_open_prs(self) -> list[Ticket]:
+        """Poll GitHub for open PRs that haven't been reviewed.
+
+        Returns review Tickets with the 'review' label so they route
+        to the review worker pool via the ticket router.
+        """
+        github_repo = os.environ.get("GITHUB_REPO")
+        if not github_repo:
+            return []
+
+        try:
+            result = subprocess.run(
+                [
+                    "gh", "pr", "list",
+                    "--repo", github_repo,
+                    "--state", "open",
+                    "--json", "number,title,reviews,createdAt",
+                    "--limit", "20",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if result.returncode != 0:
+                logger.debug("gh pr list failed: %s", result.stderr[:200])
+                return []
+
+            prs = json.loads(result.stdout)
+        except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError) as e:
+            logger.debug("PR polling error: %s", e)
+            return []
+
+        # Filter to PRs with no reviews
+        unreviewed = [pr for pr in prs if not pr.get("reviews")]
+        if not unreviewed:
+            return []
+
+        # Build a formatted PR list for the review prompt
+        pr_lines = []
+        for pr in unreviewed:
+            pr_lines.append(f"- **PR #{pr['number']}**: {pr['title']}")
+
+        pr_list_str = "\n".join(pr_lines)
+
+        # Create a single review ticket covering all unreviewed PRs
+        pr_numbers = [str(pr["number"]) for pr in unreviewed]
+        ticket_key = f"PR_REVIEW_BATCH_{'-'.join(pr_numbers[:5])}"
+
+        return [
+            Ticket(
+                key=ticket_key,
+                title=f"Review {len(unreviewed)} open PRs",
+                description=pr_list_str,
+                status="todo",
+                labels=["review"],
+            )
+        ]
+
     def _initialize_pools(self) -> None:
         """Create initial workers for each pool based on config."""
         self.pool_manager.initialize_pools()
@@ -250,7 +310,7 @@ class ScalableDaemon:
         worker: TypedWorker,
         ticket: Ticket,
     ) -> SessionResult:
-        """Run a non-coding worker (review, linear) in the main project dir."""
+        """Run a non-coding worker (linear) in the main project dir."""
         _, model_id = self.ticket_router.route_and_select(ticket, self.pool_manager.pools)
 
         client = create_client(self.project_dir, model_id)
@@ -268,6 +328,50 @@ class ScalableDaemon:
                 return await run_agent_session(client, prompt, self.project_dir)
         except Exception as e:
             logger.error("%s session error: %s", worker.worker_id, e)
+            traceback.print_exc()
+            return SessionResult(status=SESSION_ERROR, response=str(e))
+
+    async def _run_review_worker(
+        self,
+        worker: TypedWorker,
+        ticket: Ticket,
+    ) -> SessionResult:
+        """Run a review worker session focused on reviewing open PRs.
+
+        Uses the review task as the system prompt (bypasses the orchestrator
+        prompt) so the agent directly reviews PRs using gh CLI and Read tools
+        instead of trying to delegate to sub-agents.
+        """
+        _, model_id = self.ticket_router.route_and_select(ticket, self.pool_manager.pools)
+
+        review_prompt = get_review_task(self.project_dir, pr_list=ticket.description)
+
+        # Use review prompt as system prompt — the agent acts directly,
+        # not as an orchestrator delegating to sub-agents
+        client = create_client(
+            self.project_dir,
+            model_id,
+            system_prompt=review_prompt,
+        )
+
+        message = (
+            f"Review the open PRs listed in your instructions. "
+            f"Use `gh pr view`, `gh pr diff`, `gh pr comment`, and `gh pr merge` "
+            f"to review each PR. Work through them one by one."
+        )
+
+        logger.info(
+            "%s reviewing PRs: %s (model=%s)",
+            worker.worker_id,
+            ticket.title,
+            model_id,
+        )
+
+        try:
+            async with client:
+                return await run_agent_session(client, message, self.project_dir)
+        except Exception as e:
+            logger.error("%s review session error: %s", worker.worker_id, e)
             traceback.print_exc()
             return SessionResult(status=SESSION_ERROR, response=str(e))
 
@@ -291,6 +395,8 @@ class ScalableDaemon:
         try:
             if worker.pool_type == PoolType.CODING:
                 result = await self._run_coding_worker(worker, ticket)
+            elif worker.pool_type == PoolType.REVIEW:
+                result = await self._run_review_worker(worker, ticket)
             else:
                 result = await self._run_standard_worker(worker, ticket)
 
@@ -354,7 +460,7 @@ class ScalableDaemon:
         """Poll for actionable tickets.
 
         First drains the webhook event queue for immediate dispatch.
-        Falls back to synthetic LINEAR_CHECK if queue is empty.
+        Falls back to synthetic LINEAR_CHECK + open PR review tickets.
         """
         # Drain webhook-delivered tickets first (instant, no latency)
         queued = self._drain_event_queue()
@@ -362,15 +468,25 @@ class ScalableDaemon:
             logger.info("Event queue: %d tickets from webhooks", len(queued))
             return queued
 
-        # Fallback: synthetic check (polling mode)
-        return [
+        tickets: list[Ticket] = []
+
+        # Always include a coding ticket for the coding worker
+        tickets.append(
             Ticket(
                 key="LINEAR_CHECK",
                 title="Check Linear for available tickets",
                 description="Run a continuation session to check for work.",
                 status="todo",
             )
-        ]
+        )
+
+        # Check for open PRs that need review (for the review worker)
+        review_tickets = self._poll_open_prs()
+        if review_tickets:
+            logger.info("Found %d unreviewed PR batches", len(review_tickets))
+            tickets.extend(review_tickets)
+
+        return tickets
 
     def _filter_actionable_tickets(self, tickets: list[Ticket]) -> list[Ticket]:
         """Filter out tickets already being worked on."""

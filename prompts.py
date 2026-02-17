@@ -83,6 +83,24 @@ def get_continuation_task(project_dir: Path) -> str:
     return template.format(project_dir=project_dir)
 
 
+def get_review_task(project_dir: Path, pr_list: str) -> str:
+    """
+    Get the task message for a PR review session.
+
+    This is sent to the orchestrator running on a review worker,
+    focused solely on reviewing and merging open PRs.
+
+    Args:
+        project_dir: Directory for the project
+        pr_list: Formatted string listing open PRs to review
+
+    Returns:
+        Task message with project_dir and pr_list substituted
+    """
+    template = load_prompt("review_task")
+    return template.format(project_dir=project_dir, pr_list=pr_list)
+
+
 def find_active_spec() -> Path:
     """
     Find the active spec file in the specs/ directory.

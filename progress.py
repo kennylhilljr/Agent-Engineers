@@ -105,7 +105,10 @@ def is_project_initialized(project_dir: Path) -> bool:
     """
     try:
         state = load_project_state(project_dir)
-        return state is not None and state.get("initialized", False)
+        if state is None:
+            return False
+        # Accept both "initialized": true and "status": "initialized"
+        return state.get("initialized", False) or state.get("status") == "initialized"
     except ValueError:
         print(f"Warning: Corrupted state file in {project_dir}, treating as uninitialized")
         return False
