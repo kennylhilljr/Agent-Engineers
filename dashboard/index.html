@@ -654,6 +654,60 @@
             opacity: 0.6;
             pointer-events: none;
         }
+
+        /* Tool Call Visualization */
+        .tool-call-block {
+            margin: 4px 0;
+            border-radius: 6px;
+            font-size: 0.85em;
+            max-width: 85%;
+            align-self: flex-start;
+        }
+        .tool-use-block {
+            background: rgba(99, 102, 241, 0.08);
+            border: 1px solid rgba(99, 102, 241, 0.25);
+        }
+        .tool-result-block {
+            background: rgba(16, 185, 129, 0.08);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+        }
+        .tool-call-block-inner {
+            padding: 4px 8px;
+        }
+        .tool-call-header {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 0;
+            list-style: none;
+            user-select: none;
+        }
+        .tool-call-header::-webkit-details-marker { display: none; }
+        .tool-icon { font-size: 1em; }
+        .tool-label { color: #6366f1; font-weight: 600; }
+        .tool-result-block .tool-label { color: #10b981; }
+        .tool-name { color: #e2e8f0; font-family: monospace; }
+        .tool-call-body { padding: 4px 8px 4px 24px; }
+        .tool-full-name { color: #94a3b8; font-size: 0.9em; font-family: monospace; margin-bottom: 4px; }
+        .tool-call-details summary {
+            cursor: pointer;
+            color: #94a3b8;
+            font-size: 0.9em;
+            margin-bottom: 4px;
+        }
+        .tool-params {
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+            padding: 8px;
+            overflow-x: auto;
+            font-size: 0.85em;
+            color: #cbd5e1;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 200px;
+            overflow-y: auto;
+        }
     </style>
 </head>
 <body>
@@ -1052,12 +1106,44 @@
                 }
             }
 
-            // Helper: add a tool transparency message
-            function addToolMessage(toolName, toolInput, isResult) {
-                addMessage('system', isResult
-                    ? `✅ Tool result from: ${toolName}`
-                    : `🔧 Calling Linear tool: ${toolName}${toolInput ? ' (' + JSON.stringify(toolInput).substring(0, 80) + ')' : ''}`
-                );
+            // Helper: add a tool transparency message with collapsible details
+            function addToolMessage(toolName, toolInput, isResult, toolResult) {
+                const chatMessages = document.getElementById('chat-messages');
+                if (!chatMessages) return;
+
+                const toolDiv = document.createElement('div');
+                toolDiv.className = 'tool-call-block ' + (isResult ? 'tool-result-block' : 'tool-use-block');
+
+                const icon = isResult ? '✅' : '🔧';
+                const label = isResult ? 'Tool Result' : 'Tool Call';
+                // Strip mcp__ prefix for short display name
+                const toolShortName = String(toolName).replace(/^mcp__[\w-]+__/, '');
+
+                let detailsHtml = '';
+                if (!isResult && toolInput) {
+                    const formattedInput = JSON.stringify(toolInput, null, 2);
+                    detailsHtml = `<details class="tool-call-details"><summary>Parameters</summary><pre class="tool-params">${escapeHtml(formattedInput)}</pre></details>`;
+                }
+                if (isResult && toolResult) {
+                    const formattedResult = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult, null, 2);
+                    detailsHtml = `<details class="tool-call-details"><summary>Response</summary><pre class="tool-params">${escapeHtml(formattedResult)}</pre></details>`;
+                }
+
+                toolDiv.innerHTML = `
+                    <details class="tool-call-block-inner">
+                        <summary class="tool-call-header">
+                            <span class="tool-icon">${icon}</span>
+                            <span class="tool-label">${label}:</span>
+                            <span class="tool-name">${escapeHtml(toolShortName)}</span>
+                        </summary>
+                        <div class="tool-call-body">
+                            <div class="tool-full-name">${escapeHtml(String(toolName))}</div>
+                            ${detailsHtml}
+                        </div>
+                    </details>
+                `;
+                chatMessages.appendChild(toolDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
             }
 
             // Helper: finalize on completion
@@ -1114,9 +1200,9 @@
                                     if (chunk.type === 'text') {
                                         updateStreamingText(chunk.content || '');
                                     } else if (chunk.type === 'tool_use') {
-                                        addToolMessage(chunk.tool_name || 'unknown', chunk.tool_input, false);
+                                        addToolMessage(chunk.tool_name || 'unknown', chunk.tool_input, false, null);
                                     } else if (chunk.type === 'tool_result') {
-                                        addToolMessage(chunk.tool_id || 'unknown', null, true);
+                                        addToolMessage(chunk.tool_name || chunk.tool_id || 'unknown', null, true, chunk.content);
                                     } else if (chunk.type === 'error') {
                                         addMessage('system', `❌ ${chunk.content || 'Unknown error'}`);
                                     } else if (chunk.type === 'done') {
