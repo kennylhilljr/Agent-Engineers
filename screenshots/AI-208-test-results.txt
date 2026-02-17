@@ -1,0 +1,82 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.14.2, pytest-9.0.2, pluggy-1.6.0 -- /Users/bkh223/Documents/GitHub/agent-engineers/venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/bkh223/Documents/GitHub/agent-engineers
+configfile: pyproject.toml
+plugins: anyio-4.12.1, asyncio-1.3.0, typeguard-4.4.4
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 63 items
+
+../../tests/test_type_safety.py::TestBaseBridgeProtocolCompliance::test_concrete_bridge_has_provider_name PASSED [  1%]
+../../tests/test_type_safety.py::TestBaseBridgeProtocolCompliance::test_concrete_bridge_has_get_auth_info PASSED [  3%]
+../../tests/test_type_safety.py::TestBaseBridgeProtocolCompliance::test_concrete_bridge_is_instance_of_base_bridge PASSED [  4%]
+../../tests/test_type_safety.py::TestBaseBridgeProtocolCompliance::test_bridge_protocol_isinstance_concrete_bridge PASSED [  6%]
+../../tests/test_type_safety.py::TestBaseBridgeProtocolCompliance::test_bridge_protocol_isinstance_structural PASSED [  7%]
+../../tests/test_type_safety.py::TestBaseBridgeProtocolCompliance::test_bridge_protocol_rejects_incomplete PASSED [  9%]
+../../tests/test_type_safety.py::TestBaseBridgeProtocolCompliance::test_bridge_provider_name_is_str PASSED [ 11%]
+../../tests/test_type_safety.py::TestBaseBridgeProtocolCompliance::test_bridge_get_auth_info_returns_dict_of_strings PASSED [ 12%]
+../../tests/test_type_safety.py::TestBaseBridgeProtocolCompliance::test_bridge_repr PASSED [ 14%]
+../../tests/test_type_safety.py::TestBaseBridgeProtocolCompliance::test_bridge_validate_response_true_for_valid PASSED [ 15%]
+../../tests/test_type_safety.py::TestBaseBridgeProtocolCompliance::test_bridge_validate_response_false_for_failed PASSED [ 17%]
+../../tests/test_type_safety.py::TestAgentConfigProtocolCompliance::test_agent_config_isinstance_config_protocol PASSED [ 19%]
+../../tests/test_type_safety.py::TestAgentConfigProtocolCompliance::test_agent_config_validate_returns_list PASSED [ 20%]
+../../tests/test_type_safety.py::TestAgentConfigProtocolCompliance::test_agent_config_is_valid_returns_bool PASSED [ 22%]
+../../tests/test_type_safety.py::TestAgentConfigProtocolCompliance::test_structural_config_isinstance_config_protocol PASSED [ 23%]
+../../tests/test_type_safety.py::TestAgentConfigProtocolCompliance::test_incomplete_config_not_config_protocol PASSED [ 25%]
+../../tests/test_type_safety.py::TestAgentConfigProtocolCompliance::test_api_keys_validate_returns_list PASSED [ 26%]
+../../tests/test_type_safety.py::TestAgentConfigProtocolCompliance::test_agent_config_has_timeout PASSED [ 28%]
+../../tests/test_type_safety.py::TestAgentConfigProtocolCompliance::test_agent_config_has_dashboard_port PASSED [ 30%]
+../../tests/test_type_safety.py::TestRuntimeCheckableProtocols::test_bridge_protocol_is_runtime_checkable PASSED [ 31%]
+../../tests/test_type_safety.py::TestRuntimeCheckableProtocols::test_config_protocol_is_runtime_checkable PASSED [ 33%]
+../../tests/test_type_safety.py::TestRuntimeCheckableProtocols::test_progress_tracker_protocol_is_runtime_checkable PASSED [ 34%]
+../../tests/test_type_safety.py::TestRuntimeCheckableProtocols::test_exception_protocol_is_runtime_checkable PASSED [ 36%]
+../../tests/test_type_safety.py::TestRuntimeCheckableProtocols::test_concrete_exception_satisfies_exception_protocol PASSED [ 38%]
+../../tests/test_type_safety.py::TestRuntimeCheckableProtocols::test_progress_tracker_satisfies_protocol PASSED [ 39%]
+../../tests/test_type_safety.py::TestRuntimeCheckableProtocols::test_plain_object_does_not_satisfy_bridge_protocol PASSED [ 41%]
+../../tests/test_type_safety.py::TestRuntimeCheckableProtocols::test_plain_object_does_not_satisfy_config_protocol PASSED [ 42%]
+../../tests/test_type_safety.py::TestPyprojectTomlMypyConfig::test_mypy_section_exists PASSED [ 44%]
+../../tests/test_type_safety.py::TestPyprojectTomlMypyConfig::test_mypy_python_version PASSED [ 46%]
+../../tests/test_type_safety.py::TestPyprojectTomlMypyConfig::test_mypy_warn_return_any PASSED [ 30%]
+../../tests/test_type_safety.py::TestPyprojectTomlMypyConfig::test_mypy_warn_unused_configs PASSED [ 49%]
+../../tests/test_type_safety.py::TestPyprojectTomlMypyConfig::test_mypy_disallow_untyped_defs PASSED [ 50%]
+../../tests/test_type_safety.py::TestPyprojectTomlMypyConfig::test_mypy_disallow_incomplete_defs PASSED [ 52%]
+../../tests/test_type_safety.py::TestPyprojectTomlMypyConfig::test_mypy_check_untyped_defs PASSED [ 53%]
+../../tests/test_type_safety.py::TestPyprojectTomlMypyConfig::test_mypy_no_implicit_optional PASSED [ 55%]
+../../tests/test_type_safety.py::TestPyprojectTomlMypyConfig::test_mypy_warn_redundant_casts PASSED [ 57%]
+../../tests/test_type_safety.py::TestPyprojectTomlMypyConfig::test_mypy_overrides_section_exists PASSED [ 58%]
+../../tests/test_type_safety.py::TestPyprojectTomlMypyConfig::test_mypy_overrides_ignore_missing_imports PASSED [ 60%]
+../../tests/test_type_safety.py::TestPyprojectTomlMypyConfig::test_mypy_overrides_covers_openai PASSED [ 61%]
+../../tests/test_type_safety.py::TestProtocolStructuralMatching::test_any_class_with_validate_and_is_valid_satisfies_config_protocol PASSED [ 63%]
+../../tests/test_type_safety.py::TestProtocolStructuralMatching::test_any_class_with_load_project_state_satisfies_progress_protocol PASSED [ 65%]
+../../tests/test_type_safety.py::TestProtocolStructuralMatching::test_exception_protocol_structural_match PASSED [ 66%]
+../../tests/test_type_safety.py::TestOptionalTypeHandling::test_bridge_response_tokens_used_optional PASSED [ 68%]
+../../tests/test_type_safety.py::TestOptionalTypeHandling::test_bridge_response_tokens_used_set PASSED [ 69%]
+../../tests/test_type_safety.py::TestOptionalTypeHandling::test_bridge_response_error_optional PASSED [ 71%]
+../../tests/test_type_safety.py::TestOptionalTypeHandling::test_agent_error_error_code_optional_property PASSED [ 73%]
+../../tests/test_type_safety.py::TestOptionalTypeHandling::test_api_keys_optional_fields_default_none PASSED [ 74%]
+../../tests/test_type_safety.py::TestOptionalTypeHandling::test_api_keys_can_be_set PASSED [ 76%]
+../../tests/test_type_safety.py::TestProtocolsModuleExports::test_bridge_protocol_exported PASSED [ 77%]
+../../tests/test_type_safety.py::TestProtocolsModuleExports::test_config_protocol_exported PASSED [ 79%]
+../../tests/test_type_safety.py::TestProtocolsModuleExports::test_progress_tracker_protocol_exported PASSED [ 80%]
+../../tests/test_type_safety.py::TestProtocolsModuleExports::test_exception_protocol_exported PASSED [ 82%]
+../../tests/test_type_safety.py::TestProtocolsModuleExports::test_bridge_protocol_is_runtime_checkable_class PASSED [ 84%]
+../../tests/test_type_safety.py::TestProtocolsModuleExports::test_config_protocol_is_runtime_checkable_class PASSED [ 85%]
+../../tests/test_type_safety.py::TestProtocolsModuleExports::test_protocols_module_docstring PASSED [ 87%]
+../../tests/test_type_safety.py::TestProtocolsModuleExports::test_protocols_file_exists PASSED [ 88%]
+../../tests/test_type_safety.py::TestProtocolsModuleExports::test_all_four_protocols_importable PASSED [ 90%]
+../../tests/test_type_safety.py::TestAgentErrorExceptionProtocol::test_agent_error_has_error_code PASSED [ 92%]
+../../tests/test_type_safety.py::TestAgentErrorExceptionProtocol::test_agent_error_to_dict_returns_dict PASSED [ 93%]
+../../tests/test_type_safety.py::TestAgentErrorExceptionProtocol::test_agent_error_satisfies_exception_protocol PASSED [ 95%]
+../../tests/test_type_safety.py::TestAgentErrorExceptionProtocol::test_bridge_error_satisfies_exception_protocol PASSED [ 96%]
+../../tests/test_type_safety.py::TestAgentErrorExceptionProtocol::test_configuration_error_satisfies_exception_protocol PASSED [ 98%]
+../../tests/test_type_safety.py::TestAgentErrorExceptionProtocol::test_agent_error_to_dict_has_required_keys PASSED [100%]
+
+============================== 63 passed in 0.12s ==============================
+
+Issue ID: AI-208
+Linear Status: In Progress (transitioned successfully)
+Files created/modified:
+  - /Users/bkh223/Documents/GitHub/agent-engineers/pyproject.toml (modified: added [tool.mypy] section)
+  - /Users/bkh223/Documents/GitHub/agent-engineers/protocols.py (created)
+  - /Users/bkh223/Documents/GitHub/agent-engineers/tests/test_type_safety.py (created)
+  - /Users/bkh223/Documents/GitHub/agent-engineers/generations/Agent-Engineers/screenshots/AI-208-test-results.txt (created)
