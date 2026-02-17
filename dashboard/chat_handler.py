@@ -335,6 +335,8 @@ async def stream_mock_response(
         yield {
             'type': 'tool_result',
             'tool_id': 'tool_mock_1',
+            'tool_name': 'mcp__claude_ai_Linear__list_issues',
+            'content': '3 issues found: AI-128 (In Progress), AI-132 (Done), AI-137 (Done)',
             'result': {'issues': [
                 {'key': 'AI-128', 'title': 'Phase 3: AI Chat Interface', 'status': 'In Progress'},
                 {'key': 'AI-132', 'title': 'Chat Interface UI', 'status': 'Done'},
@@ -365,6 +367,8 @@ async def stream_mock_response(
             yield {
                 'type': 'tool_result',
                 'tool_id': 'tool_github_create_pr',
+                'tool_name': 'mcp__arcade__Github_CreatePullRequest',
+                'content': 'PR #66 created successfully: "New feature" (open) — https://github.com/kennylhilljr/Agent-Engineers/pull/66',
                 'result': {'number': 66, 'title': 'New feature', 'state': 'open', 'html_url': 'https://github.com/kennylhilljr/Agent-Engineers/pull/66'},
                 'timestamp': datetime.utcnow().isoformat() + 'Z'
             }
@@ -385,6 +389,8 @@ async def stream_mock_response(
             yield {
                 'type': 'tool_result',
                 'tool_id': 'tool_github_merge_pr',
+                'tool_name': 'mcp__arcade__Github_MergePullRequest',
+                'content': 'PR #65 merged successfully (sha: abc123). Pull Request successfully merged.',
                 'result': {'merged': True, 'sha': 'abc123', 'message': 'Pull Request successfully merged'},
                 'timestamp': datetime.utcnow().isoformat() + 'Z'
             }
@@ -403,6 +409,8 @@ async def stream_mock_response(
             yield {
                 'type': 'tool_result',
                 'tool_id': 'tool_github_get_pr',
+                'tool_name': 'mcp__arcade__Github_GetPullRequest',
+                'content': 'PR #65 "feat(AI-140): Slack Access in Chat" — merged, +655/-23, 2 files changed',
                 'result': {'number': 65, 'title': 'feat(AI-140): Slack Access in Chat',
                            'state': 'closed', 'merged': True,
                            'additions': 655, 'deletions': 23, 'changed_files': 2},
@@ -426,6 +434,8 @@ async def stream_mock_response(
             yield {
                 'type': 'tool_result',
                 'tool_id': 'tool_github_issues',
+                'tool_name': 'mcp__arcade__Github_ListIssues',
+                'content': 'No open GitHub issues found in Agent-Engineers.',
                 'result': {'issues': []},
                 'timestamp': datetime.utcnow().isoformat() + 'Z'
             }
@@ -444,6 +454,8 @@ async def stream_mock_response(
             yield {
                 'type': 'tool_result',
                 'tool_id': 'tool_github_repo',
+                'tool_name': 'mcp__arcade__Github_GetRepository',
+                'content': 'Agent-Engineers: 12 stars, 2 forks, 0 open issues. Description: Agent Dashboard.',
                 'result': {'name': 'Agent-Engineers', 'description': 'Agent Dashboard',
                            'stars': 12, 'forks': 2, 'open_issues': 0},
                 'timestamp': datetime.utcnow().isoformat() + 'Z'
@@ -465,6 +477,8 @@ async def stream_mock_response(
             yield {
                 'type': 'tool_result',
                 'tool_id': 'tool_github_list_prs',
+                'tool_name': 'mcp__arcade__Github_ListPullRequests',
+                'content': '3 recent PRs found: #63 Hot-Swap Provider (merged), #64 Linear Access (merged), #65 Slack Access (merged)',
                 'result': {'pull_requests': [
                     {'number': 63, 'title': 'feat(AI-138): Hot-Swap Provider', 'state': 'merged'},
                     {'number': 64, 'title': 'feat(AI-139): Linear Access in Chat', 'state': 'merged'},
@@ -494,6 +508,8 @@ async def stream_mock_response(
             yield {
                 'type': 'tool_result',
                 'tool_id': 'tool_slack_send',
+                'tool_name': 'mcp__slack__conversations_add_message',
+                'content': 'Message delivered to #agent-status (ts: 1234567890.123456)',
                 'result': {'ok': True, 'ts': '1234567890.123456', 'channel': '#agent-status'},
                 'timestamp': datetime.utcnow().isoformat() + 'Z'
             }
@@ -512,6 +528,8 @@ async def stream_mock_response(
             yield {
                 'type': 'tool_result',
                 'tool_id': 'tool_slack_list',
+                'tool_name': 'mcp__slack__channels_list',
+                'content': '2 channels found: #agent-status, #general',
                 'result': {'channels': [
                     {'id': 'C01', 'name': 'agent-status', 'is_member': True},
                     {'id': 'C02', 'name': 'general', 'is_member': True}
@@ -535,6 +553,8 @@ async def stream_mock_response(
             yield {
                 'type': 'tool_result',
                 'tool_id': 'tool_slack_react',
+                'tool_name': 'mcp__slack__conversations_replies',
+                'content': 'Replies fetched successfully from #agent-status.',
                 'result': {'ok': True},
                 'timestamp': datetime.utcnow().isoformat() + 'Z'
             }
@@ -553,6 +573,8 @@ async def stream_mock_response(
             yield {
                 'type': 'tool_result',
                 'tool_id': 'tool_slack_history',
+                'tool_name': 'mcp__slack__conversations_history',
+                'content': '2 messages retrieved from #agent-status: dashboard live, agents operational.',
                 'result': {'messages': [
                     {'text': 'Agent dashboard chat interface is now live!', 'user': 'system', 'ts': '1234567890.1'},
                     {'text': 'All agents are operational.', 'user': 'bot', 'ts': '1234567890.2'}

@@ -489,8 +489,9 @@ class TestIndexHTMLSlackIntegration:
 
     def test_slack_tool_message_displayed(self, index_html):
         """Test tool_use events trigger tool indicator in chat."""
-        # callChatAPI adds system message for tool_use events
-        assert 'Calling' in index_html and 'tool' in index_html.lower()
+        # callChatAPI adds visual tool block for tool_use events
+        # (uses 'Tool Call' label or tool-call-block class)
+        assert ('Tool Call' in index_html or 'tool-call-block' in index_html) and 'tool' in index_html.lower()
 
     def test_chat_sends_provider_context(self, index_html):
         """Test chat sends provider context for Slack routing."""

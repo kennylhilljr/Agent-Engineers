@@ -483,7 +483,8 @@ class TestIndexHTMLGitHubIntegration:
 
     def test_tool_indicator_shown_in_chat(self, index_html):
         """Test tool calls trigger visual indicator in chat."""
-        assert 'Calling' in index_html
+        # New implementation uses 'Tool Call' label in collapsible block
+        assert 'Tool Call' in index_html or 'tool-call-block' in index_html
 
     def test_sse_handles_tool_results(self, index_html):
         """Test SSE stream handles tool_result events."""
