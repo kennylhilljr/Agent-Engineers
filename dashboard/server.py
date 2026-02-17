@@ -302,10 +302,14 @@ class DashboardServer:
         self.app.router.add_get('/api/requirements/{ticket_key}', self.get_requirement)
         self.app.router.add_put('/api/requirements/{ticket_key}', self.put_requirement)
 
+        # Reasoning broadcast endpoint (AI-158)
+        self.app.router.add_post('/api/reasoning', self.broadcast_reasoning)
+
         # OPTIONS for CORS preflight
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/agents/{agent_name}', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/requirements/{ticket_key}', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/reasoning', self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
         """Handle CORS preflight OPTIONS requests."""
@@ -559,6 +563,58 @@ class DashboardServer:
             'ticket_key': ticket_key,
             'linear_synced': linear_synced,
         })
+
+    async def broadcast_to_websockets(self, message: dict) -> None:
+        """Broadcast a JSON message to all connected WebSocket clients.
+
+        Args:
+            message: Dictionary to serialise and send to every active client.
+                     Disconnected clients are silently removed from the pool.
+        """
+        disconnected = set()
+        for ws in self.websockets:
+            try:
+                await ws.send_json(message)
+            except Exception as e:
+                logger.error(f"Error broadcasting to WebSocket {id(ws)}: {e}")
+                disconnected.add(ws)
+        self.websockets -= disconnected
+        if disconnected:
+            logger.info(f"Removed {len(disconnected)} disconnected WebSocket clients during broadcast")
+
+    async def broadcast_reasoning(self, request: Request) -> Response:
+        """POST /api/reasoning — broadcast a reasoning event to all WebSocket clients.
+
+        Expected JSON body::
+
+            {
+                "content": "<reasoning text>",
+                "ticket":  "<optional ticket key, e.g. AI-158>"
+            }
+
+        Returns:
+            JSON ``{"success": true}`` on success, or
+            ``{"error": "<message>", "status": 400}`` for malformed requests.
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        content = body.get('content', '')
+        ticket = body.get('ticket', '')
+
+        message = {
+            'type': 'reasoning',
+            'content': content,
+            'ticket': ticket,
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+        }
+
+        await self.broadcast_to_websockets(message)
+        logger.info(f"Reasoning event broadcast: ticket={ticket!r}, content_len={len(content)}")
+
+        return web.json_response({'success': True})
 
     async def websocket_handler(self, request: Request) -> WebSocketResponse:
         """WebSocket endpoint for real-time metrics streaming.
