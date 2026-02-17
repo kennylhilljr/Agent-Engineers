@@ -1134,6 +1134,189 @@
             padding: 1rem;
         }
 
+        /* ========================================
+           ORCHESTRATOR FLOW VISUALIZATION
+           ======================================== */
+        .orchestrator-flow {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            font-family: monospace;
+            font-size: 0.82rem;
+        }
+        /* Root node (Orchestrator) */
+        .flow-root-node {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0;
+            color: var(--accent-blue-light);
+            font-weight: 700;
+            font-size: 0.88rem;
+        }
+        .flow-root-icon {
+            font-size: 1rem;
+        }
+        /* FileTree branch lines */
+        .flow-tree {
+            display: flex;
+            flex-direction: column;
+            padding-left: 0.75rem;
+            border-left: 1px solid var(--border-color);
+            margin-left: 0.5rem;
+            gap: 1px;
+        }
+        /* FlowNode — one step in the pipeline */
+        .flow-node {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            padding: 0.35rem 0.5rem;
+            border-radius: 5px;
+            transition: background 0.15s ease;
+            position: relative;
+        }
+        .flow-node:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+        .flow-node.active {
+            background: rgba(16, 185, 129, 0.07);
+        }
+        .flow-node.done {
+            opacity: 0.75;
+        }
+        .flow-node.pending {
+            opacity: 0.55;
+        }
+        /* Tree connector line */
+        .flow-connector {
+            display: flex;
+            align-items: flex-start;
+            color: var(--border-color);
+            padding-top: 0.35rem;
+            flex-shrink: 0;
+            width: 1.2rem;
+            font-size: 0.75rem;
+        }
+        /* ProgressRing — SVG circular indicator */
+        .progress-ring-wrapper {
+            flex-shrink: 0;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .progress-ring-svg {
+            width: 20px;
+            height: 20px;
+        }
+        .progress-ring-track {
+            fill: none;
+            stroke: rgba(71, 85, 105, 0.5);
+            stroke-width: 2.5;
+        }
+        .progress-ring-fill {
+            fill: none;
+            stroke-width: 2.5;
+            stroke-linecap: round;
+            transform-origin: center;
+            transform: rotate(-90deg);
+            transition: stroke-dashoffset 0.4s ease;
+        }
+        .progress-ring-fill.done {
+            stroke: var(--accent-green);
+        }
+        .progress-ring-fill.active {
+            stroke: #f59e0b;
+            animation: ring-pulse 1.5s ease-in-out infinite;
+        }
+        .progress-ring-fill.pending {
+            stroke: var(--text-muted);
+        }
+        .progress-ring-fill.error {
+            stroke: var(--accent-red);
+        }
+        .progress-ring-text {
+            font-size: 0.6rem;
+            font-weight: 700;
+            dominant-baseline: middle;
+            text-anchor: middle;
+        }
+        .progress-ring-text.done { fill: var(--accent-green); }
+        .progress-ring-text.active { fill: #f59e0b; }
+        .progress-ring-text.pending { fill: var(--text-muted); }
+        .progress-ring-text.error { fill: var(--accent-red); }
+        @keyframes ring-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        /* Node content */
+        .flow-node-content {
+            flex: 1;
+            min-width: 0;
+        }
+        .flow-node-header {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+        }
+        .flow-node-agent {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .flow-node-task {
+            color: var(--text-secondary);
+            font-size: 0.78rem;
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .flow-node-timing {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+        .flow-node-timing.active {
+            color: #f59e0b;
+        }
+        .flow-node-timing.done {
+            color: var(--accent-green);
+        }
+        .flow-node-status-label {
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            padding: 1px 5px;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+        .flow-node-status-label.active {
+            background: rgba(245, 158, 11, 0.15);
+            color: #f59e0b;
+        }
+        .flow-node-status-label.done {
+            background: rgba(16, 185, 129, 0.12);
+            color: var(--accent-green);
+        }
+        .flow-node-status-label.pending {
+            background: rgba(148, 163, 184, 0.1);
+            color: var(--text-muted);
+        }
+        .flow-node-status-label.error {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--accent-red);
+        }
+        .flow-empty {
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            text-align: center;
+            padding: 0.75rem;
+        }
+
         /* Tool Call Visualization */
         .tool-call-block {
             margin: 4px 0;
@@ -1224,6 +1407,14 @@
                     <h2 class="panel-section-title">Agent Status</h2>
                     <div class="agent-list" id="agent-list">
                         <!-- Agent items will be populated by JavaScript -->
+                    </div>
+                </section>
+
+                <!-- Orchestrator Flow Visualization -->
+                <section class="panel-section" id="orchestrator-flow-section">
+                    <h2 class="panel-section-title">Orchestrator Flow</h2>
+                    <div class="orchestrator-flow" id="orchestrator-flow">
+                        <!-- Flow nodes will be populated by renderOrchestratorFlow() -->
                     </div>
                 </section>
 
@@ -2157,6 +2348,148 @@
         window.mockAgentProfiles = mockAgentProfiles;
 
         // ========================================
+        // ORCHESTRATOR FLOW VISUALIZATION
+        // ========================================
+
+        /**
+         * Mock orchestrator flow data — matches the pipeline defined in orchestrator prompt.
+         * Each FlowNode has: agent, task, status ('done'|'active'|'pending'|'error'), elapsed_s
+         */
+        const mockOrchestratorFlow = {
+            ticket: 'AI-145',
+            nodes: [
+                { agent: 'ops',     task: 'Starting AI-145',       status: 'done',    elapsed_s: 3 },
+                { agent: 'coding',  task: 'Implementing AI-145',    status: 'done',    elapsed_s: 312 },
+                { agent: 'github',  task: 'Commit + PR',            status: 'done',    elapsed_s: 18 },
+                { agent: 'ops',     task: 'Transition to Review',    status: 'done',    elapsed_s: 2 },
+                { agent: 'pr_reviewer_fast', task: 'Review PR',      status: 'done',    elapsed_s: 8 },
+                { agent: 'ops',     task: 'Mark Done + Notify',     status: 'active',  elapsed_s: 1 },
+            ]
+        };
+
+        // Expose for testing
+        window.mockOrchestratorFlow = mockOrchestratorFlow;
+
+        /**
+         * ProgressRing component: renders a circular SVG progress indicator.
+         * @param {string} status - 'done' | 'active' | 'pending' | 'error'
+         * @param {number} progress - 0 to 1 (fill fraction)
+         * @returns {string} SVG HTML string
+         */
+        function ProgressRing(status, progress) {
+            const r = 7;
+            const circ = 2 * Math.PI * r;
+            const fill = status === 'done' ? 1 : (status === 'active' ? (progress || 0.6) : 0);
+            const dashoffset = circ * (1 - fill);
+            const iconMap = { done: '✓', active: '●', pending: '○', error: '✗' };
+            const icon = iconMap[status] || '○';
+            return `<svg class="progress-ring-svg" viewBox="0 0 20 20" aria-hidden="true">
+                <circle class="progress-ring-track" cx="10" cy="10" r="${r}"/>
+                <circle class="progress-ring-fill ${status}" cx="10" cy="10" r="${r}"
+                    stroke-dasharray="${circ.toFixed(2)}"
+                    stroke-dashoffset="${dashoffset.toFixed(2)}"/>
+                <text class="progress-ring-text ${status}" x="10" y="10">${icon}</text>
+            </svg>`;
+        }
+
+        // Expose for testing
+        window.ProgressRing = ProgressRing;
+
+        /**
+         * FlowNode component: renders one step in the orchestrator delegation pipeline.
+         * @param {Object} node - { agent, task, status, elapsed_s }
+         * @param {boolean} isLast - whether this is the last node (uses └ instead of ├)
+         * @returns {string} HTML string
+         */
+        function FlowNode(node, isLast) {
+            const status = node.status || 'pending';
+            const agent = escapeHtml(node.agent || '?');
+            const task = escapeHtml(node.task || '');
+            const elapsed = node.elapsed_s != null ? node.elapsed_s : null;
+            const connector = isLast ? '└─►' : '├─►';
+
+            // Timing display
+            let timingHtml = '';
+            if (status === 'done' && elapsed != null) {
+                timingHtml = `<span class="flow-node-timing done">${elapsed}s</span>`;
+            } else if (status === 'active' && elapsed != null) {
+                timingHtml = `<span class="flow-node-timing active" id="flow-timer-${agent}">${elapsed}s [ACTIVE]</span>`;
+            } else if (status === 'pending') {
+                timingHtml = `<span class="flow-node-status-label pending">PENDING</span>`;
+            } else if (status === 'error') {
+                timingHtml = `<span class="flow-node-status-label error">ERROR</span>`;
+            }
+
+            return `
+            <div class="flow-node ${status}" data-flow-agent="${agent}" data-flow-status="${status}">
+                <span class="flow-connector">${escapeHtml(connector)}</span>
+                <div class="progress-ring-wrapper">${ProgressRing(status, 0.6)}</div>
+                <div class="flow-node-content">
+                    <div class="flow-node-header">
+                        <span class="flow-node-agent">${agent}</span>
+                        <span class="flow-node-task">${task}</span>
+                        ${timingHtml}
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        // Expose for testing
+        window.FlowNode = FlowNode;
+
+        /**
+         * Render the orchestrator flow visualization.
+         * Shows the full delegation pipeline with status indicators.
+         */
+        function renderOrchestratorFlow() {
+            const container = document.getElementById('orchestrator-flow');
+            if (!container) return;
+
+            const flow = window.currentOrchestratorFlow || mockOrchestratorFlow;
+            const nodes = flow.nodes || [];
+            const ticket = escapeHtml(flow.ticket || '');
+
+            if (nodes.length === 0) {
+                container.innerHTML = '<div class="flow-empty">No active pipeline</div>';
+                return;
+            }
+
+            const nodesHtml = nodes.map((node, i) => FlowNode(node, i === nodes.length - 1)).join('');
+
+            container.innerHTML = `
+                <div class="flow-root-node">
+                    <span class="flow-root-icon">🎯</span>
+                    <span>Orchestrator</span>
+                    ${ticket ? `<span style="color:var(--text-muted);font-size:0.75rem;margin-left:4px">(${ticket})</span>` : ''}
+                </div>
+                <div class="flow-tree">${nodesHtml}</div>
+            `;
+        }
+
+        // Expose for testing
+        window.renderOrchestratorFlow = renderOrchestratorFlow;
+
+        /**
+         * Update the orchestrator flow with new data from /api/orchestrator/flow.
+         * Falls back to mock data if API unavailable.
+         */
+        async function loadOrchestratorFlow() {
+            try {
+                const response = await fetch('/api/orchestrator/flow');
+                if (!response.ok) return;
+                const data = await response.json();
+                window.currentOrchestratorFlow = data;
+                renderOrchestratorFlow();
+            } catch (error) {
+                // API not available — use mock data
+                console.debug('Orchestrator flow API not available:', error.message);
+            }
+        }
+
+        // Expose for testing
+        window.loadOrchestratorFlow = loadOrchestratorFlow;
+
+        // ========================================
         // ACTIVITY ITEM COMPONENT
         // ========================================
         /**
@@ -2449,6 +2782,7 @@
             // Render initial UI
             renderAgents();
             renderActivities();
+            renderOrchestratorFlow();
 
             // Restore provider selection in DOM
             const providerSelect = document.getElementById('provider-select');
@@ -2486,6 +2820,9 @@
 
             // Start real-time agent status polling every 5s
             startAgentStatusPolling();
+
+            // Load orchestrator flow from API (non-blocking, falls back to mock)
+            loadOrchestratorFlow();
 
             console.log('Agent Dashboard initialized successfully');
             console.log('- Provider switcher with 6 providers');
