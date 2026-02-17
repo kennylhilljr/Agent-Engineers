@@ -985,6 +985,169 @@
         }
 
         // ========================================
+        // CHAT API - SSE STREAMING
+        // ========================================
+
+        /**
+         * Call /api/chat and stream SSE response into the chat UI.
+         * Handles text, tool_use, tool_result, done, and error events.
+         *
+         * @param {string} userMessage - The user's message
+         * @param {HTMLElement|null} sendBtn - The send button element (for re-enabling)
+         */
+        async function callChatAPI(userMessage, sendBtn) {
+            // Create an assistant message placeholder for streaming
+            const assistantMsgId = 'msg-' + Date.now();
+            let assistantTextContent = '';
+            let assistantMsgElement = null;
+
+            // Helper: create or get the streaming assistant message element
+            function getOrCreateAssistantMsg() {
+                if (assistantMsgElement) return assistantMsgElement;
+                // Create a new message element in the chat
+                const chatMessages = document.getElementById('chat-messages');
+                if (!chatMessages) return null;
+
+                const msgDiv = document.createElement('div');
+                msgDiv.className = 'message assistant-message';
+                msgDiv.id = assistantMsgId;
+                msgDiv.innerHTML = '<span class="msg-content"><span class="streaming-cursor">▋</span></span>';
+                chatMessages.appendChild(msgDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                assistantMsgElement = msgDiv;
+                return msgDiv;
+            }
+
+            // Helper: update the streaming text content
+            function updateStreamingText(text) {
+                assistantTextContent += text;
+                const el = getOrCreateAssistantMsg();
+                if (el) {
+                    const contentSpan = el.querySelector('.msg-content');
+                    if (contentSpan) {
+                        contentSpan.innerHTML = assistantTextContent.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                            .replace(/```([\w]*)\n([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>')
+                            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                            .replace(/\n/g, '<br>') + '<span class="streaming-cursor">▋</span>';
+                        const chatMessages = document.getElementById('chat-messages');
+                        if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
+                    }
+                }
+            }
+
+            // Helper: finalize the assistant message (remove cursor)
+            function finalizeAssistantMsg() {
+                if (assistantMsgElement) {
+                    const contentSpan = assistantMsgElement.querySelector('.msg-content');
+                    if (contentSpan) {
+                        // Remove streaming cursor
+                        contentSpan.innerHTML = contentSpan.innerHTML.replace('<span class="streaming-cursor">▋</span>', '');
+                    }
+                    // Add to state.messages
+                    state.messages.push({
+                        role: 'assistant',
+                        content: assistantTextContent,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            }
+
+            // Helper: add a tool transparency message
+            function addToolMessage(toolName, toolInput, isResult) {
+                addMessage('system', isResult
+                    ? `✅ Tool result from: ${toolName}`
+                    : `🔧 Calling Linear tool: ${toolName}${toolInput ? ' (' + JSON.stringify(toolInput).substring(0, 80) + ')' : ''}`
+                );
+            }
+
+            // Helper: finalize on completion
+            function onDone() {
+                finalizeAssistantMsg();
+                state.isAgentRunning = false;
+                if (sendBtn) {
+                    sendBtn.disabled = false;
+                    sendBtn.textContent = 'Send';
+                }
+                updateStats();
+            }
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: userMessage,
+                        provider: state.currentProvider,
+                        model: state.currentModel,
+                        conversation_history: getConversationContext()
+                    })
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                    addMessage('system', `❌ Chat error: ${errData.error || response.statusText}`);
+                    onDone();
+                    return;
+                }
+
+                const contentType = response.headers.get('content-type') || '';
+
+                if (contentType.includes('text/event-stream')) {
+                    // Parse SSE stream
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let buffer = '';
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop(); // Keep incomplete line in buffer
+
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                try {
+                                    const chunk = JSON.parse(line.slice(6));
+
+                                    if (chunk.type === 'text') {
+                                        updateStreamingText(chunk.content || '');
+                                    } else if (chunk.type === 'tool_use') {
+                                        addToolMessage(chunk.tool_name || 'unknown', chunk.tool_input, false);
+                                    } else if (chunk.type === 'tool_result') {
+                                        addToolMessage(chunk.tool_id || 'unknown', null, true);
+                                    } else if (chunk.type === 'error') {
+                                        addMessage('system', `❌ ${chunk.content || 'Unknown error'}`);
+                                    } else if (chunk.type === 'done') {
+                                        onDone();
+                                        return;
+                                    }
+                                } catch (e) {
+                                    // Skip malformed SSE data
+                                }
+                            }
+                        }
+                    }
+                    // Stream ended without 'done' event
+                    onDone();
+                } else {
+                    // JSON fallback (non-streaming)
+                    const data = await response.json();
+                    if (data.content) {
+                        getOrCreateAssistantMsg();
+                        updateStreamingText(data.content);
+                    }
+                    onDone();
+                }
+
+            } catch (err) {
+                addMessage('system', `❌ Network error: ${err.message}`);
+                onDone();
+            }
+        }
+
+        // ========================================
         // EVENT HANDLERS
         // ========================================
         function handleSendMessage() {
@@ -1010,24 +1173,8 @@
                 sendBtn.textContent = 'Sending...';
             }
 
-            // Simulate assistant response (in production: call /api/chat with getConversationContext())
-            setTimeout(() => {
-                addMessage('assistant', `You said: "${message}". This is a placeholder response. The chat interface is ready for integration with the backend API.`);
-
-                // Clear agent running flag (allows hot-swap again)
-                state.isAgentRunning = false;
-
-                // Restore send button
-                if (sendBtn) {
-                    sendBtn.disabled = false;
-                    sendBtn.textContent = 'Send';
-                }
-            }, 500);
-
-            // Update stats (mock)
-            state.totalTokens += Math.floor(Math.random() * 500) + 100;
-            state.totalCost += Math.random() * 0.05;
-            updateStats();
+            // Call /api/chat with real SSE streaming
+            callChatAPI(message, sendBtn);
         }
 
         // ========================================
