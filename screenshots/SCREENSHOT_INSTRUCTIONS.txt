@@ -1,0 +1,94 @@
+
+================================================================================
+AI-129: Multi-Provider Switching - Manual Screenshot Capture
+================================================================================
+
+SETUP INSTRUCTIONS:
+--------------------------------------------------------------------------------
+1. Start the REST API server:
+   cd /Users/bkh223/Documents/GitHub/agent-engineers/generations/agent-dashboard
+   python dashboard/rest_api_server.py --port 8420
+
+2. Open test_chat.html in a browser:
+   Open: dashboard/test_chat.html
+   Or use: file:///Users/bkh223/Documents/GitHub/agent-engineers/generations/agent-dashboard/.worktrees/coding-0/dashboard/test_chat.html
+
+
+SCREENSHOT CHECKLIST:
+--------------------------------------------------------------------------------
+
+Screenshot 1: All 6 Providers in Selector
+  - Click on the Provider dropdown
+  - Verify all 6 providers are visible: Claude, ChatGPT, Gemini, Groq, KIMI, Windsurf
+  - Capture: provider_selector_all_6.png
+
+Screenshot 2: Provider Status Indicators
+  - Show the provider badge with status indicator (green/yellow/red dot)
+  - The dot should be visible next to the provider name
+  - Capture: provider_status_indicator.png
+
+Screenshot 3: Initial Conversation with Claude
+  - Ensure Claude is selected
+  - Send message: 'Hello, testing multi-provider chat!'
+  - Wait for response
+  - Capture: conversation_1_claude.png
+
+Screenshot 4: Hot-Swap to Gemini (History Preserved)
+  - Switch provider to Gemini using dropdown
+  - Verify the previous message is still visible
+  - Verify badge changed to 'Gemini'
+  - Verify model selector updated to show Gemini models
+  - Capture: conversation_2_gemini_hotswap.png
+
+Screenshot 5: Continue Conversation with Gemini
+  - Send message: 'What is 2+2?'
+  - Wait for Gemini response
+  - Verify both Claude and Gemini messages are visible
+  - Capture: conversation_3_gemini_response.png
+
+Screenshot 6: Hot-Swap to Groq (All History Preserved)
+  - Switch provider to Groq
+  - Verify all previous messages are still visible
+  - Verify badge changed to 'Groq'
+  - Verify model selector updated to show Groq models
+  - Capture: conversation_4_groq_hotswap.png
+
+Screenshot 7: Model Selector Sync
+  - Open the Model dropdown
+  - Verify it shows Groq-specific models (Llama 3.3 70B, Mixtral 8x7B)
+  - Capture: model_selector_groq.png
+
+Screenshot 8: Complete Conversation Thread
+  - Send final message with Groq: 'Show me the conversation history'
+  - Wait for response
+  - Scroll to show entire conversation with all 3 providers
+  - Capture: conversation_final_all_providers.png
+
+
+SAVE SCREENSHOTS TO:
+--------------------------------------------------------------------------------
+  /Users/bkh223/Documents/GitHub/agent-engineers/generations/agent-dashboard/screenshots
+
+
+BROWSER DEVELOPER CONSOLE VERIFICATION:
+--------------------------------------------------------------------------------
+  - Open browser DevTools (F12)
+  - Check Console for log messages:
+    - 'Provider hot-swapped from X to Y'
+    - 'Conversation history preserved: N messages'
+  - Check Application > Session Storage:
+    - selectedAIProvider
+    - selectedAIModel
+    - chatMessages (should contain JSON array of messages)
+
+
+SUCCESS CRITERIA:
+--------------------------------------------------------------------------------
+  ✓ All 6 providers display in selector
+  ✓ Provider status indicators show (green/yellow/red)
+  ✓ Provider switching works without losing chat history
+  ✓ Model selector updates when provider changes
+  ✓ Hot-swap during conversation preserves all messages
+
+================================================================================
+
