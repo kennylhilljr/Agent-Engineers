@@ -396,6 +396,12 @@ class DashboardServer:
         self.app.router.add_get('/api/test-results', self.get_test_results)
         self.app.router.add_get('/api/test-results/{ticket}', self.get_test_results_by_ticket)
 
+        # WebSocket protocol endpoints (AI-168)
+        self.app.router.add_post('/api/agent-status', self.post_agent_status)
+        self.app.router.add_post('/api/agent-event', self.post_agent_event)
+        self.app.router.add_post('/api/chat-stream', self.post_chat_stream)
+        self.app.router.add_post('/api/control-ack', self.post_control_ack)
+
         # OPTIONS for CORS preflight
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/agents/{agent_name}', self.handle_options)
@@ -414,6 +420,10 @@ class DashboardServer:
         self.app.router.add_route('OPTIONS', '/api/file-changes/{session_id}', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/test-results', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/test-results/{ticket}', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/agent-status', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/agent-event', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/chat-stream', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/control-ack', self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
         """Handle CORS preflight OPTIONS requests."""
@@ -1409,6 +1419,226 @@ class DashboardServer:
             'total': len(matching),
         })
 
+    # ========================================================================
+    # AI-168: WebSocket Protocol Endpoints
+    # ========================================================================
+
+    async def post_agent_status(self, request: Request) -> Response:
+        """POST /api/agent-status — broadcast an agent status change via WebSocket.
+
+        Expected JSON body::
+
+            {
+                "agent":     "coding",              # agent identifier
+                "status":    "idle|working|paused|error",
+                "ticket":    "AI-XX",               # optional
+                "metadata":  {}                     # optional extra context
+            }
+
+        Returns:
+            JSON ``{"success": true}`` on success, or 400 for malformed requests.
+
+        WebSocket broadcast::
+
+            {type: "agent_status", agent, status, ticket, timestamp}
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        agent = body.get('agent', '')
+        if not agent:
+            return web.json_response({'error': 'Missing required field: agent'}, status=400)
+
+        status = body.get('status', '')
+        valid_statuses = ('idle', 'working', 'paused', 'error')
+        if status not in valid_statuses:
+            return web.json_response(
+                {'error': f'Invalid status; must be one of {valid_statuses}'},
+                status=400
+            )
+
+        ticket = body.get('ticket', '')
+        metadata = body.get('metadata', {})
+        timestamp = datetime.utcnow().isoformat() + 'Z'
+
+        message = {
+            'type': 'agent_status',
+            'agent': agent,
+            'status': status,
+            'ticket': ticket,
+            'metadata': metadata,
+            'timestamp': timestamp,
+        }
+
+        await self.broadcast_to_websockets(message)
+        logger.info(
+            f"Agent status broadcast: agent={agent!r}, status={status!r}, ticket={ticket!r}"
+        )
+
+        return web.json_response({'success': True})
+
+    async def post_agent_event(self, request: Request) -> Response:
+        """POST /api/agent-event — broadcast a new agent event via WebSocket.
+
+        Expected JSON body::
+
+            {
+                "agent":      "coding",             # agent identifier
+                "event_type": "started|completed|failed",
+                "ticket":     "AI-XX",              # optional
+                "details":    {}                    # optional extra context
+            }
+
+        Returns:
+            JSON ``{"success": true}`` on success, or 400 for malformed requests.
+
+        WebSocket broadcast::
+
+            {type: "agent_event", agent, event_type, ticket, details, timestamp}
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        agent = body.get('agent', '')
+        if not agent:
+            return web.json_response({'error': 'Missing required field: agent'}, status=400)
+
+        event_type = body.get('event_type', '')
+        valid_event_types = ('started', 'completed', 'failed')
+        if event_type not in valid_event_types:
+            return web.json_response(
+                {'error': f'Invalid event_type; must be one of {valid_event_types}'},
+                status=400
+            )
+
+        ticket = body.get('ticket', '')
+        details = body.get('details', {})
+        timestamp = datetime.utcnow().isoformat() + 'Z'
+
+        message = {
+            'type': 'agent_event',
+            'agent': agent,
+            'event_type': event_type,
+            'ticket': ticket,
+            'details': details,
+            'timestamp': timestamp,
+        }
+
+        await self.broadcast_to_websockets(message)
+        logger.info(
+            f"Agent event broadcast: agent={agent!r}, event_type={event_type!r}, ticket={ticket!r}"
+        )
+
+        return web.json_response({'success': True})
+
+    async def post_chat_stream(self, request: Request) -> Response:
+        """POST /api/chat-stream — broadcast a streaming chat message chunk via WebSocket.
+
+        Expected JSON body::
+
+            {
+                "content":   "text chunk",          # text content of the chunk
+                "is_final":  false,                 # True if this is the last chunk
+                "stream_id": "uuid",                # optional; auto-generated if absent
+                "provider":  "claude"               # optional AI provider name
+            }
+
+        Returns:
+            JSON ``{"success": true, "stream_id": "<uuid>"}`` on success,
+            or 400 for malformed requests.
+
+        WebSocket broadcast::
+
+            {type: "chat_message", content, is_final, stream_id, provider, timestamp}
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        content = body.get('content', '')
+        is_final = bool(body.get('is_final', False))
+        stream_id = body.get('stream_id', '') or str(uuid4())
+        provider = body.get('provider', '')
+        timestamp = datetime.utcnow().isoformat() + 'Z'
+
+        message = {
+            'type': 'chat_message',
+            'content': content,
+            'is_final': is_final,
+            'stream_id': stream_id,
+            'provider': provider,
+            'timestamp': timestamp,
+        }
+
+        await self.broadcast_to_websockets(message)
+        logger.info(
+            f"Chat stream broadcast: stream_id={stream_id!r}, is_final={is_final}, "
+            f"provider={provider!r}, content_len={len(content)}"
+        )
+
+        return web.json_response({'success': True, 'stream_id': stream_id})
+
+    async def post_control_ack(self, request: Request) -> Response:
+        """POST /api/control-ack — broadcast a control command acknowledgment via WebSocket.
+
+        Expected JSON body::
+
+            {
+                "agent":    "coding",               # target agent
+                "command":  "pause|resume",         # control command
+                "success":  true,                   # whether the command succeeded
+                "message":  "Agent paused"          # optional human-readable message
+            }
+
+        Returns:
+            JSON ``{"success": true}`` on success, or 400 for malformed requests.
+
+        WebSocket broadcast::
+
+            {type: "control_ack", agent, command, success, message, timestamp}
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        agent = body.get('agent', '')
+        if not agent:
+            return web.json_response({'error': 'Missing required field: agent'}, status=400)
+
+        command = body.get('command', '')
+        valid_commands = ('pause', 'resume')
+        if command not in valid_commands:
+            return web.json_response(
+                {'error': f'Invalid command; must be one of {valid_commands}'},
+                status=400
+            )
+
+        success = bool(body.get('success', True))
+        message_text = body.get('message', f'Agent {agent} {command} acknowledged')
+        timestamp = datetime.utcnow().isoformat() + 'Z'
+
+        ws_message = {
+            'type': 'control_ack',
+            'agent': agent,
+            'command': command,
+            'success': success,
+            'message': message_text,
+            'timestamp': timestamp,
+        }
+
+        await self.broadcast_to_websockets(ws_message)
+        logger.info(
+            f"Control ack broadcast: agent={agent!r}, command={command!r}, success={success}"
+        )
+
+        return web.json_response({'success': True})
+
     async def websocket_handler(self, request: Request) -> WebSocketResponse:
         """WebSocket endpoint for real-time metrics streaming.
 
@@ -1571,6 +1801,11 @@ class DashboardServer:
         logger.info(f"    POST {base}/api/test-results")
         logger.info(f"    GET  {base}/api/test-results")
         logger.info(f"    GET  {base}/api/test-results/{{ticket}}")
+        logger.info("  WebSocket Protocol (AI-168):")
+        logger.info(f"    POST {base}/api/agent-status")
+        logger.info(f"    POST {base}/api/agent-event")
+        logger.info(f"    POST {base}/api/chat-stream")
+        logger.info(f"    POST {base}/api/control-ack")
         logger.info("  WebSocket:")
         logger.info(f"    WS   {ws_base}/ws  (broadcast interval: {self.broadcast_interval}s)")
         logger.info("=" * 60)
