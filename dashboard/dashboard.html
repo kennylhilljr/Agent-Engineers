@@ -2250,6 +2250,219 @@
             color: #475569;
             flex-shrink: 0;
         }
+
+        /* File Change Summary Styles (AI-164) */
+        .file-change-summary {
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            border-radius: 8px;
+            margin-bottom: 12px;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .file-change-summary.expanded .file-change-body {
+            display: block;
+        }
+
+        .file-change-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            cursor: pointer;
+            background: rgba(20, 30, 50, 0.8);
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .file-change-header:hover {
+            background: rgba(30, 45, 70, 0.9);
+        }
+
+        .file-change-agent {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #93c5fd;
+            flex-shrink: 0;
+        }
+
+        .file-change-ticket {
+            font-size: 0.73rem;
+            color: #64748b;
+            flex-shrink: 0;
+        }
+
+        .file-change-totals {
+            font-size: 0.78rem;
+            font-family: 'Courier New', Courier, monospace;
+            flex-shrink: 0;
+        }
+
+        .file-change-totals .added {
+            color: #10b981;
+        }
+
+        .file-change-totals .removed {
+            color: #ef4444;
+        }
+
+        .file-change-count {
+            font-size: 0.73rem;
+            color: #94a3b8;
+            flex-shrink: 0;
+        }
+
+        .file-change-toggle {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            flex-shrink: 0;
+            transition: transform 0.2s ease;
+        }
+
+        .file-change-summary.expanded .file-change-toggle {
+            transform: rotate(180deg);
+        }
+
+        .file-change-body {
+            display: none;
+            padding: 0 0 4px 0;
+        }
+
+        .file-tree {
+            list-style: none;
+            margin: 0;
+            padding: 6px 0;
+        }
+
+        .file-entry {
+            border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+            overflow: hidden;
+        }
+
+        .file-entry:last-child {
+            border-bottom: none;
+        }
+
+        .file-entry-header {
+            display: flex;
+            align-items: center;
+            padding: 6px 14px;
+            cursor: pointer;
+            gap: 8px;
+            font-size: 0.8rem;
+        }
+
+        .file-entry-header:hover {
+            background: rgba(30, 45, 70, 0.5);
+        }
+
+        .file-entry-status {
+            font-size: 0.9rem;
+            flex-shrink: 0;
+            width: 18px;
+            text-align: center;
+        }
+
+        .file-entry-status-created {
+            color: #10b981;
+        }
+
+        .file-entry-status-modified {
+            color: #f59e0b;
+        }
+
+        .file-entry-status-deleted {
+            color: #ef4444;
+        }
+
+        .file-entry-path {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.78rem;
+            color: #cbd5e1;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .file-entry-lines {
+            font-size: 0.72rem;
+            font-family: 'Courier New', Courier, monospace;
+            flex-shrink: 0;
+        }
+
+        .file-entry-lines .added {
+            color: #10b981;
+        }
+
+        .file-entry-lines .removed {
+            color: #ef4444;
+        }
+
+        .file-entry-arrow {
+            font-size: 0.65rem;
+            color: #475569;
+            flex-shrink: 0;
+            transition: transform 0.2s ease;
+        }
+
+        .file-entry.expanded .file-entry-arrow {
+            transform: rotate(180deg);
+        }
+
+        .file-diff {
+            display: none;
+            max-height: 320px;
+            overflow-y: auto;
+            border-top: 1px solid rgba(148, 163, 184, 0.1);
+            background: rgba(8, 12, 24, 0.9);
+        }
+
+        .file-entry.expanded .file-diff {
+            display: block;
+        }
+
+        .file-diff pre {
+            margin: 0;
+            padding: 8px 14px;
+            font-size: 0.76rem;
+            line-height: 1.55;
+            font-family: 'Courier New', Courier, monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .diff-line-add {
+            display: block;
+            background: rgba(16, 185, 129, 0.12);
+            color: #6ee7b7;
+        }
+
+        .diff-line-del {
+            display: block;
+            background: rgba(239, 68, 68, 0.12);
+            color: #fca5a5;
+            text-decoration: line-through;
+        }
+
+        .diff-line-context {
+            display: block;
+            color: #94a3b8;
+        }
+
+        .diff-line-hunk {
+            display: block;
+            color: #60a5fa;
+            font-style: italic;
+        }
+
+        .diff-no-content {
+            padding: 10px 14px;
+            font-size: 0.75rem;
+            color: #475569;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -3652,6 +3865,9 @@
                         } else if (message.type === 'code_stream') {
                             console.log('Received code_stream event via WebSocket', message);
                             renderCodeStreamBlock(message);
+                        } else if (message.type === 'file_changes') {
+                            console.log('Received file_changes event via WebSocket', message);
+                            renderFileChangeSummary(message);
                         }
                     } catch (error) {
                         console.error('Error processing WebSocket message:', error);
@@ -3894,6 +4110,103 @@
                     }, 2000);
                 }
             });
+        }
+
+        // Render a file change summary card in the activity feed (AI-164)
+        function renderFileChangeSummary(message) {
+            const container = document.getElementById('activity-feed') || document.body;
+
+            const agent = message.agent || 'unknown';
+            const ticket = message.ticket || '';
+            const sessionId = message.session_id || ('fc-' + Date.now());
+            const files = Array.isArray(message.files) ? message.files : [];
+            const totalAdded = message.total_added || 0;
+            const totalRemoved = message.total_removed || 0;
+            const fileCount = files.length;
+
+            // Status icon helper
+            function statusIcon(status) {
+                if (status === 'created') return '<span class="file-entry-status file-entry-status-created" title="Created">&#9679;</span>';
+                if (status === 'deleted') return '<span class="file-entry-status file-entry-status-deleted" title="Deleted">&#9679;</span>';
+                return '<span class="file-entry-status file-entry-status-modified" title="Modified">&#9679;</span>';
+            }
+
+            // Render diff content with line highlighting
+            function renderDiff(diff) {
+                if (!diff) return '<span class="diff-no-content">No diff available</span>';
+                const lines = diff.split('\n');
+                const spans = lines.map(line => {
+                    const escaped = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    if (line.startsWith('+') && !line.startsWith('+++')) {
+                        return '<span class="diff-line-add">' + escaped + '</span>';
+                    } else if (line.startsWith('-') && !line.startsWith('---')) {
+                        return '<span class="diff-line-del">' + escaped + '</span>';
+                    } else if (line.startsWith('@@')) {
+                        return '<span class="diff-line-hunk">' + escaped + '</span>';
+                    } else {
+                        return '<span class="diff-line-context">' + escaped + '</span>';
+                    }
+                });
+                return spans.join('');
+            }
+
+            // Build file entry HTML
+            const fileEntries = files.map((f, idx) => {
+                const filePath = (f.path || 'unknown').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const status = f.status || 'modified';
+                const linesAdded = f.lines_added || 0;
+                const linesRemoved = f.lines_removed || 0;
+                const entryId = 'fe-' + sessionId.replace(/[^a-zA-Z0-9]/g, '-') + '-' + idx;
+                const diffContent = renderDiff(f.diff || '');
+                const hasDiff = !!(f.diff);
+
+                return `
+                    <li class="file-entry" id="${entryId}">
+                        <div class="file-entry-header" onclick="(function(el){el.closest('.file-entry').classList.toggle('expanded');})(this)">
+                            ${statusIcon(status)}
+                            <span class="file-entry-path" title="${filePath}">${filePath}</span>
+                            <span class="file-entry-lines">
+                                <span class="added">+${linesAdded}</span>
+                                <span class="removed"> -${linesRemoved}</span>
+                            </span>
+                            ${hasDiff ? '<span class="file-entry-arrow">&#9660;</span>' : ''}
+                        </div>
+                        ${hasDiff ? '<div class="file-diff"><pre>' + diffContent + '</pre></div>' : ''}
+                    </li>`;
+            }).join('');
+
+            const summaryId = 'fcs-' + sessionId.replace(/[^a-zA-Z0-9]/g, '-');
+            const block = document.createElement('div');
+            block.className = 'file-change-summary';
+            block.id = summaryId;
+
+            block.innerHTML = `
+                <div class="file-change-header" onclick="(function(el){el.closest('.file-change-summary').classList.toggle('expanded');})(this)">
+                    <span class="file-change-agent">${agent.replace(/</g, '&lt;')}</span>
+                    ${ticket ? '<span class="file-change-ticket">' + ticket.replace(/</g, '&lt;') + '</span>' : ''}
+                    <span class="file-change-count">Files changed: ${fileCount}</span>
+                    <span class="file-change-totals">
+                        <span class="added">+${totalAdded}</span>
+                        <span class="removed"> -${totalRemoved}</span>
+                        lines
+                    </span>
+                    <span class="file-change-toggle">&#9660;</span>
+                </div>
+                <div class="file-change-body">
+                    <ul class="file-tree">
+                        ${fileEntries}
+                    </ul>
+                </div>
+            `;
+
+            // Prepend to activity feed (newest first)
+            if (container.firstChild) {
+                container.insertBefore(block, container.firstChild);
+            } else {
+                container.appendChild(block);
+            }
+
+            console.log('File change summary rendered for session', sessionId, ':', fileCount, 'files');
         }
 
         // Handle metrics update from WebSocket or HTTP
