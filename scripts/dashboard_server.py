@@ -142,6 +142,7 @@ class DashboardServer:
         self.app.router.add_get('/api/metrics', self.handle_metrics)
         self.app.router.add_get('/api/agents', self.handle_agents)
         self.app.router.add_get('/api/agents/status', self.handle_agents_status)
+        self.app.router.add_get('/api/orchestrator/flow', self.handle_orchestrator_flow)
         self.app.router.add_get('/api/providers', self.handle_providers)
         self.app.router.add_get('/api/providers/status', self.handle_providers_status)
         self.app.router.add_post('/api/chat', self.handle_chat)
@@ -362,6 +363,46 @@ class DashboardServer:
                 "agents": agents,
                 "total": 13,
                 "running_count": 0,
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+            })
+
+    async def handle_orchestrator_flow(self, request: web.Request) -> web.Response:
+        """Get current orchestrator delegation flow visualization data.
+
+        Returns the pipeline steps for the current ticket being processed,
+        including agent name, task description, status, and elapsed time.
+        Falls back to a default mock flow if no active metrics are available.
+        """
+        try:
+            # Try to read real flow from metrics store
+            nodes = []
+            ticket = ""
+            if self.metrics_store:
+                stored = self.metrics_store.get_current_flow() if hasattr(self.metrics_store, "get_current_flow") else {}
+                ticket = stored.get("ticket", "")
+                nodes = stored.get("nodes", [])
+
+            # Fall back to mock pipeline data when no real data available
+            if not nodes:
+                ticket = ""
+                nodes = [
+                    {"agent": "ops",     "task": "Starting ticket",         "status": "done",    "elapsed_s": 2},
+                    {"agent": "coding",  "task": "Implementing feature",     "status": "pending", "elapsed_s": None},
+                    {"agent": "github",  "task": "Commit + PR",              "status": "pending", "elapsed_s": None},
+                    {"agent": "ops",     "task": "Transition to Review",     "status": "pending", "elapsed_s": None},
+                    {"agent": "pr_reviewer_fast", "task": "Review PR",       "status": "pending", "elapsed_s": None},
+                    {"agent": "ops",     "task": "Mark Done + Notify",       "status": "pending", "elapsed_s": None},
+                ]
+
+            return web.json_response({
+                "ticket": ticket,
+                "nodes": nodes,
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+            })
+        except Exception:
+            return web.json_response({
+                "ticket": "",
+                "nodes": [],
                 "timestamp": datetime.utcnow().isoformat() + "Z",
             })
 
