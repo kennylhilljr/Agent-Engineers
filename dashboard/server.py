@@ -87,6 +87,12 @@ _REASONING_HISTORY_MAX = 100
 DECISION_TYPES = ['agent_selection', 'complexity', 'verification', 'pr_routing', 'error_recovery', 'other']
 _DECISION_LOG_MAX = 500  # larger than reasoning since decisions are compact
 
+# File changes constants (AI-164)
+FILE_CHANGES_MAX = 100  # circular buffer limit
+
+# Valid file change statuses (AI-164)
+FILE_CHANGE_STATUSES = ('created', 'modified', 'deleted')
+
 # Language detection map (AI-163)
 LANGUAGE_MAP = {
     '.py': 'python', '.js': 'javascript', '.ts': 'typescript',
@@ -319,6 +325,9 @@ class DashboardServer:
         # In-memory code streams store (AI-163): {stream_id: {file_path, language, agent, chunks, started_at, completed}}
         self._code_streams: dict = {}
 
+        # In-memory file changes store (AI-164): list of file change summaries, newest last
+        self._file_changes: list = []
+
         # Create app with middlewares
         self.app = web.Application(middlewares=[error_middleware, cors_middleware])
 
@@ -366,6 +375,11 @@ class DashboardServer:
         self.app.router.add_get('/api/code-streams', self.get_code_streams)
         self.app.router.add_get('/api/code-streams/{stream_id}', self.get_code_stream_by_id)
 
+        # File change summary endpoints (AI-164)
+        self.app.router.add_post('/api/file-changes', self.post_file_changes)
+        self.app.router.add_get('/api/file-changes', self.get_file_changes)
+        self.app.router.add_get('/api/file-changes/{session_id}', self.get_file_changes_by_session)
+
         # OPTIONS for CORS preflight
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/agents/{agent_name}', self.handle_options)
@@ -380,6 +394,8 @@ class DashboardServer:
         self.app.router.add_route('OPTIONS', '/api/code-stream', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/code-streams', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/code-streams/{stream_id}', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/file-changes', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/file-changes/{session_id}', self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
         """Handle CORS preflight OPTIONS requests."""
@@ -1089,6 +1105,140 @@ class DashboardServer:
                 content_type='application/json',
             )
         return web.json_response(stream)
+
+    async def post_file_changes(self, request: Request) -> Response:
+        """POST /api/file-changes — store a file change summary and broadcast via WebSocket.
+
+        Expected JSON body::
+
+            {
+                "agent":       "coding",
+                "ticket":      "AI-42",       # optional
+                "session_id":  "uuid",        # optional; auto-generated if not provided
+                "files": [
+                    {
+                        "path":          "dashboard/server.py",
+                        "status":        "modified",  # created|modified|deleted
+                        "lines_added":   47,
+                        "lines_removed": 3,
+                        "diff":          "--- a/...\n+++ b/...\n..."  # optional
+                    }
+                ],
+                "total_added":   47,          # optional; computed from files if absent
+                "total_removed": 3,           # optional; computed from files if absent
+                "timestamp":     "..."        # optional; auto-set if not provided
+            }
+
+        Returns:
+            JSON with the stored record (HTTP 201), or 400 for malformed requests.
+
+        WebSocket broadcast::
+
+            {type: "file_changes", agent, ticket, session_id, files,
+             total_added, total_removed, timestamp}
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        files = body.get('files', None)
+        if files is None or not isinstance(files, list) or len(files) == 0:
+            return web.json_response({'error': 'Missing required field: files (must be a non-empty list)'}, status=400)
+
+        agent = body.get('agent', '')
+        ticket = body.get('ticket', '')
+        session_id = body.get('session_id', '') or str(uuid4())
+        timestamp = body.get('timestamp', '') or (datetime.utcnow().isoformat() + 'Z')
+
+        # Normalise file entries and validate statuses
+        normalised_files = []
+        for f in files:
+            status = f.get('status', 'modified')
+            if status not in FILE_CHANGE_STATUSES:
+                status = 'modified'
+            normalised_files.append({
+                'path': f.get('path', ''),
+                'status': status,
+                'lines_added': int(f.get('lines_added', 0)),
+                'lines_removed': int(f.get('lines_removed', 0)),
+                'diff': f.get('diff', ''),
+            })
+
+        # Compute totals (prefer explicit values from body, else sum from files)
+        total_added = body.get('total_added', None)
+        total_removed = body.get('total_removed', None)
+        if total_added is None:
+            total_added = sum(f['lines_added'] for f in normalised_files)
+        if total_removed is None:
+            total_removed = sum(f['lines_removed'] for f in normalised_files)
+
+        record = {
+            'session_id': session_id,
+            'agent': agent,
+            'ticket': ticket,
+            'files': normalised_files,
+            'total_added': int(total_added),
+            'total_removed': int(total_removed),
+            'timestamp': timestamp,
+        }
+
+        # Append to circular buffer
+        self._file_changes.append(record)
+        if len(self._file_changes) > FILE_CHANGES_MAX:
+            del self._file_changes[0]
+
+        # Broadcast to WebSocket clients
+        ws_message = {
+            'type': 'file_changes',
+            'agent': agent,
+            'ticket': ticket,
+            'session_id': session_id,
+            'files': normalised_files,
+            'total_added': record['total_added'],
+            'total_removed': record['total_removed'],
+            'timestamp': timestamp,
+        }
+        await self.broadcast_to_websockets(ws_message)
+
+        logger.info(
+            f"File changes stored: agent={agent!r}, ticket={ticket!r}, "
+            f"session_id={session_id!r}, files={len(normalised_files)}, "
+            f"+{record['total_added']}/-{record['total_removed']}"
+        )
+
+        return web.json_response(record, status=201)
+
+    async def get_file_changes(self, request: Request) -> Response:
+        """GET /api/file-changes — return recent file change summaries (last 50, newest first).
+
+        Returns:
+            JSON ``{"summaries": [...], "total": N}``
+        """
+        # Return last 50, newest first (reverse of storage order)
+        recent = list(reversed(self._file_changes[-50:]))
+        return web.json_response({
+            'summaries': recent,
+            'total': len(recent),
+        })
+
+    async def get_file_changes_by_session(self, request: Request) -> Response:
+        """GET /api/file-changes/{session_id} — return a specific summary by session_id.
+
+        Path Parameters:
+            session_id: UUID of the file change session
+
+        Returns:
+            JSON file change summary record, or 404 if not found.
+        """
+        session_id = request.match_info['session_id']
+        for record in reversed(self._file_changes):
+            if record['session_id'] == session_id:
+                return web.json_response(record)
+        raise web.HTTPNotFound(
+            text=json.dumps({'error': 'File change summary not found', 'session_id': session_id}),
+            content_type='application/json',
+        )
 
     async def websocket_handler(self, request: Request) -> WebSocketResponse:
         """WebSocket endpoint for real-time metrics streaming.
