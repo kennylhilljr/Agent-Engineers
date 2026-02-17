@@ -334,6 +334,18 @@ class DashboardServer:
         self.app.router.add_route('OPTIONS', '/api/integrations/linear/issue/{issue_key}', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/integrations/linear/query', self.handle_options)
 
+        # Slack Integration endpoints (AI-76)
+        self.app.router.add_get('/api/integrations/slack/status', self.get_slack_status)
+        self.app.router.add_get('/api/integrations/slack/channels', self.get_slack_channels)
+        self.app.router.add_post('/api/integrations/slack/send', self.post_slack_send)
+        self.app.router.add_get('/api/integrations/slack/messages', self.get_slack_messages)
+        self.app.router.add_post('/api/integrations/slack/react', self.post_slack_react)
+        self.app.router.add_route('OPTIONS', '/api/integrations/slack/status', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/integrations/slack/channels', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/integrations/slack/send', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/integrations/slack/messages', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/integrations/slack/react', self.handle_options)
+
         # OPTIONS for CORS preflight
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/agents/{agent_name}', self.handle_options)
@@ -1767,6 +1779,152 @@ class DashboardServer:
             "status": "ok",
             "tool_name": f"linear_{action}",
             **result,
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        })
+
+    # ------------------------------------------------------------------
+    # Slack Integration (AI-76) — mock/stub endpoints
+    # ------------------------------------------------------------------
+
+    _SLACK_MOCK_CHANNELS = [
+        {"id": "C001", "name": "#ai-cli-macz", "recent_messages": 12},
+        {"id": "C002", "name": "#general", "recent_messages": 47},
+        {"id": "C003", "name": "#random", "recent_messages": 8},
+    ]
+
+    _SLACK_MOCK_MESSAGES = [
+        {"id": "MSG001", "channel": "#general", "user": "alice", "text": "Good morning team!", "ts": "1708156800.000100"},
+        {"id": "MSG002", "channel": "#general", "user": "bob", "text": "Standup in 5 minutes", "ts": "1708157400.000200"},
+        {"id": "MSG003", "channel": "#general", "user": "carol", "text": "Deploying to staging now", "ts": "1708158000.000300"},
+        {"id": "MSG004", "channel": "#general", "user": "dave", "text": "All tests passing on main", "ts": "1708158600.000400"},
+        {"id": "MSG005", "channel": "#general", "user": "alice", "text": "Great work everyone!", "ts": "1708159200.000500"},
+    ]
+
+    async def get_slack_status(self, request: Request) -> Response:
+        """GET /api/integrations/slack/status - Check Slack connectivity.
+
+        Returns stub connectivity status for the Slack MCP integration.
+
+        Returns:
+            JSON response with connection status and channel list
+        """
+        logger.info("GET /api/integrations/slack/status")
+        return web.json_response({
+            "connected": True,
+            "tool_count": 8,
+            "channels": ["#ai-cli-macz", "#general", "#random"],
+            "service": "Slack",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        })
+
+    async def get_slack_channels(self, request: Request) -> Response:
+        """GET /api/integrations/slack/channels - List channels with recent message counts.
+
+        Returns:
+            JSON response with list of channels
+        """
+        logger.info("GET /api/integrations/slack/channels")
+        return web.json_response({
+            "channels": self._SLACK_MOCK_CHANNELS,
+            "count": len(self._SLACK_MOCK_CHANNELS),
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        })
+
+    async def post_slack_send(self, request: Request) -> Response:
+        """POST /api/integrations/slack/send - Send a message to a channel.
+
+        Request body:
+            {"channel": "#general", "message": "Hello world"}
+
+        Returns:
+            JSON response with success and mock message_id
+        """
+        logger.info("POST /api/integrations/slack/send")
+        try:
+            data = await request.json()
+        except (json.JSONDecodeError, ValueError):
+            return web.json_response({"error": "Invalid JSON"}, status=400)
+
+        if not isinstance(data, dict):
+            return web.json_response({"error": "Body must be a JSON object"}, status=400)
+
+        channel = data.get("channel", "").strip()
+        message = data.get("message", "").strip()
+
+        if not channel:
+            return web.json_response({"error": "Missing required field: channel"}, status=400)
+        if not message:
+            return web.json_response({"error": "Missing required field: message"}, status=400)
+
+        import time
+        mock_message_id = f"MSG{int(time.time())}"
+        logger.info(f"Slack send mock: channel={channel}, message_id={mock_message_id}")
+        return web.json_response({
+            "success": True,
+            "message_id": mock_message_id,
+            "channel": channel,
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        })
+
+    async def get_slack_messages(self, request: Request) -> Response:
+        """GET /api/integrations/slack/messages - Get last 5 messages from a channel.
+
+        Query Parameters:
+            channel: Channel name (e.g. #general)
+
+        Returns:
+            JSON response with list of messages
+        """
+        channel = request.query.get("channel", "").strip()
+        logger.info(f"GET /api/integrations/slack/messages channel={channel!r}")
+
+        messages = self._SLACK_MOCK_MESSAGES
+        if channel:
+            # Normalise channel name for matching
+            norm = channel.lstrip("#").lower()
+            messages = [m for m in messages if m["channel"].lstrip("#").lower() == norm]
+
+        return web.json_response({
+            "messages": messages[:5],
+            "count": len(messages[:5]),
+            "channel": channel or "all",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        })
+
+    async def post_slack_react(self, request: Request) -> Response:
+        """POST /api/integrations/slack/react - Add an emoji reaction to a message.
+
+        Request body:
+            {"channel": "#general", "message_id": "MSG001", "emoji": "thumbsup"}
+
+        Returns:
+            JSON response with success
+        """
+        logger.info("POST /api/integrations/slack/react")
+        try:
+            data = await request.json()
+        except (json.JSONDecodeError, ValueError):
+            return web.json_response({"error": "Invalid JSON"}, status=400)
+
+        if not isinstance(data, dict):
+            return web.json_response({"error": "Body must be a JSON object"}, status=400)
+
+        channel = data.get("channel", "").strip()
+        message_id = data.get("message_id", "").strip()
+        emoji = data.get("emoji", "").strip()
+
+        if not channel or not message_id or not emoji:
+            return web.json_response(
+                {"error": "Missing required fields: channel, message_id, emoji"},
+                status=400
+            )
+
+        logger.info(f"Slack react mock: channel={channel}, message_id={message_id}, emoji={emoji}")
+        return web.json_response({
+            "success": True,
+            "channel": channel,
+            "message_id": message_id,
+            "emoji": emoji,
             "timestamp": datetime.utcnow().isoformat() + "Z"
         })
 

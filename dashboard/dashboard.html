@@ -2072,6 +2072,11 @@
         .tool-call-detail-row { margin-top: 6px; font-size: 12px; color: #94a3b8; font-family: monospace; white-space: pre-wrap; word-break: break-word; }
         .tool-call-detail-row strong { color: #5eead4; font-family: sans-serif; }
         .tool-call-name-badge { background: rgba(13,148,136,0.25); color: #5eead4; font-size: 11px; padding: 2px 7px; border-radius: 3px; font-family: monospace; }
+        /* AI-78: Tool Call Transparency enhancements */
+        .tool-call-block.error { border-left-color: #ef4444; background: rgba(239,68,68,0.08); }
+        .tool-call-duration { font-size: 11px; color: #888; margin-left: 8px; }
+        .tool-call-status.success { color: #10b981; }
+        .tool-call-status.error { color: #ef4444; }
         .decision-history { border-top: 1px solid #333; padding: 12px; margin-top: 8px; }
         .decision-history-title { font-size: 12px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 6px; }
         .decision-history-list { max-height: 200px; overflow-y: auto; }
@@ -4393,10 +4398,14 @@
                 this.showLoadingIndicator();
                 setTimeout(async () => {
                     this.removeLoadingIndicator();
-                    // Check for Linear intent first (AI-75)
-                    const linearHandled = await this.handleLinearIntent(text, provider, model);
-                    if (!linearHandled) {
-                        this.addMessage(this.generateAIResponse(text, provider, model, contextPrefix), 'ai', provider, model);
+                    // Check for Slack intent first (AI-76)
+                    const slackHandled = await this.handleSlackIntent(text, provider, model);
+                    if (!slackHandled) {
+                        // Check for Linear intent (AI-75)
+                        const linearHandled = await this.handleLinearIntent(text, provider, model);
+                        if (!linearHandled) {
+                            this.addMessage(this.generateAIResponse(text, provider, model, contextPrefix), 'ai', provider, model);
+                        }
                     }
                 }, 800);
             }
@@ -4597,6 +4606,148 @@
                 }
 
                 return false;
+            }
+
+            /**
+             * AI-76: Handle Slack integration intents in user messages.
+             * Returns true if a Slack tool call was handled, false otherwise.
+             * Detects send/read/react/status patterns and calls the Slack API.
+             */
+            async handleSlackIntent(message, provider, model) {
+                const lower = message.toLowerCase();
+
+                // Pattern: "send to #channel" / "message #channel" / "post to #channel"
+                if (
+                    (lower.includes('send') || lower.includes('post') || lower.includes('message'))
+                    && message.match(/#[\w-]+/)
+                    && !lower.includes('read') && !lower.includes('react') && !lower.includes('slack status')
+                ) {
+                    const channelMatch = message.match(/#([\w-]+)/);
+                    const channel = channelMatch ? `#${channelMatch[1]}` : '#general';
+                    let msgText = message.replace(/(?:send|post|message)\s+(?:to\s+)?#[\w-]+/i, '').trim();
+                    if (!msgText) msgText = 'Project update sent successfully';
+                    const toolName = 'slack_send_message';
+                    const input = { channel, message: msgText };
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/api/integrations/slack/send`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(input)
+                        });
+                        const data = await response.json();
+                        const resultStr = `Send to ${channel}: ${data.success ? 'Project update sent successfully' : 'Failed'} (id: ${data.message_id || 'n/a'})`;
+                        this.renderSlackToolCall(toolName, input, resultStr);
+                        this.addMessage(`Message sent to ${channel}. Message ID: ${data.message_id || 'n/a'}`, 'ai', provider, model);
+                        return true;
+                    } catch (err) {
+                        console.error('Slack send failed:', err);
+                        return false;
+                    }
+                }
+
+                // Pattern: "read messages" / "messages from #channel" / "show messages"
+                if (lower.includes('read messages') || lower.includes('messages from') || lower.includes('show messages') || lower.includes('recent messages')) {
+                    const channelMatch = message.match(/#([\w-]+)/);
+                    const channel = channelMatch ? `#${channelMatch[1]}` : '';
+                    const toolName = 'slack_read_messages';
+                    const input = { channel: channel || 'all' };
+                    try {
+                        const url = channel
+                            ? `${API_BASE_URL}/api/integrations/slack/messages?channel=${encodeURIComponent(channel)}`
+                            : `${API_BASE_URL}/api/integrations/slack/messages`;
+                        const response = await fetch(url);
+                        const data = await response.json();
+                        const msgs = data.messages || [];
+                        const resultStr = `Found ${msgs.length} messages in ${channel || 'all channels'}`;
+                        this.renderSlackToolCall(toolName, input, resultStr);
+                        const lines = msgs.map(m => `• [${m.user}]: ${m.text}`).join('\n');
+                        this.addMessage(`Recent messages from ${channel || 'Slack'}:\n\n${lines || 'No messages found.'}`, 'ai', provider, model);
+                        return true;
+                    } catch (err) {
+                        console.error('Slack read messages failed:', err);
+                        return false;
+                    }
+                }
+
+                // Pattern: "react to" / "add reaction" / "emoji reaction"
+                if (lower.includes('react to') || lower.includes('add reaction') || lower.includes('emoji reaction')) {
+                    const channelMatch = message.match(/#([\w-]+)/);
+                    const channel = channelMatch ? `#${channelMatch[1]}` : '#general';
+                    const emojiMatch = message.match(/:([\w+\-]+):/) || message.match(/with\s+(\w+)/i);
+                    const emoji = emojiMatch ? emojiMatch[1] : 'thumbsup';
+                    const toolName = 'slack_add_reaction';
+                    const input = { channel, message_id: 'MSG001', emoji };
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/api/integrations/slack/react`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(input)
+                        });
+                        const data = await response.json();
+                        const resultStr = `Reaction :${emoji}: added to message in ${channel}`;
+                        this.renderSlackToolCall(toolName, input, resultStr);
+                        this.addMessage(`Added :${emoji}: reaction to the message in ${channel}.`, 'ai', provider, model);
+                        return true;
+                    } catch (err) {
+                        console.error('Slack react failed:', err);
+                        return false;
+                    }
+                }
+
+                // Pattern: "slack status" / "slack connected" / "slack integration"
+                if (lower.includes('slack status') || lower.includes('slack connected') || lower.includes('slack integration')) {
+                    const toolName = 'slack_status';
+                    const input = {};
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/api/integrations/slack/status`);
+                        const data = await response.json();
+                        const resultStr = `connected: ${data.connected}, tool_count: ${data.tool_count}, channels: ${(data.channels || []).join(', ')}`;
+                        this.renderSlackToolCall(toolName, input, resultStr);
+                        this.addMessage(`Slack integration status: Connected with ${data.tool_count} tools. Channels: ${(data.channels || []).join(', ')}`, 'ai', provider, model);
+                        return true;
+                    } catch (err) {
+                        console.error('Slack status check failed:', err);
+                        return false;
+                    }
+                }
+
+                return false;
+            }
+
+            /**
+             * AI-76: Render a Slack tool call block in the chat.
+             * Uses the same teal block pattern as renderToolCall (AI-75).
+             */
+            renderSlackToolCall(toolName, input, result) {
+                const blockId = `slack-tool-call-${Date.now()}`;
+                const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+
+                const inputStr = typeof input === 'object' ? JSON.stringify(input, null, 2) : String(input);
+                const resultStr = typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result);
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'chat-message system';
+                wrapper.setAttribute('data-testid', 'tool-call-message');
+
+                wrapper.innerHTML = `
+                    <div class="chat-message-content tool-call-block" data-testid="tool-call-block" style="max-width:90%;">
+                        <div class="tool-call-header" data-testid="tool-call-header" onclick="this.parentElement.querySelector('.tool-call-body').classList.toggle('hidden'); this.querySelector('.tool-call-toggle').classList.toggle('open');">
+                            <span style="font-size:1.1rem;">&#128172;</span>
+                            <strong style="color:#5eead4; font-size:13px;">Slack Tool:</strong>
+                            <span class="tool-call-name-badge" data-testid="tool-call-name">${this.escapeHtml(toolName)}</span>
+                            <span style="flex:1;"></span>
+                            <span class="tool-call-toggle" data-testid="tool-call-toggle">&#9654;</span>
+                        </div>
+                        <div class="tool-call-body hidden" data-testid="tool-call-body" id="${blockId}">
+                            <div class="tool-call-detail-row"><strong>Input:</strong><br>${this.escapeHtml(inputStr)}</div>
+                            <div class="tool-call-detail-row" style="margin-top:8px;"><strong>Result:</strong><br>${this.escapeHtml(resultStr)}</div>
+                        </div>
+                        <div class="chat-timestamp">${timeStr}</div>
+                    </div>
+                `;
+
+                this.messagesContainer.appendChild(wrapper);
+                this.scrollToBottom();
             }
 
             showLoadingIndicator() {
@@ -4881,6 +5032,146 @@
                 }
 
                 return false;
+            }
+
+            /**
+             * AI-76: Handle Slack integration intents in user messages.
+             * Returns true if a Slack tool call was handled, false otherwise.
+             */
+            async handleSlackIntent(message, provider, model) {
+                const lower = message.toLowerCase();
+
+                // Pattern: "send to #channel" / "message #channel" / "post to #channel"
+                if (
+                    (lower.includes('send') || lower.includes('post') || lower.includes('message'))
+                    && message.match(/#[\w-]+/)
+                    && !lower.includes('read') && !lower.includes('react') && !lower.includes('slack status')
+                ) {
+                    const channelMatch = message.match(/#([\w-]+)/);
+                    const channel = channelMatch ? `#${channelMatch[1]}` : '#general';
+                    let msgText = message.replace(/(?:send|post|message)\s+(?:to\s+)?#[\w-]+/i, '').trim();
+                    if (!msgText) msgText = 'Project update sent successfully';
+                    const toolName = 'slack_send_message';
+                    const input = { channel, message: msgText };
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/api/integrations/slack/send`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(input)
+                        });
+                        const data = await response.json();
+                        const resultStr = `Send to ${channel}: ${data.success ? 'Project update sent successfully' : 'Failed'} (id: ${data.message_id || 'n/a'})`;
+                        this.renderSlackToolCall(toolName, input, resultStr);
+                        this.addMessage(`Message sent to ${channel}. Message ID: ${data.message_id || 'n/a'}`, 'ai', provider, model);
+                        return true;
+                    } catch (err) {
+                        console.error('Slack send failed:', err);
+                        return false;
+                    }
+                }
+
+                // Pattern: "read messages" / "messages from #channel" / "show messages"
+                if (lower.includes('read messages') || lower.includes('messages from') || lower.includes('show messages') || lower.includes('recent messages')) {
+                    const channelMatch = message.match(/#([\w-]+)/);
+                    const channel = channelMatch ? `#${channelMatch[1]}` : '';
+                    const toolName = 'slack_read_messages';
+                    const input = { channel: channel || 'all' };
+                    try {
+                        const url = channel
+                            ? `${API_BASE_URL}/api/integrations/slack/messages?channel=${encodeURIComponent(channel)}`
+                            : `${API_BASE_URL}/api/integrations/slack/messages`;
+                        const response = await fetch(url);
+                        const data = await response.json();
+                        const msgs = data.messages || [];
+                        const resultStr = `Found ${msgs.length} messages in ${channel || 'all channels'}`;
+                        this.renderSlackToolCall(toolName, input, resultStr);
+                        const lines = msgs.map(m => `• [${m.user}]: ${m.text}`).join('\n');
+                        this.addMessage(`Recent messages from ${channel || 'Slack'}:\n\n${lines || 'No messages found.'}`, 'ai', provider, model);
+                        return true;
+                    } catch (err) {
+                        console.error('Slack read messages failed:', err);
+                        return false;
+                    }
+                }
+
+                // Pattern: "react to" / "add reaction" / "emoji reaction"
+                if (lower.includes('react to') || lower.includes('add reaction') || lower.includes('emoji reaction')) {
+                    const channelMatch = message.match(/#([\w-]+)/);
+                    const channel = channelMatch ? `#${channelMatch[1]}` : '#general';
+                    const emojiMatch = message.match(/:([\w+\-]+):/) || message.match(/with\s+(\w+)/i);
+                    const emoji = emojiMatch ? emojiMatch[1] : 'thumbsup';
+                    const toolName = 'slack_add_reaction';
+                    const input = { channel, message_id: 'MSG001', emoji };
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/api/integrations/slack/react`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(input)
+                        });
+                        const data = await response.json();
+                        const resultStr = `Reaction :${emoji}: added to message in ${channel}`;
+                        this.renderSlackToolCall(toolName, input, resultStr);
+                        this.addMessage(`Added :${emoji}: reaction to the message in ${channel}.`, 'ai', provider, model);
+                        return true;
+                    } catch (err) {
+                        console.error('Slack react failed:', err);
+                        return false;
+                    }
+                }
+
+                // Pattern: "slack status" / "slack connected" / "slack integration"
+                if (lower.includes('slack status') || lower.includes('slack connected') || lower.includes('slack integration')) {
+                    const toolName = 'slack_status';
+                    const input = {};
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/api/integrations/slack/status`);
+                        const data = await response.json();
+                        const resultStr = `connected: ${data.connected}, tool_count: ${data.tool_count}, channels: ${(data.channels || []).join(', ')}`;
+                        this.renderSlackToolCall(toolName, input, resultStr);
+                        this.addMessage(`Slack integration status: Connected with ${data.tool_count} tools. Channels: ${(data.channels || []).join(', ')}`, 'ai', provider, model);
+                        return true;
+                    } catch (err) {
+                        console.error('Slack status check failed:', err);
+                        return false;
+                    }
+                }
+
+                return false;
+            }
+
+            /**
+             * AI-76: Render a Slack tool call block in the chat.
+             */
+            renderSlackToolCall(toolName, input, result) {
+                const blockId = `slack-tool-call-${Date.now()}`;
+                const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+
+                const inputStr = typeof input === 'object' ? JSON.stringify(input, null, 2) : String(input);
+                const resultStr = typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result);
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'chat-message system';
+                wrapper.setAttribute('data-testid', 'tool-call-message');
+
+                wrapper.innerHTML = `
+                    <div class="chat-message-content tool-call-block" data-testid="tool-call-block" style="max-width:90%;">
+                        <div class="tool-call-header" data-testid="tool-call-header" onclick="this.parentElement.querySelector('.tool-call-body').classList.toggle('hidden'); this.querySelector('.tool-call-toggle').classList.toggle('open');">
+                            <span style="font-size:1.1rem;">&#128172;</span>
+                            <strong style="color:#5eead4; font-size:13px;">Slack Tool:</strong>
+                            <span class="tool-call-name-badge" data-testid="tool-call-name">${this.escapeHtml(toolName)}</span>
+                            <span style="flex:1;"></span>
+                            <span class="tool-call-toggle" data-testid="tool-call-toggle">&#9654;</span>
+                        </div>
+                        <div class="tool-call-body hidden" data-testid="tool-call-body" id="${blockId}">
+                            <div class="tool-call-detail-row"><strong>Input:</strong><br>${this.escapeHtml(inputStr)}</div>
+                            <div class="tool-call-detail-row" style="margin-top:8px;"><strong>Result:</strong><br>${this.escapeHtml(resultStr)}</div>
+                        </div>
+                        <div class="chat-timestamp">${timeStr}</div>
+                    </div>
+                `;
+
+                this.messagesContainer.appendChild(wrapper);
+                this.scrollToBottom();
             }
 
             getMessages() {
