@@ -16,6 +16,11 @@ Intent Types:
     run_task      -- User wants to run a task (tests, build, deploy, etc.)
     get_status    -- User is asking about agent / system status
     general_chat  -- No actionable agent intent detected (fallback)
+
+AI-174 (REQ-TECH-009): Provider Bridge Integration
+    Messages routed to non-Claude providers (chatgpt, gemini, groq, kimi,
+    windsurf) are forwarded through dashboard.provider_bridge.  Claude
+    messages go through ClaudeBridge.  Graceful fallback if unavailable.
 """
 
 import asyncio
@@ -25,6 +30,31 @@ from datetime import datetime
 from typing import Any, AsyncIterator, Dict, Optional
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Provider bridge integration (AI-174 / REQ-TECH-009)
+# ---------------------------------------------------------------------------
+# Lazy import so ChatBridge still works even if provider_bridge has import
+# issues (graceful degradation).
+
+_provider_registry = None
+
+
+def _get_provider_registry():
+    """Lazily initialise and cache the BridgeRegistry singleton."""
+    global _provider_registry
+    if _provider_registry is None:
+        try:
+            from dashboard.provider_bridge import BridgeRegistry
+            _provider_registry = BridgeRegistry()
+        except Exception as exc:
+            logger.warning("provider_bridge unavailable: %s", exc)
+            _provider_registry = None
+    return _provider_registry
+
+
+# Providers handled by provider_bridge rather than the generic agent loop
+_PROVIDER_BRIDGE_NAMES = frozenset({"claude", "chatgpt", "gemini", "groq", "kimi", "windsurf"})
 
 
 # ---------------------------------------------------------------------------
@@ -532,9 +562,22 @@ class ChatBridge:
         agent: str,
         session_id: Optional[str],
     ) -> AsyncIterator[Dict[str, Any]]:
-        """Handle ask_agent intents by delegating to the specified agent."""
+        """Handle ask_agent intents by delegating to the specified agent.
+
+        For AI provider agents (claude, chatgpt, gemini, groq, kimi, windsurf)
+        the message is forwarded through the ProviderBridge (AI-174).
+        For other agents the existing delegation simulation is used.
+        """
         task = intent.get("task", "")
         await asyncio.sleep(0)
+
+        # --- AI-174: provider bridge routing ---
+        if agent in _PROVIDER_BRIDGE_NAMES:
+            async for chunk in self._handle_provider_bridge(agent, task, session_id):
+                yield chunk
+            return
+
+        # --- original delegation path ---
         yield self._chunk(
             "agent_response",
             f"Delegating to {agent} agent: {task}",
@@ -557,6 +600,79 @@ class ChatBridge:
                 "session_id": session_id,
             },
         )
+
+    async def _handle_provider_bridge(
+        self,
+        provider: str,
+        message: str,
+        session_id: Optional[str],
+    ) -> AsyncIterator[Dict[str, Any]]:
+        """Forward a message to the specified AI provider bridge (AI-174).
+
+        Yields routing + response chunks.  Falls back gracefully if the
+        bridge registry is unavailable or the provider is not configured.
+        """
+        yield self._chunk(
+            "routing",
+            f"Routing to {provider} via provider bridge.",
+            {"agent": provider, "intent_type": INTENT_ASK_AGENT, "session_id": session_id},
+        )
+        await asyncio.sleep(0)
+
+        registry = _get_provider_registry()
+        if registry is None:
+            yield self._chunk(
+                "agent_response",
+                f"[{provider.upper()}] Provider bridge unavailable. Echo: {message}",
+                {
+                    "agent": provider,
+                    "session_id": session_id,
+                    "delegation_status": "fallback",
+                    "bridge_available": False,
+                },
+            )
+            return
+
+        try:
+            bridge = registry.get(provider)
+        except KeyError:
+            yield self._chunk(
+                "agent_response",
+                f"[{provider.upper()}] Unknown provider; cannot route message.",
+                {
+                    "agent": provider,
+                    "session_id": session_id,
+                    "delegation_status": "error",
+                    "bridge_available": False,
+                },
+            )
+            return
+
+        try:
+            response_text = await bridge.send_message_async(message)
+            yield self._chunk(
+                "agent_response",
+                response_text,
+                {
+                    "agent": provider,
+                    "session_id": session_id,
+                    "delegation_status": "completed",
+                    "bridge_available": bridge.is_available(),
+                    "provider": provider,
+                },
+            )
+        except Exception as exc:
+            logger.exception("Provider bridge error for %s: %s", provider, exc)
+            yield self._chunk(
+                "error",
+                f"[{provider.upper()}] Bridge error: {exc}",
+                {
+                    "agent": provider,
+                    "session_id": session_id,
+                    "delegation_status": "error",
+                    "error_code": "BRIDGE_ERROR",
+                },
+            )
 
     async def _handle_general(
         self, message: str, session_id: Optional[str]

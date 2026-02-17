@@ -58,6 +58,14 @@ _worktree_chat_bridge_path = _WORKTREE_ROOT / "dashboard" / "chat_bridge.py"
 if _worktree_chat_bridge_path.exists():
     _load_module_from_file("dashboard.chat_bridge", _worktree_chat_bridge_path)
 
+# 4b-2. Load dashboard.provider_bridge from the worktree (AI-174 / REQ-TECH-009)
+_worktree_provider_bridge_path = _WORKTREE_ROOT / "dashboard" / "provider_bridge.py"
+if _worktree_provider_bridge_path.exists():
+    try:
+        _load_module_from_file("dashboard.provider_bridge", _worktree_provider_bridge_path)
+    except Exception:
+        pass  # graceful degradation if bridge deps missing
+
 # 4b. Override dashboard.server with the worktree's AI-161 version
 _worktree_server_path = _WORKTREE_ROOT / "dashboard" / "server.py"
 if _worktree_server_path.exists():
