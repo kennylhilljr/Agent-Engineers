@@ -94,6 +94,11 @@ REQUIREMENTS_MAX_LENGTH = 50_000  # Max length for requirements text
 chat_history: list = []  # [{"id", "type", "content", "timestamp", "provider", "model"}]
 CHAT_HISTORY_MAX = 1000
 
+# Transparency State Store (AI-131)
+# Stores orchestrator reasoning events (max 100)
+reasoning_history: list = []  # [{"agent", "decision", "complexity", "reasoning", "timestamp"}]
+REASONING_HISTORY_MAX = 100
+
 # Setup structured logging
 setup_logging(log_level=os.getenv("LOG_LEVEL", "INFO"))
 logger = get_logger(__name__)
@@ -299,6 +304,15 @@ class DashboardServer:
         self.app.router.add_post('/api/chat/history', self.post_chat_history)
         self.app.router.add_delete('/api/chat/history', self.delete_chat_history)
         self.app.router.add_route('OPTIONS', '/api/chat/history', self.handle_options)
+
+        # Transparency endpoints (AI-131)
+        self.app.router.add_post('/api/transparency/reasoning', self.post_transparency_reasoning)
+        self.app.router.add_get('/api/transparency/history', self.get_transparency_history)
+        self.app.router.add_delete('/api/transparency/history', self.delete_transparency_history)
+        self.app.router.add_post('/api/transparency/code-stream', self.post_transparency_code_stream)
+        self.app.router.add_route('OPTIONS', '/api/transparency/reasoning', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/transparency/history', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/transparency/code-stream', self.handle_options)
 
         # OPTIONS for CORS preflight
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
@@ -1295,6 +1309,145 @@ class DashboardServer:
             'cleared': count,
             'timestamp': datetime.utcnow().isoformat() + 'Z'
         })
+
+    async def post_transparency_reasoning(self, request: Request) -> Response:
+        """POST /api/transparency/reasoning - Emit a reasoning event.
+
+        Request body:
+            {agent, decision, complexity, reasoning, timestamp?}
+
+        Broadcasts event to all WebSocket clients as type "reasoning".
+
+        Returns:
+            200 OK with the stored event
+            400 Bad Request for invalid input
+        """
+        try:
+            data = await request.json()
+        except (json.JSONDecodeError, ValueError):
+            return web.json_response({'error': 'Invalid JSON'}, status=400)
+
+        if not isinstance(data, dict):
+            return web.json_response({'error': 'Body must be a JSON object'}, status=400)
+
+        # Validate required fields
+        required = ('agent', 'decision', 'complexity', 'reasoning')
+        for field in required:
+            if field not in data:
+                return web.json_response(
+                    {'error': f'Missing required field: {field}'},
+                    status=400
+                )
+
+        entry = {
+            'agent': str(data['agent']),
+            'decision': str(data['decision']),
+            'complexity': str(data['complexity']),
+            'reasoning': str(data['reasoning']),
+            'timestamp': data.get('timestamp', datetime.utcnow().isoformat() + 'Z'),
+        }
+
+        # Store in memory
+        reasoning_history.append(entry)
+        if len(reasoning_history) > REASONING_HISTORY_MAX:
+            del reasoning_history[:len(reasoning_history) - REASONING_HISTORY_MAX]
+
+        # Broadcast to WebSocket clients
+        ws_message = {
+            'type': 'reasoning',
+            'timestamp': entry['timestamp'],
+            'agent': entry['agent'],
+            'decision': entry['decision'],
+            'complexity': entry['complexity'],
+            'reasoning': entry['reasoning'],
+        }
+        disconnected = set()
+        for ws in self.websockets:
+            try:
+                await ws.send_json(ws_message)
+            except Exception as e:
+                logger.error(f"Error broadcasting reasoning to WebSocket {id(ws)}: {e}")
+                disconnected.add(ws)
+        self.websockets -= disconnected
+
+        logger.info(f"Transparency reasoning emitted from agent={entry['agent']}, complexity={entry['complexity']}")
+        return web.json_response({'status': 'ok', 'event': entry})
+
+    async def get_transparency_history(self, request: Request) -> Response:
+        """GET /api/transparency/history - Get last 100 reasoning events.
+
+        Returns:
+            200 OK with list of reasoning events
+        """
+        return web.json_response({
+            'history': reasoning_history[-REASONING_HISTORY_MAX:],
+            'count': len(reasoning_history),
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+
+    async def delete_transparency_history(self, request: Request) -> Response:
+        """DELETE /api/transparency/history - Clear all reasoning history.
+
+        Returns:
+            200 OK with confirmation
+        """
+        count = len(reasoning_history)
+        reasoning_history.clear()
+        logger.info(f"Transparency history cleared: removed {count} events")
+        return web.json_response({
+            'status': 'ok',
+            'cleared': count,
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+
+    async def post_transparency_code_stream(self, request: Request) -> Response:
+        """POST /api/transparency/code-stream - Emit a live code streaming chunk.
+
+        Request body:
+            {agent_id, chunk, file_path, done}
+
+        Broadcasts event to all WebSocket clients as type "code_stream".
+
+        Returns:
+            200 OK
+            400 Bad Request for invalid input
+        """
+        try:
+            data = await request.json()
+        except (json.JSONDecodeError, ValueError):
+            return web.json_response({'error': 'Invalid JSON'}, status=400)
+
+        if not isinstance(data, dict):
+            return web.json_response({'error': 'Body must be a JSON object'}, status=400)
+
+        required = ('agent_id', 'chunk', 'file_path')
+        for field in required:
+            if field not in data:
+                return web.json_response(
+                    {'error': f'Missing required field: {field}'},
+                    status=400
+                )
+
+        ws_message = {
+            'type': 'code_stream',
+            'agent_id': str(data['agent_id']),
+            'chunk': str(data['chunk']),
+            'file_path': str(data['file_path']),
+            'done': bool(data.get('done', False)),
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+        }
+
+        disconnected = set()
+        for ws in self.websockets:
+            try:
+                await ws.send_json(ws_message)
+            except Exception as e:
+                logger.error(f"Error broadcasting code_stream to WebSocket {id(ws)}: {e}")
+                disconnected.add(ws)
+        self.websockets -= disconnected
+
+        logger.info(f"Transparency code-stream emitted: agent={ws_message['agent_id']}, file={ws_message['file_path']}, done={ws_message['done']}")
+        return web.json_response({'status': 'ok'})
 
     def run(self):
         """Start the HTTP server with WebSocket support.
