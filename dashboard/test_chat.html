@@ -391,6 +391,93 @@
                 opacity: 1;
             }
         }
+
+        /* Tool Call Styles */
+        .chat-message.tool-call {
+            justify-content: center;
+        }
+
+        .tool-call-content {
+            max-width: 80%;
+            padding: 12px 16px;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .tool-call-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #60a5fa;
+        }
+
+        .tool-call-icon {
+            font-size: 1.1rem;
+        }
+
+        .tool-call-name {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85rem;
+        }
+
+        .tool-call-input {
+            background: rgba(15, 23, 42, 0.5);
+            padding: 8px 10px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.8rem;
+            color: #cbd5e1;
+            white-space: pre-wrap;
+            margin-top: 6px;
+        }
+
+        /* Tool Result Styles */
+        .chat-message.tool-result {
+            justify-content: center;
+        }
+
+        .tool-result-content {
+            max-width: 80%;
+            padding: 12px 16px;
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .tool-result-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #4ade80;
+        }
+
+        .tool-result-icon {
+            font-size: 1.1rem;
+        }
+
+        .tool-result-label {
+            font-size: 0.85rem;
+        }
+
+        .tool-result-output {
+            background: rgba(15, 23, 42, 0.5);
+            padding: 8px 10px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.8rem;
+            color: #cbd5e1;
+            white-space: pre-wrap;
+            margin-top: 6px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
     </style>
 </head>
 <body>
@@ -720,7 +807,7 @@
                 return this.providerModels[provider] || [];
             }
 
-            sendMessage() {
+            async sendMessage() {
                 const text = this.input.value.trim();
                 if (!text) return;
 
@@ -729,10 +816,194 @@
                 this.addMessage(text, 'user', provider, model);
                 this.input.value = '';
                 this.showLoadingIndicator();
-                setTimeout(() => {
+
+                // Try to use streaming API, fall back to mock if not available
+                try {
+                    await this.sendStreamingMessage(text, provider, model);
+                } catch (error) {
+                    console.error('Streaming error, falling back to mock:', error);
+                    // Fall back to mock response
+                    setTimeout(() => {
+                        this.removeLoadingIndicator();
+                        this.addMessage(this.generateAIResponse(text, provider, model), 'ai', provider, model);
+                    }, 800);
+                }
+            }
+
+            async sendStreamingMessage(text, provider, model) {
+                const response = await fetch('http://localhost:8420/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: text,
+                        provider: provider,
+                        model: model
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                // Check if response is streaming (SSE)
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('text/event-stream')) {
+                    // Handle streaming response
+                    await this.handleStreamingResponse(response, provider, model);
+                } else {
+                    // Handle non-streaming JSON response (fallback)
+                    const data = await response.json();
                     this.removeLoadingIndicator();
-                    this.addMessage(this.generateAIResponse(text, provider, model), 'ai', provider, model);
-                }, 800);
+                    this.addMessage(data.response || 'No response', 'ai', provider, model);
+                }
+            }
+
+            async handleStreamingResponse(response, provider, model) {
+                this.removeLoadingIndicator();
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let currentMessage = '';
+                let messageElement = null;
+                let toolCalls = [];
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = JSON.parse(line.slice(6));
+
+                            if (data.type === 'text') {
+                                // Append text to current message
+                                currentMessage += data.content;
+
+                                if (!messageElement) {
+                                    // Create message element
+                                    messageElement = this.createStreamingMessageElement(provider, model);
+                                    this.messagesContainer.appendChild(messageElement);
+                                }
+
+                                // Update content
+                                const contentEl = messageElement.querySelector('.chat-message-content');
+                                contentEl.textContent = currentMessage;
+                                this.scrollToBottom();
+
+                            } else if (data.type === 'tool_use') {
+                                // Show tool use
+                                toolCalls.push(data);
+                                this.showToolCall(data);
+
+                            } else if (data.type === 'tool_result') {
+                                // Show tool result
+                                this.showToolResult(data);
+
+                            } else if (data.type === 'done') {
+                                // Message complete
+                                this.messages.push({
+                                    id: Date.now(),
+                                    text: currentMessage,
+                                    sender: 'ai',
+                                    provider: provider,
+                                    model: model,
+                                    timestamp: new Date(),
+                                    toolCalls: toolCalls
+                                });
+                                break;
+
+                            } else if (data.type === 'error') {
+                                // Show error
+                                this.removeLoadingIndicator();
+                                this.addMessage(`Error: ${data.content}`, 'ai', provider, model);
+                            }
+                        }
+                    }
+                }
+            }
+
+            createStreamingMessageElement(provider, model) {
+                const welcome = this.messagesContainer.querySelector('.chat-welcome');
+                if (welcome) {
+                    welcome.remove();
+                }
+
+                const div = document.createElement('div');
+                div.className = 'chat-message ai';
+                div.setAttribute('data-testid', 'chat-message-ai');
+
+                const timeStr = new Date().toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                div.innerHTML = `
+                    <div>
+                        <div class="chat-message-content"></div>
+                        <div class="chat-timestamp">${timeStr}</div>
+                    </div>
+                `;
+
+                return div;
+            }
+
+            showToolCall(toolData) {
+                const div = document.createElement('div');
+                div.className = 'chat-message tool-call';
+                div.setAttribute('data-testid', 'tool-call-message');
+                div.setAttribute('data-tool-id', toolData.tool_id);
+
+                const timeStr = new Date().toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                div.innerHTML = `
+                    <div class="tool-call-content">
+                        <div class="tool-call-header">
+                            <span class="tool-call-icon">🔧</span>
+                            <span class="tool-call-name">${this.escapeHtml(toolData.tool_name)}</span>
+                        </div>
+                        <div class="tool-call-input">${this.escapeHtml(JSON.stringify(toolData.tool_input, null, 2))}</div>
+                        <div class="chat-timestamp">${timeStr}</div>
+                    </div>
+                `;
+
+                this.messagesContainer.appendChild(div);
+                this.scrollToBottom();
+            }
+
+            showToolResult(resultData) {
+                const div = document.createElement('div');
+                div.className = 'chat-message tool-result';
+                div.setAttribute('data-testid', 'tool-result-message');
+                div.setAttribute('data-tool-id', resultData.tool_id);
+
+                const timeStr = new Date().toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                div.innerHTML = `
+                    <div class="tool-result-content">
+                        <div class="tool-result-header">
+                            <span class="tool-result-icon">✅</span>
+                            <span class="tool-result-label">Tool Result</span>
+                        </div>
+                        <div class="tool-result-output">${this.escapeHtml(JSON.stringify(resultData.result, null, 2))}</div>
+                        <div class="chat-timestamp">${timeStr}</div>
+                    </div>
+                `;
+
+                this.messagesContainer.appendChild(div);
+                this.scrollToBottom();
             }
 
             addMessage(text, sender, provider = null, model = null) {

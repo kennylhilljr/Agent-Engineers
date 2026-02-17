@@ -177,6 +177,7 @@ class RESTAPIServer:
         # Sessions and providers
         self.app.router.add_get('/api/sessions', self.get_sessions)
         self.app.router.add_get('/api/providers', self.get_providers)
+        self.app.router.add_get('/api/providers/status', self.get_provider_status)
 
         # Chat
         self.app.router.add_post('/api/chat', self.chat)
@@ -407,6 +408,87 @@ class RESTAPIServer:
             'timestamp': datetime.utcnow().isoformat() + 'Z'
         })
 
+    async def get_provider_status(self, request: Request) -> Response:
+        """GET /api/providers/status - Get detailed provider status with API key validation.
+
+        Returns:
+            200 OK with provider status details
+        """
+        providers_status = []
+
+        # Claude / Anthropic
+        anthropic_key = os.getenv('ANTHROPIC_API_KEY')
+        providers_status.append({
+            'provider_id': 'claude',
+            'name': 'Claude',
+            'available': bool(anthropic_key),
+            'has_api_key': bool(anthropic_key),
+            'status': 'active' if anthropic_key else 'missing_api_key',
+            'models': ['haiku-4.5', 'sonnet-4.5', 'opus-4.6']
+        })
+
+        # OpenAI / ChatGPT
+        openai_key = os.getenv('OPENAI_API_KEY')
+        providers_status.append({
+            'provider_id': 'openai',
+            'name': 'ChatGPT',
+            'available': bool(openai_key),
+            'has_api_key': bool(openai_key),
+            'status': 'active' if openai_key else 'missing_api_key',
+            'models': ['gpt-4o', 'o1', 'o3-mini', 'o4-mini']
+        })
+
+        # Gemini
+        gemini_key = os.getenv('GEMINI_API_KEY')
+        providers_status.append({
+            'provider_id': 'gemini',
+            'name': 'Gemini',
+            'available': bool(gemini_key),
+            'has_api_key': bool(gemini_key),
+            'status': 'active' if gemini_key else 'missing_api_key',
+            'models': ['2.5-flash', '2.5-pro', '2.0-flash']
+        })
+
+        # Groq
+        groq_key = os.getenv('GROQ_API_KEY')
+        providers_status.append({
+            'provider_id': 'groq',
+            'name': 'Groq',
+            'available': bool(groq_key),
+            'has_api_key': bool(groq_key),
+            'status': 'active' if groq_key else 'missing_api_key',
+            'models': ['llama-3.3-70b', 'mixtral-8x7b']
+        })
+
+        # KIMI
+        kimi_key = os.getenv('KIMI_API_KEY')
+        providers_status.append({
+            'provider_id': 'kimi',
+            'name': 'KIMI',
+            'available': bool(kimi_key),
+            'has_api_key': bool(kimi_key),
+            'status': 'active' if kimi_key else 'missing_api_key',
+            'models': ['moonshot-v1']
+        })
+
+        # Windsurf
+        windsurf_key = os.getenv('WINDSURF_API_KEY')
+        providers_status.append({
+            'provider_id': 'windsurf',
+            'name': 'Windsurf',
+            'available': bool(windsurf_key),
+            'has_api_key': bool(windsurf_key),
+            'status': 'active' if windsurf_key else 'missing_api_key',
+            'models': ['cascade']
+        })
+
+        return web.json_response({
+            'providers': providers_status,
+            'total_providers': len(providers_status),
+            'active_providers': sum(1 for p in providers_status if p['available']),
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+
     async def chat(self, request: Request) -> Response:
         """POST /api/chat - Send chat message (streaming response).
 
@@ -415,11 +497,12 @@ class RESTAPIServer:
                 "message": "User message",
                 "provider": "claude" (optional, default: claude),
                 "model": "sonnet-4-5" (optional),
-                "session_id": "session-123" (optional)
+                "session_id": "session-123" (optional),
+                "conversation_history": [] (optional)
             }
 
         Returns:
-            200 OK with streaming response
+            200 OK with streaming Server-Sent Events (SSE) response
             400 Bad Request for invalid input
         """
         try:
@@ -436,22 +519,63 @@ class RESTAPIServer:
             }, status=400)
 
         provider = data.get('provider', 'claude')
-        model = data.get('model')
+        model = data.get('model', 'sonnet-4.5')
         session_id = data.get('session_id')
+        conversation_history = data.get('conversation_history', [])
 
-        # For now, return a mock response
-        # TODO: Integrate with actual chat implementation
-        response_data = {
-            'response': f'Received message: {message}',
-            'provider': provider,
-            'model': model,
-            'session_id': session_id,
-            'timestamp': datetime.utcnow().isoformat() + 'Z',
-            'status': 'success',
-            'note': 'Chat functionality is a placeholder - integrate with actual chat system'
-        }
+        # Import chat handler
+        try:
+            from dashboard.chat_handler import stream_chat_response
+        except ImportError:
+            # Fallback to mock response if chat_handler not available
+            return web.json_response({
+                'response': f'Received message: {message}',
+                'provider': provider,
+                'model': model,
+                'session_id': session_id,
+                'timestamp': datetime.utcnow().isoformat() + 'Z',
+                'status': 'success',
+                'note': 'Chat handler not available, using fallback'
+            })
 
-        return web.json_response(response_data)
+        # Stream response using Server-Sent Events
+        response = web.StreamResponse(
+            status=200,
+            reason='OK',
+            headers={
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+                'Access-Control-Allow-Origin': '*'
+            }
+        )
+
+        await response.prepare(request)
+
+        try:
+            async for chunk in stream_chat_response(
+                message=message,
+                provider=provider,
+                model=model,
+                conversation_history=conversation_history
+            ):
+                # Send as Server-Sent Event
+                event_data = f"data: {json.dumps(chunk)}\n\n"
+                await response.write(event_data.encode('utf-8'))
+                await response.drain()
+
+        except Exception as e:
+            # Send error event
+            error_chunk = {
+                'type': 'error',
+                'content': str(e),
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+            event_data = f"data: {json.dumps(error_chunk)}\n\n"
+            await response.write(event_data.encode('utf-8'))
+
+        await response.write_eof()
+        return response
 
     async def pause_agent(self, request: Request) -> Response:
         """POST /api/agents/{name}/pause - Pause an agent.
