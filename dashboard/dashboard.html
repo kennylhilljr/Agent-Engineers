@@ -1396,6 +1396,104 @@
             border: 1px solid rgba(239, 68, 68, 0.3);
             display: block;
         }
+
+        /* Reasoning Block Styles (AI-158) */
+        .reasoning-block {
+            font-family: 'Courier New', Courier, monospace;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            border-radius: 6px;
+            margin: 8px 0;
+            background: rgba(15, 23, 42, 0.6);
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .reasoning-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(30, 41, 59, 0.8);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+            gap: 8px;
+        }
+
+        .reasoning-header:hover {
+            background: rgba(51, 65, 85, 0.8);
+        }
+
+        .reasoning-header-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #60a5fa;
+            letter-spacing: 0.04em;
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .complexity-badge {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 4px;
+            letter-spacing: 0.06em;
+            flex-shrink: 0;
+        }
+
+        .complexity-badge.SIMPLE {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.4);
+        }
+
+        .complexity-badge.MODERATE {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.4);
+        }
+
+        .complexity-badge.COMPLEX {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+        }
+
+        .reasoning-toggle {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            flex-shrink: 0;
+            transition: transform 0.2s ease;
+        }
+
+        .reasoning-block.expanded .reasoning-toggle {
+            transform: rotate(180deg);
+        }
+
+        .reasoning-content {
+            display: none;
+            padding: 10px 12px;
+            font-size: 0.8rem;
+            color: #cbd5e1;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+            border-top: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .reasoning-block.expanded .reasoning-content {
+            display: block;
+        }
+
+        .reasoning-ticket {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -2738,6 +2836,9 @@
                         if (message.type === 'metrics_update') {
                             console.log('Received metrics update via WebSocket');
                             handleMetricsUpdate(message.data);
+                        } else if (message.type === 'reasoning') {
+                            console.log('Received reasoning event via WebSocket', message);
+                            renderReasoningBlock(message);
                         }
                     } catch (error) {
                         console.error('Error processing WebSocket message:', error);
@@ -2801,6 +2902,29 @@
             }
 
             updateConnectionStatus('disconnected', 'Disconnected');
+        }
+
+        // Render a reasoning block in the activity feed (AI-158)
+        function renderReasoningBlock(message) {
+            const container = document.getElementById('activity-feed') || document.body;
+            const complexityMatch = (message.content || '').match(/\b(SIMPLE|MODERATE|COMPLEX)\b/);
+            const complexity = complexityMatch ? complexityMatch[1] : 'MODERATE';
+            const blockId = 'reasoning-' + Date.now();
+
+            const block = document.createElement('div');
+            block.className = 'reasoning-block';
+            block.id = blockId;
+
+            block.innerHTML = `
+                <div class="reasoning-header" onclick="(function(el){el.closest('.reasoning-block').classList.toggle('expanded');})(this)">
+                    <span class="reasoning-header-title">REASONING${message.ticket ? ' \u2014 ' + message.ticket : ''}</span>
+                    <span class="complexity-badge ${complexity}">${complexity}</span>
+                    <span class="reasoning-toggle">&#9660;</span>
+                </div>
+                <div class="reasoning-content">${(message.content || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+            `;
+
+            container.prepend(block);
         }
 
         // Handle metrics update from WebSocket or HTTP
