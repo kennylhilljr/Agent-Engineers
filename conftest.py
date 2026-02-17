@@ -82,6 +82,14 @@ if _worktree_auth_path.exists() and "dashboard.auth" not in sys.modules:
     except Exception:
         pass
 
+# 4e. Load dashboard.security from the worktree (AI-177 / REQ-TECH-012) — before server
+_worktree_security_path = _WORKTREE_ROOT / "dashboard" / "security.py"
+if _worktree_security_path.exists() and "dashboard.security" not in sys.modules:
+    try:
+        _load_module_from_file("dashboard.security", _worktree_security_path)
+    except Exception:
+        pass
+
 # 4b. Override dashboard.server with the worktree's AI-161 version
 _worktree_server_path = _WORKTREE_ROOT / "dashboard" / "server.py"
 if _worktree_server_path.exists():
