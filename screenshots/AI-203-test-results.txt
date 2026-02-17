@@ -1,0 +1,54 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Library/Developer/CommandLineTools/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/bkh223/Documents/GitHub/agent-engineers
+configfile: pyproject.toml
+plugins: asyncio-1.2.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 43 items
+
+../../tests/bridges/test_bridge_refactoring.py::TestBridgeResponseDataclass::test_bridge_response_required_fields PASSED [  2%]
+../../tests/bridges/test_bridge_refactoring.py::TestBridgeResponseDataclass::test_bridge_response_default_tokens_used_is_none PASSED [  4%]
+../../tests/bridges/test_bridge_refactoring.py::TestBridgeResponseDataclass::test_bridge_response_default_error_is_none PASSED [  6%]
+../../tests/bridges/test_bridge_refactoring.py::TestBridgeResponseDataclass::test_bridge_response_default_success_is_true PASSED [  9%]
+../../tests/bridges/test_bridge_refactoring.py::TestBridgeResponseDataclass::test_bridge_response_with_all_fields PASSED [ 11%]
+../../tests/bridges/test_bridge_refactoring.py::TestBridgeResponseDataclass::test_bridge_response_failure_state PASSED [ 13%]
+../../tests/bridges/test_bridge_refactoring.py::TestBridgeResponseDataclass::test_bridge_response_is_dataclass PASSED [ 16%]
+../../tests/bridges/test_bridge_refactoring.py::TestBridgeResponseDataclass::test_bridge_response_tokens_used_accepts_int PASSED [ 18%]
+../../tests/bridges/test_bridge_refactoring.py::TestBridgeResponseDataclass::test_bridge_response_equality PASSED [ 20%]
+../../tests/bridges/test_bridge_refactoring.py::TestBridgeResponseDataclass::test_bridge_response_inequality PASSED [ 23%]
+../../tests/bridges/test_bridge_refactoring.py::TestBaseBridgeABC::test_base_bridge_cannot_be_instantiated_directly PASSED [ 25%]
+../../tests/bridges/test_bridge_refactoring.py::TestBaseBridgeABC::test_missing_provider_name_raises_type_error PASSED [ 27%]
+../../tests/bridges/test_bridge_refactoring.py::TestBaseBridgeABC::test_missing_send_task_raises_type_error PASSED [ 30%]
+../../tests/bridges/test_bridge_refactoring.py::TestBaseBridgeABC::test_missing_get_auth_info_raises_type_error PASSED [ 32%]
+../../tests/bridges/test_bridge_refactoring.py::TestBaseBridgeABC::test_complete_subclass_can_be_instantiated PASSED [ 34%]
+../../tests/bridges/test_bridge_refactoring.py::TestBaseBridgeABC::test_is_instance_of_base_bridge PASSED [ 37%]
+../../tests/bridges/test_bridge_refactoring.py::TestProviderName::test_provider_name_returns_string PASSED [ 39%]
+../../tests/bridges/test_bridge_refactoring.py::TestProviderName::test_provider_name_another_bridge PASSED [ 41%]
+../../tests/bridges/test_bridge_refactoring.py::TestSendTask::test_send_task_returns_bridge_response PASSED [ 44%]
+../../tests/bridges/test_bridge_refactoring.py::TestSendTask::test_send_task_content_reflects_task PASSED [ 46%]
+../../tests/bridges/test_bridge_refactoring.py::TestSendTask::test_send_task_failure_bridge PASSED [ 48%]
+../../tests/bridges/test_bridge_refactoring.py::TestGetAuthInfo::test_get_auth_info_returns_dict PASSED [ 51%]
+../../tests/bridges/test_bridge_refactoring.py::TestGetAuthInfo::test_get_auth_info_contains_auth_type PASSED [ 53%]
+../../tests/bridges/test_bridge_refactoring.py::TestGetAuthInfo::test_get_auth_info_api_key_bridge PASSED [ 55%]
+../../tests/bridges/test_bridge_refactoring.py::TestValidateResponse::test_validate_response_success_with_content PASSED [ 58%]
+../../tests/bridges/test_bridge_refactoring.py::TestValidateResponse::test_validate_response_false_when_success_false PASSED [ 60%]
+../../tests/bridges/test_bridge_refactoring.py::TestValidateResponse::test_validate_response_false_when_content_empty PASSED [ 62%]
+../../tests/bridges/test_bridge_refactoring.py::TestValidateResponse::test_validate_response_can_be_overridden PASSED [ 65%]
+../../tests/bridges/test_bridge_refactoring.py::TestValidateResponse::test_validate_response_override_rejects_failure PASSED [ 67%]
+../../tests/bridges/test_bridge_refactoring.py::TestRepr::test_repr_contains_class_name PASSED [ 69%]
+../../tests/bridges/test_bridge_refactoring.py::TestRepr::test_repr_contains_provider_name PASSED [ 72%]
+../../tests/bridges/test_bridge_refactoring.py::TestRepr::test_repr_format PASSED [ 74%]
+../../tests/bridges/test_bridge_refactoring.py::TestRepr::test_repr_another_bridge PASSED [ 76%]
+../../tests/bridges/test_bridge_refactoring.py::TestBridgeImports::test_base_bridge_importable PASSED [ 79%]
+../../tests/bridges/test_bridge_refactoring.py::TestBridgeImports::test_bridges_package_exports_base_bridge PASSED [ 81%]
+../../tests/bridges/test_bridge_refactoring.py::TestBridgeImports::test_bridges_package_exports_bridge_response PASSED [ 83%]
+../../tests/bridges/test_bridge_refactoring.py::TestBridgeImports::test_openai_bridge_importable SKIPPED [ 86%]
+../../tests/bridges/test_bridge_refactoring.py::TestBridgeImports::test_gemini_bridge_importable SKIPPED [ 88%]
+../../tests/bridges/test_bridge_refactoring.py::TestBridgeImports::test_groq_bridge_importable SKIPPED [ 90%]
+../../tests/bridges/test_bridge_refactoring.py::TestSharedInterface::test_all_test_bridges_have_provider_name PASSED [ 93%]
+../../tests/bridges/test_bridge_refactoring.py::TestSharedInterface::test_all_test_bridges_have_get_auth_info PASSED [ 95%]
+../../tests/bridges/test_bridge_refactoring.py::TestSharedInterface::test_all_test_bridges_have_validate_response PASSED [ 97%]
+../../tests/bridges/test_bridge_refactoring.py::TestSharedInterface::test_base_bridge_is_abstract PASSED [100%]
+
+======================== 40 passed, 3 skipped in 0.08s =========================
