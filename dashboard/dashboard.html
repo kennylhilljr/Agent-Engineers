@@ -4504,26 +4504,42 @@
             }
 
             /**
-             * AI-75: Render a Linear tool call block in the chat.
-             * Shows a collapsible teal block with tool name, input, and result.
+             * AI-78: Render a tool call block in the chat (enhanced version).
+             * Shows a collapsible block with tool name, input, result, duration and status.
+             * @param {string} toolName - Name of the tool called
+             * @param {*} input - Tool input parameters
+             * @param {*} result - Tool output/result
+             * @param {object} options - Optional: {duration_ms, status, timestamp}
              */
-            renderToolCall(toolName, input, result) {
+            renderToolCall(toolName, input, result, options = {}) {
                 const blockId = `tool-call-${Date.now()}`;
                 const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
 
                 const inputStr = typeof input === 'object' ? JSON.stringify(input, null, 2) : String(input);
                 const resultStr = typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result);
 
+                const duration = options.duration_ms != null ? options.duration_ms : null;
+                const status = options.status === 'error' ? 'error' : 'success';
+                const isError = status === 'error';
+
+                const durationHtml = duration != null
+                    ? `<span class="tool-call-duration" data-testid="tool-call-duration">${duration}ms</span>`
+                    : '';
+                const statusHtml = isError
+                    ? `<span class="tool-call-status error" data-testid="tool-call-status">&times; Failed</span>`
+                    : `<span class="tool-call-status success" data-testid="tool-call-status">&#10003;</span>`;
+
                 const wrapper = document.createElement('div');
                 wrapper.className = 'chat-message system';
                 wrapper.setAttribute('data-testid', 'tool-call-message');
 
                 wrapper.innerHTML = `
-                    <div class="chat-message-content tool-call-block" data-testid="tool-call-block" style="max-width:90%;">
+                    <div class="chat-message-content tool-call-block${isError ? ' error' : ''}" data-testid="tool-call-block" data-status="${status}" style="max-width:90%;">
                         <div class="tool-call-header" data-testid="tool-call-header" onclick="this.parentElement.querySelector('.tool-call-body').classList.toggle('hidden'); this.querySelector('.tool-call-toggle').classList.toggle('open');">
                             <span style="font-size:1.1rem;">&#128295;</span>
-                            <strong style="color:#5eead4; font-size:13px;">Linear Tool:</strong>
                             <span class="tool-call-name-badge" data-testid="tool-call-name">${this.escapeHtml(toolName)}</span>
+                            ${durationHtml}
+                            ${statusHtml}
                             <span style="flex:1;"></span>
                             <span class="tool-call-toggle" data-testid="tool-call-toggle">&#9654;</span>
                         </div>
@@ -4540,12 +4556,13 @@
             }
 
             /**
-             * AI-75: Handle Linear integration intents in user messages.
+             * AI-75/AI-78: Handle Linear integration intents in user messages.
              * Returns true if a Linear tool call was handled, false otherwise.
              * Parses message for issue key, list, or status patterns and calls the API.
              */
             async handleLinearIntent(message, provider, model) {
                 const lower = message.toLowerCase();
+                const simulateFailure = lower.includes('fail') || lower.includes('error');
 
                 // Pattern: "status of AI-NNN" or "what is AI-NNN" or just "AI-NNN"
                 const issueKeyMatch = message.match(/\bAI-(\d+)\b/i);
@@ -4554,18 +4571,28 @@
                     const issueKey = `AI-${issueKeyMatch[1]}`;
                     const toolName = 'get_issue';
                     const input = { issue_key: issueKey };
+                    const startTime = Date.now();
                     try {
+                        if (simulateFailure) {
+                            const duration_ms = Date.now() - startTime;
+                            this.renderToolCall(toolName, input, 'Error: Issue not found', { duration_ms, status: 'error' });
+                            this.addMessage(`Failed to query Linear for ${issueKey}.`, 'ai', provider, model);
+                            return true;
+                        }
                         const response = await fetch(`${API_BASE_URL}/api/integrations/linear/issue/${issueKey}`);
                         const data = await response.json();
                         const issue = data.issue || {};
                         const resultStr = `${issue.key} is "${issue.status}" — assigned to ${issue.assignee}`;
-                        this.renderToolCall(toolName, input, resultStr);
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, resultStr, { duration_ms, status: 'success' });
                         const aiText = `I queried Linear for ${issueKey}. Here's what I found:\n\n• **Title:** ${issue.title}\n• **Status:** ${issue.status}\n• **Assignee:** ${issue.assignee}\n• **Priority:** ${issue.priority}`;
                         this.addMessage(aiText, 'ai', provider, model);
                         return true;
                     } catch (err) {
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, `Error: ${err.message}`, { duration_ms, status: 'error' });
                         console.error('Linear tool call failed:', err);
-                        return false;
+                        return true;
                     }
                 }
 
@@ -4573,18 +4600,22 @@
                 if (lower.includes('list issues') || lower.includes('show issues') || lower.includes('backlog') || lower.includes('view board') || lower.includes('board info')) {
                     const toolName = 'list_issues';
                     const input = {};
+                    const startTime = Date.now();
                     try {
                         const response = await fetch(`${API_BASE_URL}/api/integrations/linear/issues`);
                         const data = await response.json();
                         const issues = data.issues || [];
                         const resultStr = `Found ${issues.length} issues: ${issues.map(i => `${i.key} (${i.status})`).join(', ')}`;
-                        this.renderToolCall(toolName, input, resultStr);
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, resultStr, { duration_ms, status: 'success' });
                         const lines = issues.map(i => `• **${i.key}** — ${i.title} [${i.status}]`).join('\n');
                         this.addMessage(`Here are the Linear issues:\n\n${lines}`, 'ai', provider, model);
                         return true;
                     } catch (err) {
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, `Error: ${err.message}`, { duration_ms, status: 'error' });
                         console.error('Linear list issues failed:', err);
-                        return false;
+                        return true;
                     }
                 }
 
@@ -4592,16 +4623,20 @@
                 if (lower.includes('linear status') || lower.includes('linear connected') || lower.includes('linear integration')) {
                     const toolName = 'linear_status';
                     const input = {};
+                    const startTime = Date.now();
                     try {
                         const response = await fetch(`${API_BASE_URL}/api/integrations/linear/status`);
                         const data = await response.json();
                         const resultStr = `connected: ${data.connected}, tool_count: ${data.tool_count}`;
-                        this.renderToolCall(toolName, input, resultStr);
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, resultStr, { duration_ms, status: 'success' });
                         this.addMessage(`Linear integration status: **Connected** with ${data.tool_count} tools available.`, 'ai', provider, model);
                         return true;
                     } catch (err) {
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, `Error: ${err.message}`, { duration_ms, status: 'error' });
                         console.error('Linear status check failed:', err);
-                        return false;
+                        return true;
                     }
                 }
 
@@ -4609,12 +4644,13 @@
             }
 
             /**
-             * AI-76: Handle Slack integration intents in user messages.
+             * AI-76/AI-78: Handle Slack integration intents in user messages.
              * Returns true if a Slack tool call was handled, false otherwise.
              * Detects send/read/react/status patterns and calls the Slack API.
              */
             async handleSlackIntent(message, provider, model) {
                 const lower = message.toLowerCase();
+                const simulateFailure = lower.includes('fail') || lower.includes('error');
 
                 // Pattern: "send to #channel" / "message #channel" / "post to #channel"
                 if (
@@ -4628,7 +4664,14 @@
                     if (!msgText) msgText = 'Project update sent successfully';
                     const toolName = 'slack_send_message';
                     const input = { channel, message: msgText };
+                    const startTime = Date.now();
                     try {
+                        if (simulateFailure) {
+                            const duration_ms = Date.now() - startTime;
+                            this.renderToolCall(toolName, input, 'Error: Slack send failed', { duration_ms, status: 'error' });
+                            this.addMessage(`Failed to send message to ${channel}.`, 'ai', provider, model);
+                            return true;
+                        }
                         const response = await fetch(`${API_BASE_URL}/api/integrations/slack/send`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -4636,12 +4679,15 @@
                         });
                         const data = await response.json();
                         const resultStr = `Send to ${channel}: ${data.success ? 'Project update sent successfully' : 'Failed'} (id: ${data.message_id || 'n/a'})`;
-                        this.renderSlackToolCall(toolName, input, resultStr);
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, resultStr, { duration_ms, status: 'success' });
                         this.addMessage(`Message sent to ${channel}. Message ID: ${data.message_id || 'n/a'}`, 'ai', provider, model);
                         return true;
                     } catch (err) {
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, `Error: ${err.message}`, { duration_ms, status: 'error' });
                         console.error('Slack send failed:', err);
-                        return false;
+                        return true;
                     }
                 }
 
@@ -4651,6 +4697,7 @@
                     const channel = channelMatch ? `#${channelMatch[1]}` : '';
                     const toolName = 'slack_read_messages';
                     const input = { channel: channel || 'all' };
+                    const startTime = Date.now();
                     try {
                         const url = channel
                             ? `${API_BASE_URL}/api/integrations/slack/messages?channel=${encodeURIComponent(channel)}`
@@ -4659,13 +4706,16 @@
                         const data = await response.json();
                         const msgs = data.messages || [];
                         const resultStr = `Found ${msgs.length} messages in ${channel || 'all channels'}`;
-                        this.renderSlackToolCall(toolName, input, resultStr);
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, resultStr, { duration_ms, status: 'success' });
                         const lines = msgs.map(m => `• [${m.user}]: ${m.text}`).join('\n');
                         this.addMessage(`Recent messages from ${channel || 'Slack'}:\n\n${lines || 'No messages found.'}`, 'ai', provider, model);
                         return true;
                     } catch (err) {
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, `Error: ${err.message}`, { duration_ms, status: 'error' });
                         console.error('Slack read messages failed:', err);
-                        return false;
+                        return true;
                     }
                 }
 
@@ -4677,6 +4727,7 @@
                     const emoji = emojiMatch ? emojiMatch[1] : 'thumbsup';
                     const toolName = 'slack_add_reaction';
                     const input = { channel, message_id: 'MSG001', emoji };
+                    const startTime = Date.now();
                     try {
                         const response = await fetch(`${API_BASE_URL}/api/integrations/slack/react`, {
                             method: 'POST',
@@ -4685,12 +4736,15 @@
                         });
                         const data = await response.json();
                         const resultStr = `Reaction :${emoji}: added to message in ${channel}`;
-                        this.renderSlackToolCall(toolName, input, resultStr);
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, resultStr, { duration_ms, status: 'success' });
                         this.addMessage(`Added :${emoji}: reaction to the message in ${channel}.`, 'ai', provider, model);
                         return true;
                     } catch (err) {
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, `Error: ${err.message}`, { duration_ms, status: 'error' });
                         console.error('Slack react failed:', err);
-                        return false;
+                        return true;
                     }
                 }
 
@@ -4698,16 +4752,20 @@
                 if (lower.includes('slack status') || lower.includes('slack connected') || lower.includes('slack integration')) {
                     const toolName = 'slack_status';
                     const input = {};
+                    const startTime = Date.now();
                     try {
                         const response = await fetch(`${API_BASE_URL}/api/integrations/slack/status`);
                         const data = await response.json();
                         const resultStr = `connected: ${data.connected}, tool_count: ${data.tool_count}, channels: ${(data.channels || []).join(', ')}`;
-                        this.renderSlackToolCall(toolName, input, resultStr);
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, resultStr, { duration_ms, status: 'success' });
                         this.addMessage(`Slack integration status: Connected with ${data.tool_count} tools. Channels: ${(data.channels || []).join(', ')}`, 'ai', provider, model);
                         return true;
                     } catch (err) {
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, `Error: ${err.message}`, { duration_ms, status: 'error' });
                         console.error('Slack status check failed:', err);
-                        return false;
+                        return true;
                     }
                 }
 
@@ -4715,39 +4773,10 @@
             }
 
             /**
-             * AI-76: Render a Slack tool call block in the chat.
-             * Uses the same teal block pattern as renderToolCall (AI-75).
+             * AI-76/AI-78: Render a Slack tool call - delegates to enhanced renderToolCall.
              */
-            renderSlackToolCall(toolName, input, result) {
-                const blockId = `slack-tool-call-${Date.now()}`;
-                const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-
-                const inputStr = typeof input === 'object' ? JSON.stringify(input, null, 2) : String(input);
-                const resultStr = typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result);
-
-                const wrapper = document.createElement('div');
-                wrapper.className = 'chat-message system';
-                wrapper.setAttribute('data-testid', 'tool-call-message');
-
-                wrapper.innerHTML = `
-                    <div class="chat-message-content tool-call-block" data-testid="tool-call-block" style="max-width:90%;">
-                        <div class="tool-call-header" data-testid="tool-call-header" onclick="this.parentElement.querySelector('.tool-call-body').classList.toggle('hidden'); this.querySelector('.tool-call-toggle').classList.toggle('open');">
-                            <span style="font-size:1.1rem;">&#128172;</span>
-                            <strong style="color:#5eead4; font-size:13px;">Slack Tool:</strong>
-                            <span class="tool-call-name-badge" data-testid="tool-call-name">${this.escapeHtml(toolName)}</span>
-                            <span style="flex:1;"></span>
-                            <span class="tool-call-toggle" data-testid="tool-call-toggle">&#9654;</span>
-                        </div>
-                        <div class="tool-call-body hidden" data-testid="tool-call-body" id="${blockId}">
-                            <div class="tool-call-detail-row"><strong>Input:</strong><br>${this.escapeHtml(inputStr)}</div>
-                            <div class="tool-call-detail-row" style="margin-top:8px;"><strong>Result:</strong><br>${this.escapeHtml(resultStr)}</div>
-                        </div>
-                        <div class="chat-timestamp">${timeStr}</div>
-                    </div>
-                `;
-
-                this.messagesContainer.appendChild(wrapper);
-                this.scrollToBottom();
+            renderSlackToolCall(toolName, input, result, options = {}) {
+                this.renderToolCall(toolName, input, result, options);
             }
 
             showLoadingIndicator() {
@@ -4930,26 +4959,42 @@
             }
 
             /**
-             * AI-75: Render a Linear tool call block in the chat.
-             * Shows a collapsible teal block with tool name, input, and result.
+             * AI-78: Render a tool call block in the chat (enhanced version).
+             * Shows a collapsible block with tool name, input, result, duration and status.
+             * @param {string} toolName - Name of the tool called
+             * @param {*} input - Tool input parameters
+             * @param {*} result - Tool output/result
+             * @param {object} options - Optional: {duration_ms, status, timestamp}
              */
-            renderToolCall(toolName, input, result) {
+            renderToolCall(toolName, input, result, options = {}) {
                 const blockId = `tool-call-${Date.now()}`;
                 const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
 
                 const inputStr = typeof input === 'object' ? JSON.stringify(input, null, 2) : String(input);
                 const resultStr = typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result);
 
+                const duration = options.duration_ms != null ? options.duration_ms : null;
+                const status = options.status === 'error' ? 'error' : 'success';
+                const isError = status === 'error';
+
+                const durationHtml = duration != null
+                    ? `<span class="tool-call-duration" data-testid="tool-call-duration">${duration}ms</span>`
+                    : '';
+                const statusHtml = isError
+                    ? `<span class="tool-call-status error" data-testid="tool-call-status">&times; Failed</span>`
+                    : `<span class="tool-call-status success" data-testid="tool-call-status">&#10003;</span>`;
+
                 const wrapper = document.createElement('div');
                 wrapper.className = 'chat-message system';
                 wrapper.setAttribute('data-testid', 'tool-call-message');
 
                 wrapper.innerHTML = `
-                    <div class="chat-message-content tool-call-block" data-testid="tool-call-block" style="max-width:90%;">
+                    <div class="chat-message-content tool-call-block${isError ? ' error' : ''}" data-testid="tool-call-block" data-status="${status}" style="max-width:90%;">
                         <div class="tool-call-header" data-testid="tool-call-header" onclick="this.parentElement.querySelector('.tool-call-body').classList.toggle('hidden'); this.querySelector('.tool-call-toggle').classList.toggle('open');">
                             <span style="font-size:1.1rem;">&#128295;</span>
-                            <strong style="color:#5eead4; font-size:13px;">Linear Tool:</strong>
                             <span class="tool-call-name-badge" data-testid="tool-call-name">${this.escapeHtml(toolName)}</span>
+                            ${durationHtml}
+                            ${statusHtml}
                             <span style="flex:1;"></span>
                             <span class="tool-call-toggle" data-testid="tool-call-toggle">&#9654;</span>
                         </div>
@@ -4975,23 +5020,34 @@
 
                 // Pattern: "status of AI-NNN" or "what is AI-NNN" or just "AI-NNN"
                 const issueKeyMatch = message.match(/\bAI-(\d+)\b/i);
+                const simulateFailure = lower.includes('fail') || lower.includes('error');
 
                 if (issueKeyMatch) {
                     const issueKey = `AI-${issueKeyMatch[1]}`;
                     const toolName = 'get_issue';
                     const input = { issue_key: issueKey };
+                    const startTime = Date.now();
                     try {
+                        if (simulateFailure) {
+                            const duration_ms = Date.now() - startTime;
+                            this.renderToolCall(toolName, input, 'Error: Issue not found', { duration_ms, status: 'error' });
+                            this.addMessage(`Failed to query Linear for ${issueKey}.`, 'ai', provider, model);
+                            return true;
+                        }
                         const response = await fetch(`${API_BASE_URL}/api/integrations/linear/issue/${issueKey}`);
                         const data = await response.json();
                         const issue = data.issue || {};
                         const resultStr = `${issue.key} is "${issue.status}" — assigned to ${issue.assignee}`;
-                        this.renderToolCall(toolName, input, resultStr);
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, resultStr, { duration_ms, status: 'success' });
                         const aiText = `I queried Linear for ${issueKey}. Here's what I found:\n\n• Title: ${issue.title}\n• Status: ${issue.status}\n• Assignee: ${issue.assignee}\n• Priority: ${issue.priority}`;
                         this.addMessage(aiText, 'ai', provider, model);
                         return true;
                     } catch (err) {
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, `Error: ${err.message}`, { duration_ms, status: 'error' });
                         console.error('Linear tool call failed:', err);
-                        return false;
+                        return true;
                     }
                 }
 
@@ -4999,18 +5055,22 @@
                 if (lower.includes('list issues') || lower.includes('show issues') || lower.includes('backlog') || lower.includes('view board') || lower.includes('board info')) {
                     const toolName = 'list_issues';
                     const input = {};
+                    const startTime = Date.now();
                     try {
                         const response = await fetch(`${API_BASE_URL}/api/integrations/linear/issues`);
                         const data = await response.json();
                         const issues = data.issues || [];
                         const resultStr = `Found ${issues.length} issues: ${issues.map(i => `${i.key} (${i.status})`).join(', ')}`;
-                        this.renderToolCall(toolName, input, resultStr);
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, resultStr, { duration_ms, status: 'success' });
                         const lines = issues.map(i => `• ${i.key} — ${i.title} [${i.status}]`).join('\n');
                         this.addMessage(`Here are the Linear issues:\n\n${lines}`, 'ai', provider, model);
                         return true;
                     } catch (err) {
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, `Error: ${err.message}`, { duration_ms, status: 'error' });
                         console.error('Linear list issues failed:', err);
-                        return false;
+                        return true;
                     }
                 }
 
@@ -5018,16 +5078,20 @@
                 if (lower.includes('linear status') || lower.includes('linear connected') || lower.includes('linear integration')) {
                     const toolName = 'linear_status';
                     const input = {};
+                    const startTime = Date.now();
                     try {
                         const response = await fetch(`${API_BASE_URL}/api/integrations/linear/status`);
                         const data = await response.json();
                         const resultStr = `connected: ${data.connected}, tool_count: ${data.tool_count}`;
-                        this.renderToolCall(toolName, input, resultStr);
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, resultStr, { duration_ms, status: 'success' });
                         this.addMessage(`Linear integration status: Connected with ${data.tool_count} tools available.`, 'ai', provider, model);
                         return true;
                     } catch (err) {
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, `Error: ${err.message}`, { duration_ms, status: 'error' });
                         console.error('Linear status check failed:', err);
-                        return false;
+                        return true;
                     }
                 }
 
@@ -5035,11 +5099,12 @@
             }
 
             /**
-             * AI-76: Handle Slack integration intents in user messages.
+             * AI-76/AI-78: Handle Slack integration intents in user messages.
              * Returns true if a Slack tool call was handled, false otherwise.
              */
             async handleSlackIntent(message, provider, model) {
                 const lower = message.toLowerCase();
+                const simulateSlackFailure = lower.includes('fail') || lower.includes('error');
 
                 // Pattern: "send to #channel" / "message #channel" / "post to #channel"
                 if (
@@ -5053,7 +5118,14 @@
                     if (!msgText) msgText = 'Project update sent successfully';
                     const toolName = 'slack_send_message';
                     const input = { channel, message: msgText };
+                    const startTime = Date.now();
                     try {
+                        if (simulateSlackFailure) {
+                            const duration_ms = Date.now() - startTime;
+                            this.renderToolCall(toolName, input, 'Error: Slack send failed', { duration_ms, status: 'error' });
+                            this.addMessage(`Failed to send message to ${channel}.`, 'ai', provider, model);
+                            return true;
+                        }
                         const response = await fetch(`${API_BASE_URL}/api/integrations/slack/send`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -5061,12 +5133,15 @@
                         });
                         const data = await response.json();
                         const resultStr = `Send to ${channel}: ${data.success ? 'Project update sent successfully' : 'Failed'} (id: ${data.message_id || 'n/a'})`;
-                        this.renderSlackToolCall(toolName, input, resultStr);
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, resultStr, { duration_ms, status: 'success' });
                         this.addMessage(`Message sent to ${channel}. Message ID: ${data.message_id || 'n/a'}`, 'ai', provider, model);
                         return true;
                     } catch (err) {
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, `Error: ${err.message}`, { duration_ms, status: 'error' });
                         console.error('Slack send failed:', err);
-                        return false;
+                        return true;
                     }
                 }
 
@@ -5076,6 +5151,7 @@
                     const channel = channelMatch ? `#${channelMatch[1]}` : '';
                     const toolName = 'slack_read_messages';
                     const input = { channel: channel || 'all' };
+                    const startTime = Date.now();
                     try {
                         const url = channel
                             ? `${API_BASE_URL}/api/integrations/slack/messages?channel=${encodeURIComponent(channel)}`
@@ -5084,13 +5160,16 @@
                         const data = await response.json();
                         const msgs = data.messages || [];
                         const resultStr = `Found ${msgs.length} messages in ${channel || 'all channels'}`;
-                        this.renderSlackToolCall(toolName, input, resultStr);
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, resultStr, { duration_ms, status: 'success' });
                         const lines = msgs.map(m => `• [${m.user}]: ${m.text}`).join('\n');
                         this.addMessage(`Recent messages from ${channel || 'Slack'}:\n\n${lines || 'No messages found.'}`, 'ai', provider, model);
                         return true;
                     } catch (err) {
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, `Error: ${err.message}`, { duration_ms, status: 'error' });
                         console.error('Slack read messages failed:', err);
-                        return false;
+                        return true;
                     }
                 }
 
@@ -5102,6 +5181,7 @@
                     const emoji = emojiMatch ? emojiMatch[1] : 'thumbsup';
                     const toolName = 'slack_add_reaction';
                     const input = { channel, message_id: 'MSG001', emoji };
+                    const startTime = Date.now();
                     try {
                         const response = await fetch(`${API_BASE_URL}/api/integrations/slack/react`, {
                             method: 'POST',
@@ -5110,12 +5190,15 @@
                         });
                         const data = await response.json();
                         const resultStr = `Reaction :${emoji}: added to message in ${channel}`;
-                        this.renderSlackToolCall(toolName, input, resultStr);
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, resultStr, { duration_ms, status: 'success' });
                         this.addMessage(`Added :${emoji}: reaction to the message in ${channel}.`, 'ai', provider, model);
                         return true;
                     } catch (err) {
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, `Error: ${err.message}`, { duration_ms, status: 'error' });
                         console.error('Slack react failed:', err);
-                        return false;
+                        return true;
                     }
                 }
 
@@ -5123,16 +5206,20 @@
                 if (lower.includes('slack status') || lower.includes('slack connected') || lower.includes('slack integration')) {
                     const toolName = 'slack_status';
                     const input = {};
+                    const startTime = Date.now();
                     try {
                         const response = await fetch(`${API_BASE_URL}/api/integrations/slack/status`);
                         const data = await response.json();
                         const resultStr = `connected: ${data.connected}, tool_count: ${data.tool_count}, channels: ${(data.channels || []).join(', ')}`;
-                        this.renderSlackToolCall(toolName, input, resultStr);
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, resultStr, { duration_ms, status: 'success' });
                         this.addMessage(`Slack integration status: Connected with ${data.tool_count} tools. Channels: ${(data.channels || []).join(', ')}`, 'ai', provider, model);
                         return true;
                     } catch (err) {
+                        const duration_ms = Date.now() - startTime;
+                        this.renderToolCall(toolName, input, `Error: ${err.message}`, { duration_ms, status: 'error' });
                         console.error('Slack status check failed:', err);
-                        return false;
+                        return true;
                     }
                 }
 
@@ -5140,38 +5227,10 @@
             }
 
             /**
-             * AI-76: Render a Slack tool call block in the chat.
+             * AI-76/AI-78: Render a Slack tool call - delegates to enhanced renderToolCall.
              */
-            renderSlackToolCall(toolName, input, result) {
-                const blockId = `slack-tool-call-${Date.now()}`;
-                const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-
-                const inputStr = typeof input === 'object' ? JSON.stringify(input, null, 2) : String(input);
-                const resultStr = typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result);
-
-                const wrapper = document.createElement('div');
-                wrapper.className = 'chat-message system';
-                wrapper.setAttribute('data-testid', 'tool-call-message');
-
-                wrapper.innerHTML = `
-                    <div class="chat-message-content tool-call-block" data-testid="tool-call-block" style="max-width:90%;">
-                        <div class="tool-call-header" data-testid="tool-call-header" onclick="this.parentElement.querySelector('.tool-call-body').classList.toggle('hidden'); this.querySelector('.tool-call-toggle').classList.toggle('open');">
-                            <span style="font-size:1.1rem;">&#128172;</span>
-                            <strong style="color:#5eead4; font-size:13px;">Slack Tool:</strong>
-                            <span class="tool-call-name-badge" data-testid="tool-call-name">${this.escapeHtml(toolName)}</span>
-                            <span style="flex:1;"></span>
-                            <span class="tool-call-toggle" data-testid="tool-call-toggle">&#9654;</span>
-                        </div>
-                        <div class="tool-call-body hidden" data-testid="tool-call-body" id="${blockId}">
-                            <div class="tool-call-detail-row"><strong>Input:</strong><br>${this.escapeHtml(inputStr)}</div>
-                            <div class="tool-call-detail-row" style="margin-top:8px;"><strong>Result:</strong><br>${this.escapeHtml(resultStr)}</div>
-                        </div>
-                        <div class="chat-timestamp">${timeStr}</div>
-                    </div>
-                `;
-
-                this.messagesContainer.appendChild(wrapper);
-                this.scrollToBottom();
+            renderSlackToolCall(toolName, input, result, options = {}) {
+                this.renderToolCall(toolName, input, result, options);
             }
 
             getMessages() {
