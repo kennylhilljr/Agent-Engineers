@@ -66,6 +66,22 @@ if _worktree_provider_bridge_path.exists():
     except Exception:
         pass  # graceful degradation if bridge deps missing
 
+# 4c. Load dashboard.config from the worktree (AI-175 / REQ-TECH-010) — before auth and server
+_worktree_config_path = _WORKTREE_ROOT / "dashboard" / "config.py"
+if _worktree_config_path.exists() and "dashboard.config" not in sys.modules:
+    try:
+        _load_module_from_file("dashboard.config", _worktree_config_path)
+    except Exception:
+        pass
+
+# 4d. Load dashboard.auth from the worktree (AI-176 / REQ-TECH-011) — before server
+_worktree_auth_path = _WORKTREE_ROOT / "dashboard" / "auth.py"
+if _worktree_auth_path.exists() and "dashboard.auth" not in sys.modules:
+    try:
+        _load_module_from_file("dashboard.auth", _worktree_auth_path)
+    except Exception:
+        pass
+
 # 4b. Override dashboard.server with the worktree's AI-161 version
 _worktree_server_path = _WORKTREE_ROOT / "dashboard" / "server.py"
 if _worktree_server_path.exists():
