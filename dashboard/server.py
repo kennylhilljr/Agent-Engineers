@@ -78,6 +78,8 @@ from aiohttp_cors import ResourceOptions, setup as cors_setup
 
 from dashboard.metrics_store import MetricsStore
 from dashboard.chat_bridge import ChatBridge, IntentParser, AgentRouter
+from dashboard.auth import auth_middleware
+from dashboard.config import get_config
 
 # In-memory store for requirements (ticket_key -> requirement text)
 _requirements_store: dict = {}
@@ -133,25 +135,16 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# Get CORS allowed origins from environment
+# Get CORS allowed origins from environment via DashboardConfig
 def get_cors_origins() -> str:
     """Get CORS allowed origins from environment variable.
 
+    Uses DASHBOARD_CORS_ORIGINS (via DashboardConfig). Defaults to '*'.
+
     Returns:
-        Comma-separated list of allowed origins or '*' for development.
-        Defaults to localhost origins for security.
+        Comma-separated list of allowed origins or '*'.
     """
-    origins = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://localhost:8080,http://127.0.0.1:3000,http://127.0.0.1:8080')
-
-    # Warn if using wildcard in production
-    if origins == '*':
-        logger.warning(
-            "SECURITY WARNING: CORS is configured to allow all origins (*). "
-            "This is acceptable for development but should NOT be used in production. "
-            "Set CORS_ALLOWED_ORIGINS to specific domains for production deployment."
-        )
-
-    return origins
+    return get_config().cors_origins
 
 
 # CORS middleware with environment-based configuration
@@ -159,8 +152,8 @@ def get_cors_origins() -> str:
 async def cors_middleware(request: Request, handler):
     """Add CORS headers to all responses.
 
-    CORS origins are configured via CORS_ALLOWED_ORIGINS environment variable.
-    Defaults to localhost origins for development security.
+    CORS origins are configured via DASHBOARD_CORS_ORIGINS environment variable.
+    Defaults to '*' (allow all origins).
     """
     response = await handler(request)
 
@@ -331,7 +324,8 @@ class DashboardServer:
         # WebSocket connections tracking
         self.websockets: Set[WebSocketResponse] = set()
         self.broadcast_task: Optional[asyncio.Task] = None
-        self.broadcast_interval = 5  # seconds
+        # Use config for broadcast_interval (env var DASHBOARD_BROADCAST_INTERVAL, default 5s)
+        self.broadcast_interval = get_config().broadcast_interval
 
         # Circular buffer for reasoning/thinking history (AI-160)
         self._reasoning_history: list = []
@@ -362,8 +356,8 @@ class DashboardServer:
         if collector is not None:
             collector.register_event_callback(self._on_new_event)
 
-        # Create app with middlewares
-        self.app = web.Application(middlewares=[error_middleware, cors_middleware])
+        # Create app with middlewares (auth before cors so rejections get CORS headers)
+        self.app = web.Application(middlewares=[auth_middleware, error_middleware, cors_middleware])
 
         # Register routes
         self._setup_routes()
@@ -2077,14 +2071,14 @@ A2UI Components:
         '--port',
         type=int,
         default=8080,
-        help='HTTP server port (default: 8080)'
+        help='HTTP server port (default: DASHBOARD_WEB_PORT env var, or 8080)'
     )
 
     parser.add_argument(
         '--host',
         type=str,
         default='127.0.0.1',
-        help='HTTP server host (default: 127.0.0.1 for localhost-only access; use 0.0.0.0 to expose to network)'
+        help='HTTP server host (default: DASHBOARD_HOST env var, or 127.0.0.1; use 0.0.0.0 to expose to network)'
     )
 
     parser.add_argument(
@@ -2103,12 +2097,28 @@ A2UI Components:
 
     args = parser.parse_args()
 
+    # CLI args take priority over env vars (env vars take priority over built-in defaults).
+    # When argparse fills in its own default (port=8080, host='127.0.0.1') we want to
+    # prefer the env-var value instead.  We detect this by comparing to argparse defaults.
+    config = get_config()
+
+    port = args.port
+    host = args.host
+
+    # If user did not explicitly supply --port, fall back to env-var config
+    if port == 8080:
+        port = config.port
+
+    # If user did not explicitly supply --host, fall back to env-var config
+    if host == '127.0.0.1':
+        host = config.host
+
     # Create and run server
     server = DashboardServer(
         project_name=args.project_name,
         metrics_dir=args.metrics_dir,
-        port=args.port,
-        host=args.host
+        port=port,
+        host=host
     )
 
     server.run()
