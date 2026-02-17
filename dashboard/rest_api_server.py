@@ -220,17 +220,16 @@ class RESTAPIServer:
         self.app.router.add_get('/health', self.health_check)  # alias for playwright config
         self.app.router.add_get('/api/metrics', self.get_metrics)
 
-        # Agents
+        # Agents - static routes BEFORE parameterized routes to avoid shadowing
         self.app.router.add_get('/api/agents', self.get_all_agents)
+        # Agent Controls - global pause/resume (AI-130) registered before {name} routes
+        self.app.router.add_post('/api/agents/pause-all', self.pause_all_agents)
+        self.app.router.add_post('/api/agents/resume-all', self.resume_all_agents)
+        self.app.router.add_get('/api/agent-controls', self.get_all_agent_controls)
         self.app.router.add_get('/api/agents/{name}', self.get_agent)
         self.app.router.add_get('/api/agents/{name}/events', self.get_agent_events)
         self.app.router.add_post('/api/agents/{name}/pause', self.pause_agent)
         self.app.router.add_post('/api/agents/{name}/resume', self.resume_agent)
-
-        # Agent Controls - global pause/resume (AI-130)
-        self.app.router.add_post('/api/agents/pause-all', self.pause_all_agents)
-        self.app.router.add_post('/api/agents/resume-all', self.resume_all_agents)
-        self.app.router.add_get('/api/agent-controls', self.get_all_agent_controls)
         self.app.router.add_get('/api/agents/{name}/requirements', self.get_agent_requirements_by_name)
         self.app.router.add_put('/api/agents/{name}/requirements', self.update_agent_requirements_by_name)
 
@@ -896,6 +895,12 @@ class RESTAPIServer:
                 status=400
             )
 
+        if len(requirements) > 50_000:
+            return web.json_response(
+                {'error': 'Requirements text exceeds maximum length of 50000 characters'},
+                status=400
+            )
+
         _requirements_cache[agent_name] = requirements
 
         _decisions_log.append({
@@ -942,6 +947,11 @@ class RESTAPIServer:
         if not requirements:
             return web.json_response({
                 'error': 'Missing required field: requirements'
+            }, status=400)
+
+        if len(requirements) > 50_000:
+            return web.json_response({
+                'error': 'Requirements text exceeds maximum length of 50000 characters'
             }, status=400)
 
         # Store requirement in cache

@@ -157,6 +157,37 @@ test.describe('AI-130: Agent Controls API', () => {
         const resumeBody = await resumeResp.json();
         expect(resumeBody.paused).toBe(false);
     });
+
+    // Security validation tests (PR #53 fixes)
+
+    test('PUT /api/agents/{agent_id}/requirements returns 400 when requirements exceeds 50k chars', async ({ request }) => {
+        const oversizedReqs = 'x'.repeat(50001);
+        const response = await request.put(
+            `${BASE_URL}/api/agents/${TEST_AGENT_ID}/requirements`,
+            {
+                data: { requirements: oversizedReqs },
+                headers: { 'Content-Type': 'application/json' }
+            }
+        );
+        expect(response.status()).toBe(400);
+        const body = await response.json();
+        expect(body).toHaveProperty('error');
+        expect(body.error).toMatch(/maximum length/i);
+    });
+
+    test('PUT /api/agents/{agent_id}/requirements accepts requirements at exactly 50k chars', async ({ request }) => {
+        const maxReqs = 'x'.repeat(50000);
+        const response = await request.put(
+            `${BASE_URL}/api/agents/${TEST_AGENT_ID}/requirements`,
+            {
+                data: { requirements: maxReqs },
+                headers: { 'Content-Type': 'application/json' }
+            }
+        );
+        expect(response.status()).toBe(200);
+        const body = await response.json();
+        expect(body).toHaveProperty('status', 'ok');
+    });
 });
 
 // ---------------------------------------------------------------------------
