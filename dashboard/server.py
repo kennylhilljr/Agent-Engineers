@@ -90,6 +90,13 @@ _DECISION_LOG_MAX = 500  # larger than reasoning since decisions are compact
 # File changes constants (AI-164)
 FILE_CHANGES_MAX = 100  # circular buffer limit
 
+# Test results constants (AI-165)
+TEST_RESULTS_MAX = 200  # circular buffer limit
+
+# Valid test result statuses (AI-165)
+TEST_RUN_STATUSES = ('passed', 'failed', 'error')
+TEST_ITEM_STATUSES = ('passed', 'failed', 'error', 'skipped')
+
 # Valid file change statuses (AI-164)
 FILE_CHANGE_STATUSES = ('created', 'modified', 'deleted')
 
@@ -328,6 +335,9 @@ class DashboardServer:
         # In-memory file changes store (AI-164): list of file change summaries, newest last
         self._file_changes: list = []
 
+        # In-memory test results store (AI-165): list of test run records, newest last
+        self._test_results: list = []
+
         # Create app with middlewares
         self.app = web.Application(middlewares=[error_middleware, cors_middleware])
 
@@ -380,6 +390,11 @@ class DashboardServer:
         self.app.router.add_get('/api/file-changes', self.get_file_changes)
         self.app.router.add_get('/api/file-changes/{session_id}', self.get_file_changes_by_session)
 
+        # Test results endpoints (AI-165)
+        self.app.router.add_post('/api/test-results', self.post_test_results)
+        self.app.router.add_get('/api/test-results', self.get_test_results)
+        self.app.router.add_get('/api/test-results/{ticket}', self.get_test_results_by_ticket)
+
         # OPTIONS for CORS preflight
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/agents/{agent_name}', self.handle_options)
@@ -396,6 +411,8 @@ class DashboardServer:
         self.app.router.add_route('OPTIONS', '/api/code-streams/{stream_id}', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/file-changes', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/file-changes/{session_id}', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/test-results', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/test-results/{ticket}', self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
         """Handle CORS preflight OPTIONS requests."""
@@ -1239,6 +1256,157 @@ class DashboardServer:
             text=json.dumps({'error': 'File change summary not found', 'session_id': session_id}),
             content_type='application/json',
         )
+
+    async def post_test_results(self, request: Request) -> Response:
+        """POST /api/test-results — store test run results and broadcast via WebSocket.
+
+        Expected JSON body::
+
+            {
+                "agent":       "coding",
+                "ticket":      "AI-42",
+                "command":     "python -m pytest dashboard/__tests__/ -v",
+                "status":      "passed",  # passed|failed|error
+                "total":       42,
+                "passed":      40,
+                "failed":      2,
+                "errors":      0,
+                "duration_ms": 3200,
+                "tests": [
+                    {
+                        "name":            "test_post_code_stream",
+                        "status":          "passed",  # passed|failed|error|skipped
+                        "duration_ms":     45,
+                        "error_output":    "",
+                        "screenshot_path": ""
+                    }
+                ],
+                "full_output": "... full pytest output ..."
+            }
+
+        Returns:
+            JSON with the stored record (HTTP 201), or 400 for malformed requests.
+
+        WebSocket broadcast::
+
+            {type: "test_results", ...full payload..., timestamp}
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        command = body.get('command', '')
+        if not command:
+            return web.json_response({'error': 'Missing required field: command'}, status=400)
+
+        status = body.get('status', 'error')
+        if status not in TEST_RUN_STATUSES:
+            status = 'error'
+
+        agent = body.get('agent', '')
+        ticket = body.get('ticket', '')
+        total = int(body.get('total', 0))
+        passed = int(body.get('passed', 0))
+        failed = int(body.get('failed', 0))
+        errors = int(body.get('errors', 0))
+        duration_ms = body.get('duration_ms', None)
+        if duration_ms is not None:
+            duration_ms = int(duration_ms)
+        full_output = body.get('full_output', '')
+
+        # Compute pass rate
+        if total > 0:
+            pass_rate = round((passed / total) * 100, 1)
+        else:
+            pass_rate = 0.0
+
+        # Normalise test items
+        raw_tests = body.get('tests', [])
+        if not isinstance(raw_tests, list):
+            raw_tests = []
+        normalised_tests = []
+        for t in raw_tests:
+            item_status = t.get('status', 'error')
+            if item_status not in TEST_ITEM_STATUSES:
+                item_status = 'error'
+            item_duration = t.get('duration_ms', None)
+            if item_duration is not None:
+                item_duration = int(item_duration)
+            normalised_tests.append({
+                'name': t.get('name', ''),
+                'status': item_status,
+                'duration_ms': item_duration,
+                'error_output': t.get('error_output', ''),
+                'screenshot_path': t.get('screenshot_path', ''),
+            })
+
+        timestamp = datetime.utcnow().isoformat() + 'Z'
+
+        record = {
+            'agent': agent,
+            'ticket': ticket,
+            'command': command,
+            'status': status,
+            'total': total,
+            'passed': passed,
+            'failed': failed,
+            'errors': errors,
+            'pass_rate': pass_rate,
+            'duration_ms': duration_ms,
+            'tests': normalised_tests,
+            'full_output': full_output,
+            'timestamp': timestamp,
+        }
+
+        # Append to circular buffer
+        self._test_results.append(record)
+        if len(self._test_results) > TEST_RESULTS_MAX:
+            del self._test_results[0]
+
+        # Broadcast to WebSocket clients
+        ws_message = dict(record)
+        ws_message['type'] = 'test_results'
+        await self.broadcast_to_websockets(ws_message)
+
+        logger.info(
+            f"Test results stored: agent={agent!r}, ticket={ticket!r}, "
+            f"command={command!r}, status={status!r}, "
+            f"total={total}, passed={passed}, failed={failed}, pass_rate={pass_rate}%"
+        )
+
+        return web.json_response(record, status=201)
+
+    async def get_test_results(self, request: Request) -> Response:
+        """GET /api/test-results — return recent test results (last 50, newest first).
+
+        Returns:
+            JSON ``{"results": [...], "total": N}``
+        """
+        recent = list(reversed(self._test_results[-50:]))
+        return web.json_response({
+            'results': recent,
+            'total': len(recent),
+        })
+
+    async def get_test_results_by_ticket(self, request: Request) -> Response:
+        """GET /api/test-results/{ticket} — return all test runs for a specific ticket.
+
+        Path Parameters:
+            ticket: Linear ticket key (e.g. 'AI-42')
+
+        Returns:
+            JSON ``{"results": [...], "total": N}`` with all runs for that ticket,
+            newest first.
+        """
+        ticket = request.match_info['ticket']
+        matching = [r for r in self._test_results if r.get('ticket', '') == ticket]
+        # Newest first
+        matching = list(reversed(matching))
+        return web.json_response({
+            'results': matching,
+            'total': len(matching),
+        })
 
     async def websocket_handler(self, request: Request) -> WebSocketResponse:
         """WebSocket endpoint for real-time metrics streaming.
