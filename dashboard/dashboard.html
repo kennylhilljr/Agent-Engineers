@@ -2047,6 +2047,31 @@
             color: #fbbf24;
             border: 1px solid rgba(245, 158, 11, 0.3);
         }
+
+        /* Reasoning / Transparency Styles - AI-131 */
+        .reasoning-block { border-left: 3px solid #7c3aed; background: rgba(124,58,237,0.08); border-radius: 4px; margin: 8px 0; }
+        .reasoning-header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; user-select: none; }
+        .reasoning-header:hover { background: rgba(124,58,237,0.15); border-radius: 4px; }
+        .reasoning-toggle { color: #7c3aed; font-size: 12px; transition: transform 0.2s; }
+        .reasoning-toggle.open { transform: rotate(90deg); }
+        .reasoning-body { padding: 8px 16px 12px; font-size: 13px; color: #ccc; }
+        .reasoning-body.hidden { display: none; }
+        .complexity-badge { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; }
+        .complexity-badge.complex { background: #f59e0b; color: #000; }
+        .complexity-badge.simple { background: #10b981; color: #000; }
+        .reasoning-detail-row { margin-top: 6px; font-size: 12px; color: #94a3b8; }
+        .reasoning-detail-row strong { color: #cbd5e1; }
+        .decision-history { border-top: 1px solid #333; padding: 12px; margin-top: 8px; }
+        .decision-history-title { font-size: 12px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 6px; }
+        .decision-history-list { max-height: 200px; overflow-y: auto; }
+        .decision-history-list.hidden { display: none; }
+        .decision-history-entry { display: flex; gap: 8px; padding: 4px 0; font-size: 12px; color: #888; border-bottom: 1px solid #222; }
+        .decision-history-entry:last-child { border-bottom: none; }
+        .decision-history-ts { flex-shrink: 0; color: #64748b; }
+        .decision-history-text { flex: 1; }
+        .streaming-block { border-left: 3px solid #06b6d4; }
+        .streaming-badge { background: #06b6d4; color: #000; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: bold; }
+        .streaming-badge.done { background: #10b981; }
     </style>
 </head>
 <body>
@@ -2321,6 +2346,26 @@
                         </button>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Decision History Panel - AI-131 -->
+    <div class="card" style="margin-top: 24px;" data-testid="decision-history-panel">
+        <div class="card-header">
+            <h2 class="card-title">
+                <span style="font-size:1.2rem;">&#129504;</span>
+                Orchestrator Decision History
+                <span id="decision-history-count" style="font-size:0.75rem; color:#94a3b8; font-weight:400; margin-left:8px;" data-testid="decision-history-count">0 events</span>
+            </h2>
+        </div>
+        <div class="decision-history" id="decision-history-container">
+            <div class="decision-history-title" id="decision-history-toggle" data-testid="decision-history-toggle" onclick="toggleDecisionHistoryList()">
+                <span id="decision-history-toggle-icon">&#9660;</span>
+                Recent Decisions (last 10)
+            </div>
+            <div class="decision-history-list" id="decision-history-list" data-testid="decision-history-list">
+                <div style="color: #64748b; font-size: 12px; padding: 8px 0;" data-testid="decision-history-empty">No reasoning events yet. Events will appear here when the orchestrator makes routing decisions.</div>
             </div>
         </div>
     </div>
@@ -3569,22 +3614,82 @@
         }
 
         /**
-         * Handle orchestrator reasoning message
-         * Shows reasoning/decision-making process
+         * AI-131: Handle orchestrator reasoning message
+         * Shows collapsible reasoning blocks in chat and updates decision history panel
          */
         function handleReasoning(message) {
-            const { content, source, context, timestamp } = message;
+            const { agent, decision, complexity, reasoning, timestamp } = message;
+            console.log(`[REAL-TIME] Reasoning from ${agent}: ${decision} (${complexity})`);
+            // Render collapsible reasoning block in chat
+            if (window.chatInterface) {
+                window.chatInterface.addReasoningBlock({ agent, decision, complexity, reasoning, timestamp });
+            }
+            // Update decision history panel
+            updateDecisionHistoryPanel({ agent, decision, complexity, reasoning, timestamp });
+        }
 
-            console.log(`[REAL-TIME] Reasoning from ${source}: ${content}`);
+        /**
+         * AI-131: Handle code stream message
+         * Shows live code generation with real-time streaming
+         */
+        function handleCodeStreamAI131(message) {
+            const chunk = message.chunk !== undefined ? message.chunk : message.content;
+            const filePath = message.file_path || '';
+            const done = message.done !== undefined ? message.done : false;
+            const agentId = message.agent_id || message.operation || '';
+            console.log(`[CODE-STREAM] agent=${agentId} file=${filePath} done=${done}`);
+        }
 
-            // Add to live activity feed
-            addToLiveActivityFeed({
-                type: 'reasoning',
-                agent: source,
-                message: content,
-                timestamp: timestamp,
-                metadata: context
-            });
+        // AI-131: In-memory list of reasoning events for the decision history panel
+        const decisionHistoryLocal = [];
+
+        /**
+         * AI-131: Add a reasoning event to the decision history panel
+         */
+        function updateDecisionHistoryPanel(event) {
+            decisionHistoryLocal.unshift(event);
+            if (decisionHistoryLocal.length > 10) decisionHistoryLocal.pop();
+
+            const listEl = document.getElementById('decision-history-list');
+            const countEl = document.getElementById('decision-history-count');
+            if (!listEl) return;
+
+            if (countEl) {
+                const n = decisionHistoryLocal.length;
+                countEl.textContent = `${n} event${n !== 1 ? 's' : ''}`;
+            }
+
+            listEl.innerHTML = decisionHistoryLocal.map(ev => {
+                const ts = ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'}) : '';
+                const complexClass = (ev.complexity || '').toLowerCase() === 'complex' ? 'complex' : 'simple';
+                return `<div class="decision-history-entry" data-testid="decision-history-entry">
+                    <span class="decision-history-ts">${ts}</span>
+                    <span class="decision-history-text">
+                        <strong>${escapeHtmlGlobal(ev.agent || '')}</strong>:
+                        ${escapeHtmlGlobal(ev.decision || '')}
+                        <span class="complexity-badge ${complexClass}">${escapeHtmlGlobal(ev.complexity || '')}</span>
+                    </span>
+                </div>`;
+            }).join('');
+        }
+
+        /**
+         * AI-131: Toggle decision history list expand/collapse
+         */
+        function toggleDecisionHistoryList() {
+            const list = document.getElementById('decision-history-list');
+            const icon = document.getElementById('decision-history-toggle-icon');
+            if (!list) return;
+            list.classList.toggle('hidden');
+            if (icon) icon.textContent = list.classList.contains('hidden') ? '\u25BA' : '\u25BC';
+        }
+
+        /**
+         * AI-131: Global HTML escape helper used outside ChatInterface class
+         */
+        function escapeHtmlGlobal(text) {
+            if (typeof text !== 'string') text = String(text);
+            return text.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
         }
 
         /**
@@ -4224,6 +4329,48 @@
 
                 div.appendChild(content);
                 this.messagesContainer.appendChild(div);
+            }
+
+            /**
+             * AI-131: Add a collapsible reasoning block to the chat
+             * Shows orchestrator decision with complexity badge and expandable detail
+             */
+            addReasoningBlock({ agent, decision, complexity, reasoning, timestamp }) {
+                // Remove welcome message if present
+                const welcome = this.messagesContainer.querySelector('.chat-welcome');
+                if (welcome) welcome.remove();
+
+                const complexityLower = (complexity || '').toLowerCase();
+                const complexClass = complexityLower === 'complex' ? 'complex' : 'simple';
+                const blockId = `reasoning-${Date.now()}`;
+                const timeStr = timestamp
+                    ? new Date(timestamp).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
+                    : new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'chat-message system';
+                wrapper.setAttribute('data-testid', 'reasoning-message');
+
+                wrapper.innerHTML = `
+                    <div class="chat-message-content reasoning-block" data-testid="reasoning-block" style="max-width:90%;">
+                        <div class="reasoning-header" data-testid="reasoning-header" onclick="this.parentElement.querySelector('.reasoning-body').classList.toggle('hidden'); this.querySelector('.reasoning-toggle').classList.toggle('open');">
+                            <span style="font-size:1.1rem;">&#129504;</span>
+                            <strong style="color:#c4b5fd; font-size:13px;">Orchestrator Reasoning</strong>
+                            <span class="complexity-badge ${complexClass}" data-testid="complexity-badge">${this.escapeHtml(complexity || '')}</span>
+                            <span style="flex:1;"></span>
+                            <span class="reasoning-toggle" data-testid="reasoning-toggle">&#9654;</span>
+                        </div>
+                        <div class="reasoning-body hidden" data-testid="reasoning-body" id="${blockId}">
+                            <div class="reasoning-detail-row"><strong>Agent:</strong> ${this.escapeHtml(agent || '')}</div>
+                            <div class="reasoning-detail-row"><strong>Decision:</strong> ${this.escapeHtml(decision || '')}</div>
+                            <div class="reasoning-detail-row" style="margin-top:8px; color:#e2e8f0;">${this.escapeHtml(reasoning || '')}</div>
+                        </div>
+                        <div class="chat-timestamp">${timeStr}</div>
+                    </div>
+                `;
+
+                this.messagesContainer.appendChild(wrapper);
+                this.scrollToBottom();
             }
 
             showLoadingIndicator() {
