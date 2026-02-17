@@ -680,6 +680,159 @@
             color: var(--text-secondary);
         }
 
+        /* ========================================
+           AGENT LEADERBOARD
+           ======================================== */
+        .leaderboard-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.75rem;
+        }
+        .leaderboard-sort-controls {
+            display: flex;
+            gap: 4px;
+        }
+        .leaderboard-sort-btn {
+            background: var(--bg-tertiary);
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            transition: all 0.15s ease;
+        }
+        .leaderboard-sort-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--accent-blue);
+        }
+        .leaderboard-sort-btn.active {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--accent-blue-light);
+            border-color: var(--accent-blue);
+        }
+        .leaderboard-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        /* TaskCard component */
+        .task-card {
+            display: grid;
+            grid-template-columns: 24px 1fr auto;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0.6rem;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            border-left: 3px solid transparent;
+            transition: background 0.15s ease, border-color 0.15s ease;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+        .task-card:hover {
+            background: #3f4f63;
+        }
+        .task-card.status-running {
+            border-left-color: var(--accent-green);
+        }
+        .task-card.status-idle {
+            border-left-color: var(--border-color);
+        }
+        .task-card.status-error {
+            border-left-color: var(--accent-red);
+        }
+        .task-card.status-paused {
+            border-left-color: var(--accent-yellow);
+        }
+        .task-card-rank {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            font-family: monospace;
+            text-align: center;
+        }
+        .task-card-rank.gold { color: #f59e0b; }
+        .task-card-rank.silver { color: #94a3b8; }
+        .task-card-rank.bronze { color: #b87333; }
+        .task-card-main {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+        .task-card-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .task-card-stats {
+            display: flex;
+            gap: 8px;
+            color: var(--text-muted);
+            font-size: 0.72rem;
+            flex-wrap: wrap;
+        }
+        .task-card-stat {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+        .task-card-stat-label {
+            color: var(--text-muted);
+            font-size: 0.65rem;
+        }
+        .task-card-stat-value {
+            font-family: monospace;
+        }
+        .task-card-meta {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 2px;
+        }
+        .task-card-xp {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #f59e0b;
+            font-family: monospace;
+        }
+        .task-card-level {
+            font-size: 0.7rem;
+            color: var(--accent-blue-light);
+        }
+        .task-card-status-badge {
+            font-size: 0.62rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            padding: 1px 5px;
+            border-radius: 3px;
+        }
+        .task-card-status-badge.running {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent-green);
+        }
+        .task-card-status-badge.idle {
+            background: rgba(148, 163, 184, 0.1);
+            color: var(--text-muted);
+        }
+        .task-card-status-badge.error {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--accent-red);
+        }
+        .task-card-status-badge.paused {
+            background: rgba(245, 158, 11, 0.12);
+            color: #f59e0b;
+        }
+
         /* Active Requirement Display */
         .agent-active-task {
             margin-top: 6px;
@@ -1462,6 +1615,21 @@
                     <h2 class="panel-section-title">Activity Feed</h2>
                     <div class="activity-feed" id="activity-feed">
                         <!-- Activity items will be populated by JavaScript -->
+                    </div>
+                </section>
+
+                <!-- Agent Leaderboard -->
+                <section class="panel-section" id="leaderboard-section">
+                    <div class="leaderboard-header">
+                        <h2 class="panel-section-title" style="margin-bottom:0">Agent Leaderboard</h2>
+                        <div class="leaderboard-sort-controls" id="leaderboard-sort-controls" aria-label="Sort leaderboard by">
+                            <button class="leaderboard-sort-btn active" data-sort="xp" title="Sort by XP">XP</button>
+                            <button class="leaderboard-sort-btn" data-sort="success_rate" title="Sort by success rate">Rate</button>
+                            <button class="leaderboard-sort-btn" data-sort="cost" title="Sort by cost">Cost</button>
+                        </div>
+                    </div>
+                    <div class="leaderboard-list" id="leaderboard-list" aria-live="polite">
+                        <!-- TaskCards will be populated by renderLeaderboard() -->
                     </div>
                 </section>
             </aside>
@@ -2650,6 +2818,150 @@
 
         // Expose for testing
         window.loadOrchestratorFlow = loadOrchestratorFlow;
+
+        // ========================================
+        // AGENT LEADERBOARD
+        // ========================================
+
+        // Current sort column for the leaderboard
+        let leaderboardSortKey = 'xp';
+
+        // Expose for testing
+        window.leaderboardSortKey = leaderboardSortKey;
+
+        /**
+         * TaskCard component: renders one agent row in the leaderboard.
+         * @param {Object} agent - agent state object (id, name, model, status, ...)
+         * @param {Object} profile - mockAgentProfiles[agent.id] data
+         * @param {number} rank - 1-indexed rank position
+         * @returns {string} HTML string for one TaskCard
+         */
+        function TaskCard(agent, profile, rank) {
+            const agentId = agent.id || agent.name;
+            const agentName = escapeHtml(agent.name || agentId);
+            const status = agent.status || 'idle';
+            const xp = profile.xp || 0;
+            const level = profile.level || 1;
+            const successRate = profile.total_invocations > 0
+                ? ((profile.success_rate || 0) * 100).toFixed(0) + '%'
+                : '—';
+            const avgDur = profile.avg_duration_seconds
+                ? formatDuration(profile.avg_duration_seconds)
+                : '—';
+            const cost = formatCost(profile.total_cost_usd || 0);
+
+            // Rank badge color
+            let rankClass = '';
+            if (rank === 1) rankClass = 'gold';
+            else if (rank === 2) rankClass = 'silver';
+            else if (rank === 3) rankClass = 'bronze';
+
+            const rankDisplay = rank <= 3 ? ['🥇', '🥈', '🥉'][rank - 1] : `#${rank}`;
+
+            return `
+            <div class="task-card status-${status}" data-agent-id="${agentId}" data-rank="${rank}">
+                <span class="task-card-rank ${rankClass}">${rankDisplay}</span>
+                <div class="task-card-main">
+                    <span class="task-card-name">${agentName}</span>
+                    <div class="task-card-stats">
+                        <span class="task-card-stat">
+                            <span class="task-card-stat-label">Rate:</span>
+                            <span class="task-card-stat-value">${successRate}</span>
+                        </span>
+                        <span class="task-card-stat">
+                            <span class="task-card-stat-label">Avg:</span>
+                            <span class="task-card-stat-value">${avgDur}</span>
+                        </span>
+                        <span class="task-card-stat">
+                            <span class="task-card-stat-label">Cost:</span>
+                            <span class="task-card-stat-value">${cost}</span>
+                        </span>
+                    </div>
+                </div>
+                <div class="task-card-meta">
+                    <span class="task-card-xp">${xp.toLocaleString()} XP</span>
+                    <span class="task-card-level">Lv.${level}</span>
+                    <span class="task-card-status-badge ${status}">${status}</span>
+                </div>
+            </div>`;
+        }
+
+        // Expose for testing
+        window.TaskCard = TaskCard;
+
+        /**
+         * Sort agent+profile pairs by the given key.
+         * @param {Array} pairs - [{agent, profile}, ...]
+         * @param {string} sortKey - 'xp' | 'success_rate' | 'cost'
+         * @returns {Array} sorted pairs (descending)
+         */
+        function sortLeaderboard(pairs, sortKey) {
+            return [...pairs].sort((a, b) => {
+                if (sortKey === 'xp') {
+                    return (b.profile.xp || 0) - (a.profile.xp || 0);
+                } else if (sortKey === 'success_rate') {
+                    return (b.profile.success_rate || 0) - (a.profile.success_rate || 0);
+                } else if (sortKey === 'cost') {
+                    return (b.profile.total_cost_usd || 0) - (a.profile.total_cost_usd || 0);
+                }
+                return 0;
+            });
+        }
+
+        // Expose for testing
+        window.sortLeaderboard = sortLeaderboard;
+
+        /**
+         * Render the agent leaderboard.
+         * Sorts agents by leaderboardSortKey and renders TaskCard for each.
+         */
+        function renderLeaderboard() {
+            const container = document.getElementById('leaderboard-list');
+            if (!container) return;
+
+            const agents = state.agents || [];
+            if (agents.length === 0) {
+                container.innerHTML = '<div class="flow-empty">No agents available</div>';
+                return;
+            }
+
+            // Build pairs of {agent, profile}
+            const pairs = agents.map(agent => ({
+                agent,
+                profile: mockAgentProfiles[agent.id || agent.name] || {
+                    xp: 0, level: 1, success_rate: 0, total_invocations: 0,
+                    avg_duration_seconds: 0, total_cost_usd: 0,
+                }
+            }));
+
+            const sorted = sortLeaderboard(pairs, leaderboardSortKey);
+            container.innerHTML = sorted.map(({ agent, profile }, i) =>
+                TaskCard(agent, profile, i + 1)
+            ).join('');
+        }
+
+        // Expose for testing
+        window.renderLeaderboard = renderLeaderboard;
+
+        /**
+         * Update the active sort button state.
+         * @param {string} sortKey
+         */
+        function setLeaderboardSort(sortKey) {
+            leaderboardSortKey = sortKey;
+            window.leaderboardSortKey = sortKey;
+
+            // Update button active states
+            const btns = document.querySelectorAll('.leaderboard-sort-btn');
+            btns.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.sort === sortKey);
+            });
+
+            renderLeaderboard();
+        }
+
+        // Expose for testing
+        window.setLeaderboardSort = setLeaderboardSort;
 
         // ========================================
         // ACTIVITY ITEM COMPONENT
