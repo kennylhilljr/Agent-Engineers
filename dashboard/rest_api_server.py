@@ -414,6 +414,14 @@ class RESTAPIServer:
     async def get_providers(self, request: Request) -> Response:
         """GET /api/providers - Get available AI providers and models.
 
+        Provider availability is determined by checking environment variables:
+        - Claude: ANTHROPIC_API_KEY
+        - ChatGPT: OPENAI_API_KEY
+        - Gemini: GEMINI_API_KEY or GOOGLE_API_KEY
+        - Groq: GROQ_API_KEY
+        - KIMI: KIMI_API_KEY or MOONSHOT_API_KEY
+        - Windsurf: WINDSURF_API_KEY
+
         Returns:
             200 OK with list of providers and their models
         """
@@ -423,7 +431,7 @@ class RESTAPIServer:
                 'provider_id': 'claude',
                 'models': ['haiku-4-5', 'sonnet-4-5', 'opus-4-6'],
                 'default_model': 'sonnet-4-5',
-                'available': True,  # Always available (default)
+                'available': bool(os.getenv('ANTHROPIC_API_KEY')),
                 'description': 'Anthropic Claude models (default)'
             },
             {
@@ -439,7 +447,7 @@ class RESTAPIServer:
                 'provider_id': 'gemini',
                 'models': ['2.5-flash', '2.5-pro', '2.0-flash'],
                 'default_model': '2.5-flash',
-                'available': bool(os.getenv('GEMINI_API_KEY')),
+                'available': bool(os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')),
                 'description': 'Google Gemini models'
             },
             {
@@ -455,7 +463,7 @@ class RESTAPIServer:
                 'provider_id': 'kimi',
                 'models': ['moonshot-v1'],
                 'default_model': 'moonshot-v1',
-                'available': bool(os.getenv('KIMI_API_KEY')),
+                'available': bool(os.getenv('KIMI_API_KEY') or os.getenv('MOONSHOT_API_KEY')),
                 'description': 'Moonshot KIMI (2M token context)'
             },
             {
