@@ -59,6 +59,8 @@ Usage:
 
 import argparse
 import asyncio
+import csv
+import io
 import json
 import logging
 import os
@@ -66,6 +68,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Set
+from uuid import uuid4
 
 import aiohttp
 from aiohttp import web, WSMsgType
@@ -77,6 +80,12 @@ from dashboard.metrics_store import MetricsStore
 # In-memory store for requirements (ticket_key -> requirement text)
 _requirements_store: dict = {}
 
+# Max size of per-instance reasoning history circular buffer (AI-160)
+_REASONING_HISTORY_MAX = 100
+
+# Decision log constants (AI-161)
+DECISION_TYPES = ['agent_selection', 'complexity', 'verification', 'pr_routing', 'error_recovery', 'other']
+_DECISION_LOG_MAX = 500  # larger than reasoning since decisions are compact
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -277,6 +286,11 @@ class DashboardServer:
         self.broadcast_task: Optional[asyncio.Task] = None
         self.broadcast_interval = 5  # seconds
 
+        # Circular buffer for reasoning/thinking history (AI-160)
+        self._reasoning_history: list = []
+
+        # Circular buffer for decision log (AI-161)
+        self._decision_log: list = []
         # Create app with middlewares
         self.app = web.Application(middlewares=[error_middleware, cors_middleware])
 
@@ -305,11 +319,25 @@ class DashboardServer:
         # Reasoning broadcast endpoint (AI-158)
         self.app.router.add_post('/api/reasoning', self.broadcast_reasoning)
 
+        # Agent thinking broadcast endpoint (AI-159)
+        self.app.router.add_post('/api/agent-thinking', self.broadcast_agent_thinking)
+
+        # Reasoning blocks history endpoint (AI-160)
+        self.app.router.add_get('/api/reasoning/blocks', self.get_reasoning_blocks)
+
+        # Decision log endpoints (AI-161)
+        self.app.router.add_post('/api/decisions', self.post_decision)
+        self.app.router.add_get('/api/decisions', self.get_decisions)
+        self.app.router.add_get('/api/decisions/export', self.export_decisions)
         # OPTIONS for CORS preflight
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/agents/{agent_name}', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/requirements/{ticket_key}', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/reasoning', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/agent-thinking', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/reasoning/blocks', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/decisions', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/decisions/export', self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
         """Handle CORS preflight OPTIONS requests."""
@@ -615,6 +643,202 @@ class DashboardServer:
         logger.info(f"Reasoning event broadcast: ticket={ticket!r}, content_len={len(content)}")
 
         return web.json_response({'success': True})
+
+    async def broadcast_agent_thinking(self, request: Request) -> Response:
+        """POST /api/agent-thinking — broadcast an agent thinking event to all WebSocket clients.
+
+        Expected JSON body::
+
+            {
+                "agent":    "<agent name, e.g. 'coding'>",
+                "category": "<one of: files|changes|commands|tests>",
+                "content":  "<thinking text>",
+                "ticket":   "<optional ticket key, e.g. 'AI-159'>"
+            }
+
+        Returns:
+            JSON ``{"success": true}`` on success, or
+            ``{"error": "<message>"}`` with status 400 for malformed requests.
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        agent = body.get('agent', '')
+        category = body.get('category', 'files')
+        content = body.get('content', '')
+        ticket = body.get('ticket', '')
+
+        timestamp = datetime.now().isoformat()
+        message = {
+            'type': 'agent_thinking',
+            'agent': agent,
+            'category': category,
+            'content': content,
+            'ticket': ticket,
+            'timestamp': timestamp,
+        }
+
+        # Append to reasoning history circular buffer (AI-160)
+        self._reasoning_history.append({
+            'type': 'agent_thinking',
+            'agent': agent,
+            'category': category,
+            'content': content,
+            'ticket': ticket,
+            'timestamp': timestamp,
+        })
+        if len(self._reasoning_history) > _REASONING_HISTORY_MAX:
+            del self._reasoning_history[0]
+
+        await self.broadcast_to_websockets(message)
+        logger.info(
+            f"Agent thinking event broadcast: agent={agent!r}, category={category!r}, "
+            f"ticket={ticket!r}, content_len={len(content)}"
+        )
+
+        return web.json_response({'success': True})
+
+    async def get_reasoning_blocks(self, request: Request) -> Response:
+        """GET /api/reasoning/blocks — return summary of recent reasoning/thinking events.
+
+        Returns the last 50 events from the circular buffer of reasoning and
+        agent-thinking events that have been broadcast since server start.
+
+        Returns:
+            JSON ``{"blocks": [...], "total": N}`` where blocks contains at most
+            50 of the most recent events.
+        """
+        # Return last 50 of the up-to-100 stored events
+        blocks = self._reasoning_history[-50:]
+        return web.json_response({
+            'blocks': blocks,
+            'total': len(self._reasoning_history),
+        })
+
+    async def post_decision(self, request: Request) -> Response:
+        """POST /api/decisions — log an orchestrator decision and broadcast via WebSocket.
+
+        Expected JSON body::
+
+            {
+                "type": "agent_selection",   # one of DECISION_TYPES
+                "ticket": "AI-42",           # optional
+                "decision": "Use coding (sonnet) agent",
+                "reason": "Security-related changes require deeper analysis",
+                "outcome": "pending"         # optional: pending|success|failure
+            }
+
+        Returns:
+            JSON with the stored decision (including generated id and timestamp).
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        decision_type = body.get('type', 'other')
+        if decision_type not in DECISION_TYPES:
+            decision_type = 'other'
+
+        decision_text = body.get('decision', '')
+        if not decision_text:
+            return web.json_response({'error': 'Missing required field: decision'}, status=400)
+
+        record = {
+            'id': str(uuid4()),
+            'type': decision_type,
+            'ticket': body.get('ticket', ''),
+            'decision': decision_text,
+            'reason': body.get('reason', ''),
+            'outcome': body.get('outcome', 'pending'),
+            'timestamp': datetime.now().isoformat(),
+        }
+
+        # Append to circular buffer
+        self._decision_log.append(record)
+        if len(self._decision_log) > _DECISION_LOG_MAX:
+            del self._decision_log[0]
+
+        # Broadcast to WebSocket clients
+        await self.broadcast_to_websockets({
+            'type': 'decision_logged',
+            'decision': record,
+        })
+
+        logger.info(
+            f"Decision logged: type={decision_type!r}, ticket={record['ticket']!r}, "
+            f"decision={decision_text[:60]!r}"
+        )
+
+        return web.json_response(record, status=201)
+
+    async def get_decisions(self, request: Request) -> Response:
+        """GET /api/decisions — return decision log with optional filtering.
+
+        Query Parameters:
+            type: Filter by decision type (e.g. agent_selection)
+            ticket: Filter by ticket key (e.g. AI-42)
+            limit: Maximum number of results to return (default: all)
+
+        Returns:
+            JSON ``{"decisions": [...], "total": N}``
+        """
+        decision_type_filter = request.query.get('type', '').strip()
+        ticket_filter = request.query.get('ticket', '').strip()
+        limit_str = request.query.get('limit', '').strip()
+
+        results = list(self._decision_log)
+
+        if decision_type_filter:
+            results = [d for d in results if d['type'] == decision_type_filter]
+
+        if ticket_filter:
+            results = [d for d in results if d['ticket'] == ticket_filter]
+
+        # Most recent first
+        results = list(reversed(results))
+
+        if limit_str:
+            try:
+                limit = int(limit_str)
+                results = results[:limit]
+            except ValueError:
+                pass
+
+        return web.json_response({
+            'decisions': results,
+            'total': len(results),
+        })
+
+    async def export_decisions(self, request: Request) -> Response:
+        """GET /api/decisions/export — export decision log as JSON or CSV.
+
+        Query Parameters:
+            format: 'json' (default) or 'csv'
+
+        Returns:
+            JSON array or CSV file download.
+        """
+        export_format = request.query.get('format', 'json').lower()
+
+        if export_format == 'csv':
+            output = io.StringIO()
+            fieldnames = ['id', 'type', 'ticket', 'decision', 'reason', 'outcome', 'timestamp']
+            writer = csv.DictWriter(output, fieldnames=fieldnames)
+            writer.writeheader()
+            for record in self._decision_log:
+                writer.writerow({f: record.get(f, '') for f in fieldnames})
+
+            return web.Response(
+                text=output.getvalue(),
+                content_type='text/csv',
+                headers={'Content-Disposition': 'attachment; filename="decisions.csv"'},
+            )
+        else:
+            # Default: JSON
+            return web.json_response(list(self._decision_log))
 
     async def websocket_handler(self, request: Request) -> WebSocketResponse:
         """WebSocket endpoint for real-time metrics streaming.

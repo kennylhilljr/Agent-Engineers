@@ -1494,6 +1494,436 @@
             margin-bottom: 6px;
             font-weight: 600;
         }
+
+        /* Agent Thinking Block Styles (AI-159) */
+        .thinking-block {
+            font-family: 'Courier New', Courier, monospace;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            border-radius: 6px;
+            margin: 8px 0;
+            background: rgba(15, 23, 42, 0.6);
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .thinking-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(30, 41, 59, 0.8);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+            gap: 8px;
+        }
+
+        .thinking-header:hover {
+            background: rgba(51, 65, 85, 0.8);
+        }
+
+        .thinking-header-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #a78bfa;
+            letter-spacing: 0.04em;
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .thinking-category-icon {
+            font-size: 0.9rem;
+            flex-shrink: 0;
+        }
+
+        .thinking-toggle {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            flex-shrink: 0;
+            transition: transform 0.2s ease;
+        }
+
+        .thinking-block.expanded .thinking-toggle {
+            transform: rotate(180deg);
+        }
+
+        .thinking-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-in-out, opacity 0.2s ease;
+            opacity: 0;
+            padding: 0 12px;
+            border-top: 0px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .thinking-block.expanded .thinking-content {
+            max-height: 2000px;
+            opacity: 1;
+            padding: 10px 12px;
+            border-top: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        /* Collapsed summary info for thinking blocks (AI-160) */
+        .thinking-count {
+            font-size: 0.7rem;
+            color: #64748b;
+            flex-shrink: 0;
+            white-space: nowrap;
+            margin-left: 4px;
+        }
+
+        .thinking-timestamp {
+            font-size: 0.7rem;
+            color: #475569;
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+
+        .thinking-stream {
+            font-size: 0.8rem;
+            color: #cbd5e1;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .thinking-stream-entry {
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.05);
+        }
+
+        .thinking-stream-entry:last-child {
+            border-bottom: none;
+        }
+
+        /* Category-specific colors */
+        .thinking-block[data-category="files"] .thinking-header {
+            border-left: 3px solid #3b82f6;
+        }
+
+        .thinking-block[data-category="files"] .thinking-header-title {
+            color: #60a5fa;
+        }
+
+        .thinking-block[data-category="changes"] .thinking-header {
+            border-left: 3px solid #f97316;
+        }
+
+        .thinking-block[data-category="changes"] .thinking-header-title {
+            color: #fb923c;
+        }
+
+        .thinking-block[data-category="commands"] .thinking-header {
+            border-left: 3px solid #a855f7;
+        }
+
+        .thinking-block[data-category="commands"] .thinking-header-title {
+            color: #c084fc;
+        }
+
+        .thinking-block[data-category="tests"] .thinking-header {
+            border-left: 3px solid #22c55e;
+        }
+
+        .thinking-block[data-category="tests"] .thinking-header-title {
+            color: #4ade80;
+        }
+
+        /* Global reasoning controls bar (AI-160) */
+        .reasoning-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 6px;
+            margin-bottom: 8px;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        .reasoning-controls-count {
+            font-size: 0.75rem;
+            color: #64748b;
+            flex: 1;
+            font-weight: 600;
+        }
+
+        .reasoning-controls-btn {
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 4px;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            background: rgba(30, 41, 59, 0.9);
+            color: #94a3b8;
+            cursor: pointer;
+            letter-spacing: 0.04em;
+            transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+        }
+
+        .reasoning-controls-btn:hover {
+            background: rgba(51, 65, 85, 0.9);
+            color: #e2e8f0;
+            border-color: rgba(148, 163, 184, 0.5);
+        }
+
+        .reasoning-controls-btn.expand-all:hover {
+            color: #60a5fa;
+            border-color: rgba(96, 165, 250, 0.4);
+        }
+
+        .reasoning-controls-btn.collapse-all:hover {
+            color: #f87171;
+            border-color: rgba(248, 113, 113, 0.4);
+        }
+
+        /* Decision Log Panel Styles (AI-161) */
+        #decision-log-panel {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+        }
+
+        #decision-log-panel:hover {
+            border-color: rgba(59, 130, 246, 0.5);
+            box-shadow: 0 10px 30px rgba(59, 130, 246, 0.1);
+        }
+
+        .decision-log-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .decision-log-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #f1f5f9;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .decision-log-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .decision-search {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            border-radius: 8px;
+            color: #f1f5f9;
+            font-size: 0.85rem;
+            padding: 7px 12px;
+            outline: none;
+            width: 220px;
+            transition: border-color 0.2s ease;
+        }
+
+        .decision-search::placeholder {
+            color: #64748b;
+        }
+
+        .decision-search:focus {
+            border-color: rgba(96, 165, 250, 0.5);
+        }
+
+        .decision-export-btn {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(96, 165, 250, 0.4);
+            border-radius: 8px;
+            color: #60a5fa;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 7px 14px;
+            transition: all 0.2s ease;
+        }
+
+        .decision-export-btn:hover {
+            background: rgba(59, 130, 246, 0.15);
+            border-color: rgba(96, 165, 250, 0.7);
+        }
+
+        .decision-list {
+            max-height: 480px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+        }
+
+        .decision-list::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .decision-list::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.3);
+            border-radius: 4px;
+        }
+
+        .decision-list-empty {
+            text-align: center;
+            color: #64748b;
+            font-size: 0.9rem;
+            padding: 32px 0;
+        }
+
+        .decision-entry {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px 14px;
+            border-radius: 8px;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            margin-bottom: 8px;
+            background: rgba(15, 23, 42, 0.5);
+            transition: border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .decision-entry:hover {
+            border-color: rgba(148, 163, 184, 0.25);
+            background: rgba(30, 41, 59, 0.5);
+        }
+
+        .decision-entry-icon {
+            font-size: 1.1rem;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .decision-entry-body {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .decision-entry-top {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 4px;
+        }
+
+        .decision-type-badge {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            border: 1px solid;
+            flex-shrink: 0;
+        }
+
+        .decision-type-badge.agent_selection {
+            background: rgba(59, 130, 246, 0.1);
+            color: #60a5fa;
+            border-color: rgba(59, 130, 246, 0.35);
+        }
+
+        .decision-type-badge.complexity {
+            background: rgba(139, 92, 246, 0.1);
+            color: #a78bfa;
+            border-color: rgba(139, 92, 246, 0.35);
+        }
+
+        .decision-type-badge.verification {
+            background: rgba(16, 185, 129, 0.1);
+            color: #34d399;
+            border-color: rgba(16, 185, 129, 0.35);
+        }
+
+        .decision-type-badge.pr_routing {
+            background: rgba(249, 115, 22, 0.1);
+            color: #fb923c;
+            border-color: rgba(249, 115, 22, 0.35);
+        }
+
+        .decision-type-badge.error_recovery {
+            background: rgba(239, 68, 68, 0.1);
+            color: #f87171;
+            border-color: rgba(239, 68, 68, 0.35);
+        }
+
+        .decision-type-badge.other {
+            background: rgba(148, 163, 184, 0.1);
+            color: #94a3b8;
+            border-color: rgba(148, 163, 184, 0.3);
+        }
+
+        .decision-ticket {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #60a5fa;
+            background: rgba(59, 130, 246, 0.08);
+            padding: 1px 6px;
+            border-radius: 4px;
+        }
+
+        .decision-text {
+            font-size: 0.88rem;
+            color: #e2e8f0;
+            font-weight: 500;
+            word-break: break-word;
+        }
+
+        .decision-reason {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-top: 3px;
+            word-break: break-word;
+        }
+
+        .decision-entry-meta {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+
+        .decision-timestamp {
+            font-size: 0.72rem;
+            color: #475569;
+            white-space: nowrap;
+        }
+
+        .decision-outcome {
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 1px 7px;
+            border-radius: 4px;
+        }
+
+        .decision-outcome.pending {
+            color: #f59e0b;
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .decision-outcome.success {
+            color: #4ade80;
+            background: rgba(74, 222, 128, 0.1);
+        }
+
+        .decision-outcome.failure {
+            color: #f87171;
+            background: rgba(248, 113, 113, 0.1);
+        }
     </style>
 </head>
 <body>
@@ -1692,6 +2122,41 @@
             </div>
 
             <div id="req-feedback" class="req-feedback" data-testid="req-feedback" role="status"></div>
+        </div>
+
+        <!-- Decision Log Panel (AI-161) -->
+        <div id="decision-log-panel" data-testid="decision-log-panel">
+            <div class="decision-log-header">
+                <h2 class="decision-log-title">
+                    <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="flex-shrink:0;">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                    </svg>
+                    Decision Log
+                </h2>
+                <div class="decision-log-controls">
+                    <input
+                        type="text"
+                        id="decision-search"
+                        class="decision-search"
+                        placeholder="Search decisions or tickets..."
+                        aria-label="Search decisions"
+                        data-testid="decision-search"
+                        oninput="filterDecisions()"
+                    />
+                    <button
+                        class="decision-export-btn"
+                        id="decision-export-btn"
+                        data-testid="decision-export-btn"
+                        aria-label="Export decisions as JSON"
+                        onclick="exportDecisions()"
+                    >
+                        Export JSON
+                    </button>
+                </div>
+            </div>
+            <div class="decision-list" id="decision-list" data-testid="decision-list">
+                <div class="decision-list-empty" id="decision-list-empty">No decisions logged yet.</div>
+            </div>
         </div>
 
         <!-- Chat Interface -->
@@ -2839,6 +3304,12 @@
                         } else if (message.type === 'reasoning') {
                             console.log('Received reasoning event via WebSocket', message);
                             renderReasoningBlock(message);
+                        } else if (message.type === 'agent_thinking') {
+                            console.log('Received agent_thinking event via WebSocket', message);
+                            renderAgentThinkingBlock(message);
+                        } else if (message.type === 'decision_logged') {
+                            console.log('Received decision_logged event via WebSocket', message);
+                            prependDecisionEntry(message.decision);
                         }
                     } catch (error) {
                         console.error('Error processing WebSocket message:', error);
@@ -3305,15 +3776,162 @@
             console.log('Chat interface initialized');
         }
 
+        // ==========================================
+        // Decision Log Implementation (AI-161)
+        // ==========================================
+
+        // In-memory cache of decisions for search filtering
+        var _decisionCache = [];
+
+        var DECISION_TYPE_ICONS = {
+            'agent_selection': '\u{1F916}',
+            'complexity': '\u{1F4CA}',
+            'verification': '\u2705',
+            'pr_routing': '\u{1F50D}',
+            'error_recovery': '\u26A0',
+            'other': '\u{1F4CB}'
+        };
+
+        function formatDecisionTimestamp(ts) {
+            if (!ts) return '';
+            try {
+                var d = new Date(ts);
+                return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            } catch (e) {
+                return ts;
+            }
+        }
+
+        function buildDecisionEntryHTML(decision) {
+            var icon = DECISION_TYPE_ICONS[decision.type] || DECISION_TYPE_ICONS['other'];
+            var typeClass = decision.type || 'other';
+            var ticketHTML = decision.ticket
+                ? '<span class="decision-ticket">' + escapeHtmlDecision(decision.ticket) + '</span>'
+                : '';
+            var reasonHTML = decision.reason
+                ? '<div class="decision-reason">' + escapeHtmlDecision(decision.reason) + '</div>'
+                : '';
+            var outcomeClass = decision.outcome || 'pending';
+            var ts = formatDecisionTimestamp(decision.timestamp);
+            return '<div class="decision-entry" data-id="' + escapeHtmlDecision(decision.id || '') + '">'
+                + '<span class="decision-entry-icon">' + icon + '</span>'
+                + '<div class="decision-entry-body">'
+                +   '<div class="decision-entry-top">'
+                +     '<span class="decision-type-badge ' + typeClass + '">' + escapeHtmlDecision(decision.type || 'other') + '</span>'
+                +     ticketHTML
+                +   '</div>'
+                +   '<div class="decision-text">' + escapeHtmlDecision(decision.decision || '') + '</div>'
+                +   reasonHTML
+                + '</div>'
+                + '<div class="decision-entry-meta">'
+                +   '<span class="decision-timestamp">' + ts + '</span>'
+                +   '<span class="decision-outcome ' + escapeHtmlDecision(outcomeClass) + '">' + escapeHtmlDecision(outcomeClass) + '</span>'
+                + '</div>'
+                + '</div>';
+        }
+
+        function escapeHtmlDecision(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function prependDecisionEntry(decision) {
+            // Keep cache in sync (most recent first)
+            _decisionCache.unshift(decision);
+            renderDecisionList(_decisionCache);
+        }
+
+        function renderDecisionList(decisions) {
+            var list = document.getElementById('decision-list');
+            var emptyMsg = document.getElementById('decision-list-empty');
+            if (!list) return;
+
+            // Remove old entries (keep empty placeholder)
+            var existing = list.querySelectorAll('.decision-entry');
+            existing.forEach(function(el) { el.remove(); });
+
+            if (!decisions || decisions.length === 0) {
+                if (emptyMsg) emptyMsg.style.display = '';
+                return;
+            }
+
+            if (emptyMsg) emptyMsg.style.display = 'none';
+
+            decisions.forEach(function(d) {
+                var wrapper = document.createElement('div');
+                wrapper.innerHTML = buildDecisionEntryHTML(d);
+                var entry = wrapper.firstChild;
+                list.appendChild(entry);
+            });
+        }
+
+        function filterDecisions() {
+            var search = document.getElementById('decision-search');
+            if (!search) return;
+            var term = search.value.toLowerCase().trim();
+            if (!term) {
+                renderDecisionList(_decisionCache);
+                return;
+            }
+            var filtered = _decisionCache.filter(function(d) {
+                return (
+                    (d.decision || '').toLowerCase().includes(term) ||
+                    (d.ticket || '').toLowerCase().includes(term) ||
+                    (d.reason || '').toLowerCase().includes(term) ||
+                    (d.type || '').toLowerCase().includes(term)
+                );
+            });
+            renderDecisionList(filtered);
+        }
+
+        async function exportDecisions() {
+            try {
+                var resp = await fetch('/api/decisions/export?format=json');
+                if (!resp.ok) throw new Error('Export failed: ' + resp.status);
+                var data = await resp.json();
+                var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = 'decisions.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (e) {
+                console.error('Decision export error:', e);
+            }
+        }
+
+        async function loadDecisionHistory() {
+            try {
+                var resp = await fetch('/api/decisions?limit=100');
+                if (!resp.ok) return;
+                var data = await resp.json();
+                if (data.decisions && data.decisions.length > 0) {
+                    _decisionCache = data.decisions;
+                    renderDecisionList(_decisionCache);
+                }
+            } catch (e) {
+                console.warn('Could not load decision history:', e);
+            }
+        }
+
         // Start when DOM is ready
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
                 init();
                 initChat();
+                loadDecisionHistory();
             });
         } else {
             init();
             initChat();
+            loadDecisionHistory();
         }
 
         // Cleanup on page unload
