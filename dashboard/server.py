@@ -62,6 +62,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Set
@@ -72,9 +73,6 @@ from aiohttp.web import Request, Response, WebSocketResponse, middleware
 from aiohttp_cors import ResourceOptions, setup as cors_setup
 
 from dashboard.metrics_store import MetricsStore
-
-# Linear API configuration
-LINEAR_API_KEY = os.environ.get('LINEAR_API_KEY', '')
 
 # In-memory store for requirements (ticket_key -> requirement text)
 _requirements_store: dict = {}
@@ -175,13 +173,22 @@ async def update_linear_issue(issue_key: str, description: str) -> bool:
     Raises:
         Exception: If the API call fails
     """
-    get_id_query = """
-    query GetIssue($key: String!) {
-        issue(id: $key) {
-            id
+    api_key = os.environ.get('LINEAR_API_KEY', '')
+    if not api_key:
+        return False
+
+    # Search for issue by identifier (e.g., "AI-157")
+    search_query = """
+    query SearchIssue($term: String!) {
+        issueSearch(term: $term, first: 1) {
+            nodes {
+                id
+                identifier
+            }
         }
     }
     """
+
     update_query = """
     mutation UpdateIssue($id: String!, $description: String!) {
         issueUpdate(id: $id, input: { description: $description }) {
@@ -189,32 +196,33 @@ async def update_linear_issue(issue_key: str, description: str) -> bool:
         }
     }
     """
-    headers = {
-        'Authorization': LINEAR_API_KEY,
-        'Content-Type': 'application/json',
-    }
+
     async with aiohttp.ClientSession() as session:
-        # First get the internal issue ID from the key
+        headers = {
+            'Authorization': f'Bearer {api_key}',  # FIXED: Bearer prefix
+            'Content-Type': 'application/json'
+        }
+        # Search for issue by identifier
         async with session.post(
             'https://api.linear.app/graphql',
-            json={'query': get_id_query, 'variables': {'key': issue_key}},
-            headers=headers,
+            json={'query': search_query, 'variables': {'term': issue_key}},
+            headers=headers
         ) as resp:
             data = await resp.json()
-            if 'errors' in data:
-                raise Exception(f"Linear API error getting issue ID: {data['errors']}")
-            issue_id = data['data']['issue']['id']
+            nodes = data.get('data', {}).get('issueSearch', {}).get('nodes', [])
+            if not nodes:
+                logger.warning(f"Linear issue not found for key: {issue_key}")
+                return False
+            issue_id = nodes[0]['id']
 
-        # Then update the issue description
+        # Update the issue description
         async with session.post(
             'https://api.linear.app/graphql',
             json={'query': update_query, 'variables': {'id': issue_id, 'description': description}},
-            headers=headers,
+            headers=headers
         ) as resp:
             result = await resp.json()
-            if 'errors' in result:
-                raise Exception(f"Linear API error updating issue: {result['errors']}")
-            return result['data']['issueUpdate']['success']
+            return result.get('data', {}).get('issueUpdate', {}).get('success', False)
 
 
 class DashboardServer:
@@ -458,6 +466,10 @@ class DashboardServer:
         ticket_key = request.match_info['ticket_key']
         logger.info(f"GET /api/requirements/{ticket_key}")
 
+        # Validate ticket_key format (e.g., AI-157)
+        if not re.match(r'^[A-Z]+-\d+$', ticket_key):
+            return web.json_response({'error': 'Invalid ticket key format'}, status=400)
+
         requirement_text = _requirements_store.get(ticket_key, '')
         return web.json_response({
             'ticket_key': ticket_key,
@@ -484,6 +496,10 @@ class DashboardServer:
         ticket_key = request.match_info['ticket_key']
         logger.info(f"PUT /api/requirements/{ticket_key}")
 
+        # Validate ticket_key format (e.g., AI-157)
+        if not re.match(r'^[A-Z]+-\d+$', ticket_key):
+            return web.json_response({'error': 'Invalid ticket key format'}, status=400)
+
         try:
             body = await request.json()
         except Exception:
@@ -499,6 +515,10 @@ class DashboardServer:
             )
 
         requirement_text = body['requirement']
+
+        if not isinstance(requirement_text, str):
+            return web.json_response({'error': 'requirement must be a string'}, status=400)
+
         sync_to_linear = bool(body.get('sync_to_linear', False))
 
         # Store locally (atomic in-memory update)
@@ -507,7 +527,8 @@ class DashboardServer:
 
         linear_synced = False
         if sync_to_linear:
-            if not LINEAR_API_KEY:
+            linear_api_key = os.environ.get('LINEAR_API_KEY', '')
+            if not linear_api_key:
                 logger.warning("LINEAR_API_KEY not set — cannot sync to Linear")
                 return web.json_response(
                     {
