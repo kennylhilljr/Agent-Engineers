@@ -1780,6 +1780,41 @@
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
         }
+
+        /* Agent Pause/Resume Controls (AI-151 / AI-152) */
+        .agent-control-btn {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            padding: 2px 8px;
+            font-size: 0.65rem;
+            border-radius: 4px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            transition: opacity 0.15s;
+            z-index: 1;
+        }
+        .agent-control-btn.pause-btn {
+            background: rgba(245, 158, 11, 0.15);
+            border-color: rgba(245, 158, 11, 0.4);
+            color: #f59e0b;
+        }
+        .agent-control-btn.pause-btn:hover {
+            background: rgba(245, 158, 11, 0.3);
+        }
+        .agent-control-btn.resume-btn {
+            background: rgba(16, 185, 129, 0.15);
+            border-color: rgba(16, 185, 129, 0.4);
+            color: #10b981;
+        }
+        .agent-control-btn.resume-btn:hover {
+            background: rgba(16, 185, 129, 0.3);
+        }
+        .agent-item { position: relative; }
     </style>
 </head>
 <body>
@@ -2123,6 +2158,14 @@
                     </details>`;
                 }
 
+                // Build pause/resume control button for AI-151/AI-152
+                let controlBtnHtml = '';
+                if (status === 'running') {
+                    controlBtnHtml = `<button class="agent-control-btn pause-btn" data-agent-id="${agentId}" title="Pause agent">Pause</button>`;
+                } else if (status === 'paused') {
+                    controlBtnHtml = `<button class="agent-control-btn resume-btn" data-agent-id="${agentId}" title="Resume agent">Resume</button>`;
+                }
+
                 return `
                 <div class="agent-item fade-in" data-agent="${agentId}">
                     <div class="agent-info">
@@ -2138,6 +2181,7 @@
                         ${invocations > 0 ? `<span class="agent-invocations" title="Total invocations">×${invocations}</span>` : ''}
                     </div>
                     ${activeTaskHtml}
+                    ${controlBtnHtml}
                 </div>`;
             }).join('');
         };
@@ -3047,6 +3091,67 @@
         }
 
         // ========================================
+        // AGENT PAUSE / RESUME CONTROLS (AI-151 / AI-152)
+        // ========================================
+
+        /** Set of paused agent IDs; prevents orchestrator from assigning new tasks */
+        window.pausedAgents = new Set();
+
+        /**
+         * Returns true if the given agentId is currently paused.
+         * @param {string} agentId
+         * @returns {boolean}
+         */
+        function isAgentPaused(agentId) {
+            return window.pausedAgents.has(agentId);
+        }
+        window.isAgentPaused = isAgentPaused;
+
+        /**
+         * Adds a system message to the chat feed without user interaction.
+         * @param {string} text
+         */
+        function addSystemMessage(text) {
+            addMessage('system', text);
+        }
+        window.addSystemMessage = addSystemMessage;
+
+        /**
+         * Pauses a running agent: marks it paused, blocks new task delegation,
+         * inserts a system message, and refreshes the agent list.
+         * Does NOT terminate any in-progress work.
+         * @param {string} agentId
+         */
+        function pauseAgent(agentId) {
+            window.pausedAgents.add(agentId);
+            const agent = state.agents.find(a => (a.id || a.name) === agentId);
+            if (agent) {
+                agent.status = 'paused';
+                const agentName = agent.name || agentId;
+                addSystemMessage('Agent ' + agentName + ' paused by user');
+            }
+            window.renderAgents();
+        }
+        window.pauseAgent = pauseAgent;
+
+        /**
+         * Resumes a paused agent: restores idle status, removes from paused set,
+         * inserts a system message, and refreshes the agent list.
+         * @param {string} agentId
+         */
+        function resumeAgent(agentId) {
+            window.pausedAgents.delete(agentId);
+            const agent = state.agents.find(a => (a.id || a.name) === agentId);
+            if (agent) {
+                agent.status = 'idle';
+                const agentName = agent.name || agentId;
+                addSystemMessage('Agent ' + agentName + ' resumed by user');
+            }
+            window.renderAgents();
+        }
+        window.resumeAgent = resumeAgent;
+
+        // ========================================
         // AGENT PROFILE DATA (Mock AgentProfile from metrics.py types)
         // ========================================
         const mockAgentProfiles = {
@@ -3893,6 +3998,18 @@
             });
             document.addEventListener('keydown', function(e) {
                 if (e.key === 'Escape') closeAgentDetail();
+            });
+
+            // Pause/Resume button event delegation (AI-151 / AI-152)
+            document.getElementById('agent-list').addEventListener('click', function(e) {
+                const btn = e.target.closest('.agent-control-btn');
+                if (!btn) return;
+                const agentId = btn.dataset.agentId;
+                if (btn.classList.contains('pause-btn')) {
+                    pauseAgent(agentId);
+                } else if (btn.classList.contains('resume-btn')) {
+                    resumeAgent(agentId);
+                }
             });
 
             // Load provider status from API (non-blocking)
