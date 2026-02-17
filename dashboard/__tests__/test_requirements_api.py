@@ -8,6 +8,7 @@ Tests cover:
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -155,7 +156,7 @@ class TestPutRequirement(AioHTTPTestCase):
                 'sync_to_linear': True,
             }
             # Ensure LINEAR_API_KEY is set so the code proceeds
-            with patch.object(server_module, 'LINEAR_API_KEY', 'test-api-key'):
+            with patch.dict(os.environ, {'LINEAR_API_KEY': 'test-api-key'}):
                 resp = await self.client.request(
                     'PUT',
                     '/api/requirements/AI-157',
@@ -198,7 +199,7 @@ class TestPutRequirement(AioHTTPTestCase):
                 'requirement': 'Important requirement.',
                 'sync_to_linear': True,
             }
-            with patch.object(server_module, 'LINEAR_API_KEY', 'test-api-key'):
+            with patch.dict(os.environ, {'LINEAR_API_KEY': 'test-api-key'}):
                 resp = await self.client.request(
                     'PUT',
                     '/api/requirements/AI-157',
@@ -218,7 +219,9 @@ class TestPutRequirement(AioHTTPTestCase):
     @unittest_run_loop
     async def test_put_requirement_missing_api_key_skips_linear_sync(self):
         """PUT with sync_to_linear=true but no LINEAR_API_KEY skips sync gracefully."""
-        with patch.object(server_module, 'LINEAR_API_KEY', ''):
+        # Remove LINEAR_API_KEY from environment if present
+        env_without_key = {k: v for k, v in os.environ.items() if k != 'LINEAR_API_KEY'}
+        with patch.dict(os.environ, env_without_key, clear=True):
             payload = {
                 'requirement': 'Requirement without key.',
                 'sync_to_linear': True,
