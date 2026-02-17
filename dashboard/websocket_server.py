@@ -44,6 +44,8 @@ from typing import Any, Literal, Optional, Set
 
 from aiohttp import WSMsgType, web
 
+from exceptions import SecurityError
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -133,7 +135,12 @@ def validate_websocket_auth(request: web.Request) -> tuple[bool, Optional[str]]:
     logger.warning(
         f"WebSocket authentication failed from {request.remote}"
     )
-    return (False, "Unauthorized: Invalid or missing authentication token")
+    error = SecurityError(
+        message="Unauthorized: Invalid or missing authentication token",
+        error_code="SECURITY_TOKEN_INVALID",
+        auth_type="bearer_token"
+    )
+    return (False, str(error))
 
 
 # ============================================================================
