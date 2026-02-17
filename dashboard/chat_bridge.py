@@ -606,41 +606,6 @@ class ChatBridge:
             },
         )
 
-    def _check_file_security(self, path: str, session_id: Optional[str]) -> Optional[Dict[str, Any]]:
-        """Validate *path* against the sandbox file-access policy.
-
-        Returns a security error chunk dict if the path is blocked, or ``None``
-        if the path is permitted.  Callers should yield the returned chunk and
-        abort the operation when the return value is not ``None``.
-
-        Args:
-            path: The file-system path to validate.
-            session_id: Session identifier for metadata.
-
-        Returns:
-            An error chunk dict, or ``None`` if access is permitted.
-        """
-        policy = _get_sandbox_policy()
-        if policy is None or not path:
-            return None
-
-        try:
-            policy.check_file(path)
-            return None
-        except Exception as sec_exc:
-            from dashboard.security import SecurityError
-            if isinstance(sec_exc, SecurityError):
-                return self._chunk(
-                    "error",
-                    f"Security policy violation: {sec_exc}",
-                    {
-                        "error_code": "SECURITY_FILE_BLOCKED",
-                        "path": path,
-                        "session_id": session_id,
-                    },
-                )
-            raise
-
     async def _handle_agent_delegation(
         self,
         intent: Dict[str, Any],
