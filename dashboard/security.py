@@ -27,12 +27,13 @@ from typing import FrozenSet, List, Optional
 ALLOWED_COMMANDS: FrozenSet[str] = frozenset([
     "git", "pytest", "python", "python3", "pip", "pip3",
     "npm", "npx", "node",
-    "curl", "echo", "cat", "ls", "grep", "find",
-    "mkdir", "cp", "mv", "rm", "touch", "chmod",
+    "curl", "echo", "cat", "ls", "grep",
+    "mkdir", "touch",
     "uv", "gh",
     "ps", "pwd", "which", "env", "wc",
     "head", "tail",
     "sleep", "lsof",
+    # Removed: rm, mv, cp, chmod, find (too risky without comprehensive pattern coverage)
 ])
 
 # ---------------------------------------------------------------------------
@@ -40,14 +41,18 @@ ALLOWED_COMMANDS: FrozenSet[str] = frozenset([
 # ---------------------------------------------------------------------------
 
 BLOCKED_PATTERNS: List[str] = [
-    r"rm\s+-rf\s+/",         # rm -rf /
-    r">\s*/etc/",             # redirect into /etc/
-    r"\bsudo\b",              # sudo
-    r"chmod\s+777",           # world-writable chmod
-    r"curl[^\n]*\|\s*bash",   # curl | bash (pipe to shell)
-    r"\beval\s*\(",           # eval()
-    r"__import__\s*\(",       # dynamic import
-    r"\bexec\s*\(",           # exec() shell injection
+    r"rm\s+(-\w*f\w*|-\w*r\w*)\s",   # any rm with -f or -r flags (covers -rf, -fr, -Rf, etc.)
+    r">\s*/etc/",                      # redirect into /etc/
+    r">\s*/usr/",                      # redirect into /usr/
+    r">\s*/sys/",                      # redirect into /sys/
+    r"sudo\s+",                        # sudo (with trailing space to avoid false positives)
+    r"chmod\s+[0-7]*[2367][0-7][0-7]", # any world-writable chmod (e.g. 777, 775, 776)
+    r"chmod\s+[ao][+]",               # chmod a+... or chmod o+... (grant to all/others)
+    r"curl[^\n]*\|\s*(ba)?sh",        # curl | bash or curl | sh
+    r"wget[^\n]*\|\s*(ba)?sh",        # wget | bash or wget | sh
+    r"\beval\s*[\(\`]",               # eval() or eval`...`
+    r"\bexec\s*[\(\`]",               # exec() or exec`...`
+    r"__import__\s*\(",               # dynamic import
 ]
 
 
