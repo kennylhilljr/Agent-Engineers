@@ -789,6 +789,7 @@
             sessionNumber: 1,
             totalTokens: 0,
             totalCost: 0,
+            isAgentRunning: false,  // Hot-swap guard: prevent switching during active agent call
         };
         const state = window.state;
 
@@ -991,6 +992,7 @@
             const message = input.value.trim();
 
             if (!message) return;
+            if (state.isAgentRunning) return; // Prevent double-send during active call
 
             // Add user message
             addMessage('user', message);
@@ -998,9 +1000,28 @@
             // Clear input
             input.value = '';
 
-            // Simulate assistant response
+            // Set agent running flag (prevents hot-swap during response)
+            state.isAgentRunning = true;
+
+            // Update send button state
+            const sendBtn = document.getElementById('send-button');
+            if (sendBtn) {
+                sendBtn.disabled = true;
+                sendBtn.textContent = 'Sending...';
+            }
+
+            // Simulate assistant response (in production: call /api/chat with getConversationContext())
             setTimeout(() => {
                 addMessage('assistant', `You said: "${message}". This is a placeholder response. The chat interface is ready for integration with the backend API.`);
+
+                // Clear agent running flag (allows hot-swap again)
+                state.isAgentRunning = false;
+
+                // Restore send button
+                if (sendBtn) {
+                    sendBtn.disabled = false;
+                    sendBtn.textContent = 'Send';
+                }
             }, 500);
 
             // Update stats (mock)
@@ -1096,8 +1117,65 @@
             }
         }
 
+        // ========================================
+        // HOT-SWAP HELPERS
+        // ========================================
+        function getConversationContext() {
+            /**
+             * Extract conversation history for context passing to new provider.
+             * Returns array of {role, content} objects from non-system messages.
+             * Exposed as window.getConversationContext for testing.
+             */
+            return state.messages
+                .filter(msg => msg.role !== 'system')
+                .map(msg => ({
+                    role: msg.role,
+                    content: msg.content,
+                    timestamp: msg.timestamp
+                }));
+        }
+        window.getConversationContext = getConversationContext;
+
+        function performHotSwap(previousProvider, previousModel, newProvider, newModel) {
+            /**
+             * Perform a provider hot-swap:
+             * 1. Preserve full conversation history (it's already in state.messages)
+             * 2. Insert a clear system message noting the transition
+             * 3. The conversation context is accessible via getConversationContext()
+             *    for the next API call to the new provider
+             *
+             * Exposed as window.performHotSwap for testing.
+             */
+            const contextCount = getConversationContext().length;
+            const previousName = previousProvider.charAt(0).toUpperCase() + previousProvider.slice(1);
+            const newName = newProvider.charAt(0).toUpperCase() + newProvider.slice(1);
+
+            // Insert clear system message noting the provider change
+            const systemMsg = [
+                `🔄 Provider switched: ${previousName} (${previousModel}) → ${newName} (${newModel})`,
+                `Conversation history preserved (${contextCount} message${contextCount !== 1 ? 's' : ''}).`,
+                `Context will be sent to ${newName} for continuity.`
+            ].join(' ');
+
+            addMessage('system', systemMsg);
+        }
+        window.performHotSwap = performHotSwap;
+
         function handleProviderChange(event) {
-            state.currentProvider = event.target.value;
+            const previousProvider = state.currentProvider;
+            const previousModel = state.currentModel;
+            const newProvider = event.target.value;
+
+            // Hot-swap guard: don't allow switching while an agent call is running
+            if (state.isAgentRunning) {
+                addMessage('system', '⚠️ Cannot switch provider while an agent response is in progress.');
+                // Reset the selector to the current provider
+                const providerSelect = document.getElementById('provider-select');
+                if (providerSelect) providerSelect.value = previousProvider;
+                return;
+            }
+
+            state.currentProvider = newProvider;
             // Persist provider selection
             sessionStorage.setItem('currentProvider', state.currentProvider);
 
@@ -1111,7 +1189,8 @@
             // Update provider status badge for the new selection
             updateCurrentProviderStatus(state.currentProvider, window.providerStatus);
 
-            addMessage('system', `Switched to provider: ${state.currentProvider}`);
+            // Perform hot-swap: preserve history, insert system message
+            performHotSwap(previousProvider, previousModel, state.currentProvider, state.currentModel);
         }
 
         function handleModelChange(event) {
