@@ -77,6 +77,7 @@ from aiohttp.web import Request, Response, WebSocketResponse, middleware
 from aiohttp_cors import ResourceOptions, setup as cors_setup
 
 from dashboard.metrics_store import MetricsStore
+from dashboard.chat_bridge import ChatBridge, IntentParser, AgentRouter
 
 # In-memory store for requirements (ticket_key -> requirement text)
 _requirements_store: dict = {}
@@ -350,6 +351,12 @@ class DashboardServer:
         # Circular backlog of agent_event WS messages for reconnecting clients (AI-171)
         # Each entry is the fully-formatted WebSocket message dict.
         self._agent_event_backlog: list = []
+
+        # Chat-to-Agent Bridge (AI-173 / REQ-TECH-008)
+        self._chat_bridge = ChatBridge(
+            intent_parser=IntentParser(),
+            agent_router=AgentRouter(),
+        )
 
         # Register as a listener on the supplied collector (AI-171)
         if collector is not None:
@@ -1609,9 +1616,22 @@ class DashboardServer:
         return web.json_response({'success': True})
 
     async def post_chat_stream(self, request: Request) -> Response:
-        """POST /api/chat-stream — broadcast a streaming chat message chunk via WebSocket.
+        """POST /api/chat-stream — bridge a user chat message to the agent system (AI-173).
 
-        Expected JSON body::
+        When the request contains a ``message`` field the bridge pipeline is invoked:
+        intent parsing → agent routing → simulated delegation → streaming via WebSocket.
+
+        When the request contains a raw ``content`` field (legacy path) the chunk is
+        broadcast directly without intent parsing, for backward compatibility.
+
+        Request body (JSON) — bridge mode::
+
+            {
+                "message":    "ask coding agent to run tests",   # user chat message
+                "session_id": "uuid"                             # optional session id
+            }
+
+        Request body (JSON) — legacy broadcast mode::
 
             {
                 "content":   "text chunk",          # text content of the chunk
@@ -1621,10 +1641,14 @@ class DashboardServer:
             }
 
         Returns:
-            JSON ``{"success": true, "stream_id": "<uuid>"}`` on success,
+            JSON ``{"success": true, "stream_id": "<uuid>", "chunks_sent": N}`` on success,
             or 400 for malformed requests.
 
-        WebSocket broadcast::
+        WebSocket broadcast (bridge mode)::
+
+            {type: "chat_response", chunk_type, content, metadata, stream_id, timestamp}
+
+        WebSocket broadcast (legacy mode)::
 
             {type: "chat_message", content, is_final, stream_id, provider, timestamp}
         """
@@ -1633,6 +1657,75 @@ class DashboardServer:
         except Exception:
             return web.json_response({'error': 'Invalid JSON body'}, status=400)
 
+        # ----------------------------------------------------------------
+        # Bridge mode: user sends a natural-language "message"
+        # ----------------------------------------------------------------
+        if 'message' in body:
+            user_message = body.get('message', '')
+            if not isinstance(user_message, str) or not user_message.strip():
+                return web.json_response(
+                    {'error': 'message field must be a non-empty string'},
+                    status=400,
+                )
+
+            session_id = body.get('session_id', '') or str(uuid4())
+            stream_id = body.get('stream_id', '') or str(uuid4())
+            chunks_sent = 0
+
+            try:
+                generator = await self._chat_bridge.handle_message(
+                    user_message, session_id=session_id
+                )
+                async for bridge_chunk in generator:
+                    chunk_type = bridge_chunk.get('type', 'text')
+                    is_final = (chunk_type == 'done')
+
+                    ws_message = {
+                        'type': 'chat_response',
+                        'chunk_type': chunk_type,
+                        'content': bridge_chunk.get('content', ''),
+                        'metadata': bridge_chunk.get('metadata', {}),
+                        'stream_id': stream_id,
+                        'session_id': session_id,
+                        'is_final': is_final,
+                        'timestamp': bridge_chunk.get('timestamp', datetime.utcnow().isoformat() + 'Z'),
+                    }
+
+                    await self.broadcast_to_websockets(ws_message)
+                    chunks_sent += 1
+
+                    if is_final:
+                        break
+
+            except Exception as exc:
+                logger.exception("ChatBridge pipeline error: %r", exc)
+                error_msg = {
+                    'type': 'chat_response',
+                    'chunk_type': 'error',
+                    'content': f'Error processing message: {exc}',
+                    'metadata': {'error_code': 'BRIDGE_PIPELINE_ERROR'},
+                    'stream_id': stream_id,
+                    'session_id': session_id,
+                    'is_final': True,
+                    'timestamp': datetime.utcnow().isoformat() + 'Z',
+                }
+                await self.broadcast_to_websockets(error_msg)
+                chunks_sent += 1
+
+            logger.info(
+                f"ChatBridge stream complete: stream_id={stream_id!r}, "
+                f"session_id={session_id!r}, chunks_sent={chunks_sent}"
+            )
+            return web.json_response({
+                'success': True,
+                'stream_id': stream_id,
+                'session_id': session_id,
+                'chunks_sent': chunks_sent,
+            })
+
+        # ----------------------------------------------------------------
+        # Legacy broadcast mode: raw content chunk
+        # ----------------------------------------------------------------
         content = body.get('content', '')
         is_final = bool(body.get('is_final', False))
         stream_id = body.get('stream_id', '') or str(uuid4())
@@ -1650,7 +1743,7 @@ class DashboardServer:
 
         await self.broadcast_to_websockets(message)
         logger.info(
-            f"Chat stream broadcast: stream_id={stream_id!r}, is_final={is_final}, "
+            f"Chat stream broadcast (legacy): stream_id={stream_id!r}, is_final={is_final}, "
             f"provider={provider!r}, content_len={len(content)}"
         )
 
