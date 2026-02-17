@@ -655,6 +655,78 @@
             pointer-events: none;
         }
 
+        /* Active Requirement Display */
+        .agent-active-task {
+            margin-top: 6px;
+            background: rgba(16, 185, 129, 0.06);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 5px;
+            font-size: 0.78rem;
+        }
+        .agent-active-task-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 5px 8px;
+            list-style: none;
+            cursor: pointer;
+            user-select: none;
+        }
+        .agent-active-task-header::-webkit-details-marker { display: none; }
+        .agent-task-ticket {
+            font-weight: 700;
+            color: #10b981;
+            font-family: monospace;
+            margin-right: 6px;
+        }
+        .agent-task-title {
+            color: var(--text-primary);
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 160px;
+        }
+        .agent-task-timer {
+            color: #10b981;
+            font-family: monospace;
+            font-size: 0.75rem;
+            flex-shrink: 0;
+        }
+        .agent-active-task-body {
+            padding: 6px 8px;
+            border-top: 1px solid rgba(16, 185, 129, 0.15);
+        }
+        .agent-task-description {
+            color: var(--text-secondary);
+            line-height: 1.4;
+            margin-bottom: 6px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .agent-task-stats {
+            display: flex;
+            gap: 12px;
+            margin-top: 4px;
+        }
+        .agent-task-stat {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .agent-task-stat-label {
+            color: var(--text-muted);
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .agent-task-stat-value {
+            color: #10b981;
+            font-family: monospace;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
         /* Enhanced Agent Status Panel */
         .agent-details {
             display: flex;
@@ -921,8 +993,8 @@
         // AGENT ROSTER - 13 Agents from agents/definitions.py
         // ========================================
         const mockAgents = [
-            { id: 'linear',          name: 'Linear',          model: 'haiku',  status: 'idle', description: 'Manages Linear issues and project status.', invocations: 0, level: 1 },
-            { id: 'coding',          name: 'Coding',          model: 'sonnet', status: 'idle', description: 'Writes and tests code for complex features.', invocations: 0, level: 1 },
+            { id: 'linear',          name: 'Linear',          model: 'haiku',  status: 'idle', description: 'Manages Linear issues and project status.', invocations: 0, level: 1, active_task: null },
+            { id: 'coding',          name: 'Coding',          model: 'sonnet', status: 'idle', description: 'Writes and tests code for complex features.', invocations: 0, level: 1, active_task: null },
             { id: 'github',          name: 'GitHub',          model: 'haiku',  status: 'idle', description: 'Handles Git commits, branches, and PRs.', invocations: 0, level: 1 },
             { id: 'slack',           name: 'Slack',           model: 'haiku',  status: 'idle', description: 'Sends Slack notifications to users.', invocations: 0, level: 1 },
             { id: 'pr_reviewer',     name: 'PR Reviewer',     model: 'sonnet', status: 'idle', description: 'Reviews PRs for quality and correctness.', invocations: 0, level: 1 },
@@ -968,6 +1040,40 @@
                 const modelColors = { sonnet: '#6366f1', haiku: '#10b981', opus: '#f59e0b' };
                 const modelColor = modelColors[model] || '#94a3b8';
 
+                // Build active task section for running agents
+                let activeTaskHtml = '';
+                if (status === 'running' && agent.active_task) {
+                    const task = agent.active_task;
+                    const ticketKey = escapeHtml(task.ticket_key || '');
+                    const ticketTitle = escapeHtml(task.title || 'Working...');
+                    const taskDesc = escapeHtml(task.description || '');
+                    const tokens = formatCount(task.tokens || 0);
+                    const cost = formatCost(task.cost || 0);
+                    const timerId = `timer-${agentId}`;
+
+                    activeTaskHtml = `
+                    <details class="agent-active-task" open>
+                        <summary class="agent-active-task-header">
+                            ${ticketKey ? `<span class="agent-task-ticket">${ticketKey}</span>` : ''}
+                            <span class="agent-task-title">${ticketTitle}</span>
+                            <span class="agent-task-timer" id="${timerId}" data-started="${escapeHtml(String(task.started_at || ''))}">0:00</span>
+                        </summary>
+                        <div class="agent-active-task-body">
+                            ${taskDesc ? `<div class="agent-task-description">${taskDesc}</div>` : ''}
+                            <div class="agent-task-stats">
+                                <div class="agent-task-stat">
+                                    <span class="agent-task-stat-label">Tokens</span>
+                                    <span class="agent-task-stat-value" id="tokens-${agentId}">${tokens}</span>
+                                </div>
+                                <div class="agent-task-stat">
+                                    <span class="agent-task-stat-label">Cost</span>
+                                    <span class="agent-task-stat-value" id="cost-${agentId}">${cost}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </details>`;
+                }
+
                 return `
                 <div class="agent-item fade-in" data-agent="${agentId}">
                     <div class="agent-info">
@@ -982,6 +1088,7 @@
                         <span class="agent-status-text ${status}">${statusIcon} ${status}</span>
                         ${invocations > 0 ? `<span class="agent-invocations" title="Total invocations">×${invocations}</span>` : ''}
                     </div>
+                    ${activeTaskHtml}
                 </div>`;
             }).join('');
         };
@@ -1095,6 +1202,69 @@
             const now = new Date();
             return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
         }
+
+        /**
+         * Format a token count with K suffix for thousands.
+         * @param {number} count
+         * @returns {string} e.g. "1.2K" or "847"
+         */
+        function formatCount(count) {
+            if (count >= 1000) return (count / 1000).toFixed(1) + 'K';
+            return String(count);
+        }
+
+        /**
+         * Format a dollar cost to appropriate precision.
+         * @param {number} cost
+         * @returns {string} e.g. "$0.0023" or "$1.24"
+         */
+        function formatCost(cost) {
+            if (cost === 0) return '$0.00';
+            if (cost < 0.01) return '$' + cost.toFixed(4);
+            return '$' + cost.toFixed(2);
+        }
+
+        /**
+         * Format elapsed seconds as M:SS string.
+         * @param {number} seconds
+         * @returns {string} e.g. "1:23" or "12:05"
+         */
+        function formatElapsed(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${m}:${s.toString().padStart(2, '0')}`;
+        }
+
+        // Expose for testing
+        window.formatCount = formatCount;
+        window.formatCost = formatCost;
+        window.formatElapsed = formatElapsed;
+
+        /**
+         * Update all active task timers. Called every second.
+         * Finds all .agent-task-timer elements with data-started attribute and
+         * computes elapsed time since the agent started the task.
+         */
+        function updateActiveTaskTimers() {
+            const timers = document.querySelectorAll('.agent-task-timer[data-started]');
+            const now = Date.now();
+            timers.forEach(el => {
+                const startedAt = el.getAttribute('data-started');
+                if (!startedAt) return;
+                try {
+                    const startMs = new Date(startedAt).getTime();
+                    if (isNaN(startMs)) return;
+                    const elapsedSec = Math.max(0, Math.floor((now - startMs) / 1000));
+                    el.textContent = formatElapsed(elapsedSec);
+                } catch (e) {
+                    // Ignore invalid dates
+                }
+            });
+        }
+
+        // Start timer update loop (every second)
+        window.activeTaskTimerIntervalId = setInterval(updateActiveTaskTimers, 1000);
+        window.updateActiveTaskTimers = updateActiveTaskTimers;
 
         // ========================================
         // CHAT API - SSE STREAMING

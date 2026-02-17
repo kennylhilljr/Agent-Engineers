@@ -216,7 +216,7 @@ class TestRenderAgentsFunction:
     def test_render_agents_shows_status_dot(self, html_content):
         """renderAgents must render a status dot with status class."""
         idx = html_content.index('window.renderAgents')
-        section = html_content[idx:idx + 1500]
+        section = html_content[idx:idx + 4000]
         assert 'agent-status-dot' in section
 
     def test_render_agents_uses_escape_html(self, html_content):
