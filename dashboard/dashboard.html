@@ -1016,6 +1016,48 @@
             gap: 16px;
         }
 
+        /* AI-133: Chat History Toolbar */
+        .chat-history-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 10px;
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            border-radius: 8px;
+            font-size: 0.8rem;
+        }
+
+        .chat-history-label {
+            color: #64748b;
+            font-size: 0.78rem;
+        }
+
+        .clear-history-btn {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 12px;
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            border-radius: 6px;
+            color: #f87171;
+            font-size: 0.78rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .clear-history-btn:hover {
+            background: rgba(239, 68, 68, 0.18);
+            border-color: rgba(239, 68, 68, 0.45);
+            color: #fca5a5;
+        }
+
+        .clear-history-btn:active {
+            transform: scale(0.97);
+        }
+
         .chat-messages {
             flex: 1;
             overflow-y: auto;
@@ -1096,6 +1138,21 @@
             color: #e2e8f0;
             border-bottom-left-radius: 2px;
             border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        /* AI-133: System message style */
+        .chat-message.system {
+            justify-content: center;
+        }
+
+        .chat-message.system .chat-message-content {
+            background: rgba(245, 158, 11, 0.1);
+            color: #fcd34d;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            text-align: center;
+            max-width: 90%;
         }
 
         .chat-timestamp {
@@ -2171,6 +2228,21 @@
                 </h2>
             </div>
             <div id="chat-container" class="chat-container">
+                <div class="chat-history-toolbar" data-testid="chat-history-toolbar">
+                    <span class="chat-history-label" id="chat-history-count" data-testid="chat-history-count">0 messages</span>
+                    <button
+                        id="clear-history-btn"
+                        class="clear-history-btn"
+                        data-testid="clear-history-button"
+                        aria-label="Clear chat history"
+                        title="Clear all chat history"
+                    >
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                        Clear History
+                    </button>
+                </div>
                 <div class="provider-selector-container">
                     <label for="ai-provider-selector" class="provider-selector-label">
                         AI Provider:
@@ -3822,11 +3894,20 @@
                     this.modelSelector.addEventListener('change', (e) => this.handleModelChange(e));
                 }
 
+                // AI-133: Wire up Clear History button
+                const clearBtn = document.getElementById('clear-history-btn');
+                if (clearBtn) {
+                    clearBtn.addEventListener('click', () => this.clearHistory());
+                }
+
                 // Load provider status (AI-73)
                 this.loadProviderStatus();
 
                 // Refresh provider status every 30 seconds
                 setInterval(() => this.loadProviderStatus(), 30000);
+
+                // AI-133: Restore message history on page load
+                this.restoreHistory();
             }
 
             loadSavedProvider() {
@@ -4092,6 +4173,10 @@
                 this.messages.push(message);
                 this.renderMessage(message);
                 this.scrollToBottom();
+
+                // AI-133: Persist message to API + localStorage
+                this.persistMessage(message);
+                this.updateHistoryCount();
             }
 
             renderMessage(message) {
@@ -4211,6 +4296,162 @@
                         <p>Welcome to the Agent Dashboard Chat. Ask me anything about your agent status, metrics, or general questions!</p>
                     </div>
                 `;
+            }
+
+            // ---------------------------------------------------------------
+            // AI-133: Message History Persistence Methods
+            // ---------------------------------------------------------------
+
+            /**
+             * Persist a single message to the server API and localStorage backup.
+             * API format: {id, type: 'user'|'ai'|'system', content, timestamp, provider, model}
+             */
+            async persistMessage(message) {
+                const entry = {
+                    id: message.id,
+                    type: message.sender === 'user' ? 'user' : (message.sender === 'ai' ? 'ai' : 'system'),
+                    content: message.text,
+                    timestamp: message.timestamp.toISOString(),
+                    provider: message.provider || null,
+                    model: message.model || null
+                };
+
+                // 1. Persist to server API
+                try {
+                    await fetch(`${API_BASE_URL}/api/chat/history`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(entry)
+                    });
+                } catch (err) {
+                    console.warn('AI-133: Failed to persist message to API, using localStorage fallback:', err);
+                }
+
+                // 2. Always update localStorage as backup
+                this.saveToLocalStorage();
+            }
+
+            /**
+             * Restore chat history on page load.
+             * Tries the API first; falls back to localStorage if API fails or is empty.
+             */
+            async restoreHistory() {
+                let restored = false;
+
+                // Try API first
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/chat/history`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        const apiMessages = data.messages || [];
+                        if (apiMessages.length > 0) {
+                            this.loadMessagesFromStore(apiMessages);
+                            restored = true;
+                            console.log(`AI-133: Restored ${apiMessages.length} messages from API`);
+                        }
+                    }
+                } catch (err) {
+                    console.warn('AI-133: Could not load history from API:', err);
+                }
+
+                // Fallback to localStorage if API returned nothing
+                if (!restored) {
+                    try {
+                        const raw = localStorage.getItem('agent_dashboard_chat_history');
+                        if (raw) {
+                            const localMessages = JSON.parse(raw);
+                            if (localMessages.length > 0) {
+                                this.loadMessagesFromStore(localMessages);
+                                console.log(`AI-133: Restored ${localMessages.length} messages from localStorage`);
+                            }
+                        }
+                    } catch (err) {
+                        console.warn('AI-133: Could not load history from localStorage:', err);
+                    }
+                }
+
+                this.updateHistoryCount();
+            }
+
+            /**
+             * Load messages from a stored array (API or localStorage format) into the UI.
+             * Each entry: {id, type, content, timestamp, provider, model}
+             */
+            loadMessagesFromStore(entries) {
+                // Remove welcome message
+                const welcome = this.messagesContainer.querySelector('.chat-welcome');
+                if (welcome) welcome.remove();
+
+                for (const entry of entries) {
+                    const message = {
+                        id: entry.id,
+                        text: entry.content,
+                        sender: entry.type,  // 'user', 'ai', 'system'
+                        provider: entry.provider,
+                        model: entry.model,
+                        timestamp: new Date(entry.timestamp)
+                    };
+                    this.messages.push(message);
+                    this.renderMessage(message);
+                }
+                this.scrollToBottom();
+            }
+
+            /**
+             * Save current messages to localStorage as backup.
+             * Uses key: agent_dashboard_chat_history
+             */
+            saveToLocalStorage() {
+                try {
+                    const entries = this.messages.map(m => ({
+                        id: m.id,
+                        type: m.sender === 'user' ? 'user' : (m.sender === 'ai' ? 'ai' : 'system'),
+                        content: m.text,
+                        timestamp: m.timestamp instanceof Date
+                            ? m.timestamp.toISOString()
+                            : m.timestamp,
+                        provider: m.provider || null,
+                        model: m.model || null
+                    }));
+                    localStorage.setItem('agent_dashboard_chat_history', JSON.stringify(entries));
+                } catch (err) {
+                    console.warn('AI-133: Could not save to localStorage:', err);
+                }
+            }
+
+            /**
+             * Clear all history: server API, localStorage, and in-memory messages.
+             */
+            async clearHistory() {
+                // Clear server API
+                try {
+                    await fetch(`${API_BASE_URL}/api/chat/history`, { method: 'DELETE' });
+                } catch (err) {
+                    console.warn('AI-133: Failed to clear history from API:', err);
+                }
+
+                // Clear localStorage
+                try {
+                    localStorage.removeItem('agent_dashboard_chat_history');
+                } catch (err) {
+                    console.warn('AI-133: Failed to clear localStorage:', err);
+                }
+
+                // Clear in-memory + DOM
+                this.clearMessages();
+                this.updateHistoryCount();
+                console.log('AI-133: Chat history cleared');
+            }
+
+            /**
+             * Update the history count label in the toolbar.
+             */
+            updateHistoryCount() {
+                const countEl = document.getElementById('chat-history-count');
+                if (countEl) {
+                    const n = this.messages.length;
+                    countEl.textContent = n === 1 ? '1 message' : `${n} messages`;
+                }
             }
         }
 

@@ -89,6 +89,11 @@ AGENT_CONTROLS_MAX_ENTRIES = 100  # Max number of agent entries to prevent unbou
 AGENT_ID_PATTERN = re.compile(r'^[a-zA-Z0-9_-]+$')  # Only alphanumeric, underscore, dash
 REQUIREMENTS_MAX_LENGTH = 50_000  # Max length for requirements text
 
+# Chat History State Store (AI-133)
+# Persists chat messages for the current server session (max 1000 messages)
+chat_history: list = []  # [{"id", "type", "content", "timestamp", "provider", "model"}]
+CHAT_HISTORY_MAX = 1000
+
 # Setup structured logging
 setup_logging(log_level=os.getenv("LOG_LEVEL", "INFO"))
 logger = get_logger(__name__)
@@ -141,7 +146,7 @@ async def cors_middleware(request: Request, handler):
             # Default to first allowed origin if no match
             response.headers['Access-Control-Allow-Origin'] = allowed_list[0]
 
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
     response.headers['Access-Control-Allow-Credentials'] = 'true'
     return response
@@ -288,6 +293,12 @@ class DashboardServer:
         self.app.router.add_post('/api/agents/{agent_id}/resume', self.resume_agent)
         self.app.router.add_get('/api/agents/{agent_id}/requirements', self.get_agent_requirements)
         self.app.router.add_put('/api/agents/{agent_id}/requirements', self.update_agent_requirements)
+
+        # Chat History endpoints (AI-133)
+        self.app.router.add_get('/api/chat/history', self.get_chat_history)
+        self.app.router.add_post('/api/chat/history', self.post_chat_history)
+        self.app.router.add_delete('/api/chat/history', self.delete_chat_history)
+        self.app.router.add_route('OPTIONS', '/api/chat/history', self.handle_options)
 
         # OPTIONS for CORS preflight
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
@@ -1187,6 +1198,101 @@ class DashboardServer:
             'agent_controls': agent_controls,
             'total_agents': len(agent_controls),
             'paused_count': sum(1 for c in agent_controls.values() if c.get('paused', False)),
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+
+    # -------------------------------------------------------------------------
+    # Chat History - AI-133: Message History Persistence
+    # -------------------------------------------------------------------------
+
+    async def get_chat_history(self, request: Request) -> Response:
+        """GET /api/chat/history - Retrieve persisted message history (last 1000 messages).
+
+        Returns:
+            200 OK with list of chat messages
+        """
+        return web.json_response({
+            'messages': chat_history[-CHAT_HISTORY_MAX:],
+            'count': len(chat_history),
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+
+    async def post_chat_history(self, request: Request) -> Response:
+        """POST /api/chat/history - Append message(s) to the history.
+
+        Request body:
+            Single message: {"id", "type": "user|ai|system", "content", "timestamp",
+                             "provider"?, "model"?}
+            OR array:        [{"id", "type", ...}, ...]
+
+        Returns:
+            200 OK with confirmation and updated count
+            400 Bad Request for invalid input
+        """
+        try:
+            data = await request.json()
+        except (json.JSONDecodeError, ValueError):
+            return web.json_response({'error': 'Invalid JSON'}, status=400)
+
+        # Accept single message or array
+        if isinstance(data, dict):
+            messages_to_add = [data]
+        elif isinstance(data, list):
+            messages_to_add = data
+        else:
+            return web.json_response({'error': 'Body must be a message object or array'}, status=400)
+
+        added = 0
+        for msg in messages_to_add:
+            if not isinstance(msg, dict):
+                continue
+            # Validate required fields
+            if 'content' not in msg or 'type' not in msg:
+                return web.json_response(
+                    {'error': 'Each message must have "type" and "content" fields'},
+                    status=400
+                )
+            if msg['type'] not in ('user', 'ai', 'system'):
+                return web.json_response(
+                    {'error': f'Invalid message type "{msg["type"]}". Must be user, ai, or system'},
+                    status=400
+                )
+            # Ensure required fields have defaults
+            entry = {
+                'id': msg.get('id', int(datetime.utcnow().timestamp() * 1000)),
+                'type': msg['type'],
+                'content': msg['content'],
+                'timestamp': msg.get('timestamp', datetime.utcnow().isoformat() + 'Z'),
+                'provider': msg.get('provider'),
+                'model': msg.get('model')
+            }
+            chat_history.append(entry)
+            added += 1
+
+        # Enforce server-side limit
+        if len(chat_history) > CHAT_HISTORY_MAX:
+            del chat_history[:len(chat_history) - CHAT_HISTORY_MAX]
+
+        logger.info(f"Chat history: added {added} message(s), total={len(chat_history)}")
+        return web.json_response({
+            'status': 'ok',
+            'added': added,
+            'total': len(chat_history),
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+
+    async def delete_chat_history(self, request: Request) -> Response:
+        """DELETE /api/chat/history - Clear all persisted chat history.
+
+        Returns:
+            200 OK with confirmation
+        """
+        count = len(chat_history)
+        chat_history.clear()
+        logger.info(f"Chat history cleared: removed {count} messages")
+        return web.json_response({
+            'status': 'ok',
+            'cleared': count,
             'timestamp': datetime.utcnow().isoformat() + 'Z'
         })
 
