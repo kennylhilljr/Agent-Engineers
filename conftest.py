@@ -53,7 +53,20 @@ _worktree_collector_path = _WORKTREE_ROOT / "dashboard" / "collector.py"
 if _worktree_collector_path.exists():
     _load_module_from_file("dashboard.collector", _worktree_collector_path)
 
-# 4. Override dashboard.server with the worktree's AI-161 version
+# 4a. Load dashboard.chat_bridge from the worktree (AI-173) — must be before server.py
+_worktree_chat_bridge_path = _WORKTREE_ROOT / "dashboard" / "chat_bridge.py"
+if _worktree_chat_bridge_path.exists():
+    _load_module_from_file("dashboard.chat_bridge", _worktree_chat_bridge_path)
+
+# 4b-2. Load dashboard.provider_bridge from the worktree (AI-174 / REQ-TECH-009)
+_worktree_provider_bridge_path = _WORKTREE_ROOT / "dashboard" / "provider_bridge.py"
+if _worktree_provider_bridge_path.exists():
+    try:
+        _load_module_from_file("dashboard.provider_bridge", _worktree_provider_bridge_path)
+    except Exception:
+        pass  # graceful degradation if bridge deps missing
+
+# 4b. Override dashboard.server with the worktree's AI-161 version
 _worktree_server_path = _WORKTREE_ROOT / "dashboard" / "server.py"
 if _worktree_server_path.exists():
     _load_module_from_file("dashboard.server", _worktree_server_path)
@@ -67,3 +80,4 @@ if _worktree_rest_api_path.exists():
 _worktree_orchestrator_hook_path = _WORKTREE_ROOT / "dashboard" / "orchestrator_hook.py"
 if _worktree_orchestrator_hook_path.exists():
     _load_module_from_file("dashboard.orchestrator_hook", _worktree_orchestrator_hook_path)
+
