@@ -30,4 +30,4 @@ echo "Dashboard will be available at: http://127.0.0.1:8080/"
 echo ""
 
 # Run the server; forward all CLI arguments (e.g. --port, --host)
-python run_server.py "$@"
+python -m dashboard.server "$@"
