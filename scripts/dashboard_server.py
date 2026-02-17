@@ -100,6 +100,7 @@ class DashboardServer:
         self.app.router.add_get('/api/health', self.handle_health)
         self.app.router.add_get('/api/metrics', self.handle_metrics)
         self.app.router.add_get('/api/agents', self.handle_agents)
+        self.app.router.add_get('/api/providers', self.handle_providers)
 
     def _setup_cors(self) -> None:
         """Set up CORS to allow browser access from any origin."""
@@ -123,9 +124,23 @@ class DashboardServer:
     async def handle_index(self, request: web.Request) -> web.Response:
         """Serve the main dashboard HTML page.
 
-        Returns a single-file HTML page with embedded CSS and JavaScript
-        that displays all agent metrics in a responsive dashboard layout.
+        Returns the modern dashboard HTML with provider switcher, chat interface,
+        and real-time agent status panels. Falls back to generated HTML if file not found.
         """
+        # Try to serve the modern index.html from dashboard/ directory
+        dashboard_html_path = PROJECT_ROOT / "dashboard" / "index.html"
+        if dashboard_html_path.exists():
+            try:
+                html = dashboard_html_path.read_text(encoding='utf-8')
+                return web.Response(
+                    text=html,
+                    content_type='text/html',
+                    charset='utf-8'
+                )
+            except Exception as e:
+                logger.warning(f"Failed to read dashboard/index.html: {e}, falling back to generated HTML")
+
+        # Fallback to generated HTML
         html = self._generate_dashboard_html()
         return web.Response(
             text=html,
@@ -195,6 +210,73 @@ class DashboardServer:
                 {"error": f"Failed to load agents: {str(e)}"},
                 status=500
             )
+
+    async def handle_providers(self, request: web.Request) -> web.Response:
+        """Get provider availability status.
+
+        Checks environment variables to determine which AI providers are available.
+        Returns a JSON object with each provider's availability and models.
+        """
+        import os
+
+        # Provider configuration with required env vars and model lists
+        provider_config = {
+            "claude": {
+                "name": "Claude",
+                "env_vars": ["ANTHROPIC_API_KEY"],
+                "models": ["haiku-4.5", "sonnet-4.5", "opus-4.6"],
+                "default_model": "sonnet-4.5"
+            },
+            "openai": {
+                "name": "ChatGPT",
+                "env_vars": ["OPENAI_API_KEY"],
+                "models": ["gpt-4o", "o1", "o3-mini", "o4-mini"],
+                "default_model": "gpt-4o"
+            },
+            "gemini": {
+                "name": "Gemini",
+                "env_vars": ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+                "models": ["2.5-flash", "2.5-pro", "2.0-flash"],
+                "default_model": "2.5-flash"
+            },
+            "groq": {
+                "name": "Groq",
+                "env_vars": ["GROQ_API_KEY"],
+                "models": ["llama-3.3-70b", "mixtral-8x7b"],
+                "default_model": "llama-3.3-70b"
+            },
+            "kimi": {
+                "name": "KIMI",
+                "env_vars": ["KIMI_API_KEY", "MOONSHOT_API_KEY"],
+                "models": ["moonshot"],
+                "default_model": "moonshot"
+            },
+            "windsurf": {
+                "name": "Windsurf",
+                "env_vars": ["WINDSURF_API_KEY"],
+                "models": ["cascade"],
+                "default_model": "cascade"
+            }
+        }
+
+        providers = {}
+        for provider_id, config in provider_config.items():
+            # Check if any of the required env vars are set
+            available = any(os.environ.get(var) for var in config["env_vars"])
+            providers[provider_id] = {
+                "id": provider_id,
+                "name": config["name"],
+                "available": available,
+                "models": config["models"],
+                "default_model": config["default_model"],
+                "status": "available" if available else "unavailable"
+            }
+
+        return web.json_response({
+            "providers": providers,
+            "default_provider": "claude",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        })
 
     def _generate_dashboard_html(self) -> str:
         """Generate the complete single-file HTML dashboard.

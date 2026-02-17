@@ -403,6 +403,61 @@
             border-color: var(--accent-blue);
         }
 
+        /* Provider Status Indicators */
+        .provider-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.75rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .provider-status-badge.available {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent-green);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .provider-status-badge.unavailable {
+            background: rgba(148, 163, 184, 0.1);
+            color: var(--text-muted);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .provider-status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        .provider-status-dot.available {
+            background: var(--accent-green);
+        }
+
+        .provider-status-dot.unavailable {
+            background: var(--text-muted);
+        }
+
+        .provider-selector-row {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .provider-status-info {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-left: auto;
+        }
+
+        .provider-status-info .available-count {
+            color: var(--accent-green);
+            font-weight: 600;
+        }
+
         .chat-input-wrapper {
             display: flex;
             gap: 1rem;
@@ -655,22 +710,31 @@
                     <div class="chat-input-container">
                         <!-- Provider/Model Selector -->
                         <div class="provider-selector-container">
-                            <div class="selector-group">
-                                <label class="selector-label" for="provider-select">Provider:</label>
-                                <select class="selector" id="provider-select">
-                                    <option value="claude">Claude</option>
-                                    <option value="openai">ChatGPT</option>
-                                    <option value="gemini">Gemini</option>
-                                    <option value="groq">Groq</option>
-                                    <option value="kimi">KIMI</option>
-                                    <option value="windsurf">Windsurf</option>
-                                </select>
-                            </div>
-                            <div class="selector-group">
-                                <label class="selector-label" for="model-select">Model:</label>
-                                <select class="selector" id="model-select">
-                                    <!-- Model options will be populated by JavaScript -->
-                                </select>
+                            <div class="provider-selector-row">
+                                <div class="selector-group">
+                                    <label class="selector-label" for="provider-select">Provider:</label>
+                                    <select class="selector" id="provider-select" aria-label="Select AI provider">
+                                        <option value="claude">Claude</option>
+                                        <option value="openai">ChatGPT</option>
+                                        <option value="gemini">Gemini</option>
+                                        <option value="groq">Groq</option>
+                                        <option value="kimi">KIMI</option>
+                                        <option value="windsurf">Windsurf</option>
+                                    </select>
+                                </div>
+                                <div class="selector-group">
+                                    <label class="selector-label" for="model-select">Model:</label>
+                                    <select class="selector" id="model-select" aria-label="Select AI model">
+                                        <!-- Model options will be populated by JavaScript -->
+                                    </select>
+                                </div>
+                                <!-- Provider status badge shows current provider availability -->
+                                <span id="provider-status-badge" class="provider-status-badge" role="status" aria-live="polite" style="display:none;">
+                                    <span class="provider-status-dot"></span>
+                                    <span id="provider-status-text"></span>
+                                </span>
+                                <!-- Summary of available providers -->
+                                <span class="provider-status-info" id="provider-status-info" aria-label="Provider availability summary"></span>
                             </div>
                         </div>
 
@@ -718,6 +782,11 @@
             totalCost: 0,
         };
         const state = window.state;
+
+        // ========================================
+        // PROVIDER STATUS CACHE
+        // ========================================
+        window.providerStatus = {}; // Expose for testing
 
         // ========================================
         // PROVIDER/MODEL CONFIGURATION
@@ -897,10 +966,100 @@
             updateStats();
         }
 
+        // ========================================
+        // PROVIDER STATUS FUNCTIONS
+        // ========================================
+        async function loadProviderStatus() {
+            try {
+                const response = await fetch('/api/providers');
+                if (!response.ok) return;
+
+                const data = await response.json();
+                const providers = data.providers || {};
+
+                // Cache provider status
+                window.providerStatus = providers;
+
+                // Update the provider selector options with availability info
+                updateProviderSelectorOptions(providers);
+
+                // Update status for current provider
+                updateCurrentProviderStatus(state.currentProvider, providers);
+
+                // Update summary count
+                const availableCount = Object.values(providers).filter(p => p.available).length;
+                const totalCount = Object.keys(providers).length;
+                const infoEl = document.getElementById('provider-status-info');
+                if (infoEl) {
+                    infoEl.innerHTML = `<span class="available-count">${availableCount}</span>/${totalCount} providers active`;
+                    infoEl.setAttribute('aria-label', `${availableCount} of ${totalCount} providers have active API keys`);
+                }
+            } catch (error) {
+                // API not available - show offline status
+                const infoEl = document.getElementById('provider-status-info');
+                if (infoEl) {
+                    infoEl.textContent = 'Status unavailable';
+                }
+                console.debug('Provider status API not available:', error.message);
+            }
+        }
+
+        function updateProviderSelectorOptions(providers) {
+            const providerSelect = document.getElementById('provider-select');
+            if (!providerSelect) return;
+
+            // Update option labels to indicate availability
+            const options = providerSelect.querySelectorAll('option');
+            options.forEach(option => {
+                const providerId = option.value;
+                const info = providers[providerId];
+                if (info) {
+                    const statusIcon = info.available ? '● ' : '○ ';
+                    // Get base name (without previous status prefix)
+                    const baseName = option.textContent.replace(/^[●○] /, '');
+                    option.textContent = statusIcon + baseName;
+                    option.title = info.available
+                        ? `${info.name} - API key configured`
+                        : `${info.name} - No API key found`;
+                    option.style.color = info.available ? '' : '#94a3b8';
+                }
+            });
+        }
+
+        function updateCurrentProviderStatus(providerId, providers) {
+            const badge = document.getElementById('provider-status-badge');
+            const statusText = document.getElementById('provider-status-text');
+            const statusDot = badge ? badge.querySelector('.provider-status-dot') : null;
+
+            if (!badge || !statusText || !statusDot) return;
+
+            const info = providers[providerId];
+            if (!info) {
+                badge.style.display = 'none';
+                return;
+            }
+
+            badge.style.display = 'inline-flex';
+            if (info.available) {
+                badge.className = 'provider-status-badge available';
+                statusDot.className = 'provider-status-dot available';
+                statusText.textContent = 'Active';
+                badge.setAttribute('title', `${info.name} API key is configured and active`);
+            } else {
+                badge.className = 'provider-status-badge unavailable';
+                statusDot.className = 'provider-status-dot unavailable';
+                statusText.textContent = 'No API Key';
+                badge.setAttribute('title', `${info.name} API key not found - using mock responses`);
+            }
+        }
+
         function handleProviderChange(event) {
             state.currentProvider = event.target.value;
             updateModelSelector(state.currentProvider);
             updateStats();
+
+            // Update provider status badge for the new selection
+            updateCurrentProviderStatus(state.currentProvider, window.providerStatus);
 
             addMessage('system', `Switched to provider: ${state.currentProvider}`);
         }
@@ -976,8 +1135,12 @@
             document.getElementById('resume-all').addEventListener('click', handleResumeAll);
             document.getElementById('agent-list').addEventListener('click', handleAgentClick);
 
+            // Load provider status from API (non-blocking)
+            loadProviderStatus();
+
             console.log('Agent Dashboard initialized successfully');
-            console.log('- No external dependencies');
+            console.log('- Provider switcher with 6 providers');
+            console.log('- Provider status indicators via /api/providers');
             console.log('- Self-contained HTML/CSS/JavaScript');
             console.log('- Ready for backend integration');
         }
