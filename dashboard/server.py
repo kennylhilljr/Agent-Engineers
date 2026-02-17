@@ -104,6 +104,11 @@ REASONING_HISTORY_MAX = 100
 provider_switch_history: list = []  # [{"from_provider", "to_provider", "timestamp", "message_count"}]
 PROVIDER_SWITCH_HISTORY_MAX = 50
 
+# Tool Call History Store (AI-78)
+# Records tool calls (linear, slack, etc.) with timing and status (max 50)
+tool_call_history: list = []  # [{"tool_name", "input", "result", "duration_ms", "status", "timestamp"}]
+TOOL_CALL_HISTORY_MAX = 50
+
 # Setup structured logging
 setup_logging(log_level=os.getenv("LOG_LEVEL", "INFO"))
 logger = get_logger(__name__)
@@ -345,6 +350,13 @@ class DashboardServer:
         self.app.router.add_route('OPTIONS', '/api/integrations/slack/send', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/integrations/slack/messages', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/integrations/slack/react', self.handle_options)
+
+        # Tool Call History endpoints (AI-78)
+        self.app.router.add_post('/api/tools/call', self.post_tool_call)
+        self.app.router.add_get('/api/tools/calls', self.get_tool_calls)
+        self.app.router.add_delete('/api/tools/calls', self.delete_tool_calls)
+        self.app.router.add_route('OPTIONS', '/api/tools/call', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/tools/calls', self.handle_options)
 
         # OPTIONS for CORS preflight
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
@@ -1926,6 +1938,81 @@ class DashboardServer:
             "message_id": message_id,
             "emoji": emoji,
             "timestamp": datetime.utcnow().isoformat() + "Z"
+        })
+
+    # ------------------------------------------------------------------
+    # Tool Call History (AI-78) — record and retrieve tool calls
+    # ------------------------------------------------------------------
+
+    async def post_tool_call(self, request: Request) -> Response:
+        """POST /api/tools/call — Record a tool call.
+
+        Request body:
+            {tool_name, input, result, duration_ms?, status?, timestamp?}
+
+        Returns:
+            200 OK with stored entry
+            400 Bad Request for invalid input
+        """
+        try:
+            data = await request.json()
+        except (json.JSONDecodeError, ValueError):
+            return web.json_response({'error': 'Invalid JSON'}, status=400)
+
+        if not isinstance(data, dict):
+            return web.json_response({'error': 'Body must be a JSON object'}, status=400)
+
+        tool_name = data.get('tool_name', '').strip()
+        if not tool_name:
+            return web.json_response({'error': 'Missing required field: tool_name'}, status=400)
+
+        status_val = data.get('status', 'success')
+        if status_val not in ('success', 'error'):
+            return web.json_response(
+                {'error': "status must be 'success' or 'error'"},
+                status=400
+            )
+
+        entry = {
+            'tool_name': tool_name,
+            'input': data.get('input', {}),
+            'result': data.get('result', ''),
+            'duration_ms': data.get('duration_ms'),
+            'status': status_val,
+            'timestamp': data.get('timestamp', datetime.utcnow().isoformat() + 'Z'),
+        }
+        tool_call_history.append(entry)
+        if len(tool_call_history) > TOOL_CALL_HISTORY_MAX:
+            del tool_call_history[:len(tool_call_history) - TOOL_CALL_HISTORY_MAX]
+
+        logger.info(f"AI-78: Tool call recorded: {tool_name} status={status_val}")
+        return web.json_response({'status': 'ok', 'entry': entry})
+
+    async def get_tool_calls(self, request: Request) -> Response:
+        """GET /api/tools/calls — Retrieve last 50 tool calls.
+
+        Returns:
+            200 OK with list of tool calls
+        """
+        return web.json_response({
+            'calls': tool_call_history[-TOOL_CALL_HISTORY_MAX:],
+            'count': len(tool_call_history),
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+        })
+
+    async def delete_tool_calls(self, request: Request) -> Response:
+        """DELETE /api/tools/calls — Clear all tool call history.
+
+        Returns:
+            200 OK with count of cleared entries
+        """
+        count = len(tool_call_history)
+        tool_call_history.clear()
+        logger.info(f"AI-78: Tool call history cleared: removed {count} entries")
+        return web.json_response({
+            'status': 'ok',
+            'cleared': count,
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
         })
 
     def run(self):
