@@ -12,17 +12,292 @@
             box-sizing: border-box;
         }
 
+        /* AI-179: CSS Custom Properties for Dark/Light Themes */
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --border-color: #30363d;
+            --accent: #58a6ff;
+            --body-bg-start: #0f172a;
+            --body-bg-end: #1e293b;
+            --card-bg: rgba(15, 23, 42, 0.8);
+            --header-bg: rgba(15, 23, 42, 0.5);
+            --transition-theme: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
+
+        [data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f6f8fa;
+            --text-primary: #24292f;
+            --text-secondary: #656d76;
+            --border-color: #d0d7de;
+            --accent: #0969da;
+            --body-bg-start: #f0f4f8;
+            --body-bg-end: #dde8f0;
+            --card-bg: rgba(255, 255, 255, 0.9);
+            --header-bg: rgba(246, 248, 250, 0.9);
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-            color: #f1f5f9;
+            background: linear-gradient(135deg, var(--body-bg-start) 0%, var(--body-bg-end) 100%);
+            color: var(--text-primary);
             min-height: 100vh;
+            padding: 0;
+            transition: var(--transition-theme);
+        }
+
+        /* AI-178: App Layout for Left Panel + Main Content */
+        .app-layout {
+            display: flex;
+            min-height: 100vh;
+            align-items: stretch;
+        }
+
+        /* AI-178: Left Panel / Sidebar */
+        .left-panel {
+            width: 220px;
+            min-width: 220px;
+            background: var(--bg-secondary, #161b22);
+            border-right: 1px solid var(--border-color, #30363d);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+            transition: width 0.3s ease, min-width 0.3s ease;
+            z-index: 100;
+        }
+
+        .left-panel.collapsed {
+            width: 48px;
+            min-width: 48px;
+        }
+
+        .left-panel.collapsed .panel-content {
+            display: none;
+        }
+
+        .left-panel.collapsed .collapse-icon {
+            display: flex;
+        }
+
+        .left-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 12px;
+            border-bottom: 1px solid var(--border-color, #30363d);
+            min-height: 56px;
+            flex-shrink: 0;
+        }
+
+        .left-panel-logo {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--accent, #58a6ff);
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .left-panel-toggle {
+            background: none;
+            border: none;
+            color: var(--text-secondary, #8b949e);
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 6px;
+            font-size: 1.1rem;
+            line-height: 1;
+            flex-shrink: 0;
+            transition: background 0.15s ease, color 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .left-panel-toggle:hover {
+            background: var(--border-color, #30363d);
+            color: var(--text-primary, #e6edf3);
+        }
+
+        .left-panel.collapsed .left-panel-toggle {
+            margin: 0 auto;
+        }
+
+        .collapse-icon {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            padding: 16px 0;
+        }
+
+        .collapse-icon-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary, #8b949e);
+            cursor: pointer;
+            font-size: 1.1rem;
+            padding: 8px;
+            border-radius: 6px;
+            transition: background 0.15s ease, color 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+        }
+
+        .collapse-icon-btn:hover {
+            background: var(--border-color, #30363d);
+            color: var(--accent, #58a6ff);
+        }
+
+        .panel-content {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 12px 8px;
+            flex: 1;
+        }
+
+        .panel-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 10px;
+            border-radius: 6px;
+            color: var(--text-secondary, #8b949e);
+            font-size: 0.82rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.15s ease, color 0.15s ease;
+            text-decoration: none;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+        }
+
+        .panel-nav-item:hover {
+            background: var(--border-color, #30363d);
+            color: var(--text-primary, #e6edf3);
+        }
+
+        .panel-nav-item.active {
+            background: rgba(88, 166, 255, 0.1);
+            color: var(--accent, #58a6ff);
+        }
+
+        .panel-nav-icon {
+            font-size: 1rem;
+            flex-shrink: 0;
+            width: 20px;
+            text-align: center;
+        }
+
+        .panel-section-label {
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary, #8b949e);
+            padding: 8px 10px 4px;
+            opacity: 0.6;
+        }
+
+        /* AI-178: Main content area */
+        .main-content {
+            flex: 1;
+            min-width: 0;
             padding: 20px;
+            overflow-x: hidden;
+        }
+
+        /* AI-179: Dark mode toggle button */
+        .theme-toggle-btn {
+            background: none;
+            border: 1px solid var(--border-color, #30363d);
+            color: var(--text-secondary, #8b949e);
+            cursor: pointer;
+            padding: 6px 10px;
+            border-radius: 8px;
+            font-size: 1rem;
+            line-height: 1;
+            transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .theme-toggle-btn:hover {
+            background: var(--border-color, #30363d);
+            color: var(--text-primary, #e6edf3);
+        }
+
+        /* AI-179: Light mode overrides for elements with hardcoded dark colors */
+        [data-theme="light"] .header {
+            background: var(--header-bg);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+        }
+
+        [data-theme="light"] .header h1 {
+            background: linear-gradient(135deg, #0969da 0%, #0550ae 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        [data-theme="light"] .header p {
+            color: var(--text-secondary);
+        }
+
+        [data-theme="light"] .card {
+            background: var(--card-bg);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+        }
+
+        [data-theme="light"] .card-title {
+            color: var(--text-primary);
+        }
+
+        [data-theme="light"] .task-description {
+            color: var(--text-secondary);
+        }
+
+        [data-theme="light"] body {
+            background: linear-gradient(135deg, var(--body-bg-start) 0%, var(--body-bg-end) 100%);
+        }
+
+        /* AI-178: Responsive - auto-collapse left panel on narrow viewports */
+        @media (max-width: 768px) {
+            .left-panel {
+                width: 48px;
+                min-width: 48px;
+            }
+            .left-panel .panel-content {
+                display: none;
+            }
+            .left-panel .collapse-icon {
+                display: flex;
+            }
+            .left-panel .left-panel-logo {
+                display: none;
+            }
         }
 
         .container {
             max-width: 1400px;
             margin: 0 auto;
+            width: 100%;
         }
 
         /* Header */
@@ -2759,6 +3034,61 @@
     </style>
 </head>
 <body>
+    <!-- AI-178: App layout with collapsible left panel -->
+    <div class="app-layout">
+        <!-- AI-178: Left Panel / Sidebar -->
+        <aside class="left-panel" id="left-panel" aria-label="Navigation sidebar">
+            <div class="left-panel-header">
+                <span class="left-panel-logo">Agent Dash</span>
+                <button
+                    class="left-panel-toggle"
+                    id="left-panel-toggle"
+                    onclick="toggleLeftPanel()"
+                    aria-label="Toggle sidebar"
+                    title="Collapse sidebar"
+                >&#9664;</button>
+            </div>
+            <!-- Icons shown when collapsed -->
+            <div class="collapse-icon" id="collapse-icon-bar">
+                <button class="collapse-icon-btn" onclick="toggleLeftPanel()" aria-label="Expand sidebar" title="Expand sidebar">&#9654;</button>
+                <button class="collapse-icon-btn" onclick="document.getElementById('stats-grid').scrollIntoView({behavior:'smooth'})" aria-label="Go to stats" title="Stats">&#128202;</button>
+                <button class="collapse-icon-btn" onclick="document.getElementById('agent-cards').scrollIntoView({behavior:'smooth'})" aria-label="Go to agents" title="Agents">&#129302;</button>
+                <button class="collapse-icon-btn" onclick="document.getElementById('chat-container').scrollIntoView({behavior:'smooth'})" aria-label="Go to chat" title="Chat">&#128172;</button>
+                <button class="collapse-icon-btn" onclick="document.getElementById('decision-log-panel').scrollIntoView({behavior:'smooth'})" aria-label="Go to decisions" title="Decisions">&#128203;</button>
+            </div>
+            <!-- Panel navigation content (hidden when collapsed) -->
+            <nav class="panel-content" id="panel-content">
+                <span class="panel-section-label">Dashboard</span>
+                <button class="panel-nav-item active" onclick="document.getElementById('stats-grid').scrollIntoView({behavior:'smooth'})">
+                    <span class="panel-nav-icon">&#128202;</span>
+                    <span>Stats Overview</span>
+                </button>
+                <button class="panel-nav-item" onclick="document.getElementById('agent-cards').scrollIntoView({behavior:'smooth'})">
+                    <span class="panel-nav-icon">&#129302;</span>
+                    <span>Agents</span>
+                </button>
+                <button class="panel-nav-item" onclick="document.getElementById('provider-usage').scrollIntoView({behavior:'smooth'})">
+                    <span class="panel-nav-icon">&#9889;</span>
+                    <span>Provider Usage</span>
+                </button>
+                <span class="panel-section-label">Tools</span>
+                <button class="panel-nav-item" onclick="document.getElementById('requirement-editor').scrollIntoView({behavior:'smooth'})">
+                    <span class="panel-nav-icon">&#9998;</span>
+                    <span>Requirements</span>
+                </button>
+                <button class="panel-nav-item" onclick="document.getElementById('decision-log-panel').scrollIntoView({behavior:'smooth'})">
+                    <span class="panel-nav-icon">&#128203;</span>
+                    <span>Decision Log</span>
+                </button>
+                <button class="panel-nav-item" onclick="document.getElementById('chat-container').scrollIntoView({behavior:'smooth'})">
+                    <span class="panel-nav-icon">&#128172;</span>
+                    <span>Chat Interface</span>
+                </button>
+            </nav>
+        </aside>
+
+        <!-- AI-178: Main content area -->
+        <main class="main-content" id="main-content">
     <div class="container">
         <!-- Header -->
         <div class="header">
@@ -2770,6 +3100,14 @@
                     <span id="status-text">Connecting...</span>
                 </div>
                 <span id="last-update"></span>
+                <!-- AI-179: Dark mode toggle button -->
+                <button
+                    class="theme-toggle-btn"
+                    id="theme-toggle-btn"
+                    onclick="toggleDarkMode()"
+                    aria-label="Toggle dark/light mode"
+                    title="Toggle dark/light mode"
+                ><span id="theme-toggle-icon">&#9728;&#65039;</span> <span id="theme-toggle-label">Light</span></button>
             </div>
         </div>
 
@@ -3064,6 +3402,8 @@
             </div>
         </div>
     </div>
+        </main>
+    </div><!-- /.app-layout -->
 
     <!-- Chart.js Library (inlined for no-external-dependency compliance) -->
     <script>
@@ -5328,6 +5668,68 @@
             if (refreshTimer) clearInterval(refreshTimer);
             Object.values(charts).forEach(chart => chart && chart.destroy());
         });
+
+        // AI-178: Left Panel Collapsibility
+        function toggleLeftPanel() {
+            var panel = document.getElementById('left-panel');
+            if (!panel) return;
+            panel.classList.toggle('collapsed');
+            var isCollapsed = panel.classList.contains('collapsed');
+            localStorage.setItem('leftPanelCollapsed', isCollapsed);
+            // Update toggle button title/aria-label
+            var btn = document.getElementById('left-panel-toggle');
+            if (btn) {
+                btn.setAttribute('title', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
+                btn.setAttribute('aria-label', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
+                btn.innerHTML = isCollapsed ? '&#9654;' : '&#9664;';
+            }
+        }
+
+        // AI-179: Dark Mode Toggle
+        function toggleDarkMode() {
+            var html = document.documentElement;
+            var isDark = html.getAttribute('data-theme') !== 'light';
+            var newTheme = isDark ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            // Update button icon and label
+            var icon = document.getElementById('theme-toggle-icon');
+            var label = document.getElementById('theme-toggle-label');
+            if (icon) icon.textContent = newTheme === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+            if (label) label.textContent = newTheme === 'dark' ? 'Light' : 'Dark';
+        }
+
+        // Apply saved theme on load (default: dark)
+        (function() {
+            var savedTheme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            // Update theme toggle button to reflect current theme
+            var icon = document.getElementById('theme-toggle-icon');
+            var label = document.getElementById('theme-toggle-label');
+            if (savedTheme === 'light') {
+                if (icon) icon.textContent = '\uD83C\uDF19';
+                if (label) label.textContent = 'Dark';
+            } else {
+                if (icon) icon.textContent = '\u2600\uFE0F';
+                if (label) label.textContent = 'Light';
+            }
+        })();
+
+        // Restore left panel collapsed preference on load
+        (function() {
+            if (localStorage.getItem('leftPanelCollapsed') === 'true') {
+                var panel = document.getElementById('left-panel');
+                if (panel) {
+                    panel.classList.add('collapsed');
+                    var btn = document.getElementById('left-panel-toggle');
+                    if (btn) {
+                        btn.setAttribute('title', 'Expand sidebar');
+                        btn.setAttribute('aria-label', 'Expand sidebar');
+                        btn.innerHTML = '&#9654;';
+                    }
+                }
+            }
+        })();
     </script>
 </body>
 </html>
