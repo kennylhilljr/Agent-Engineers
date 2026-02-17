@@ -1,0 +1,32 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Library/Developer/CommandLineTools/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/bkh223/Documents/GitHub/agent-engineers
+configfile: pyproject.toml
+plugins: asyncio-1.2.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 21 items
+
+tests/test_technical_debt.py::TestTechnicalDebtFile::test_file_exists PASSED [  4%]
+tests/test_technical_debt.py::TestTechnicalDebtFile::test_file_is_non_empty PASSED [  9%]
+tests/test_technical_debt.py::TestTechnicalDebtFile::test_file_has_audit_summary_section PASSED [ 14%]
+tests/test_technical_debt.py::TestTechnicalDebtFile::test_file_has_items_found_section PASSED [ 19%]
+tests/test_technical_debt.py::TestTechnicalDebtFile::test_file_has_linear_issue_reference PASSED [ 23%]
+tests/test_technical_debt.py::TestTechnicalDebtFile::test_file_has_guidelines_section PASSED [ 28%]
+tests/test_technical_debt.py::TestTechnicalDebtFile::test_file_has_td001_entry PASSED [ 33%]
+tests/test_technical_debt.py::TestTechnicalDebtFile::test_file_references_agent_py PASSED [ 38%]
+tests/test_technical_debt.py::TestTechnicalDebtFile::test_file_has_changelog PASSED [ 42%]
+tests/test_technical_debt.py::TestTodoCount::test_no_new_raw_marker_comments PASSED [ 47%]
+tests/test_technical_debt.py::TestTodoCount::test_marker_count_matches_expected PASSED [ 52%]
+tests/test_technical_debt.py::TestAgentPyChanges::test_todo_marker_removed_from_agent_py PASSED [ 57%]
+tests/test_technical_debt.py::TestAgentPyChanges::test_ticket_key_none_still_present PASSED [ 61%]
+tests/test_technical_debt.py::TestAgentPyChanges::test_explanatory_comment_present PASSED [ 66%]
+tests/test_technical_debt.py::TestAgentPyChanges::test_run_agent_session_accepts_ticket_key PASSED [ 71%]
+tests/test_technical_debt.py::TestAgentPyChanges::test_broadcast_uses_ticket_key PASSED [ 76%]
+tests/test_technical_debt.py::TestFileScanSanity::test_project_root_exists PASSED [ 80%]
+tests/test_technical_debt.py::TestFileScanSanity::test_python_files_found PASSED [ 85%]
+tests/test_technical_debt.py::TestFileScanSanity::test_agent_py_is_included PASSED [ 90%]
+tests/test_technical_debt.py::TestFileScanSanity::test_venv_files_excluded PASSED [ 95%]
+tests/test_technical_debt.py::TestFileScanSanity::test_generations_excluded PASSED [100%]
+
+============================== 21 passed in 1.95s ==============================
