@@ -80,4 +80,3 @@ if _worktree_rest_api_path.exists():
 _worktree_orchestrator_hook_path = _WORKTREE_ROOT / "dashboard" / "orchestrator_hook.py"
 if _worktree_orchestrator_hook_path.exists():
     _load_module_from_file("dashboard.orchestrator_hook", _worktree_orchestrator_hook_path)
-
