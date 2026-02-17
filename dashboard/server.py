@@ -86,6 +86,30 @@ _REASONING_HISTORY_MAX = 100
 # Decision log constants (AI-161)
 DECISION_TYPES = ['agent_selection', 'complexity', 'verification', 'pr_routing', 'error_recovery', 'other']
 _DECISION_LOG_MAX = 500  # larger than reasoning since decisions are compact
+
+# Language detection map (AI-163)
+LANGUAGE_MAP = {
+    '.py': 'python', '.js': 'javascript', '.ts': 'typescript',
+    '.html': 'html', '.css': 'css', '.json': 'json',
+    '.md': 'markdown', '.sh': 'bash', '.yaml': 'yaml', '.yml': 'yaml',
+    '.go': 'go', '.rs': 'rust', '.java': 'java', '.tsx': 'typescript',
+    '.rb': 'ruby', '.php': 'php', '.cpp': 'cpp', '.c': 'c',
+    '.h': 'c', '.hpp': 'cpp', '.cs': 'csharp', '.kt': 'kotlin',
+    '.swift': 'swift', '.sql': 'sql', '.xml': 'xml', '.toml': 'toml',
+}
+
+
+def detect_language(file_path: str) -> str:
+    """Detect programming language from file extension.
+
+    Args:
+        file_path: Path to the file (e.g., 'src/app.py')
+
+    Returns:
+        Language identifier string (e.g., 'python'), defaults to 'text'
+    """
+    ext = Path(file_path).suffix.lower()
+    return LANGUAGE_MAP.get(ext, 'text')
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -291,6 +315,10 @@ class DashboardServer:
 
         # Circular buffer for decision log (AI-161)
         self._decision_log: list = []
+
+        # In-memory code streams store (AI-163): {stream_id: {file_path, language, agent, chunks, started_at, completed}}
+        self._code_streams: dict = {}
+
         # Create app with middlewares
         self.app = web.Application(middlewares=[error_middleware, cors_middleware])
 
@@ -332,6 +360,12 @@ class DashboardServer:
         # Decision audit trail endpoints (AI-162)
         self.app.router.add_get('/api/decisions/summary', self.get_decisions_summary)
         self.app.router.add_get('/api/decisions/{decision_id}', self.get_decision_by_id)
+
+        # Code streaming endpoints (AI-163)
+        self.app.router.add_post('/api/code-stream', self.post_code_stream)
+        self.app.router.add_get('/api/code-streams', self.get_code_streams)
+        self.app.router.add_get('/api/code-streams/{stream_id}', self.get_code_stream_by_id)
+
         # OPTIONS for CORS preflight
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/agents/{agent_name}', self.handle_options)
@@ -343,6 +377,9 @@ class DashboardServer:
         self.app.router.add_route('OPTIONS', '/api/decisions/export', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/decisions/summary', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/decisions/{decision_id}', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/code-stream', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/code-streams', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/code-streams/{stream_id}', self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
         """Handle CORS preflight OPTIONS requests."""
@@ -900,6 +937,158 @@ class DashboardServer:
             'by_outcome': by_outcome,
             'recent_session_count': len(session_ids),
         })
+
+    async def post_code_stream(self, request: Request) -> Response:
+        """POST /api/code-stream — receive a code streaming chunk and broadcast via WebSocket.
+
+        Expected JSON body::
+
+            {
+                "agent":       "coding",         # which agent (coding|coding_fast)
+                "file_path":   "src/app.py",     # file being edited
+                "language":    "python",         # optional; auto-detected from extension if absent
+                "chunk":       "    def foo():", # the code chunk
+                "chunk_type":  "addition",       # addition|deletion|context
+                "stream_id":   "uuid",           # groups chunks for the same edit session
+                "is_final":    false             # True when streaming is complete
+            }
+
+        Returns:
+            JSON ``{"success": true, "stream_id": "<uuid>"}``
+
+        Raises:
+            400: If request body is invalid or missing required fields.
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        agent = body.get('agent', '')
+        file_path = body.get('file_path', '')
+        if not file_path:
+            return web.json_response({'error': 'Missing required field: file_path'}, status=400)
+
+        chunk = body.get('chunk', '')
+        chunk_type = body.get('chunk_type', 'context')
+        if chunk_type not in ('addition', 'deletion', 'context'):
+            chunk_type = 'context'
+
+        is_final = bool(body.get('is_final', False))
+
+        # Use provided stream_id or generate one
+        stream_id = body.get('stream_id', '') or str(uuid4())
+
+        # Auto-detect language from file extension if not provided
+        language = body.get('language', '') or detect_language(file_path)
+
+        timestamp = datetime.utcnow().isoformat() + 'Z'
+
+        # Create or update stream record
+        if stream_id not in self._code_streams:
+            self._code_streams[stream_id] = {
+                'stream_id': stream_id,
+                'agent': agent,
+                'file_path': file_path,
+                'language': language,
+                'chunks': [],
+                'started_at': timestamp,
+                'completed': False,
+            }
+
+        stream = self._code_streams[stream_id]
+        stream['chunks'].append({
+            'chunk': chunk,
+            'chunk_type': chunk_type,
+            'timestamp': timestamp,
+        })
+
+        if is_final:
+            stream['completed'] = True
+            stream['completed_at'] = timestamp
+
+        # Broadcast to WebSocket clients
+        ws_message = {
+            'type': 'code_stream',
+            'agent': agent,
+            'file_path': file_path,
+            'language': language,
+            'chunk': chunk,
+            'chunk_type': chunk_type,
+            'stream_id': stream_id,
+            'is_final': is_final,
+            'timestamp': timestamp,
+        }
+        await self.broadcast_to_websockets(ws_message)
+
+        logger.info(
+            f"Code stream chunk: agent={agent!r}, file={file_path!r}, "
+            f"lang={language!r}, stream_id={stream_id!r}, "
+            f"chunk_type={chunk_type!r}, is_final={is_final}"
+        )
+
+        return web.json_response({'success': True, 'stream_id': stream_id})
+
+    async def get_code_streams(self, request: Request) -> Response:
+        """GET /api/code-streams — list active and recent code streams.
+
+        Query Parameters:
+            agent: Filter by agent name
+            completed: If 'true', include only completed streams; if 'false', only active
+
+        Returns:
+            JSON ``{"streams": [...], "total": N}`` with stream summaries (without chunks).
+        """
+        agent_filter = request.query.get('agent', '').strip()
+        completed_filter = request.query.get('completed', '').strip().lower()
+
+        results = []
+        for stream_id, stream in self._code_streams.items():
+            # Apply filters
+            if agent_filter and stream.get('agent', '') != agent_filter:
+                continue
+            if completed_filter == 'true' and not stream.get('completed', False):
+                continue
+            if completed_filter == 'false' and stream.get('completed', False):
+                continue
+
+            # Return summary without full chunks list
+            results.append({
+                'stream_id': stream['stream_id'],
+                'agent': stream['agent'],
+                'file_path': stream['file_path'],
+                'language': stream['language'],
+                'chunk_count': len(stream['chunks']),
+                'started_at': stream['started_at'],
+                'completed': stream['completed'],
+                'completed_at': stream.get('completed_at', None),
+            })
+
+        # Sort by most recent first
+        results.sort(key=lambda s: s['started_at'], reverse=True)
+
+        return web.json_response({
+            'streams': results,
+            'total': len(results),
+        })
+
+    async def get_code_stream_by_id(self, request: Request) -> Response:
+        """GET /api/code-streams/{stream_id} — return full content of a code stream.
+
+        Path Parameters:
+            stream_id: UUID of the code stream
+
+        Returns:
+            JSON with full stream record including all chunks, or 404 if not found.
+        """
+        stream_id = request.match_info['stream_id']
+        stream = self._code_streams.get(stream_id)
+        if stream is None:
+            raise web.HTTPNotFound(
+                text=json.dumps({'error': 'Stream not found', 'stream_id': stream_id}),
+                content_type='application/json',
+            )
+        return web.json_response(stream)
 
     async def websocket_handler(self, request: Request) -> WebSocketResponse:
         """WebSocket endpoint for real-time metrics streaming.
