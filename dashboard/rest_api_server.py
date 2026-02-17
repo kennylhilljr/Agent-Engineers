@@ -217,6 +217,7 @@ class RESTAPIServer:
         """Register all REST API routes."""
         # Health and metrics
         self.app.router.add_get('/api/health', self.health_check)
+        self.app.router.add_get('/health', self.health_check)  # alias for playwright config
         self.app.router.add_get('/api/metrics', self.get_metrics)
 
         # Agents
@@ -225,6 +226,13 @@ class RESTAPIServer:
         self.app.router.add_get('/api/agents/{name}/events', self.get_agent_events)
         self.app.router.add_post('/api/agents/{name}/pause', self.pause_agent)
         self.app.router.add_post('/api/agents/{name}/resume', self.resume_agent)
+
+        # Agent Controls - global pause/resume (AI-130)
+        self.app.router.add_post('/api/agents/pause-all', self.pause_all_agents)
+        self.app.router.add_post('/api/agents/resume-all', self.resume_all_agents)
+        self.app.router.add_get('/api/agent-controls', self.get_all_agent_controls)
+        self.app.router.add_get('/api/agents/{name}/requirements', self.get_agent_requirements_by_name)
+        self.app.router.add_put('/api/agents/{name}/requirements', self.update_agent_requirements_by_name)
 
         # Sessions and providers
         self.app.router.add_get('/api/sessions', self.get_sessions)
@@ -769,6 +777,140 @@ class RESTAPIServer:
             'agent_name': agent_name,
             'state': 'idle',
             'message': f'Agent {agent_name} has been resumed',
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+
+    # -------------------------------------------------------------------------
+    # AI-130: Global Pause/Resume & Agent Controls
+    # -------------------------------------------------------------------------
+
+    async def pause_all_agents(self, request: Request) -> Response:
+        """POST /api/agents/pause-all - Pause all agents.
+
+        Returns:
+            200 OK with count and list of paused agent names
+        """
+        for agent_name in ALL_AGENT_NAMES:
+            _agent_states[agent_name] = 'paused'
+            # Ensure requirements entry exists in cache
+            if agent_name not in _requirements_cache:
+                _requirements_cache[agent_name] = ''
+
+        _decisions_log.append({
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'decision_type': 'pause_all',
+            'agent_count': len(ALL_AGENT_NAMES)
+        })
+
+        return web.json_response({
+            'status': 'ok',
+            'paused_count': len(ALL_AGENT_NAMES),
+            'agent_ids': ALL_AGENT_NAMES,
+            'message': f'All {len(ALL_AGENT_NAMES)} agents have been paused',
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+
+    async def resume_all_agents(self, request: Request) -> Response:
+        """POST /api/agents/resume-all - Resume all agents.
+
+        Returns:
+            200 OK with count and list of resumed agent names
+        """
+        for agent_name in ALL_AGENT_NAMES:
+            _agent_states[agent_name] = 'idle'
+
+        _decisions_log.append({
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'decision_type': 'resume_all',
+            'agent_count': len(ALL_AGENT_NAMES)
+        })
+
+        return web.json_response({
+            'status': 'ok',
+            'resumed_count': len(ALL_AGENT_NAMES),
+            'agent_ids': ALL_AGENT_NAMES,
+            'message': f'All {len(ALL_AGENT_NAMES)} agents have been resumed',
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+
+    async def get_all_agent_controls(self, request: Request) -> Response:
+        """GET /api/agent-controls - Get pause/resume state and requirements for all agents.
+
+        Returns:
+            200 OK with control state for all agents
+        """
+        controls = {}
+        for agent_name in ALL_AGENT_NAMES:
+            controls[agent_name] = {
+                'paused': _agent_states.get(agent_name, 'idle') == 'paused',
+                'requirements': _requirements_cache.get(agent_name, '')
+            }
+
+        paused_count = sum(1 for s in _agent_states.values() if s == 'paused')
+
+        return web.json_response({
+            'agent_controls': controls,
+            'total_agents': len(ALL_AGENT_NAMES),
+            'paused_count': paused_count,
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+
+    async def get_agent_requirements_by_name(self, request: Request) -> Response:
+        """GET /api/agents/{name}/requirements - Get requirements for a specific agent.
+
+        Returns:
+            200 OK with requirements and pause state
+        """
+        agent_name = request.match_info['name']
+        requirements = _requirements_cache.get(agent_name, '')
+        paused = _agent_states.get(agent_name, 'idle') == 'paused'
+
+        return web.json_response({
+            'agent_id': agent_name,
+            'requirements': requirements,
+            'paused': paused,
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+
+    async def update_agent_requirements_by_name(self, request: Request) -> Response:
+        """PUT /api/agents/{name}/requirements - Update requirements for a specific agent.
+
+        Request body:
+            {"requirements": "Updated requirement text"}
+
+        Returns:
+            200 OK with confirmation
+            400 Bad Request for invalid input
+        """
+        agent_name = request.match_info['name']
+
+        try:
+            data = await request.json()
+        except json.JSONDecodeError:
+            return web.json_response({'error': 'Invalid JSON in request body'}, status=400)
+
+        requirements = data.get('requirements')
+        if requirements is None:
+            return web.json_response(
+                {'error': 'Missing required field: requirements'},
+                status=400
+            )
+
+        _requirements_cache[agent_name] = requirements
+
+        _decisions_log.append({
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'decision_type': 'requirement_update',
+            'agent_name': agent_name,
+            'requirements_length': len(requirements)
+        })
+
+        return web.json_response({
+            'status': 'ok',
+            'agent_id': agent_name,
+            'requirements': requirements,
+            'paused': _agent_states.get(agent_name, 'idle') == 'paused',
+            'message': f'Requirements for {agent_name} updated successfully',
             'timestamp': datetime.utcnow().isoformat() + 'Z'
         })
 
