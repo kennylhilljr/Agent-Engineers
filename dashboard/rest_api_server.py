@@ -48,6 +48,9 @@ _agent_states: Dict[str, str] = {}  # agent_name -> "running" | "paused" | "idle
 _requirements_cache: Dict[str, str] = {}  # ticket_key -> requirement text
 _decisions_log: list[Dict[str, Any]] = []  # Decision history
 
+# WebSocket clients connected to /api/ws for agent_status broadcasts
+_ws_clients: set = set()
+
 
 def get_auth_token() -> Optional[str]:
     """Get authentication token from environment variable."""
@@ -250,6 +253,9 @@ class RESTAPIServer:
 
         # Dashboard HTML
         self.app.router.add_get('/', self.serve_dashboard)
+
+        # WebSocket for agent_status broadcasts
+        self.app.router.add_get('/api/ws', self.ws_handler)
 
         # OPTIONS for CORS preflight
         for route in ['/api/metrics', '/api/agents', '/api/sessions', '/api/providers',
@@ -732,6 +738,9 @@ class RESTAPIServer:
             'new_state': 'paused'
         })
 
+        # Broadcast status change via WebSocket
+        await self._broadcast_agent_status(agent_name, 'paused')
+
         return web.json_response({
             'status': 'success',
             'agent_name': agent_name,
@@ -770,6 +779,9 @@ class RESTAPIServer:
             'previous_state': previous_state,
             'new_state': 'idle'
         })
+
+        # Broadcast status change via WebSocket
+        await self._broadcast_agent_status(agent_name, 'idle')
 
         return web.json_response({
             'status': 'success',
@@ -1018,6 +1030,52 @@ class RESTAPIServer:
             'returned_decisions': len(decisions),
             'timestamp': datetime.utcnow().isoformat() + 'Z'
         })
+
+    async def ws_handler(self, request: Request):
+        """GET /api/ws - WebSocket endpoint for real-time agent status broadcasts.
+
+        Clients connecting here receive agent_status events whenever an agent
+        is paused or resumed via the REST API.
+        """
+        from aiohttp import web as _web
+        ws = _web.WebSocketResponse()
+        await ws.prepare(request)
+
+        _ws_clients.add(ws)
+        try:
+            async for msg in ws:
+                pass  # We only broadcast; inbound messages are ignored
+        finally:
+            _ws_clients.discard(ws)
+
+        return ws
+
+    async def _broadcast_agent_status(self, agent_name: str, status: str) -> None:
+        """Broadcast an agent_status event to all connected WebSocket clients.
+
+        Args:
+            agent_name: Name of the agent whose status changed
+            status: New status string (e.g. "paused" or "idle")
+        """
+        if not _ws_clients:
+            return
+
+        payload = json.dumps({
+            "type": "agent_status",
+            "agent": agent_name,
+            "status": status,
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        })
+
+        dead_clients = set()
+        for ws in list(_ws_clients):
+            try:
+                await ws.send_str(payload)
+            except Exception:
+                dead_clients.add(ws)
+
+        for ws in dead_clients:
+            _ws_clients.discard(ws)
 
     async def serve_dashboard(self, request: Request) -> Response:
         """GET / - Serve dashboard HTML.
