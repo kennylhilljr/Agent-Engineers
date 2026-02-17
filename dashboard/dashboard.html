@@ -4778,6 +4778,111 @@
                 return text.replace(/[&<>"']/g, m => map[m]);
             }
 
+            /**
+             * AI-75: Render a Linear tool call block in the chat.
+             * Shows a collapsible teal block with tool name, input, and result.
+             */
+            renderToolCall(toolName, input, result) {
+                const blockId = `tool-call-${Date.now()}`;
+                const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+
+                const inputStr = typeof input === 'object' ? JSON.stringify(input, null, 2) : String(input);
+                const resultStr = typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result);
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'chat-message system';
+                wrapper.setAttribute('data-testid', 'tool-call-message');
+
+                wrapper.innerHTML = `
+                    <div class="chat-message-content tool-call-block" data-testid="tool-call-block" style="max-width:90%;">
+                        <div class="tool-call-header" data-testid="tool-call-header" onclick="this.parentElement.querySelector('.tool-call-body').classList.toggle('hidden'); this.querySelector('.tool-call-toggle').classList.toggle('open');">
+                            <span style="font-size:1.1rem;">&#128295;</span>
+                            <strong style="color:#5eead4; font-size:13px;">Linear Tool:</strong>
+                            <span class="tool-call-name-badge" data-testid="tool-call-name">${this.escapeHtml(toolName)}</span>
+                            <span style="flex:1;"></span>
+                            <span class="tool-call-toggle" data-testid="tool-call-toggle">&#9654;</span>
+                        </div>
+                        <div class="tool-call-body hidden" data-testid="tool-call-body" id="${blockId}">
+                            <div class="tool-call-detail-row"><strong>Input:</strong><br>${this.escapeHtml(inputStr)}</div>
+                            <div class="tool-call-detail-row" style="margin-top:8px;"><strong>Result:</strong><br>${this.escapeHtml(resultStr)}</div>
+                        </div>
+                        <div class="chat-timestamp">${timeStr}</div>
+                    </div>
+                `;
+
+                this.messagesContainer.appendChild(wrapper);
+                this.scrollToBottom();
+            }
+
+            /**
+             * AI-75: Handle Linear integration intents in user messages.
+             * Returns true if a Linear tool call was handled, false otherwise.
+             * Parses message for issue key, list, or status patterns and calls the API.
+             */
+            async handleLinearIntent(message, provider, model) {
+                const lower = message.toLowerCase();
+
+                // Pattern: "status of AI-NNN" or "what is AI-NNN" or just "AI-NNN"
+                const issueKeyMatch = message.match(/\bAI-(\d+)\b/i);
+
+                if (issueKeyMatch) {
+                    const issueKey = `AI-${issueKeyMatch[1]}`;
+                    const toolName = 'get_issue';
+                    const input = { issue_key: issueKey };
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/api/integrations/linear/issue/${issueKey}`);
+                        const data = await response.json();
+                        const issue = data.issue || {};
+                        const resultStr = `${issue.key} is "${issue.status}" — assigned to ${issue.assignee}`;
+                        this.renderToolCall(toolName, input, resultStr);
+                        const aiText = `I queried Linear for ${issueKey}. Here's what I found:\n\n• Title: ${issue.title}\n• Status: ${issue.status}\n• Assignee: ${issue.assignee}\n• Priority: ${issue.priority}`;
+                        this.addMessage(aiText, 'ai', provider, model);
+                        return true;
+                    } catch (err) {
+                        console.error('Linear tool call failed:', err);
+                        return false;
+                    }
+                }
+
+                // Pattern: "list issues", "show issues", "backlog", "view board"
+                if (lower.includes('list issues') || lower.includes('show issues') || lower.includes('backlog') || lower.includes('view board') || lower.includes('board info')) {
+                    const toolName = 'list_issues';
+                    const input = {};
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/api/integrations/linear/issues`);
+                        const data = await response.json();
+                        const issues = data.issues || [];
+                        const resultStr = `Found ${issues.length} issues: ${issues.map(i => `${i.key} (${i.status})`).join(', ')}`;
+                        this.renderToolCall(toolName, input, resultStr);
+                        const lines = issues.map(i => `• ${i.key} — ${i.title} [${i.status}]`).join('\n');
+                        this.addMessage(`Here are the Linear issues:\n\n${lines}`, 'ai', provider, model);
+                        return true;
+                    } catch (err) {
+                        console.error('Linear list issues failed:', err);
+                        return false;
+                    }
+                }
+
+                // Pattern: "linear status" or "linear connected"
+                if (lower.includes('linear status') || lower.includes('linear connected') || lower.includes('linear integration')) {
+                    const toolName = 'linear_status';
+                    const input = {};
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/api/integrations/linear/status`);
+                        const data = await response.json();
+                        const resultStr = `connected: ${data.connected}, tool_count: ${data.tool_count}`;
+                        this.renderToolCall(toolName, input, resultStr);
+                        this.addMessage(`Linear integration status: Connected with ${data.tool_count} tools available.`, 'ai', provider, model);
+                        return true;
+                    } catch (err) {
+                        console.error('Linear status check failed:', err);
+                        return false;
+                    }
+                }
+
+                return false;
+            }
+
             getMessages() {
                 return this.messages;
             }
