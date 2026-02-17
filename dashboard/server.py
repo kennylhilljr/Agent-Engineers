@@ -65,6 +65,7 @@ import asyncio
 import json
 import os
 import psutil
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -80,6 +81,13 @@ from dashboard.metrics_store import MetricsStore
 from dashboard.logging_config import setup_logging, get_logger, LoggingMiddleware
 from dashboard.performance_metrics import metrics_collector, timed_operation, increment_counter, set_gauge
 from dashboard.config import get_config, DashboardConfig
+
+# Agent Controls State Store (AI-130)
+# Maintains pause/resume state and requirements for each agent
+agent_controls: dict = {}  # {agent_id: {"paused": bool, "requirements": str}}
+AGENT_CONTROLS_MAX_ENTRIES = 100  # Max number of agent entries to prevent unbounded memory growth
+AGENT_ID_PATTERN = re.compile(r'^[a-zA-Z0-9_-]+$')  # Only alphanumeric, underscore, dash
+REQUIREMENTS_MAX_LENGTH = 50_000  # Max length for requirements text
 
 # Setup structured logging
 setup_logging(log_level=os.getenv("LOG_LEVEL", "INFO"))
@@ -271,12 +279,28 @@ class DashboardServer:
         self.app.router.add_get('/monitoring', self.serve_monitoring_dashboard)
         self.app.router.add_get('/api/system/status', self.system_status)
 
+        # Agent Controls endpoints (AI-130)
+        # Static routes must be registered BEFORE parameterized routes to avoid shadowing
+        self.app.router.add_post('/api/agents/pause-all', self.pause_all_agents)
+        self.app.router.add_post('/api/agents/resume-all', self.resume_all_agents)
+        self.app.router.add_get('/api/agent-controls', self.get_all_agent_controls)
+        self.app.router.add_post('/api/agents/{agent_id}/pause', self.pause_agent)
+        self.app.router.add_post('/api/agents/{agent_id}/resume', self.resume_agent)
+        self.app.router.add_get('/api/agents/{agent_id}/requirements', self.get_agent_requirements)
+        self.app.router.add_put('/api/agents/{agent_id}/requirements', self.update_agent_requirements)
+
         # OPTIONS for CORS preflight
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/agents/{agent_name}', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/providers/status', self.handle_options)
         self.app.router.add_route('OPTIONS', '/metrics', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/system/status', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/agents/pause-all', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/agents/resume-all', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/agent-controls', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/agents/{agent_id}/pause', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/agents/{agent_id}/resume', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/agents/{agent_id}/requirements', self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
         """Handle CORS preflight OPTIONS requests."""
@@ -950,6 +974,221 @@ class DashboardServer:
 
         self.websockets.clear()
         logger.info("WebSocket cleanup complete")
+
+    # -------------------------------------------------------------------------
+    # Agent Controls - AI-130: Pause, Resume & Requirement Editing
+    # -------------------------------------------------------------------------
+
+    def _validate_agent_id(self, agent_id: str) -> Optional[Response]:
+        """Validate agent_id format. Returns error Response if invalid, else None."""
+        if not agent_id:
+            return web.json_response({'error': 'agent_id must not be empty'}, status=400)
+        if not AGENT_ID_PATTERN.match(agent_id):
+            return web.json_response(
+                {'error': 'agent_id must contain only alphanumeric characters, dashes, or underscores'},
+                status=400
+            )
+        return None
+
+    def _get_agent_control(self, agent_id: str) -> dict:
+        """Get or initialize control state for an agent.
+
+        Enforces a maximum of AGENT_CONTROLS_MAX_ENTRIES entries to prevent
+        unbounded memory growth from arbitrary agent IDs.
+        """
+        if agent_id not in agent_controls:
+            if len(agent_controls) >= AGENT_CONTROLS_MAX_ENTRIES:
+                logger.warning(
+                    f"agent_controls store at capacity ({AGENT_CONTROLS_MAX_ENTRIES}). "
+                    f"Rejecting new entry for agent_id: {agent_id}"
+                )
+                raise ValueError(
+                    f"Maximum number of agent control entries ({AGENT_CONTROLS_MAX_ENTRIES}) reached. "
+                    "Cannot add new agent."
+                )
+            agent_controls[agent_id] = {"paused": False, "requirements": ""}
+        return agent_controls[agent_id]
+
+    async def pause_agent(self, request: Request) -> Response:
+        """POST /api/agents/{agent_id}/pause - Pause a specific agent.
+
+        Stops the agent from accepting new delegations.
+
+        Returns:
+            200 OK with updated agent control state
+            400 Bad Request for invalid agent_id
+        """
+        agent_id = request.match_info['agent_id']
+        err = self._validate_agent_id(agent_id)
+        if err:
+            return err
+        try:
+            control = self._get_agent_control(agent_id)
+        except ValueError as e:
+            return web.json_response({'error': str(e)}, status=400)
+        control['paused'] = True
+        logger.info(f"Agent paused: {agent_id}")
+        return web.json_response({
+            'status': 'ok',
+            'agent_id': agent_id,
+            'paused': True,
+            'message': f'Agent {agent_id} has been paused',
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+
+    async def resume_agent(self, request: Request) -> Response:
+        """POST /api/agents/{agent_id}/resume - Resume a paused agent.
+
+        Allows the agent to accept new delegations again.
+
+        Returns:
+            200 OK with updated agent control state
+            400 Bad Request for invalid agent_id
+        """
+        agent_id = request.match_info['agent_id']
+        err = self._validate_agent_id(agent_id)
+        if err:
+            return err
+        try:
+            control = self._get_agent_control(agent_id)
+        except ValueError as e:
+            return web.json_response({'error': str(e)}, status=400)
+        control['paused'] = False
+        logger.info(f"Agent resumed: {agent_id}")
+        return web.json_response({
+            'status': 'ok',
+            'agent_id': agent_id,
+            'paused': False,
+            'message': f'Agent {agent_id} has been resumed',
+            'requirements': control.get('requirements', ''),
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+
+    async def pause_all_agents(self, request: Request) -> Response:
+        """POST /api/agents/pause-all - Pause all agents.
+
+        Global control to stop all agents from accepting new delegations.
+
+        Returns:
+            200 OK with count of paused agents
+        """
+        state = self.store.load()
+        agent_names = list(state.get('agents', {}).keys())
+        for agent_id in agent_names:
+            control = self._get_agent_control(agent_id)
+            control['paused'] = True
+        logger.info(f"All agents paused: {len(agent_names)} agents")
+        return web.json_response({
+            'status': 'ok',
+            'paused_count': len(agent_names),
+            'agent_ids': agent_names,
+            'message': f'All {len(agent_names)} agents have been paused',
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+
+    async def resume_all_agents(self, request: Request) -> Response:
+        """POST /api/agents/resume-all - Resume all paused agents.
+
+        Global control to allow all agents to accept new delegations.
+
+        Returns:
+            200 OK with count of resumed agents
+        """
+        state = self.store.load()
+        agent_names = list(state.get('agents', {}).keys())
+        for agent_id in agent_names:
+            control = self._get_agent_control(agent_id)
+            control['paused'] = False
+        logger.info(f"All agents resumed: {len(agent_names)} agents")
+        return web.json_response({
+            'status': 'ok',
+            'resumed_count': len(agent_names),
+            'agent_ids': agent_names,
+            'message': f'All {len(agent_names)} agents have been resumed',
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+
+    async def get_agent_requirements(self, request: Request) -> Response:
+        """GET /api/agents/{agent_id}/requirements - Get current requirements for an agent.
+
+        Returns:
+            200 OK with current requirement text
+            400 Bad Request for invalid agent_id
+        """
+        agent_id = request.match_info['agent_id']
+        err = self._validate_agent_id(agent_id)
+        if err:
+            return err
+        try:
+            control = self._get_agent_control(agent_id)
+        except ValueError as e:
+            return web.json_response({'error': str(e)}, status=400)
+        return web.json_response({
+            'agent_id': agent_id,
+            'requirements': control.get('requirements', ''),
+            'paused': control.get('paused', False),
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+
+    async def update_agent_requirements(self, request: Request) -> Response:
+        """PUT /api/agents/{agent_id}/requirements - Update requirements for an agent.
+
+        Request body:
+            {"requirements": "Updated requirement text"}
+
+        Returns:
+            200 OK with confirmation
+            400 Bad Request for invalid input
+        """
+        agent_id = request.match_info['agent_id']
+        err = self._validate_agent_id(agent_id)
+        if err:
+            return err
+        try:
+            data = await request.json()
+        except json.JSONDecodeError:
+            return web.json_response({'error': 'Invalid JSON'}, status=400)
+
+        requirements = data.get('requirements')
+        if requirements is None:
+            return web.json_response(
+                {'error': 'Missing required field: requirements'},
+                status=400
+            )
+
+        if len(requirements) > REQUIREMENTS_MAX_LENGTH:
+            return web.json_response(
+                {'error': f'Requirements text exceeds maximum length of {REQUIREMENTS_MAX_LENGTH} characters'},
+                status=400
+            )
+
+        try:
+            control = self._get_agent_control(agent_id)
+        except ValueError as e:
+            return web.json_response({'error': str(e)}, status=400)
+        control['requirements'] = requirements
+        logger.info(f"Requirements updated for agent {agent_id}: {len(requirements)} chars")
+        return web.json_response({
+            'status': 'ok',
+            'agent_id': agent_id,
+            'requirements': requirements,
+            'paused': control.get('paused', False),
+            'message': f'Requirements for {agent_id} updated successfully',
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+
+    async def get_all_agent_controls(self, request: Request) -> Response:
+        """GET /api/agent-controls - Get pause/resume state and requirements for all agents.
+
+        Returns:
+            200 OK with all agent control states
+        """
+        return web.json_response({
+            'agent_controls': agent_controls,
+            'total_agents': len(agent_controls),
+            'paused_count': sum(1 for c in agent_controls.values() if c.get('paused', False)),
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
 
     def run(self):
         """Start the HTTP server with WebSocket support.
