@@ -66,11 +66,18 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Set
 
+import aiohttp
 from aiohttp import web, WSMsgType
 from aiohttp.web import Request, Response, WebSocketResponse, middleware
 from aiohttp_cors import ResourceOptions, setup as cors_setup
 
 from dashboard.metrics_store import MetricsStore
+
+# Linear API configuration
+LINEAR_API_KEY = os.environ.get('LINEAR_API_KEY', '')
+
+# In-memory store for requirements (ticket_key -> requirement text)
+_requirements_store: dict = {}
 
 # Configure logging
 logging.basicConfig(
@@ -127,7 +134,7 @@ async def cors_middleware(request: Request, handler):
             # Default to first allowed origin if no match
             response.headers['Access-Control-Allow-Origin'] = allowed_list[0]
 
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, OPTIONS'
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
     response.headers['Access-Control-Allow-Credentials'] = 'true'
     return response
@@ -153,6 +160,61 @@ async def error_middleware(request: Request, handler):
             },
             status=500
         )
+
+
+async def update_linear_issue(issue_key: str, description: str) -> bool:
+    """Update a Linear issue description via the Linear GraphQL API.
+
+    Args:
+        issue_key: Linear issue key (e.g. 'AI-157')
+        description: New description text
+
+    Returns:
+        True if updated successfully, False otherwise
+
+    Raises:
+        Exception: If the API call fails
+    """
+    get_id_query = """
+    query GetIssue($key: String!) {
+        issue(id: $key) {
+            id
+        }
+    }
+    """
+    update_query = """
+    mutation UpdateIssue($id: String!, $description: String!) {
+        issueUpdate(id: $id, input: { description: $description }) {
+            success
+        }
+    }
+    """
+    headers = {
+        'Authorization': LINEAR_API_KEY,
+        'Content-Type': 'application/json',
+    }
+    async with aiohttp.ClientSession() as session:
+        # First get the internal issue ID from the key
+        async with session.post(
+            'https://api.linear.app/graphql',
+            json={'query': get_id_query, 'variables': {'key': issue_key}},
+            headers=headers,
+        ) as resp:
+            data = await resp.json()
+            if 'errors' in data:
+                raise Exception(f"Linear API error getting issue ID: {data['errors']}")
+            issue_id = data['data']['issue']['id']
+
+        # Then update the issue description
+        async with session.post(
+            'https://api.linear.app/graphql',
+            json={'query': update_query, 'variables': {'id': issue_id, 'description': description}},
+            headers=headers,
+        ) as resp:
+            result = await resp.json()
+            if 'errors' in result:
+                raise Exception(f"Linear API error updating issue: {result['errors']}")
+            return result['data']['issueUpdate']['success']
 
 
 class DashboardServer:
@@ -228,9 +290,14 @@ class DashboardServer:
         self.app.router.add_get('/api/agents/{agent_name}', self.get_agent)
         self.app.router.add_get('/ws', self.websocket_handler)
 
+        # Requirement sync endpoints
+        self.app.router.add_get('/api/requirements/{ticket_key}', self.get_requirement)
+        self.app.router.add_put('/api/requirements/{ticket_key}', self.put_requirement)
+
         # OPTIONS for CORS preflight
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/agents/{agent_name}', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/requirements/{ticket_key}', self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
         """Handle CORS preflight OPTIONS requests."""
@@ -377,6 +444,100 @@ class DashboardServer:
                 text=json.dumps({'error': str(e)}),
                 content_type='application/json'
             )
+
+    async def get_requirement(self, request: Request) -> Response:
+        """Get the current requirement text for a ticket.
+
+        Path Parameters:
+            ticket_key: Linear ticket key (e.g. 'AI-157')
+
+        Returns:
+            JSON response with ticket_key and requirement text.
+            If no requirement is stored, returns an empty string.
+        """
+        ticket_key = request.match_info['ticket_key']
+        logger.info(f"GET /api/requirements/{ticket_key}")
+
+        requirement_text = _requirements_store.get(ticket_key, '')
+        return web.json_response({
+            'ticket_key': ticket_key,
+            'requirement': requirement_text,
+        })
+
+    async def put_requirement(self, request: Request) -> Response:
+        """Update the requirement text for a ticket, optionally syncing to Linear.
+
+        Path Parameters:
+            ticket_key: Linear ticket key (e.g. 'AI-157')
+
+        Request Body (JSON):
+            requirement (str): The updated requirement text
+            sync_to_linear (bool): If true, update the Linear issue description
+
+        Returns:
+            JSON response with success status and optional linear_synced flag.
+
+        Raises:
+            400: If request body is invalid JSON or missing 'requirement' field
+            500: If Linear API call fails when sync_to_linear is true
+        """
+        ticket_key = request.match_info['ticket_key']
+        logger.info(f"PUT /api/requirements/{ticket_key}")
+
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response(
+                {'error': 'Invalid JSON in request body'},
+                status=400,
+            )
+
+        if 'requirement' not in body:
+            return web.json_response(
+                {'error': 'Missing required field: requirement'},
+                status=400,
+            )
+
+        requirement_text = body['requirement']
+        sync_to_linear = bool(body.get('sync_to_linear', False))
+
+        # Store locally (atomic in-memory update)
+        _requirements_store[ticket_key] = requirement_text
+        logger.info(f"Stored requirement for {ticket_key} ({len(requirement_text)} chars)")
+
+        linear_synced = False
+        if sync_to_linear:
+            if not LINEAR_API_KEY:
+                logger.warning("LINEAR_API_KEY not set — cannot sync to Linear")
+                return web.json_response(
+                    {
+                        'success': True,
+                        'ticket_key': ticket_key,
+                        'linear_synced': False,
+                        'linear_error': 'LINEAR_API_KEY environment variable is not set',
+                    },
+                    status=200,
+                )
+            try:
+                linear_synced = await update_linear_issue(ticket_key, requirement_text)
+                logger.info(f"Linear sync successful for {ticket_key}")
+            except Exception as e:
+                logger.error(f"Linear API error for {ticket_key}: {e}")
+                return web.json_response(
+                    {
+                        'success': True,
+                        'ticket_key': ticket_key,
+                        'linear_synced': False,
+                        'linear_error': str(e),
+                    },
+                    status=200,
+                )
+
+        return web.json_response({
+            'success': True,
+            'ticket_key': ticket_key,
+            'linear_synced': linear_synced,
+        })
 
     async def websocket_handler(self, request: Request) -> WebSocketResponse:
         """WebSocket endpoint for real-time metrics streaming.
