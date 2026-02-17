@@ -170,18 +170,20 @@ class TestStreamChatResponse:
     @pytest.mark.asyncio
     async def test_stream_chat_gemini_uses_mock(self):
         """Test Gemini uses mock (not implemented yet)."""
-        chunks = []
-        async for chunk in stream_chat_response('Hello', 'gemini', '2.5-flash'):
-            chunks.append(chunk)
+        # Clear Gemini API keys to force mock usage
+        with patch.dict(os.environ, {'GEMINI_API_KEY': '', 'GOOGLE_API_KEY': ''}, clear=False):
+            chunks = []
+            async for chunk in stream_chat_response('Hello', 'gemini', '2.5-flash'):
+                chunks.append(chunk)
 
-        # Should use mock
-        assert len(chunks) > 0
-        assert chunks[-1]['type'] == 'done'
+            # Should use mock
+            assert len(chunks) > 0
+            assert chunks[-1]['type'] == 'done'
 
-        # Check provider name in response
-        text_chunks = [c for c in chunks if c['type'] == 'text']
-        full_text = ''.join(c['content'] for c in text_chunks)
-        assert 'GEMINI' in full_text.upper()
+            # Check provider name in response
+            text_chunks = [c for c in chunks if c['type'] == 'text']
+            full_text = ''.join(c['content'] for c in text_chunks)
+            assert 'GEMINI' in full_text.upper()
 
     @pytest.mark.asyncio
     async def test_stream_chat_groq_uses_mock(self):

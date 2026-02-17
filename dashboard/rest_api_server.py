@@ -412,74 +412,140 @@ class RESTAPIServer:
         """GET /api/providers/status - Get detailed provider status with API key validation.
 
         Returns:
-            200 OK with provider status details
+            200 OK with provider status details including bridge availability
         """
         providers_status = []
 
         # Claude / Anthropic
         anthropic_key = os.getenv('ANTHROPIC_API_KEY')
+        claude_status = 'available' if anthropic_key else 'unconfigured'
         providers_status.append({
             'provider_id': 'claude',
             'name': 'Claude',
             'available': bool(anthropic_key),
             'has_api_key': bool(anthropic_key),
-            'status': 'active' if anthropic_key else 'missing_api_key',
-            'models': ['haiku-4.5', 'sonnet-4.5', 'opus-4.6']
+            'status': claude_status,
+            'status_indicator': 'green' if anthropic_key else 'yellow',
+            'models': ['haiku-4.5', 'sonnet-4.5', 'opus-4.6'],
+            'default_model': 'sonnet-4.5',
+            'bridge_available': True,
+            'description': 'Anthropic Claude models'
         })
 
         # OpenAI / ChatGPT
         openai_key = os.getenv('OPENAI_API_KEY')
+        openai_status = 'available' if openai_key else 'unconfigured'
+        try:
+            from bridges.openai_bridge import OpenAIBridge
+            openai_bridge_available = True
+        except ImportError:
+            openai_bridge_available = False
+
         providers_status.append({
             'provider_id': 'openai',
             'name': 'ChatGPT',
             'available': bool(openai_key),
             'has_api_key': bool(openai_key),
-            'status': 'active' if openai_key else 'missing_api_key',
-            'models': ['gpt-4o', 'o1', 'o3-mini', 'o4-mini']
+            'status': openai_status,
+            'status_indicator': 'green' if openai_key else 'yellow',
+            'models': ['gpt-4o', 'o1', 'o3-mini', 'o4-mini'],
+            'default_model': 'gpt-4o',
+            'bridge_available': openai_bridge_available,
+            'description': 'OpenAI ChatGPT models'
         })
 
         # Gemini
-        gemini_key = os.getenv('GEMINI_API_KEY')
+        gemini_key = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')
+        gemini_status = 'available' if gemini_key else 'unconfigured'
+        try:
+            from bridges.gemini_bridge import GeminiBridge
+            gemini_bridge_available = True
+        except ImportError:
+            gemini_bridge_available = False
+            if gemini_key:
+                gemini_status = 'error'
+
         providers_status.append({
             'provider_id': 'gemini',
             'name': 'Gemini',
-            'available': bool(gemini_key),
+            'available': bool(gemini_key) and gemini_bridge_available,
             'has_api_key': bool(gemini_key),
-            'status': 'active' if gemini_key else 'missing_api_key',
-            'models': ['2.5-flash', '2.5-pro', '2.0-flash']
+            'status': gemini_status,
+            'status_indicator': 'green' if (gemini_key and gemini_bridge_available) else ('red' if gemini_key else 'yellow'),
+            'models': ['2.5-flash', '2.5-pro', '2.0-flash'],
+            'default_model': '2.5-flash',
+            'bridge_available': gemini_bridge_available,
+            'description': 'Google Gemini models'
         })
 
         # Groq
         groq_key = os.getenv('GROQ_API_KEY')
+        groq_status = 'available' if groq_key else 'unconfigured'
+        try:
+            from bridges.groq_bridge import GroqBridge
+            groq_bridge_available = True
+        except ImportError:
+            groq_bridge_available = False
+            if groq_key:
+                groq_status = 'error'
+
         providers_status.append({
             'provider_id': 'groq',
             'name': 'Groq',
-            'available': bool(groq_key),
+            'available': bool(groq_key) and groq_bridge_available,
             'has_api_key': bool(groq_key),
-            'status': 'active' if groq_key else 'missing_api_key',
-            'models': ['llama-3.3-70b', 'mixtral-8x7b']
+            'status': groq_status,
+            'status_indicator': 'green' if (groq_key and groq_bridge_available) else ('red' if groq_key else 'yellow'),
+            'models': ['llama-3.3-70b', 'mixtral-8x7b'],
+            'default_model': 'llama-3.3-70b',
+            'bridge_available': groq_bridge_available,
+            'description': 'Groq ultra-fast LPU inference'
         })
 
         # KIMI
-        kimi_key = os.getenv('KIMI_API_KEY')
+        kimi_key = os.getenv('KIMI_API_KEY') or os.getenv('MOONSHOT_API_KEY')
+        kimi_status = 'available' if kimi_key else 'unconfigured'
+        try:
+            from bridges.kimi_bridge import KimiBridge
+            kimi_bridge_available = True
+        except ImportError:
+            kimi_bridge_available = False
+            if kimi_key:
+                kimi_status = 'error'
+
         providers_status.append({
             'provider_id': 'kimi',
             'name': 'KIMI',
-            'available': bool(kimi_key),
+            'available': bool(kimi_key) and kimi_bridge_available,
             'has_api_key': bool(kimi_key),
-            'status': 'active' if kimi_key else 'missing_api_key',
-            'models': ['moonshot-v1']
+            'status': kimi_status,
+            'status_indicator': 'green' if (kimi_key and kimi_bridge_available) else ('red' if kimi_key else 'yellow'),
+            'models': ['moonshot-v1'],
+            'default_model': 'moonshot-v1',
+            'bridge_available': kimi_bridge_available,
+            'description': 'Moonshot KIMI (2M token context)'
         })
 
         # Windsurf
         windsurf_key = os.getenv('WINDSURF_API_KEY')
+        windsurf_status = 'unconfigured'  # Not yet implemented
+        try:
+            from bridges.windsurf_bridge import WindsurfBridge
+            windsurf_bridge_available = True
+        except ImportError:
+            windsurf_bridge_available = False
+
         providers_status.append({
             'provider_id': 'windsurf',
             'name': 'Windsurf',
-            'available': bool(windsurf_key),
+            'available': False,  # Not implemented yet
             'has_api_key': bool(windsurf_key),
-            'status': 'active' if windsurf_key else 'missing_api_key',
-            'models': ['cascade']
+            'status': windsurf_status,
+            'status_indicator': 'yellow',
+            'models': ['cascade'],
+            'default_model': 'cascade',
+            'bridge_available': windsurf_bridge_available,
+            'description': 'Codeium Windsurf IDE (coming soon)'
         })
 
         return web.json_response({

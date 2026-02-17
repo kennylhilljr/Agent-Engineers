@@ -393,6 +393,184 @@ async def stream_mock_response(
     }
 
 
+async def stream_gemini_response(
+    message: str,
+    model: str,
+    conversation_history: list[Dict[str, Any]] = None
+) -> AsyncIterator[Dict[str, Any]]:
+    """Stream response from Gemini API using bridge module.
+
+    Args:
+        message: User message
+        model: Gemini model ID
+        conversation_history: Previous messages in conversation
+
+    Yields:
+        Dict with type ('text', 'done', 'error') and content
+    """
+    try:
+        from bridges.gemini_bridge import GeminiBridge
+    except ImportError:
+        yield {
+            'type': 'error',
+            'content': 'Gemini bridge not available',
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        }
+        yield {
+            'type': 'done',
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        }
+        return
+
+    try:
+        bridge = GeminiBridge.from_env()
+        session = bridge.create_session(model=model)
+
+        # Add conversation history
+        if conversation_history:
+            for msg in conversation_history:
+                role = 'user' if msg['role'] == 'user' else 'model'
+                session.add_message(role, msg['content'])
+
+        # Stream response
+        async for token in bridge.stream_response(session, message):
+            yield {
+                'type': 'text',
+                'content': token,
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+
+    except Exception as e:
+        yield {
+            'type': 'error',
+            'content': f'Error streaming from Gemini: {str(e)}',
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        }
+
+    yield {
+        'type': 'done',
+        'timestamp': datetime.utcnow().isoformat() + 'Z'
+    }
+
+
+async def stream_groq_response(
+    message: str,
+    model: str,
+    conversation_history: list[Dict[str, Any]] = None
+) -> AsyncIterator[Dict[str, Any]]:
+    """Stream response from Groq API using bridge module.
+
+    Args:
+        message: User message
+        model: Groq model ID
+        conversation_history: Previous messages in conversation
+
+    Yields:
+        Dict with type ('text', 'done', 'error') and content
+    """
+    try:
+        from bridges.groq_bridge import GroqBridge
+    except ImportError:
+        yield {
+            'type': 'error',
+            'content': 'Groq bridge not available',
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        }
+        yield {
+            'type': 'done',
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        }
+        return
+
+    try:
+        bridge = GroqBridge.from_env()
+        session = bridge.create_session(model=model)
+
+        # Add conversation history
+        if conversation_history:
+            for msg in conversation_history:
+                session.add_message(msg['role'], msg['content'])
+
+        # Stream response
+        async for token in bridge.stream_response(session, message):
+            yield {
+                'type': 'text',
+                'content': token,
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+
+    except Exception as e:
+        yield {
+            'type': 'error',
+            'content': f'Error streaming from Groq: {str(e)}',
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        }
+
+    yield {
+        'type': 'done',
+        'timestamp': datetime.utcnow().isoformat() + 'Z'
+    }
+
+
+async def stream_kimi_response(
+    message: str,
+    model: str,
+    conversation_history: list[Dict[str, Any]] = None
+) -> AsyncIterator[Dict[str, Any]]:
+    """Stream response from KIMI API using bridge module.
+
+    Args:
+        message: User message
+        model: KIMI model ID
+        conversation_history: Previous messages in conversation
+
+    Yields:
+        Dict with type ('text', 'done', 'error') and content
+    """
+    try:
+        from bridges.kimi_bridge import KimiBridge
+    except ImportError:
+        yield {
+            'type': 'error',
+            'content': 'KIMI bridge not available',
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        }
+        yield {
+            'type': 'done',
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        }
+        return
+
+    try:
+        bridge = KimiBridge.from_env()
+        session = bridge.create_session(model=model)
+
+        # Add conversation history
+        if conversation_history:
+            for msg in conversation_history:
+                session.add_message(msg['role'], msg['content'])
+
+        # Stream response
+        async for token in bridge.stream_response(session, message):
+            yield {
+                'type': 'text',
+                'content': token,
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+
+    except Exception as e:
+        yield {
+            'type': 'error',
+            'content': f'Error streaming from KIMI: {str(e)}',
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        }
+
+    yield {
+        'type': 'done',
+        'timestamp': datetime.utcnow().isoformat() + 'Z'
+    }
+
+
 async def stream_chat_response(
     message: str,
     provider: str = 'claude',
@@ -432,22 +610,37 @@ async def stream_chat_response(
                 yield chunk
 
     elif provider == 'gemini':
-        # TODO: Implement Gemini streaming
-        async for chunk in stream_mock_response(message, 'Gemini', model):
-            yield chunk
+        # Check if Gemini API key is available
+        if os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY'):
+            async for chunk in stream_gemini_response(message, model, conversation_history):
+                yield chunk
+        else:
+            # Fall back to mock
+            async for chunk in stream_mock_response(message, 'Gemini', model):
+                yield chunk
 
     elif provider == 'groq':
-        # TODO: Implement Groq streaming
-        async for chunk in stream_mock_response(message, 'Groq', model):
-            yield chunk
+        # Check if Groq API key is available
+        if os.getenv('GROQ_API_KEY'):
+            async for chunk in stream_groq_response(message, model, conversation_history):
+                yield chunk
+        else:
+            # Fall back to mock
+            async for chunk in stream_mock_response(message, 'Groq', model):
+                yield chunk
 
     elif provider == 'kimi':
-        # TODO: Implement KIMI streaming
-        async for chunk in stream_mock_response(message, 'KIMI', model):
-            yield chunk
+        # Check if KIMI API key is available
+        if os.getenv('KIMI_API_KEY') or os.getenv('MOONSHOT_API_KEY'):
+            async for chunk in stream_kimi_response(message, model, conversation_history):
+                yield chunk
+        else:
+            # Fall back to mock
+            async for chunk in stream_mock_response(message, 'KIMI', model):
+                yield chunk
 
     elif provider == 'windsurf':
-        # TODO: Implement Windsurf streaming
+        # Windsurf not yet implemented - use mock
         async for chunk in stream_mock_response(message, 'Windsurf', model):
             yield chunk
 
