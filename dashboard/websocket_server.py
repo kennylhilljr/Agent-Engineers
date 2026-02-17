@@ -34,6 +34,7 @@ Usage:
 import asyncio
 import json
 import logging
+import os
 import time
 from dataclasses import asdict, dataclass
 from datetime import datetime
@@ -48,6 +49,94 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# Authentication Utilities
+# ============================================================================
+
+def get_auth_token() -> Optional[str]:
+    """Get authentication token from environment variable."""
+    return os.getenv("DASHBOARD_AUTH_TOKEN")
+
+
+def constant_time_compare(a: str, b: str) -> bool:
+    """Compare two strings in constant time to prevent timing attacks.
+
+    Args:
+        a: First string to compare
+        b: Second string to compare
+
+    Returns:
+        True if strings are equal, False otherwise
+
+    Security Note:
+        This function uses bitwise operations to ensure comparison
+        always takes the same amount of time, regardless of where
+        the strings differ. This prevents timing attacks.
+    """
+    if len(a) != len(b):
+        result = 1
+    else:
+        result = 0
+
+    for x, y in zip(a, b):
+        result |= ord(x) ^ ord(y)
+
+    return result == 0
+
+
+def validate_websocket_auth(request: web.Request) -> tuple[bool, Optional[str]]:
+    """Validate WebSocket authentication from request.
+
+    Checks for bearer token in:
+    1. Authorization header (standard)
+    2. Sec-WebSocket-Protocol header (for browsers that don't support custom headers)
+    3. Query parameter 'token' (fallback for limited clients)
+
+    Args:
+        request: aiohttp Request object
+
+    Returns:
+        Tuple of (is_valid, error_message)
+        - (True, None) if authentication succeeds or is not required
+        - (False, error_message) if authentication fails
+    """
+    auth_token = get_auth_token()
+
+    # If no token is configured, allow all connections (dev mode)
+    if not auth_token:
+        return (True, None)
+
+    # Check Authorization header (standard method)
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+        if constant_time_compare(token, auth_token):
+            return (True, None)
+
+    # Check Sec-WebSocket-Protocol header (browser compatibility)
+    # Browsers may send token in this header when custom headers aren't supported
+    ws_protocol = request.headers.get("Sec-WebSocket-Protocol", "")
+    if ws_protocol:
+        # Format: "bearer-<token>" or just the token
+        if ws_protocol.startswith("bearer-"):
+            token = ws_protocol[7:]
+            if constant_time_compare(token, auth_token):
+                return (True, None)
+        elif constant_time_compare(ws_protocol, auth_token):
+            return (True, None)
+
+    # Check query parameter (fallback for limited clients)
+    token_param = request.query.get("token", "")
+    if token_param and constant_time_compare(token_param, auth_token):
+        return (True, None)
+
+    # Authentication failed
+    logger.warning(
+        f"WebSocket authentication failed from {request.remote}"
+    )
+    return (False, "Unauthorized: Invalid or missing authentication token")
 
 
 # ============================================================================
@@ -351,7 +440,27 @@ class WebSocketServer:
         """WebSocket connection handler.
 
         Accepts WebSocket connections and maintains them for real-time updates.
+
+        Security:
+            - If DASHBOARD_AUTH_TOKEN is set, validates bearer token before accepting connection
+            - Supports token in Authorization header, Sec-WebSocket-Protocol header, or query param
+            - Logs authentication failures (but not the invalid tokens)
         """
+        # Validate authentication before accepting connection
+        is_valid, error_message = validate_websocket_auth(request)
+        if not is_valid:
+            # Return 401 Unauthorized for failed authentication
+            ws = web.WebSocketResponse()
+            await ws.prepare(request)
+            await ws.send_json({
+                'type': 'error',
+                'error': 'Unauthorized',
+                'message': error_message,
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            })
+            await ws.close(code=1008, message=b'Unauthorized')
+            return ws
+
         ws = web.WebSocketResponse(max_msg_size=self.max_message_size)
         await ws.prepare(request)
 

@@ -52,8 +52,42 @@ def get_auth_token() -> Optional[str]:
     return os.getenv("DASHBOARD_AUTH_TOKEN")
 
 
+def constant_time_compare(a: str, b: str) -> bool:
+    """Compare two strings in constant time to prevent timing attacks.
+
+    Args:
+        a: First string to compare
+        b: Second string to compare
+
+    Returns:
+        True if strings are equal, False otherwise
+
+    Security Note:
+        This function uses bitwise operations to ensure comparison
+        always takes the same amount of time, regardless of where
+        the strings differ. This prevents timing attacks where an
+        attacker could determine the correct token character by character
+        based on response time differences.
+    """
+    if len(a) != len(b):
+        # Still perform constant-time comparison even if lengths differ
+        # to avoid leaking length information
+        result = 1
+    else:
+        result = 0
+
+    # Compare all characters in constant time
+    for x, y in zip(a, b):
+        result |= ord(x) ^ ord(y)
+
+    return result == 0
+
+
 def create_auth_middleware():
     """Create authentication middleware that checks token on each request."""
+    import logging
+    logger = logging.getLogger(__name__)
+
     @middleware
     async def auth_middleware(request: Request, handler):
         """Authentication middleware - checks bearer token if DASHBOARD_AUTH_TOKEN is set."""
@@ -72,16 +106,29 @@ def create_auth_middleware():
         auth_header = request.headers.get("Authorization", "")
 
         if not auth_header.startswith("Bearer "):
+            logger.warning(
+                f"Authentication failed: Missing or invalid Authorization header from {request.remote}"
+            )
             return web.json_response(
-                {"error": "Missing or invalid Authorization header"},
+                {
+                    "error": "Unauthorized",
+                    "message": "Missing or invalid Authorization header. Expected format: 'Authorization: Bearer <token>'"
+                },
                 status=401
             )
 
         token = auth_header[7:]  # Remove "Bearer " prefix
 
-        if token != auth_token:
+        # Use constant-time comparison to prevent timing attacks
+        if not constant_time_compare(token, auth_token):
+            logger.warning(
+                f"Authentication failed: Invalid token from {request.remote}"
+            )
             return web.json_response(
-                {"error": "Invalid authentication token"},
+                {
+                    "error": "Unauthorized",
+                    "message": "Invalid authentication token"
+                },
                 status=401
             )
 
