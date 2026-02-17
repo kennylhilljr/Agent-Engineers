@@ -19,7 +19,7 @@ module.exports = {
     ['list']
   ],
   use: {
-    baseURL: 'http://127.0.0.1:8080',
+    baseURL: process.env.BASE_URL || 'http://127.0.0.1:8420',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure'
@@ -33,8 +33,8 @@ module.exports = {
     }
   ],
   webServer: {
-    command: 'python -m dashboard.server --port 8080',
-    url: 'http://127.0.0.1:8080/health',
+    command: 'python -m dashboard.server --port 8420',
+    url: 'http://127.0.0.1:8420/health',
     timeout: 120000,
     reuseExistingServer: !process.env.CI
   }
