@@ -1,0 +1,3700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Status Dashboard</title>
+    <style>
+        /* Reset and Base Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 30px;
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #94a3b8;
+            font-size: 1.1rem;
+        }
+
+        .refresh-info {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 15px;
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border: 1px solid;
+            transition: all 0.3s ease;
+        }
+
+        .connection-status.connected {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+
+        .connection-status.connecting {
+            background: rgba(245, 158, 11, 0.1);
+            color: #f59e0b;
+            border-color: rgba(245, 158, 11, 0.3);
+        }
+
+        .connection-status.disconnected {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .refresh-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .refresh-indicator.connecting {
+            background: #f59e0b;
+            animation: spin 1s linear infinite;
+        }
+
+        .refresh-indicator.disconnected {
+            background: #ef4444;
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Grid Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 24px;
+            margin-bottom: 30px;
+        }
+
+        /* Card Styles (Adapted from A2UI) */
+        .card {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 12px;
+            padding: 24px;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: rgba(59, 130, 246, 0.5);
+            box-shadow: 0 10px 30px rgba(59, 130, 246, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .card-header {
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #f1f5f9;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-icon {
+            width: 24px;
+            height: 24px;
+        }
+
+        /* TaskCard Component (Adapted from A2UI) */
+        .task-card {
+            cursor: pointer;
+        }
+
+        .task-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            border: 1px solid;
+        }
+
+        .status-completed {
+            background: rgba(34, 197, 94, 0.1);
+            color: #4ade80;
+            border-color: rgba(34, 197, 94, 0.3);
+        }
+
+        .status-in-progress {
+            background: rgba(59, 130, 246, 0.1);
+            color: #60a5fa;
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        .status-pending {
+            background: rgba(148, 163, 184, 0.1);
+            color: #94a3b8;
+            border-color: rgba(148, 163, 184, 0.3);
+        }
+
+        .task-description {
+            color: #94a3b8;
+            font-size: 0.9rem;
+            margin-top: 10px;
+            line-height: 1.5;
+        }
+
+        .task-metadata {
+            display: flex;
+            gap: 15px;
+            margin-top: 15px;
+            font-size: 0.85rem;
+            color: #64748b;
+        }
+
+        /* ProgressRing Component (Adapted from A2UI) */
+        .progress-ring-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .progress-ring {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 24px;
+        }
+
+        .progress-ring svg {
+            transform: rotate(-90deg);
+            filter: drop-shadow(0 0 10px currentColor);
+        }
+
+        .progress-percentage {
+            position: absolute;
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+
+        .progress-percentage-symbol {
+            font-size: 1.5rem;
+            color: #94a3b8;
+        }
+
+        .progress-metrics {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .progress-metric {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px;
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.15);
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .progress-metric:hover {
+            border-color: rgba(148, 163, 184, 0.3);
+        }
+
+        .metric-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+            color: #cbd5e1;
+        }
+
+        .metric-value {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #f1f5f9;
+        }
+
+        /* Orchestration View */
+        .orchestration-view {
+            margin-bottom: 30px;
+        }
+
+        .orch-node {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            border-radius: 12px;
+            padding: 16px 24px;
+            max-width: 420px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .orch-node-info {
+            flex: 1;
+        }
+
+        .orch-node-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #f1f5f9;
+        }
+
+        .orch-node-model {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-top: 2px;
+        }
+
+        .orch-connector {
+            width: 2px;
+            height: 28px;
+            background: rgba(148, 163, 184, 0.25);
+            margin: 0 auto;
+        }
+
+        .agent-group {
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid rgba(148, 163, 184, 0.12);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 16px;
+        }
+
+        .agent-group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .agent-group-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .agent-group-subtitle {
+            font-size: 0.7rem;
+            color: #64748b;
+        }
+
+        .agent-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+            gap: 10px;
+        }
+
+        .agent-chip {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(148, 163, 184, 0.15);
+            border-radius: 10px;
+            padding: 12px 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .agent-chip:hover {
+            border-color: rgba(59, 130, 246, 0.4);
+            background: rgba(15, 23, 42, 0.85);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .agent-chip-inactive {
+            opacity: 0.5;
+        }
+
+        .agent-chip-inactive:hover {
+            opacity: 0.7;
+        }
+
+        .agent-chip-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .agent-chip-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .agent-chip-name {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #f1f5f9;
+            margin-bottom: 1px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .agent-chip-model {
+            font-size: 0.7rem;
+            color: #94a3b8;
+            margin-bottom: 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .agent-chip-stats {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.7rem;
+            color: #64748b;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 2px;
+        }
+
+        /* Provider Usage & Limits */
+        .provider-usage-section {
+            margin-bottom: 30px;
+        }
+
+        .provider-usage-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .provider-usage-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .provider-usage-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 14px;
+        }
+
+        .provider-card {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(148, 163, 184, 0.15);
+            border-radius: 12px;
+            padding: 16px;
+            transition: all 0.2s ease;
+        }
+
+        .provider-card:hover {
+            border-color: rgba(148, 163, 184, 0.3);
+            background: rgba(15, 23, 42, 0.8);
+        }
+
+        .provider-card-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .provider-card-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #f1f5f9;
+            flex: 1;
+        }
+
+        .provider-console-link {
+            font-size: 0.7rem;
+            color: #60a5fa;
+            text-decoration: none;
+            padding: 3px 8px;
+            border-radius: 4px;
+            border: 1px solid rgba(96, 165, 250, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        .provider-console-link:hover {
+            background: rgba(96, 165, 250, 0.1);
+            border-color: rgba(96, 165, 250, 0.5);
+        }
+
+        .usage-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .usage-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .usage-label {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            min-width: 60px;
+        }
+
+        .usage-bar-container {
+            flex: 1;
+            height: 8px;
+            background: rgba(148, 163, 184, 0.1);
+            border-radius: 4px;
+            margin: 0 10px;
+            overflow: hidden;
+        }
+
+        .usage-bar {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .usage-bar.low { background: linear-gradient(90deg, #10b981, #34d399); }
+        .usage-bar.medium { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+        .usage-bar.high { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+        .usage-value {
+            font-size: 0.7rem;
+            color: #64748b;
+            min-width: 80px;
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .rate-limits-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(148, 163, 184, 0.08);
+        }
+
+        .rate-limit-tag {
+            font-size: 0.65rem;
+            color: #64748b;
+            padding: 2px 6px;
+            background: rgba(148, 163, 184, 0.08);
+            border-radius: 4px;
+        }
+
+        /* ActivityItem Component (Adapted from A2UI) */
+        .activity-feed {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .activity-feed::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .activity-feed::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 4px;
+        }
+
+        .activity-feed::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.3);
+            border-radius: 4px;
+        }
+
+        .activity-item {
+            display: flex;
+            gap: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.15);
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .activity-item:hover {
+            background: rgba(15, 23, 42, 0.7);
+            border-color: rgba(148, 163, 184, 0.3);
+        }
+
+        .activity-timeline {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .activity-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            box-shadow: 0 0 0 4px rgba(15, 23, 42, 0.8);
+        }
+
+        .activity-line {
+            width: 2px;
+            height: 40px;
+            background: rgba(148, 163, 184, 0.2);
+            margin-top: 4px;
+        }
+
+        .activity-content {
+            flex: 1;
+        }
+
+        .activity-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 8px;
+        }
+
+        .activity-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+
+        .activity-time {
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+
+        .activity-description {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            line-height: 1.5;
+        }
+
+        /* ErrorCard Component (Adapted from A2UI) */
+        .error-card {
+            border-left: 4px solid;
+        }
+
+        .error-severity-info {
+            border-left-color: #60a5fa;
+        }
+
+        .error-severity-warning {
+            border-left-color: #fbbf24;
+        }
+
+        .error-severity-error {
+            border-left-color: #ef4444;
+        }
+
+        .error-severity-critical {
+            border-left-color: #a855f7;
+        }
+
+        .error-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 12px;
+        }
+
+        .error-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+
+        .error-severity-badge {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            border: 1px solid;
+        }
+
+        .severity-info {
+            background: rgba(96, 165, 250, 0.1);
+            color: #60a5fa;
+            border-color: rgba(96, 165, 250, 0.3);
+        }
+
+        .severity-warning {
+            background: rgba(251, 191, 36, 0.1);
+            color: #fbbf24;
+            border-color: rgba(251, 191, 36, 0.3);
+        }
+
+        .severity-error {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .severity-critical {
+            background: rgba(168, 85, 247, 0.1);
+            color: #a855f7;
+            border-color: rgba(168, 85, 247, 0.3);
+        }
+
+        .error-message {
+            color: #cbd5e1;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        /* Chart Container */
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 20px;
+        }
+
+        .chart-large {
+            height: 400px;
+        }
+
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            border-color: rgba(59, 130, 246, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-label {
+            color: #94a3b8;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Loading State */
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px;
+            color: #64748b;
+        }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(148, 163, 184, 0.2);
+            border-top-color: #60a5fa;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Error State */
+        .error-state {
+            padding: 40px;
+            text-align: center;
+            color: #ef4444;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .chart-container {
+                height: 250px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+
+            .card {
+                padding: 16px;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Modal Overlay */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        .modal-overlay.visible { opacity: 1; }
+
+        .modal {
+            background: #1e293b;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 640px;
+            max-height: 80vh;
+            overflow-y: auto;
+            padding: 28px;
+            transform: scale(0.95);
+            transition: transform 0.2s ease;
+        }
+        .modal-overlay.visible .modal { transform: scale(1); }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+        }
+        .modal-header h2 { font-size: 1.4rem; color: #f1f5f9; }
+        .modal-close {
+            background: none;
+            border: none;
+            color: #94a3b8;
+            font-size: 1.6rem;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        .modal-close:hover { background: rgba(148, 163, 184, 0.15); color: #f1f5f9; }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .detail-item {
+            background: rgba(15, 23, 42, 0.5);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+        .detail-label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+        .detail-value { font-size: 1.1rem; font-weight: 600; color: #f1f5f9; }
+
+        .detail-section-title { font-size: 0.9rem; color: #94a3b8; margin: 16px 0 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+        .badge-list { display: flex; flex-wrap: wrap; gap: 6px; }
+        .detail-badge {
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+        .detail-badge.achievement {
+            background: rgba(250, 204, 21, 0.15);
+            color: #fbbf24;
+            border-color: rgba(250, 204, 21, 0.3);
+        }
+        .detail-badge.weakness {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .events-list { display: flex; flex-direction: column; gap: 8px; }
+        .event-item {
+            background: rgba(15, 23, 42, 0.5);
+            padding: 10px 12px;
+            border-radius: 8px;
+            border-left: 3px solid #3b82f6;
+            font-size: 0.85rem;
+        }
+        .event-item .event-time { color: #64748b; font-size: 0.75rem; }
+        .event-item .event-status { margin-left: 8px; }
+        .event-item .event-status.success { color: #4ade80; }
+        .event-item .event-status.error { color: #f87171; }
+
+        /* Chat Interface Styles */
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 500px;
+            gap: 16px;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 16px;
+            background: rgba(15, 23, 42, 0.3);
+            border-radius: 8px;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .chat-messages::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .chat-messages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.3);
+            border-radius: 3px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.5);
+        }
+
+        .chat-welcome {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #94a3b8;
+            text-align: center;
+            font-size: 0.95rem;
+        }
+
+        .chat-message {
+            display: flex;
+            gap: 8px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .chat-message.user {
+            justify-content: flex-end;
+        }
+
+        .chat-message-content {
+            max-width: 70%;
+            padding: 10px 14px;
+            border-radius: 8px;
+            word-wrap: break-word;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        .chat-message.user .chat-message-content {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: #fff;
+            border-bottom-right-radius: 2px;
+        }
+
+        .chat-message.ai .chat-message-content {
+            background: rgba(148, 163, 184, 0.15);
+            color: #e2e8f0;
+            border-bottom-left-radius: 2px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .chat-timestamp {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 4px;
+        }
+
+        /* Provider Selector Styles */
+        .provider-selector-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            padding: 12px;
+            background: rgba(15, 23, 42, 0.4);
+            border-radius: 8px;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .provider-selector-label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #94a3b8;
+            white-space: nowrap;
+        }
+
+        .provider-selector {
+            flex: 1;
+            padding: 8px 12px;
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            border-radius: 8px;
+            color: #f1f5f9;
+            font-size: 0.9rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .provider-selector:hover {
+            border-color: #3b82f6;
+            background: rgba(15, 23, 42, 0.9);
+        }
+
+        .provider-selector:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+        }
+
+        .provider-selector option {
+            background: #1e293b;
+            color: #f1f5f9;
+            padding: 8px;
+        }
+
+        .provider-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .chat-input-area {
+            display: flex;
+            gap: 8px;
+        }
+
+        .chat-input-wrapper {
+            display: flex;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 12px 14px;
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 8px;
+            color: #f1f5f9;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            background: rgba(15, 23, 42, 0.7);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+        }
+
+        .chat-input::placeholder {
+            color: #64748b;
+        }
+
+        .chat-send-btn {
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 48px;
+            flex-shrink: 0;
+        }
+
+        .chat-send-btn:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            transform: translateY(-2px);
+        }
+
+        .chat-send-btn:active {
+            transform: translateY(0);
+        }
+
+        .chat-send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .chat-send-btn svg {
+            width: 20px;
+            height: 20px;
+            stroke-width: 2;
+        }
+
+        .chat-loading {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .chat-loading-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #94a3b8;
+            animation: bounce 1.4s infinite;
+        }
+
+        .chat-loading-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .chat-loading-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes bounce {
+            0%, 80%, 100% {
+                transform: translateY(0);
+                opacity: 0.8;
+            }
+            40% {
+                transform: translateY(-8px);
+                opacity: 1;
+            }
+        }
+
+        /* Requirement Editor Styles */
+        .req-editor-section {
+            margin-top: 40px;
+        }
+
+        .req-ticket-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .req-ticket-input {
+            flex: 1;
+            min-width: 160px;
+            padding: 10px 14px;
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 8px;
+            color: #f1f5f9;
+            font-size: 0.95rem;
+            font-family: inherit;
+            transition: border-color 0.2s ease;
+        }
+
+        .req-ticket-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+        }
+
+        .req-ticket-input::placeholder { color: #64748b; }
+
+        .req-load-btn {
+            padding: 10px 18px;
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .req-load-btn:hover {
+            background: rgba(59, 130, 246, 0.25);
+            border-color: rgba(59, 130, 246, 0.5);
+        }
+
+        .req-textarea {
+            width: 100%;
+            min-height: 160px;
+            padding: 14px;
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 8px;
+            color: #f1f5f9;
+            font-size: 0.9rem;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            line-height: 1.6;
+            resize: vertical;
+            transition: border-color 0.2s ease;
+        }
+
+        .req-textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+        }
+
+        .req-textarea::placeholder { color: #64748b; }
+
+        .req-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 14px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .req-sync-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        /* Toggle switch */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            position: absolute;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(148, 163, 184, 0.25);
+            border-radius: 24px;
+            transition: background 0.2s ease;
+        }
+
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background: #f1f5f9;
+            border-radius: 50%;
+            transition: transform 0.2s ease;
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background: #3b82f6;
+        }
+
+        .toggle-switch input:checked + .toggle-slider::before {
+            transform: translateX(20px);
+        }
+
+        .req-sync-label {
+            font-size: 0.9rem;
+            color: #cbd5e1;
+            font-weight: 500;
+        }
+
+        .req-sync-label span {
+            color: #64748b;
+            font-size: 0.8rem;
+            font-weight: 400;
+            margin-left: 4px;
+        }
+
+        .req-save-btn {
+            padding: 10px 22px;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .req-save-btn:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            transform: translateY(-1px);
+        }
+
+        .req-save-btn:active { transform: translateY(0); }
+
+        .req-save-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .req-feedback {
+            margin-top: 12px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: none;
+        }
+
+        .req-feedback.success {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            display: block;
+        }
+
+        .req-feedback.error {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            display: block;
+        }
+
+        /* Reasoning Block Styles (AI-158) */
+        .reasoning-block {
+            font-family: 'Courier New', Courier, monospace;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            border-radius: 6px;
+            margin: 8px 0;
+            background: rgba(15, 23, 42, 0.6);
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .reasoning-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(30, 41, 59, 0.8);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+            gap: 8px;
+        }
+
+        .reasoning-header:hover {
+            background: rgba(51, 65, 85, 0.8);
+        }
+
+        .reasoning-header-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #60a5fa;
+            letter-spacing: 0.04em;
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .complexity-badge {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 4px;
+            letter-spacing: 0.06em;
+            flex-shrink: 0;
+        }
+
+        .complexity-badge.SIMPLE {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.4);
+        }
+
+        .complexity-badge.MODERATE {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.4);
+        }
+
+        .complexity-badge.COMPLEX {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+        }
+
+        .reasoning-toggle {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            flex-shrink: 0;
+            transition: transform 0.2s ease;
+        }
+
+        .reasoning-block.expanded .reasoning-toggle {
+            transform: rotate(180deg);
+        }
+
+        .reasoning-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-in-out, opacity 0.2s ease;
+            opacity: 0;
+            padding: 0 12px;
+            font-size: 0.8rem;
+            color: #cbd5e1;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+            border-top: 0px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .reasoning-block.expanded .reasoning-content {
+            max-height: 2000px;
+            opacity: 1;
+            padding: 10px 12px;
+            border-top: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        /* Collapsed summary preview for reasoning blocks (AI-160) */
+        .reasoning-preview {
+            font-size: 0.72rem;
+            color: #64748b;
+            font-style: italic;
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-left: 6px;
+        }
+
+        .reasoning-block.expanded .reasoning-preview {
+            display: none;
+        }
+
+        .reasoning-timestamp {
+            font-size: 0.7rem;
+            color: #475569;
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+
+        .reasoning-ticket {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        /* Agent Thinking Block Styles (AI-159) */
+        .thinking-block {
+            font-family: 'Courier New', Courier, monospace;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            border-radius: 6px;
+            margin: 8px 0;
+            background: rgba(15, 23, 42, 0.6);
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .thinking-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(30, 41, 59, 0.8);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+            gap: 8px;
+        }
+
+        .thinking-header:hover {
+            background: rgba(51, 65, 85, 0.8);
+        }
+
+        .thinking-header-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #a78bfa;
+            letter-spacing: 0.04em;
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .thinking-category-icon {
+            font-size: 0.9rem;
+            flex-shrink: 0;
+        }
+
+        .thinking-toggle {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            flex-shrink: 0;
+            transition: transform 0.2s ease;
+        }
+
+        .thinking-block.expanded .thinking-toggle {
+            transform: rotate(180deg);
+        }
+
+        .thinking-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-in-out, opacity 0.2s ease;
+            opacity: 0;
+            padding: 0 12px;
+            border-top: 0px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .thinking-block.expanded .thinking-content {
+            max-height: 2000px;
+            opacity: 1;
+            padding: 10px 12px;
+            border-top: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        /* Collapsed summary info for thinking blocks (AI-160) */
+        .thinking-count {
+            font-size: 0.7rem;
+            color: #64748b;
+            flex-shrink: 0;
+            white-space: nowrap;
+            margin-left: 4px;
+        }
+
+        .thinking-timestamp {
+            font-size: 0.7rem;
+            color: #475569;
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+
+        .thinking-stream {
+            font-size: 0.8rem;
+            color: #cbd5e1;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .thinking-stream-entry {
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.05);
+        }
+
+        .thinking-stream-entry:last-child {
+            border-bottom: none;
+        }
+
+        /* Category-specific colors */
+        .thinking-block[data-category="files"] .thinking-header {
+            border-left: 3px solid #3b82f6;
+        }
+
+        .thinking-block[data-category="files"] .thinking-header-title {
+            color: #60a5fa;
+        }
+
+        .thinking-block[data-category="changes"] .thinking-header {
+            border-left: 3px solid #f97316;
+        }
+
+        .thinking-block[data-category="changes"] .thinking-header-title {
+            color: #fb923c;
+        }
+
+        .thinking-block[data-category="commands"] .thinking-header {
+            border-left: 3px solid #a855f7;
+        }
+
+        .thinking-block[data-category="commands"] .thinking-header-title {
+            color: #c084fc;
+        }
+
+        .thinking-block[data-category="tests"] .thinking-header {
+            border-left: 3px solid #22c55e;
+        }
+
+        .thinking-block[data-category="tests"] .thinking-header-title {
+            color: #4ade80;
+        }
+
+        /* Global reasoning controls bar (AI-160) */
+        .reasoning-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 6px;
+            margin-bottom: 8px;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        .reasoning-controls-count {
+            font-size: 0.75rem;
+            color: #64748b;
+            flex: 1;
+            font-weight: 600;
+        }
+
+        .reasoning-controls-btn {
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 4px;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            background: rgba(30, 41, 59, 0.9);
+            color: #94a3b8;
+            cursor: pointer;
+            letter-spacing: 0.04em;
+            transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+        }
+
+        .reasoning-controls-btn:hover {
+            background: rgba(51, 65, 85, 0.9);
+            color: #e2e8f0;
+            border-color: rgba(148, 163, 184, 0.5);
+        }
+
+        .reasoning-controls-btn.expand-all:hover {
+            color: #60a5fa;
+            border-color: rgba(96, 165, 250, 0.4);
+        }
+
+        .reasoning-controls-btn.collapse-all:hover {
+            color: #f87171;
+            border-color: rgba(248, 113, 113, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>Agent Status Dashboard</h1>
+            <p>Real-time monitoring of autonomous agent performance</p>
+            <div class="refresh-info">
+                <div class="connection-status" id="connection-status">
+                    <div class="refresh-indicator" id="status-indicator"></div>
+                    <span id="status-text">Connecting...</span>
+                </div>
+                <span id="last-update"></span>
+            </div>
+        </div>
+
+        <!-- Global Stats -->
+        <div class="stats-grid" id="stats-grid">
+            <div class="loading">
+                <div class="loading-spinner"></div>
+                <p>Loading dashboard...</p>
+            </div>
+        </div>
+
+        <!-- Agent Orchestration View -->
+        <div id="agent-cards"></div>
+
+        <!-- Provider Usage & Limits -->
+        <div id="provider-usage"></div>
+
+        <!-- Charts Section -->
+        <div class="dashboard-grid">
+            <!-- Performance Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <svg class="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                        Agent Success Rates
+                    </h2>
+                </div>
+                <div class="chart-container">
+                    <canvas id="success-rate-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Token Usage by Provider -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <svg class="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h10v10H7zM12 7V3M12 21v-4M7 12H3M21 12h-4"></path>
+                        </svg>
+                        Token Usage by Provider
+                    </h2>
+                </div>
+                <div class="chart-container">
+                    <canvas id="token-usage-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Activity & Performance Charts -->
+        <div class="dashboard-grid">
+            <!-- Activity Timeline Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <svg class="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Recent Activity
+                    </h2>
+                </div>
+                <!-- Global Expand/Collapse controls for reasoning+thinking blocks (AI-160) -->
+                <div class="reasoning-controls" id="reasoning-controls" style="display:none;">
+                    <span class="reasoning-controls-count" id="reasoning-controls-count">0 blocks</span>
+                    <button class="reasoning-controls-btn expand-all" id="reasoning-expand-all" onclick="expandAllReasoningBlocks()">Expand All</button>
+                    <button class="reasoning-controls-btn collapse-all" id="reasoning-collapse-all" onclick="collapseAllReasoningBlocks()">Collapse All</button>
+                </div>
+                <div class="activity-feed" id="activity-feed">
+                    <div class="loading">
+                        <div class="loading-spinner"></div>
+                        <p>Loading activity...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Performance Metrics Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <svg class="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path>
+                        </svg>
+                        Agent Performance Overview
+                    </h2>
+                </div>
+                <div class="chart-container">
+                    <canvas id="performance-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cost & Efficiency Charts -->
+        <div class="dashboard-grid">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <svg class="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Cost Analysis
+                    </h2>
+                </div>
+                <div class="chart-container">
+                    <canvas id="cost-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <svg class="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                        Daily Token Allocation
+                    </h2>
+                </div>
+                <div class="chart-container">
+                    <canvas id="allocation-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Requirement Editor -->
+        <div class="card req-editor-section" id="requirement-editor" data-testid="requirement-editor">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <svg class="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    Requirement Editor
+                </h2>
+            </div>
+
+            <div class="req-ticket-row">
+                <input
+                    type="text"
+                    id="req-ticket-key"
+                    class="req-ticket-input"
+                    placeholder="Ticket key (e.g. AI-157)"
+                    data-testid="req-ticket-key-input"
+                    aria-label="Ticket key"
+                />
+                <button
+                    id="req-load-btn"
+                    class="req-load-btn"
+                    data-testid="req-load-button"
+                    aria-label="Load requirement"
+                >
+                    Load
+                </button>
+            </div>
+
+            <textarea
+                id="req-textarea"
+                class="req-textarea"
+                placeholder="Enter or edit requirement text here..."
+                data-testid="req-textarea"
+                aria-label="Requirement text"
+            ></textarea>
+
+            <div class="req-footer">
+                <label class="req-sync-toggle" for="req-sync-toggle" data-testid="req-sync-toggle-label">
+                    <span class="toggle-switch">
+                        <input
+                            type="checkbox"
+                            id="req-sync-toggle"
+                            data-testid="req-sync-toggle"
+                            aria-label="Sync to Linear"
+                        />
+                        <span class="toggle-slider"></span>
+                    </span>
+                    <span class="req-sync-label">
+                        Sync to Linear
+                        <span>(updates the Linear issue description)</span>
+                    </span>
+                </label>
+
+                <button
+                    id="req-save-btn"
+                    class="req-save-btn"
+                    data-testid="req-save-button"
+                    aria-label="Save requirement"
+                >
+                    Save Requirement
+                </button>
+            </div>
+
+            <div id="req-feedback" class="req-feedback" data-testid="req-feedback" role="status"></div>
+        </div>
+
+        <!-- Chat Interface -->
+        <div class="card" style="margin-top: 40px;">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <svg class="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                    </svg>
+                    Chat Interface
+                </h2>
+            </div>
+            <div id="chat-container" class="chat-container">
+                <div class="provider-selector-container">
+                    <label for="ai-provider-selector" class="provider-selector-label">
+                        AI Provider:
+                    </label>
+                    <select
+                        id="ai-provider-selector"
+                        class="provider-selector"
+                        data-testid="ai-provider-selector"
+                        aria-label="Select AI Provider"
+                    >
+                        <option value="claude" data-testid="provider-option-claude">Claude (Haiku 4.5, Sonnet 4.5, Opus 4.6)</option>
+                        <option value="chatgpt" data-testid="provider-option-chatgpt">ChatGPT (GPT-4o, o1, o3-mini, o4-mini)</option>
+                        <option value="gemini" data-testid="provider-option-gemini">Gemini (2.5 Flash, 2.5 Pro, 2.0 Flash)</option>
+                        <option value="groq" data-testid="provider-option-groq">Groq (Llama 3.3 70B, Mixtral 8x7B)</option>
+                        <option value="kimi" data-testid="provider-option-kimi">KIMI (Moonshot 2M context)</option>
+                        <option value="windsurf" data-testid="provider-option-windsurf">Windsurf (Cascade)</option>
+                    </select>
+                    <span class="provider-badge" id="provider-badge" data-testid="provider-badge">Claude</span>
+                </div>
+                <div id="chat-messages" class="chat-messages">
+                    <div class="chat-welcome">
+                        <p>Welcome to the Agent Dashboard Chat. Ask me anything about your agent status, metrics, or general questions!</p>
+                    </div>
+                </div>
+                <div class="chat-input-area">
+                    <div class="chat-input-wrapper">
+                        <input
+                            type="text"
+                            id="chat-input"
+                            class="chat-input"
+                            placeholder="Type a message... (e.g., 'What's my status?')"
+                            data-testid="chat-message-input"
+                        />
+                        <button
+                            id="chat-send-btn"
+                            class="chat-send-btn"
+                            data-testid="chat-send-button"
+                            aria-label="Send message"
+                        >
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <script>
+        // Configuration
+        const API_BASE_URL = window.location.origin;
+        const WS_BASE_URL = `ws://${window.location.host}`;
+        const REFRESH_INTERVAL = 30000; // 30 seconds (fallback if WebSocket fails)
+        const MAX_RECONNECT_DELAY = 30000; // 30 seconds max delay
+        const INITIAL_RECONNECT_DELAY = 1000; // 1 second initial delay
+
+        let refreshTimer;
+        let charts = {};
+        let websocket = null;
+        let reconnectDelay = INITIAL_RECONNECT_DELAY;
+        let reconnectTimer = null;
+        let isManualClose = false;
+
+        // Utility Functions
+        function formatTime(date) {
+            return new Intl.DateTimeFormat('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            }).format(date);
+        }
+
+        function formatRelativeTime(timestamp) {
+            const now = new Date();
+            const date = new Date(timestamp);
+            const diff = now - date;
+            const seconds = Math.floor(diff / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const hours = Math.floor(minutes / 60);
+            const days = Math.floor(hours / 24);
+
+            if (seconds < 60) return 'just now';
+            if (minutes < 60) return `${minutes}m ago`;
+            if (hours < 24) return `${hours}h ago`;
+            return `${days}d ago`;
+        }
+
+        function getSuccessRateColor(rate) {
+            if (rate >= 0.9) return '#10b981';
+            if (rate >= 0.7) return '#f59e0b';
+            return '#ef4444';
+        }
+
+        function getProgressRingColor(percentage) {
+            if (percentage >= 80) return '#10b981';
+            if (percentage >= 50) return '#f59e0b';
+            return '#ef4444';
+        }
+
+        // API Functions
+        async function fetchMetrics() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/metrics`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return await response.json();
+            } catch (error) {
+                console.error('Failed to fetch metrics:', error);
+                showError('Failed to load dashboard data. Please ensure the server is running.');
+                return null;
+            }
+        }
+
+        // Agent architecture metadata
+        const AGENT_META = {
+            linear: { platform: 'linear', defaultModel: 'Claude Haiku', role: 'Issues & project tracking', group: 'workflow' },
+            coding: { platform: 'coding', defaultModel: 'Claude Sonnet', role: 'Implementation + Playwright testing', group: 'workflow' },
+            coding_fast: { platform: 'coding_fast', defaultModel: 'Claude Haiku', role: 'Simple changes (CSS, config)', group: 'workflow' },
+            github: { platform: 'github', defaultModel: 'Claude Haiku', role: 'Commits, branches, PRs', group: 'workflow' },
+            pr_reviewer: { platform: 'pr_reviewer', defaultModel: 'Claude Sonnet', role: 'Code review & auto-merge', group: 'workflow' },
+            pr_reviewer_fast: { platform: 'pr_reviewer_fast', defaultModel: 'Claude Haiku', role: 'Quick PR review', group: 'workflow' },
+            slack: { platform: 'slack', defaultModel: 'Claude Haiku', role: 'Team notifications', group: 'workflow' },
+            ops: { platform: 'ops', defaultModel: 'Claude Haiku', role: 'Batch operations', group: 'workflow' },
+            claude: { platform: 'claude', defaultModel: 'Haiku / Sonnet / Opus', role: 'Primary orchestration & coding', group: 'ai_provider' },
+            chatgpt: { platform: 'openai', defaultModel: 'GPT-4o, o1, o3-mini', role: 'Cross-validation & reasoning', group: 'ai_provider' },
+            gemini: { platform: 'gemini', defaultModel: 'Gemini 2.5 Flash / Pro', role: 'Research & search grounding', group: 'ai_provider' },
+            groq: { platform: 'groq', defaultModel: 'Llama 3.3 70B, Mixtral', role: 'Ultra-fast LPU inference', group: 'ai_provider' },
+            kimi: { platform: 'kimi', defaultModel: 'Moonshot v1, Kimi k2', role: 'Ultra-long context (2M tokens)', group: 'ai_provider' },
+            windsurf: { platform: 'windsurf', defaultModel: 'Cascade', role: 'Parallel IDE coding', group: 'ai_provider' },
+        };
+
+        // Workflow agent icons (function-specific)
+        const WORKFLOW_ICONS = {
+            linear: {
+                bg: 'rgba(94, 106, 210, 0.15)', border: 'rgba(94, 106, 210, 0.3)',
+                svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5E6AD2" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1" fill="#5E6AD2"/><circle cx="4" cy="12" r="1" fill="#5E6AD2"/><circle cx="4" cy="18" r="1" fill="#5E6AD2"/></svg>'
+            },
+            coding: {
+                bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)',
+                svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>'
+            },
+            coding_fast: {
+                bg: 'rgba(96, 165, 250, 0.15)', border: 'rgba(96, 165, 250, 0.3)',
+                svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 18l5-6-5-6M9 6l-5 6 5 6" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 2L11 22" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/></svg>'
+            },
+            github: {
+                bg: 'rgba(139, 148, 158, 0.15)', border: 'rgba(139, 148, 158, 0.3)',
+                svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b949e" stroke-width="2" stroke-linecap="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 01-9 9"/></svg>'
+            },
+            pr_reviewer: {
+                bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)',
+                svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>'
+            },
+            pr_reviewer_fast: {
+                bg: 'rgba(52, 211, 153, 0.15)', border: 'rgba(52, 211, 153, 0.3)',
+                svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>'
+            },
+            slack: {
+                bg: 'rgba(224, 30, 90, 0.15)', border: 'rgba(224, 30, 90, 0.3)',
+                svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E01E5A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>'
+            },
+            ops: {
+                bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.3)',
+                svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M1 12h4m14 0h4M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83"/></svg>'
+            },
+        };
+
+        // AI provider icons (brand-specific)
+        const PROVIDER_ICONS = {
+            claude: {
+                bg: 'rgba(212, 165, 116, 0.15)', border: 'rgba(212, 165, 116, 0.3)',
+                svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M13.8 3L7 21" stroke="#D4A574" stroke-width="2.5" stroke-linecap="round"/><path d="M10.2 3L17 21" stroke="#D4A574" stroke-width="2.5" stroke-linecap="round"/><circle cx="18.5" cy="5" r="2" fill="#D4A574" opacity="0.6"/></svg>'
+            },
+            openai: {
+                bg: 'rgba(16, 163, 127, 0.15)', border: 'rgba(16, 163, 127, 0.3)',
+                svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10a37f" stroke-width="1.8"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" stroke-linecap="round"/><path d="M8 14l4-8 4 8M9.5 12h5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+            },
+            gemini: {
+                bg: 'rgba(66, 133, 244, 0.15)', border: 'rgba(66, 133, 244, 0.3)',
+                svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="#4285F4"><path d="M12 2l2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5z"/></svg>'
+            },
+            groq: {
+                bg: 'rgba(245, 80, 54, 0.15)', border: 'rgba(245, 80, 54, 0.3)',
+                svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="#f55036"><path d="M13 2L4 14h7l-2 8 9-12h-7l2-8z"/></svg>'
+            },
+            kimi: {
+                bg: 'rgba(124, 58, 237, 0.15)', border: 'rgba(124, 58, 237, 0.3)',
+                svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="#7c3aed"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>'
+            },
+            windsurf: {
+                bg: 'rgba(6, 182, 212, 0.15)', border: 'rgba(6, 182, 212, 0.3)',
+                svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="2" stroke-linecap="round"><path d="M3 17c2-2 4-3 7-3s5 2 7 2 3-1 4-2M3 12c2-2 4-3 7-3s5 2 7 2 3-1 4-2M3 7c2-2 4-3 7-3s5 2 7 2 3-1 4-2"/></svg>'
+            },
+        };
+
+        // Provider rate limits, console URLs, and agent-to-provider mapping
+        const PROVIDER_CONFIG = {
+            claude: {
+                name: 'Claude (Anthropic)',
+                consoleUrl: 'https://console.anthropic.com/settings/usage',
+                agents: ['coding', 'coding_fast', 'linear', 'github', 'pr_reviewer', 'pr_reviewer_fast', 'slack', 'ops', 'claude'],
+                modelPrefix: 'claude-',
+                limits: {
+                    rpm: 4000,
+                    tpm: 400000,
+                    daily_tokens: 25000000,
+                },
+                pricing: { input: 3.00, output: 15.00, unit: 'per 1M tokens (Sonnet)' }
+            },
+            openai: {
+                name: 'ChatGPT (OpenAI)',
+                consoleUrl: 'https://platform.openai.com/usage',
+                agents: ['chatgpt'],
+                modelPrefix: 'gpt-',
+                limits: {
+                    rpm: 5000,
+                    tpm: 800000,
+                    daily_tokens: 50000000,
+                },
+                pricing: { input: 2.50, output: 10.00, unit: 'per 1M tokens (GPT-4o)' }
+            },
+            gemini: {
+                name: 'Gemini (Google)',
+                consoleUrl: 'https://aistudio.google.com/usage',
+                agents: ['gemini'],
+                modelPrefix: 'gemini-',
+                limits: {
+                    rpm: 1000,
+                    tpm: 4000000,
+                    daily_tokens: 1500000,
+                },
+                pricing: { input: 1.25, output: 5.00, unit: 'per 1M tokens (2.5 Flash)' }
+            },
+            groq: {
+                name: 'Groq',
+                consoleUrl: 'https://console.groq.com/settings/limits',
+                agents: ['groq'],
+                modelPrefix: 'llama-',
+                limits: {
+                    rpm: 30,
+                    tpm: 15000,
+                    daily_tokens: 500000,
+                },
+                pricing: { input: 0.59, output: 0.79, unit: 'per 1M tokens (Llama 3.3 70B)' }
+            },
+            kimi: {
+                name: 'KIMI (Moonshot)',
+                consoleUrl: 'https://platform.moonshot.ai/console/limits',
+                agents: ['kimi'],
+                modelPrefix: 'moonshot-',
+                limits: {
+                    rpm: 60,
+                    tpm: 300000,
+                    daily_tokens: 10000000,
+                },
+                pricing: { input: 1.00, output: 2.00, unit: 'per 1M tokens (Kimi k2)' }
+            },
+            windsurf: {
+                name: 'Windsurf (Codeium)',
+                consoleUrl: 'https://windsurf.com/account',
+                agents: ['windsurf'],
+                modelPrefix: 'cascade-',
+                limits: {
+                    daily_actions: 5,
+                    monthly_actions: 50,
+                },
+                pricing: { input: 0, output: 0, unit: 'Free tier — 50 premium actions/mo' }
+            },
+        };
+
+        // Compute time-windowed provider usage from events and agent profiles
+        function computeProviderMetrics(data) {
+            const events = data.events || [];
+            const agents = data.agents || {};
+            const now = new Date();
+            const oneMinAgo = new Date(now - 60 * 1000);
+            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+            const metrics = {};
+
+            for (const [providerKey, config] of Object.entries(PROVIDER_CONFIG)) {
+                // Filter events belonging to this provider's agents
+                const providerEvents = events.filter(ev =>
+                    config.agents.includes(ev.agent_name)
+                );
+
+                // Time-windowed event metrics
+                const lastMinEvents = providerEvents.filter(ev => {
+                    const t = new Date(ev.started_at || ev.timestamp);
+                    return t >= oneMinAgo;
+                });
+                const todayEvents = providerEvents.filter(ev => {
+                    const t = new Date(ev.started_at || ev.timestamp);
+                    return t >= todayStart;
+                });
+
+                // Per-minute: requests and tokens in the last 60 seconds
+                const rpm = lastMinEvents.length;
+                const tpm = lastMinEvents.reduce((sum, ev) => sum + (ev.total_tokens || 0), 0);
+
+                // Daily: tokens and cost since midnight
+                const dailyTokens = todayEvents.reduce((sum, ev) => sum + (ev.total_tokens || 0), 0);
+                const dailyCost = todayEvents.reduce((sum, ev) => sum + (ev.estimated_cost_usd || 0), 0);
+                const dailyRequests = todayEvents.length;
+
+                // Monthly: requests since start of month
+                const monthEvents = providerEvents.filter(ev => {
+                    const t = new Date(ev.started_at || ev.timestamp);
+                    return t >= monthStart;
+                });
+                const monthlyRequests = monthEvents.length;
+
+                // Lifetime totals from agent profiles
+                let totalTokens = 0;
+                let totalCost = 0;
+                let totalInvocations = 0;
+                for (const agentName of config.agents) {
+                    const a = agents[agentName];
+                    if (a) {
+                        totalTokens += a.total_tokens || 0;
+                        totalCost += a.total_cost_usd || 0;
+                        totalInvocations += a.total_invocations || 0;
+                    }
+                }
+
+                metrics[providerKey] = {
+                    rpm, tpm, dailyTokens, dailyCost, dailyRequests,
+                    monthlyRequests, totalTokens, totalCost, totalInvocations
+                };
+            }
+
+            return metrics;
+        }
+
+        function renderProviderUsage(data) {
+            const container = document.getElementById('provider-usage');
+            const metrics = computeProviderMetrics(data);
+
+            function usageBarClass(pct) {
+                if (pct >= 80) return 'high';
+                if (pct >= 50) return 'medium';
+                return 'low';
+            }
+
+            function formatNum(n) {
+                if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+                if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+                return n.toLocaleString();
+            }
+
+            function usageRow(label, used, limit) {
+                if (limit <= 0) return '';
+                const pct = Math.min((used / limit) * 100, 100);
+                return `
+                    <div class="usage-row">
+                        <span class="usage-label">${label}</span>
+                        <div class="usage-bar-container">
+                            <div class="usage-bar ${usageBarClass(pct)}" style="width: ${pct}%"></div>
+                        </div>
+                        <span class="usage-value">${formatNum(used)} / ${formatNum(limit)}</span>
+                    </div>
+                `;
+            }
+
+            const cards = Object.entries(PROVIDER_CONFIG).map(([key, config]) => {
+                const icon = PROVIDER_ICONS[key] || PROVIDER_ICONS.claude;
+                const m = metrics[key];
+                const limits = config.limits;
+                const consoleLink = config.consoleUrl
+                    ? `<a href="${config.consoleUrl}" target="_blank" rel="noopener" class="provider-console-link">View Console</a>`
+                    : '';
+
+                // Build usage bars: rate window (1 min) + daily window
+                const rows = [
+                    usageRow('Req/min', m.rpm, limits.rpm),
+                    usageRow('Tokens/min', m.tpm, limits.tpm),
+                    usageRow('Daily tokens', m.dailyTokens, limits.daily_tokens),
+                    usageRow('Daily actions', m.dailyRequests, limits.daily_actions || 0),
+                    usageRow('Monthly actions', m.monthlyRequests, limits.monthly_actions || 0),
+                ].filter(Boolean).join('');
+
+                // Tags: pricing + daily spend + lifetime spend
+                const pricingTag = config.pricing.input > 0
+                    ? `<span class="rate-limit-tag">$${config.pricing.input} in / $${config.pricing.output} out ${config.pricing.unit}</span>`
+                    : `<span class="rate-limit-tag">${config.pricing.unit}</span>`;
+                const dailyCostTag = m.dailyCost > 0
+                    ? `<span class="rate-limit-tag">Today: $${m.dailyCost.toFixed(2)}</span>`
+                    : '';
+                const lifetimeCostTag = m.totalCost > 0
+                    ? `<span class="rate-limit-tag">Lifetime: $${m.totalCost.toFixed(2)}</span>`
+                    : '';
+                const lifetimeTokenTag = m.totalTokens > 0
+                    ? `<span class="rate-limit-tag">${formatNum(m.totalTokens)} tokens total</span>`
+                    : '';
+
+                return `
+                    <div class="provider-card">
+                        <div class="provider-card-header">
+                            <div class="agent-chip-icon" style="background: ${icon.bg}; border: 1px solid ${icon.border}; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                ${icon.svg}
+                            </div>
+                            <span class="provider-card-name">${config.name}</span>
+                            ${consoleLink}
+                        </div>
+                        ${rows || '<div style="font-size:0.8rem;color:#475569;padding:4px 0;">No rate limits configured</div>'}
+                        <div class="rate-limits-row">
+                            ${pricingTag}
+                            ${dailyCostTag}
+                            ${lifetimeCostTag}
+                            ${lifetimeTokenTag}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = `
+                <div class="provider-usage-section">
+                    <div class="provider-usage-header">
+                        <span class="provider-usage-title">Provider Usage &amp; Limits</span>
+                    </div>
+                    <div class="provider-usage-grid">
+                        ${cards}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Render Functions
+        function renderStatsGrid(data) {
+            const statsGrid = document.getElementById('stats-grid');
+            const stats = [
+                { label: 'Total Sessions', value: data.total_sessions || 0, icon: '📊' },
+                { label: 'Total Agents', value: Object.keys(data.agents || {}).length, icon: '🤖' },
+                { label: 'Total Cost', value: `$${(data.total_cost_usd || 0).toFixed(2)}`, icon: '💰' },
+                { label: 'Total Tokens', value: (data.total_tokens || 0).toLocaleString(), icon: '🎫' }
+            ];
+
+            statsGrid.innerHTML = stats.map(stat => `
+                <div class="stat-card">
+                    <div class="stat-value">${stat.value}</div>
+                    <div class="stat-label">${stat.icon} ${stat.label}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderAgentCards(data) {
+            const container = document.getElementById('agent-cards');
+            const agents = data.agents || data;
+
+            // Build agent entries from metadata, merging in live data
+            const workflowAgents = [];
+            const aiProviderAgents = [];
+
+            for (const [name, meta] of Object.entries(AGENT_META)) {
+                const agentData = (typeof agents === 'object') ? agents[name] || null : null;
+                const entry = { name, meta, data: agentData };
+                if (meta.group === 'workflow') workflowAgents.push(entry);
+                else if (meta.group === 'ai_provider') aiProviderAgents.push(entry);
+            }
+
+            // Include any agents from live data not in AGENT_META (skip orchestrator)
+            if (typeof agents === 'object') {
+                for (const [name, agentData] of Object.entries(agents)) {
+                    if (!AGENT_META[name] && name !== 'orchestrator') {
+                        workflowAgents.push({
+                            name,
+                            meta: { platform: 'ops', defaultModel: 'Unknown', role: '', group: 'workflow' },
+                            data: agentData
+                        });
+                    }
+                }
+            }
+
+            function renderChip(entry) {
+                const { name, meta, data: agentData } = entry;
+                const icon = meta.group === 'workflow'
+                    ? (WORKFLOW_ICONS[name] || WORKFLOW_ICONS.ops)
+                    : (PROVIDER_ICONS[meta.platform] || PROVIDER_ICONS.claude);
+                const hasData = agentData && agentData.total_invocations > 0;
+                const successRate = hasData ? Math.round((agentData.success_rate || 0) * 100) : null;
+                const cost = hasData ? (agentData.total_cost_usd || 0).toFixed(2) : null;
+                const invocations = hasData ? agentData.total_invocations : 0;
+                const statusColor = hasData ? getSuccessRateColor((agentData.success_rate || 0)) : '#475569';
+                const displayName = name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                const modelLabel = meta.defaultModel;
+
+                return `
+                    <div class="agent-chip ${hasData ? '' : 'agent-chip-inactive'}" onclick="viewAgentDetails('${name}')">
+                        <div class="agent-chip-icon" style="background: ${icon.bg}; border: 1px solid ${icon.border};">
+                            ${icon.svg}
+                        </div>
+                        <div class="agent-chip-info">
+                            <div class="agent-chip-name">${displayName}</div>
+                            <div class="agent-chip-model">${modelLabel}</div>
+                            <div class="agent-chip-stats">
+                                ${hasData ? `
+                                    <span><span class="status-dot" style="background: ${statusColor};"></span>${successRate}%</span>
+                                    <span>$${cost}</span>
+                                    <span>${invocations} calls</span>
+                                ` : `<span style="color: #475569;">${meta.role}</span>`}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            const orchIcon = PROVIDER_ICONS.claude;
+            const activeWorkflow = workflowAgents.filter(e => e.data && e.data.total_invocations > 0).length;
+            const activeProvider = aiProviderAgents.filter(e => e.data && e.data.total_invocations > 0).length;
+
+            container.innerHTML = `
+                <div class="orchestration-view">
+                    <div class="orch-node">
+                        <div class="agent-chip-icon" style="background: ${orchIcon.bg}; border: 1px solid ${orchIcon.border};">
+                            ${orchIcon.svg}
+                        </div>
+                        <div class="orch-node-info">
+                            <div class="orch-node-title">Orchestrator</div>
+                            <div class="orch-node-model">Claude Haiku &middot; Plans, delegates, passes context between agents</div>
+                        </div>
+                    </div>
+
+                    <div class="orch-connector"></div>
+
+                    <div class="agent-group">
+                        <div class="agent-group-header">
+                            <span class="agent-group-title">Workflow Agents</span>
+                            <span class="agent-group-subtitle">${activeWorkflow} of ${workflowAgents.length} active</span>
+                        </div>
+                        <div class="agent-row">
+                            ${workflowAgents.map(renderChip).join('')}
+                        </div>
+                    </div>
+
+                    <div class="agent-group">
+                        <div class="agent-group-header">
+                            <span class="agent-group-title">AI Provider Agents</span>
+                            <span class="agent-group-subtitle">Cross-validation &amp; parallel coding &middot; ${activeProvider} active</span>
+                        </div>
+                        <div class="agent-row">
+                            ${aiProviderAgents.map(renderChip).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderActivityFeed(events) {
+            const feed = document.getElementById('activity-feed');
+            if (!events || events.length === 0) {
+                feed.innerHTML = '<div class="loading"><p>No recent activity</p></div>';
+                return;
+            }
+
+            const eventTypeColors = {
+                'task_started': '#60a5fa',
+                'task_completed': '#10b981',
+                'file_modified': '#a855f7',
+                'command_executed': '#f59e0b',
+                'test_run': '#8b5cf6',
+                'decision_made': '#fbbf24',
+                'error_occurred': '#ef4444',
+                'milestone_reached': '#10b981'
+            };
+
+            const eventTypeIcons = {
+                'task_started': '▶',
+                'task_completed': '✓',
+                'file_modified': '📝',
+                'command_executed': '⚙',
+                'test_run': '🧪',
+                'decision_made': '🎯',
+                'error_occurred': '⚠',
+                'milestone_reached': '🏁'
+            };
+
+            // Take last 10 events
+            const recentEvents = events.slice(-10).reverse();
+
+            feed.innerHTML = recentEvents.map((event, index) => {
+                const eventType = event.event_type || 'task_completed';
+                const color = eventTypeColors[eventType] || '#60a5fa';
+                const icon = eventTypeIcons[eventType] || '•';
+                const showLine = index < recentEvents.length - 1;
+
+                return `
+                    <div class="activity-item">
+                        <div class="activity-timeline">
+                            <div class="activity-dot" style="background: ${color};">
+                                ${icon}
+                            </div>
+                            ${showLine ? '<div class="activity-line"></div>' : ''}
+                        </div>
+                        <div class="activity-content">
+                            <div class="activity-header">
+                                <div class="activity-title">${event.agent_name || 'Unknown'}</div>
+                                <div class="activity-time">${formatRelativeTime(event.timestamp)}</div>
+                            </div>
+                            <div class="activity-description">
+                                ${event.event_type || 'Activity'} - ${event.description || event.outcome || 'No description'}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Chart Functions
+        function createSuccessRateChart(agents) {
+            const ctx = document.getElementById('success-rate-chart');
+            if (!ctx) return;
+
+            const agentNames = Object.keys(agents);
+            const successRates = agentNames.map(name => (agents[name].success_rate || 0) * 100);
+
+            if (charts.successRate) charts.successRate.destroy();
+
+            charts.successRate = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: agentNames,
+                    datasets: [{
+                        label: 'Success Rate (%)',
+                        data: successRates,
+                        backgroundColor: successRates.map(rate =>
+                            rate >= 90 ? 'rgba(16, 185, 129, 0.8)' :
+                            rate >= 70 ? 'rgba(245, 158, 11, 0.8)' :
+                            'rgba(239, 68, 68, 0.8)'
+                        ),
+                        borderColor: successRates.map(rate =>
+                            rate >= 90 ? '#10b981' :
+                            rate >= 70 ? '#f59e0b' :
+                            '#ef4444'
+                        ),
+                        borderWidth: 2,
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            titleColor: '#f1f5f9',
+                            bodyColor: '#cbd5e1',
+                            borderColor: 'rgba(148, 163, 184, 0.3)',
+                            borderWidth: 1,
+                            padding: 12,
+                            displayColors: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            grid: { color: 'rgba(148, 163, 184, 0.1)' },
+                            ticks: { color: '#94a3b8', callback: value => value + '%' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createTokenUsageChart(agents) {
+            const ctx = document.getElementById('token-usage-chart');
+            if (!ctx) return;
+
+            const agentNames = Object.keys(agents);
+            const inputTokens = agentNames.map(name => (agents[name].total_tokens || 0) * 0.6);
+            const outputTokens = agentNames.map(name => (agents[name].total_tokens || 0) * 0.4);
+
+            if (charts.tokenUsage) charts.tokenUsage.destroy();
+
+            charts.tokenUsage = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: agentNames,
+                    datasets: [
+                        {
+                            label: 'Input Tokens',
+                            data: inputTokens,
+                            backgroundColor: 'rgba(96, 165, 250, 0.8)',
+                            borderColor: '#60a5fa',
+                            borderWidth: 2,
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Output Tokens',
+                            data: outputTokens,
+                            backgroundColor: 'rgba(168, 85, 247, 0.8)',
+                            borderColor: '#a855f7',
+                            borderWidth: 2,
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#94a3b8', padding: 15 }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            titleColor: '#f1f5f9',
+                            bodyColor: '#cbd5e1',
+                            borderColor: 'rgba(148, 163, 184, 0.3)',
+                            borderWidth: 1,
+                            padding: 12,
+                            callbacks: {
+                                label: ctx => ctx.dataset.label + ': ' + Math.round(ctx.parsed.y).toLocaleString()
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            stacked: true,
+                            grid: { color: 'rgba(148, 163, 184, 0.1)' },
+                            ticks: {
+                                color: '#94a3b8',
+                                callback: value => value >= 1000 ? (value / 1000).toFixed(0) + 'k' : value
+                            },
+                            title: { display: true, text: 'Tokens', color: '#94a3b8' }
+                        },
+                        x: {
+                            stacked: true,
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createPerformanceChart(agents) {
+            const ctx = document.getElementById('performance-chart');
+            if (!ctx) return;
+
+            const agentNames = Object.keys(agents);
+            const successData = agentNames.map(name => agents[name].successful_invocations || 0);
+            const failedData = agentNames.map(name => agents[name].failed_invocations || 0);
+
+            if (charts.performance) charts.performance.destroy();
+
+            charts.performance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: agentNames,
+                    datasets: [{
+                        label: 'Successful Invocations',
+                        data: successData,
+                        backgroundColor: [
+                            'rgba(96, 165, 250, 0.8)',
+                            'rgba(16, 185, 129, 0.8)',
+                            'rgba(168, 85, 247, 0.8)',
+                            'rgba(245, 158, 11, 0.8)',
+                            'rgba(239, 68, 68, 0.8)'
+                        ],
+                        borderColor: [
+                            '#60a5fa', '#10b981', '#a855f7', '#f59e0b', '#ef4444'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#94a3b8', padding: 15 }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            titleColor: '#f1f5f9',
+                            bodyColor: '#cbd5e1',
+                            borderColor: 'rgba(148, 163, 184, 0.3)',
+                            borderWidth: 1,
+                            padding: 12
+                        }
+                    }
+                }
+            });
+        }
+
+        function createCostChart(agents) {
+            const ctx = document.getElementById('cost-chart');
+            if (!ctx) return;
+
+            const agentNames = Object.keys(agents);
+            const costData = agentNames.map(name => agents[name].total_cost_usd || 0);
+
+            if (charts.cost) charts.cost.destroy();
+
+            charts.cost = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: agentNames,
+                    datasets: [{
+                        label: 'Total Cost (USD)',
+                        data: costData,
+                        backgroundColor: 'rgba(245, 158, 11, 0.8)',
+                        borderColor: '#f59e0b',
+                        borderWidth: 2,
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            titleColor: '#f1f5f9',
+                            bodyColor: '#cbd5e1',
+                            borderColor: 'rgba(148, 163, 184, 0.3)',
+                            borderWidth: 1,
+                            padding: 12,
+                            callbacks: {
+                                label: ctx => '$' + ctx.parsed.y.toFixed(2)
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(148, 163, 184, 0.1)' },
+                            ticks: {
+                                color: '#94a3b8',
+                                callback: value => '$' + value.toFixed(2)
+                            }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createAllocationChart(agents, events) {
+            const ctx = document.getElementById('allocation-chart');
+            if (!ctx) return;
+
+            // Aggregate tokens by day from events
+            const dailyData = {};
+            const today = new Date();
+            for (let i = 6; i >= 0; i--) {
+                const d = new Date(today);
+                d.setDate(d.getDate() - i);
+                const key = d.toISOString().split('T')[0];
+                dailyData[key] = { tokens: 0, cost: 0 };
+            }
+
+            (events || []).forEach(ev => {
+                const day = (ev.started_at || ev.timestamp || '').split('T')[0];
+                if (dailyData[day]) {
+                    dailyData[day].tokens += ev.total_tokens || 0;
+                    dailyData[day].cost += ev.estimated_cost_usd || 0;
+                }
+            });
+
+            const labels = Object.keys(dailyData).map(d => {
+                const dt = new Date(d + 'T00:00:00');
+                return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            });
+            const tokenData = Object.values(dailyData).map(d => d.tokens);
+            const costData = Object.values(dailyData).map(d => d.cost);
+
+            if (charts.allocation) charts.allocation.destroy();
+
+            charts.allocation = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Tokens Used',
+                            data: tokenData,
+                            backgroundColor: 'rgba(96, 165, 250, 0.7)',
+                            borderColor: '#60a5fa',
+                            borderWidth: 2,
+                            borderRadius: 6,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Cost ($)',
+                            data: costData,
+                            type: 'line',
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.3,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#94a3b8', padding: 15 }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            titleColor: '#f1f5f9',
+                            bodyColor: '#cbd5e1',
+                            borderColor: 'rgba(148, 163, 184, 0.3)',
+                            borderWidth: 1,
+                            padding: 12
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            beginAtZero: true,
+                            grid: { color: 'rgba(148, 163, 184, 0.1)' },
+                            ticks: {
+                                color: '#94a3b8',
+                                callback: value => value >= 1000 ? (value / 1000).toFixed(0) + 'k' : value
+                            },
+                            title: { display: true, text: 'Tokens', color: '#60a5fa' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            beginAtZero: true,
+                            grid: { display: false },
+                            ticks: {
+                                color: '#94a3b8',
+                                callback: value => '$' + value.toFixed(2)
+                            },
+                            title: { display: true, text: 'Cost', color: '#f59e0b' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function showError(message) {
+            const statsGrid = document.getElementById('stats-grid');
+            statsGrid.innerHTML = `
+                <div class="error-state" style="grid-column: 1/-1;">
+                    <div class="card error-card error-severity-error">
+                        <div class="error-header">
+                            <div class="error-title">⚠️ Dashboard Error</div>
+                            <span class="error-severity-badge severity-error">ERROR</span>
+                        </div>
+                        <div class="error-message">${message}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showAgentModal(agentName, a, recentEvents) {
+            const meta = AGENT_META[agentName] || { platform: 'claude', defaultModel: 'Unknown', role: '', group: 'workflow' };
+            const icon = meta.group === 'workflow'
+                ? (WORKFLOW_ICONS[agentName] || WORKFLOW_ICONS.ops)
+                : (PROVIDER_ICONS[meta.platform] || PROVIDER_ICONS.claude);
+            const displayName = agentName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            const pct = Math.round((a.success_rate || 0) * 100);
+            const strengths = (a.strengths || []).map(s => `<span class="detail-badge">${s}</span>`).join('');
+            const weaknesses = (a.weaknesses || []).map(w => `<span class="detail-badge weakness">${w}</span>`).join('');
+            const events = (recentEvents || []).slice(-10).reverse().map(ev => {
+                const t = new Date(ev.started_at || ev.ended_at).toLocaleTimeString();
+                const cls = ev.status === 'success' ? 'success' : 'error';
+                return `<div class="event-item"><span class="event-time">${t}</span><span class="event-status ${cls}">${ev.status}</span> — ${ev.ticket_key || ev.event_id}</div>`;
+            }).join('');
+
+            // Provider usage & limits section for AI provider agents
+            let providerSection = '';
+            const providerKey = meta.group === 'ai_provider' ? (agentName === 'chatgpt' ? 'openai' : meta.platform) : null;
+            const providerInfo = providerKey ? PROVIDER_CONFIG[providerKey] : null;
+            if (providerInfo) {
+                const consoleLink = providerInfo.consoleUrl
+                    ? `<a href="${providerInfo.consoleUrl}" target="_blank" rel="noopener" style="color: #60a5fa; font-size: 0.8rem; text-decoration: none;">Open usage console &rarr;</a>`
+                    : '';
+                const pricingLine = providerInfo.pricing.input > 0
+                    ? `$${providerInfo.pricing.input} input / $${providerInfo.pricing.output} output ${providerInfo.pricing.unit}`
+                    : providerInfo.pricing.unit;
+                const limitLabels = { rpm: 'Requests/min', tpm: 'Tokens/min', daily_tokens: 'Daily tokens', daily_actions: 'Daily actions' };
+                const tierRows = Object.entries(providerInfo.limits)
+                    .filter(([, v]) => v > 0)
+                    .map(([k, v]) =>
+                        `<div style="display:flex;justify-content:space-between;font-size:0.8rem;color:#94a3b8;margin-bottom:4px;"><span>${limitLabels[k] || k}</span><span style="color:#f1f5f9;">${v.toLocaleString()}</span></div>`
+                    ).join('');
+                providerSection = `
+                    <div class="detail-section-title" style="display:flex;justify-content:space-between;align-items:center;">
+                        <span>Rate Limits</span>
+                        ${consoleLink}
+                    </div>
+                    ${tierRows}
+                    <div style="font-size:0.75rem;color:#64748b;margin-top:8px;">Pricing: ${pricingLine}</div>
+                `;
+            }
+
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.innerHTML = `
+                <div class="modal">
+                    <div class="modal-header">
+                        <h2 style="display: flex; align-items: center; gap: 10px;">
+                            <span class="agent-chip-icon" style="background: ${icon.bg}; border: 1px solid ${icon.border}; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; flex-shrink: 0;">
+                                ${icon.svg}
+                            </span>
+                            <span>
+                                ${displayName}
+                                <div style="font-size: 0.7rem; font-weight: 400; color: #94a3b8; margin-top: 2px;">${meta.defaultModel} &middot; ${meta.role}</div>
+                            </span>
+                        </h2>
+                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">&times;</button>
+                    </div>
+                    <div class="detail-grid">
+                        <div class="detail-item"><div class="detail-label">Success Rate</div><div class="detail-value">${pct}%</div></div>
+                        <div class="detail-item"><div class="detail-label">Invocations</div><div class="detail-value">${a.successful_invocations || 0} / ${a.total_invocations || 0}</div></div>
+                        <div class="detail-item"><div class="detail-label">Avg Duration</div><div class="detail-value">${Math.round(a.avg_duration_seconds || 0)}s</div></div>
+                        <div class="detail-item"><div class="detail-label">Total Cost</div><div class="detail-value">$${(a.total_cost_usd || 0).toFixed(2)}</div></div>
+                        <div class="detail-item"><div class="detail-label">Commits</div><div class="detail-value">${a.commits_made || 0}</div></div>
+                        <div class="detail-item"><div class="detail-label">PRs Created / Merged</div><div class="detail-value">${a.prs_created || 0} / ${a.prs_merged || 0}</div></div>
+                        <div class="detail-item"><div class="detail-label">Files (Created / Modified)</div><div class="detail-value">${a.files_created || 0} / ${a.files_modified || 0}</div></div>
+                        <div class="detail-item"><div class="detail-label">Lines (+/-)</div><div class="detail-value">+${a.lines_added || 0} / -${a.lines_removed || 0}</div></div>
+                        <div class="detail-item"><div class="detail-label">Tests Written</div><div class="detail-value">${a.tests_written || 0}</div></div>
+                        <div class="detail-item"><div class="detail-label">Total Tokens</div><div class="detail-value">${(a.total_tokens || 0).toLocaleString()}</div></div>
+                    </div>
+                    ${providerSection}
+                    ${strengths ? `<div class="detail-section-title">Strengths</div><div class="badge-list">${strengths}</div>` : ''}
+                    ${weaknesses ? `<div class="detail-section-title">Weaknesses</div><div class="badge-list">${weaknesses}</div>` : ''}
+                    ${events ? `<div class="detail-section-title">Recent Events</div><div class="events-list">${events}</div>` : ''}
+                </div>
+            `;
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+            document.body.appendChild(overlay);
+            requestAnimationFrame(() => overlay.classList.add('visible'));
+        }
+
+        async function viewAgentDetails(agentName) {
+            const meta = AGENT_META[agentName] || { platform: 'claude', defaultModel: 'Unknown', role: '', group: 'workflow' };
+
+            try {
+                const resp = await fetch(`${API_BASE_URL}/api/agents/${agentName}?include_events`);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                showAgentModal(agentName, data.agent, data.recent_events);
+            } catch (err) {
+                // Fallback: show modal with empty/default stats (works for provider-only agents like "claude")
+                const emptyAgent = {
+                    success_rate: 0, total_invocations: 0, successful_invocations: 0,
+                    avg_duration_seconds: 0, total_cost_usd: 0, commits_made: 0,
+                    prs_created: 0, prs_merged: 0, files_created: 0, files_modified: 0,
+                    lines_added: 0, lines_removed: 0, tests_written: 0, total_tokens: 0,
+                    strengths: [], weaknesses: []
+                };
+                showAgentModal(agentName, emptyAgent, []);
+            }
+        }
+
+        // WebSocket Connection Management
+        function updateConnectionStatus(status, message) {
+            const statusElement = document.getElementById('connection-status');
+            const indicatorElement = document.getElementById('status-indicator');
+            const textElement = document.getElementById('status-text');
+
+            if (!statusElement || !indicatorElement || !textElement) return;
+
+            // Remove all status classes
+            statusElement.classList.remove('connected', 'connecting', 'disconnected');
+            indicatorElement.classList.remove('connecting', 'disconnected');
+
+            // Add new status class
+            statusElement.classList.add(status);
+            if (status !== 'connected') {
+                indicatorElement.classList.add(status);
+            }
+
+            // Update text
+            textElement.textContent = message;
+
+            console.log(`Connection status: ${status} - ${message}`);
+        }
+
+        function connectWebSocket() {
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                console.log('WebSocket already connected');
+                return;
+            }
+
+            updateConnectionStatus('connecting', 'Connecting to live updates...');
+
+            try {
+                websocket = new WebSocket(`${WS_BASE_URL}/ws`);
+
+                websocket.onopen = () => {
+                    console.log('WebSocket connected successfully');
+                    updateConnectionStatus('connected', 'Live updates active');
+                    reconnectDelay = INITIAL_RECONNECT_DELAY; // Reset delay on successful connection
+
+                    // Clear fallback timer if using WebSocket
+                    if (refreshTimer) {
+                        clearInterval(refreshTimer);
+                        refreshTimer = null;
+                    }
+                };
+
+                websocket.onmessage = (event) => {
+                    try {
+                        const message = JSON.parse(event.data);
+
+                        if (message.type === 'metrics_update') {
+                            console.log('Received metrics update via WebSocket');
+                            handleMetricsUpdate(message.data);
+                        } else if (message.type === 'reasoning') {
+                            console.log('Received reasoning event via WebSocket', message);
+                            renderReasoningBlock(message);
+                        } else if (message.type === 'agent_thinking') {
+                            console.log('Received agent_thinking event via WebSocket', message);
+                            renderAgentThinkingBlock(message);
+                        }
+                    } catch (error) {
+                        console.error('Error processing WebSocket message:', error);
+                    }
+                };
+
+                websocket.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    updateConnectionStatus('disconnected', 'Connection error');
+                };
+
+                websocket.onclose = (event) => {
+                    console.log('WebSocket closed:', event.code, event.reason);
+                    websocket = null;
+
+                    if (!isManualClose) {
+                        updateConnectionStatus('disconnected', 'Reconnecting...');
+                        scheduleReconnect();
+                    }
+                };
+            } catch (error) {
+                console.error('Error creating WebSocket:', error);
+                updateConnectionStatus('disconnected', 'Connection failed');
+                scheduleReconnect();
+            }
+        }
+
+        function scheduleReconnect() {
+            if (reconnectTimer) {
+                clearTimeout(reconnectTimer);
+            }
+
+            console.log(`Scheduling reconnect in ${reconnectDelay}ms`);
+
+            reconnectTimer = setTimeout(() => {
+                console.log('Attempting to reconnect WebSocket...');
+                connectWebSocket();
+
+                // Exponential backoff with max delay
+                reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
+            }, reconnectDelay);
+
+            // Enable fallback polling while disconnected
+            if (!refreshTimer) {
+                refreshTimer = setInterval(updateDashboard, REFRESH_INTERVAL);
+                console.log('Fallback polling enabled');
+            }
+        }
+
+        function closeWebSocket() {
+            isManualClose = true;
+
+            if (reconnectTimer) {
+                clearTimeout(reconnectTimer);
+                reconnectTimer = null;
+            }
+
+            if (websocket) {
+                websocket.close();
+                websocket = null;
+            }
+
+            updateConnectionStatus('disconnected', 'Disconnected');
+        }
+
+        // Format a relative timestamp (AI-160)
+        function formatRelativeTime(isoTimestamp) {
+            if (!isoTimestamp) return '';
+            try {
+                const then = new Date(isoTimestamp);
+                const now = new Date();
+                const diffMs = now - then;
+                const diffSec = Math.floor(diffMs / 1000);
+                if (diffSec < 5)  return 'just now';
+                if (diffSec < 60) return diffSec + 's ago';
+                const diffMin = Math.floor(diffSec / 60);
+                if (diffMin < 60) return diffMin + ' min ago';
+                const diffHr = Math.floor(diffMin / 60);
+                if (diffHr < 24) return diffHr + 'h ago';
+                return Math.floor(diffHr / 24) + 'd ago';
+            } catch (e) {
+                return '';
+            }
+        }
+
+        // Update the global reasoning controls count badge (AI-160)
+        function updateReasoningControlsCount() {
+            const container = document.getElementById('activity-feed');
+            const controlsBar = document.getElementById('reasoning-controls');
+            const countEl = document.getElementById('reasoning-controls-count');
+            if (!container || !controlsBar || !countEl) return;
+            const total = container.querySelectorAll('.reasoning-block, .thinking-block').length;
+            if (total === 0) {
+                controlsBar.style.display = 'none';
+            } else {
+                controlsBar.style.display = 'flex';
+                countEl.textContent = total + ' ' + (total === 1 ? 'block' : 'blocks');
+            }
+        }
+
+        // Expand all reasoning + thinking blocks (AI-160)
+        function expandAllReasoningBlocks() {
+            const container = document.getElementById('activity-feed') || document.body;
+            container.querySelectorAll('.reasoning-block, .thinking-block').forEach(function(el) {
+                el.classList.add('expanded');
+            });
+        }
+
+        // Collapse all reasoning + thinking blocks (AI-160)
+        function collapseAllReasoningBlocks() {
+            const container = document.getElementById('activity-feed') || document.body;
+            container.querySelectorAll('.reasoning-block, .thinking-block').forEach(function(el) {
+                el.classList.remove('expanded');
+            });
+        }
+
+        // Render a reasoning block in the activity feed (AI-158, enhanced AI-160)
+        function renderReasoningBlock(message) {
+            const container = document.getElementById('activity-feed') || document.body;
+            const complexityMatch = (message.content || '').match(/\b(SIMPLE|MODERATE|COMPLEX)\b/);
+            const complexity = complexityMatch ? complexityMatch[1] : 'MODERATE';
+            const blockId = 'reasoning-' + Date.now();
+
+            // Preview: first ~60 chars of content stripped of newlines
+            const rawContent = message.content || '';
+            const previewText = rawContent.replace(/\s+/g, ' ').trim().slice(0, 60) +
+                                (rawContent.length > 60 ? '\u2026' : '');
+            const relTime = formatRelativeTime(message.timestamp);
+
+            const block = document.createElement('div');
+            block.className = 'reasoning-block';
+            block.id = blockId;
+            block.setAttribute('data-timestamp', message.timestamp || '');
+
+            block.innerHTML = `
+                <div class="reasoning-header" onclick="(function(el){el.closest('.reasoning-block').classList.toggle('expanded');updateReasoningControlsCount();})(this)">
+                    <span class="reasoning-header-title">REASONING${message.ticket ? ' \u2014 ' + message.ticket : ''}</span>
+                    <span class="complexity-badge ${complexity}">${complexity}</span>
+                    <span class="reasoning-preview">${previewText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
+                    <span class="reasoning-timestamp">${relTime}</span>
+                    <span class="reasoning-toggle">&#9660;</span>
+                </div>
+                <div class="reasoning-content">${rawContent.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+            `;
+
+            container.prepend(block);
+            updateReasoningControlsCount();
+        }
+
+        // Category icons for agent thinking (AI-159)
+        const THINKING_CATEGORY_ICONS = {
+            files:    '\uD83D\uDCC2',  // 📂
+            changes:  '\u270F\uFE0F',  // ✏️
+            commands: '\u26A1',        // ⚡
+            tests:    '\uD83E\uDDEA',  // 🧪
+        };
+
+        // Category labels for agent thinking (AI-159)
+        const THINKING_CATEGORY_LABELS = {
+            files:    'FILES READ',
+            changes:  'PLANNED CHANGES',
+            commands: 'COMMANDS',
+            tests:    'TESTS',
+        };
+
+        // Render an agent thinking block in the activity feed (AI-159, enhanced AI-160)
+        // If a block already exists for the same agent+ticket+category, append content.
+        function renderAgentThinkingBlock(message) {
+            const container = document.getElementById('activity-feed') || document.body;
+            const agent    = message.agent    || 'agent';
+            const category = message.category || 'files';
+            const ticket   = message.ticket   || '';
+            const content  = message.content  || '';
+
+            // Build a stable ID so we can find an existing block for the same agent+ticket+category
+            const blockKey = 'thinking-' + agent.replace(/\W+/g, '_') + '-' + category +
+                             (ticket ? '-' + ticket.replace(/\W+/g, '_') : '');
+
+            let block = document.getElementById(blockKey);
+
+            if (!block) {
+                // Create a new thinking block
+                const icon  = THINKING_CATEGORY_ICONS[category]  || '\uD83D\uDD0D';
+                const label = THINKING_CATEGORY_LABELS[category] || category.toUpperCase();
+                const headerTitle = 'AGENT THINKING' +
+                                    (agent  ? ' \u2014 ' + agent.toUpperCase() : '') +
+                                    (ticket ? ' \u2014 ' + ticket : '');
+                const relTime = formatRelativeTime(message.timestamp);
+
+                block = document.createElement('div');
+                block.className = 'thinking-block';
+                block.id = blockKey;
+                block.setAttribute('data-category', category);
+                block.setAttribute('data-timestamp', message.timestamp || '');
+
+                block.innerHTML = '<div class="thinking-header" onclick="(function(el){el.closest(\'.thinking-block\').classList.toggle(\'expanded\');updateReasoningControlsCount();})(this)">' +
+                    '<span class="thinking-category-icon">' + icon + '</span>' +
+                    '<span class="thinking-header-title">' + headerTitle + ' \u2014 ' + label + '</span>' +
+                    '<span class="thinking-count" id="' + blockKey + '-count">1 entry</span>' +
+                    '<span class="thinking-timestamp" id="' + blockKey + '-ts">' + relTime + '</span>' +
+                    '<span class="thinking-toggle">&#9660;</span>' +
+                    '</div>' +
+                    '<div class="thinking-content">' +
+                    '<ul class="thinking-stream" id="' + blockKey + '-stream"></ul>' +
+                    '</div>';
+
+                container.prepend(block);
+                updateReasoningControlsCount();
+            }
+
+            // Append the new content entry to the stream list
+            if (content) {
+                const stream = document.getElementById(blockKey + '-stream');
+                if (stream) {
+                    const entry = document.createElement('li');
+                    entry.className = 'thinking-stream-entry';
+                    entry.textContent = content;
+                    stream.appendChild(entry);
+
+                    // Update count badge
+                    const countEl = document.getElementById(blockKey + '-count');
+                    if (countEl) {
+                        const n = stream.querySelectorAll('.thinking-stream-entry').length;
+                        countEl.textContent = n + (n === 1 ? ' entry' : ' entries');
+                    }
+                    // Update relative timestamp
+                    const tsEl = document.getElementById(blockKey + '-ts');
+                    if (tsEl && message.timestamp) {
+                        block.setAttribute('data-timestamp', message.timestamp);
+                        tsEl.textContent = formatRelativeTime(message.timestamp);
+                    }
+                }
+            }
+        }
+
+        // Handle metrics update from WebSocket or HTTP
+        function handleMetricsUpdate(data) {
+            // Update timestamp
+            document.getElementById('last-update').textContent =
+                `Updated at ${formatTime(new Date())}`;
+
+            // Render components
+            renderStatsGrid(data);
+            renderAgentCards(data);
+            renderProviderUsage(data);
+            renderActivityFeed(data.events || []);
+
+            // Create charts
+            if (data.agents && Object.keys(data.agents).length > 0) {
+                createSuccessRateChart(data.agents);
+                createTokenUsageChart(data.agents);
+                createPerformanceChart(data.agents);
+                createCostChart(data.agents);
+                createAllocationChart(data.agents, data.events || []);
+            }
+        }
+
+        // Main Update Function (HTTP fallback)
+        async function updateDashboard() {
+            const data = await fetchMetrics();
+            if (!data) return;
+
+            handleMetricsUpdate(data);
+        }
+
+        // Initialize Dashboard
+        async function init() {
+            console.log('Initializing Agent Status Dashboard...');
+
+            // Load initial data via HTTP
+            await updateDashboard();
+
+            // Connect to WebSocket for live updates
+            connectWebSocket();
+
+            console.log('Dashboard initialized');
+            console.log('WebSocket live updates enabled with auto-reconnect');
+            console.log(`Fallback polling: every ${REFRESH_INTERVAL/1000}s`);
+        }
+
+        // ==========================================
+        // Requirement Editor Implementation
+        // ==========================================
+
+        const reqTicketInput = document.getElementById('req-ticket-key');
+        const reqLoadBtn = document.getElementById('req-load-btn');
+        const reqTextarea = document.getElementById('req-textarea');
+        const reqSyncToggle = document.getElementById('req-sync-toggle');
+        const reqSaveBtn = document.getElementById('req-save-btn');
+        const reqFeedback = document.getElementById('req-feedback');
+
+        function showReqFeedback(message, type) {
+            if (!reqFeedback) return;
+            reqFeedback.textContent = message;
+            reqFeedback.className = 'req-feedback ' + type;
+            // Auto-hide after 5 seconds
+            clearTimeout(reqFeedback._hideTimer);
+            reqFeedback._hideTimer = setTimeout(() => {
+                reqFeedback.className = 'req-feedback';
+                reqFeedback.textContent = '';
+            }, 5000);
+        }
+
+        async function loadRequirement() {
+            const ticketKey = reqTicketInput ? reqTicketInput.value.trim() : '';
+            if (!ticketKey) {
+                showReqFeedback('Please enter a ticket key first.', 'error');
+                return;
+            }
+            try {
+                const resp = await fetch(`${API_BASE_URL}/api/requirements/${encodeURIComponent(ticketKey)}`);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                if (reqTextarea) reqTextarea.value = data.requirement || '';
+                showReqFeedback(`Requirement loaded for ${data.ticket_key}.`, 'success');
+            } catch (err) {
+                showReqFeedback(`Failed to load requirement: ${err.message}`, 'error');
+            }
+        }
+
+        async function saveRequirement() {
+            const ticketKey = reqTicketInput ? reqTicketInput.value.trim() : '';
+            if (!ticketKey) {
+                showReqFeedback('Please enter a ticket key first.', 'error');
+                return;
+            }
+            const requirementText = reqTextarea ? reqTextarea.value : '';
+            const syncToLinear = reqSyncToggle ? reqSyncToggle.checked : false;
+
+            if (reqSaveBtn) reqSaveBtn.disabled = true;
+            try {
+                const resp = await fetch(`${API_BASE_URL}/api/requirements/${encodeURIComponent(ticketKey)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ requirement: requirementText, sync_to_linear: syncToLinear }),
+                });
+                const data = await resp.json();
+                if (!resp.ok) {
+                    throw new Error(data.error || `HTTP ${resp.status}`);
+                }
+                let msg = `Requirement saved for ${data.ticket_key}.`;
+                if (syncToLinear) {
+                    if (data.linear_synced) {
+                        msg += ' Linear issue updated successfully.';
+                    } else if (data.linear_error) {
+                        msg += ` Note: Linear sync failed — ${data.linear_error}`;
+                        showReqFeedback(msg, 'error');
+                        return;
+                    }
+                }
+                showReqFeedback(msg, 'success');
+            } catch (err) {
+                showReqFeedback(`Failed to save requirement: ${err.message}`, 'error');
+            } finally {
+                if (reqSaveBtn) reqSaveBtn.disabled = false;
+            }
+        }
+
+        if (reqLoadBtn) reqLoadBtn.addEventListener('click', loadRequirement);
+        if (reqSaveBtn) reqSaveBtn.addEventListener('click', saveRequirement);
+        if (reqTicketInput) {
+            reqTicketInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') loadRequirement();
+            });
+        }
+
+        // ==========================================
+        // Chat Interface Implementation
+        // ==========================================
+
+        class ChatInterface {
+            constructor() {
+                this.messagesContainer = document.getElementById('chat-messages');
+                this.input = document.getElementById('chat-input');
+                this.sendBtn = document.getElementById('chat-send-btn');
+                this.providerSelector = document.getElementById('ai-provider-selector');
+                this.providerBadge = document.getElementById('provider-badge');
+                this.messages = [];
+                this.selectedProvider = 'claude';
+
+                this.init();
+            }
+
+            init() {
+                if (!this.input || !this.sendBtn) {
+                    console.warn('Chat interface elements not found');
+                    return;
+                }
+
+                // Load saved provider from sessionStorage
+                this.loadSavedProvider();
+
+                // Set up event listeners
+                this.sendBtn.addEventListener('click', () => this.sendMessage());
+                this.input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        this.sendMessage();
+                    }
+                });
+
+                if (this.providerSelector) {
+                    this.providerSelector.addEventListener('change', (e) => this.handleProviderChange(e));
+                }
+            }
+
+            loadSavedProvider() {
+                try {
+                    const savedProvider = sessionStorage.getItem('selectedAIProvider');
+                    if (savedProvider) {
+                        this.selectedProvider = savedProvider;
+                        if (this.providerSelector) {
+                            this.providerSelector.value = savedProvider;
+                        }
+                        this.updateProviderBadge(savedProvider);
+                    } else {
+                        // Default is Claude
+                        this.updateProviderBadge('claude');
+                    }
+                } catch (error) {
+                    console.warn('Could not load saved provider:', error);
+                }
+            }
+
+            handleProviderChange(event) {
+                const newProvider = event.target.value;
+                this.selectedProvider = newProvider;
+
+                // Save to sessionStorage
+                try {
+                    sessionStorage.setItem('selectedAIProvider', newProvider);
+                } catch (error) {
+                    console.warn('Could not save provider to sessionStorage:', error);
+                }
+
+                // Update badge
+                this.updateProviderBadge(newProvider);
+
+                console.log(`Provider switched to: ${newProvider}`);
+            }
+
+            updateProviderBadge(provider) {
+                if (!this.providerBadge) return;
+
+                const providerNames = {
+                    'claude': 'Claude',
+                    'chatgpt': 'ChatGPT',
+                    'gemini': 'Gemini',
+                    'groq': 'Groq',
+                    'kimi': 'KIMI',
+                    'windsurf': 'Windsurf'
+                };
+
+                this.providerBadge.textContent = providerNames[provider] || provider;
+            }
+
+            getSelectedProvider() {
+                return this.selectedProvider;
+            }
+
+            sendMessage() {
+                const text = this.input.value.trim();
+                if (!text) return;
+
+                const provider = this.selectedProvider;
+                // Add user message
+                this.addMessage(text, 'user', provider);
+                this.input.value = '';
+
+                // Simulate AI response
+                this.showLoadingIndicator();
+                setTimeout(() => {
+                    this.removeLoadingIndicator();
+                    this.addMessage(this.generateAIResponse(text, provider), 'ai', provider);
+                }, 800);
+            }
+
+            addMessage(text, sender, provider = null) {
+                const message = {
+                    id: Date.now(),
+                    text,
+                    sender,
+                    provider: provider || this.selectedProvider,
+                    timestamp: new Date()
+                };
+
+                this.messages.push(message);
+                this.renderMessage(message);
+                this.scrollToBottom();
+            }
+
+            renderMessage(message) {
+                // Remove welcome message on first message
+                const welcome = this.messagesContainer.querySelector('.chat-welcome');
+                if (welcome && this.messages.length === 1) {
+                    welcome.remove();
+                }
+
+                const div = document.createElement('div');
+                div.className = `chat-message ${message.sender}`;
+                div.setAttribute('data-testid', `chat-message-${message.sender}`);
+                div.setAttribute('data-message-id', message.id);
+
+                const content = document.createElement('div');
+                const timeStr = message.timestamp.toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                content.innerHTML = `
+                    <div class="chat-message-content">${this.escapeHtml(message.text)}</div>
+                    <div class="chat-timestamp">${timeStr}</div>
+                `;
+
+                div.appendChild(content);
+                this.messagesContainer.appendChild(div);
+            }
+
+            showLoadingIndicator() {
+                const div = document.createElement('div');
+                div.className = 'chat-message ai';
+                div.id = 'chat-loading';
+                div.setAttribute('data-testid', 'chat-loading-indicator');
+
+                div.innerHTML = `
+                    <div class="chat-message-content">
+                        <div class="chat-loading">
+                            <div class="chat-loading-dot"></div>
+                            <div class="chat-loading-dot"></div>
+                            <div class="chat-loading-dot"></div>
+                        </div>
+                    </div>
+                `;
+
+                this.messagesContainer.appendChild(div);
+                this.scrollToBottom();
+            }
+
+            removeLoadingIndicator() {
+                const loading = document.getElementById('chat-loading');
+                if (loading) {
+                    loading.remove();
+                }
+            }
+
+            generateAIResponse(userMessage, provider) {
+                // Simple response generation based on keywords
+                const lower = userMessage.toLowerCase();
+                const providerNames = {
+                    'claude': 'Claude',
+                    'chatgpt': 'ChatGPT',
+                    'gemini': 'Gemini',
+                    'groq': 'Groq',
+                    'kimi': 'KIMI',
+                    'windsurf': 'Windsurf'
+                };
+                const providerName = providerNames[provider] || provider;
+
+                if (lower.includes('status') || lower.includes('how')) {
+                    return `[${providerName}] Your agents are running smoothly. All systems are operational with 99.2% uptime.`;
+                }
+                if (lower.includes('metric') || lower.includes('performance')) {
+                    return `[${providerName}] Current metrics show strong performance: 94% success rate, avg response time 245ms.`;
+                }
+                if (lower.includes('error') || lower.includes('issue') || lower.includes('problem')) {
+                    return `[${providerName}] No critical errors detected. All monitoring systems are reporting normal status.`;
+                }
+                if (lower.includes('cost') || lower.includes('usage') || lower.includes('token')) {
+                    return `[${providerName}] Token usage is at 42% of daily allocation. Cost trending 8% below budget.`;
+                }
+                if (lower.includes('hello') || lower.includes('hi') || lower.includes('hey')) {
+                    return `[${providerName}] Hello! I'm here to help you with any questions about your agent dashboard.`;
+                }
+
+                return `[${providerName}] I understand. Based on your agent dashboard, everything is performing within expected parameters. Is there anything specific you'd like to know?`;
+            }
+
+            scrollToBottom() {
+                this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+            }
+
+            escapeHtml(text) {
+                const map = {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                };
+                return text.replace(/[&<>"']/g, m => map[m]);
+            }
+
+            getMessages() {
+                return this.messages;
+            }
+
+            clearMessages() {
+                this.messages = [];
+                this.messagesContainer.innerHTML = `
+                    <div class="chat-welcome">
+                        <p>Welcome to the Agent Dashboard Chat. Ask me anything about your agent status, metrics, or general questions!</p>
+                    </div>
+                `;
+            }
+        }
+
+        let chatInterface;
+
+        function initChat() {
+            chatInterface = new ChatInterface();
+            console.log('Chat interface initialized');
+        }
+
+        // Start when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                init();
+                initChat();
+            });
+        } else {
+            init();
+            initChat();
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            closeWebSocket();
+            if (refreshTimer) clearInterval(refreshTimer);
+            Object.values(charts).forEach(chart => chart && chart.destroy());
+        });
+    </script>
+</body>
+</html>
