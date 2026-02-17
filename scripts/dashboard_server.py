@@ -141,6 +141,7 @@ class DashboardServer:
         self.app.router.add_get('/api/health', self.handle_health)
         self.app.router.add_get('/api/metrics', self.handle_metrics)
         self.app.router.add_get('/api/agents', self.handle_agents)
+        self.app.router.add_get('/api/agents/status', self.handle_agents_status)
         self.app.router.add_get('/api/providers', self.handle_providers)
         self.app.router.add_get('/api/providers/status', self.handle_providers_status)
         self.app.router.add_post('/api/chat', self.handle_chat)
@@ -253,6 +254,101 @@ class DashboardServer:
                 {"error": f"Failed to load agents: {str(e)}"},
                 status=500
             )
+
+    async def handle_agents_status(self, request: web.Request) -> web.Response:
+        """Get real-time agent status panel data.
+
+        Returns all 13 agents from definitions.py with their current status,
+        model assignment, and description. Status is derived from recent
+        metrics activity (running = active in last 60s, else idle).
+
+        Returns:
+            JSON object with agents list and timestamp
+        """
+        # 13 agents from agents/definitions.py DEFAULT_MODELS
+        AGENT_ROSTER = [
+            {"id": "linear",         "name": "Linear",         "model": "haiku",  "description": "Manages Linear issues, project status, and session handoff."},
+            {"id": "coding",         "name": "Coding",         "model": "sonnet", "description": "Writes and tests code. Complex feature implementation."},
+            {"id": "github",         "name": "GitHub",         "model": "haiku",  "description": "Handles Git commits, branches, and GitHub PRs."},
+            {"id": "slack",          "name": "Slack",          "model": "haiku",  "description": "Sends Slack notifications to keep users informed."},
+            {"id": "pr_reviewer",    "name": "PR Reviewer",    "model": "sonnet", "description": "Reviews PRs for quality, correctness, and test coverage."},
+            {"id": "ops",            "name": "Ops",            "model": "haiku",  "description": "Composite operations agent: Linear + Slack + GitHub in one call."},
+            {"id": "coding_fast",    "name": "Coding Fast",    "model": "haiku",  "description": "Fast coding agent for simple changes: CSS, config, tests."},
+            {"id": "pr_reviewer_fast","name": "PR Reviewer Fast","model": "haiku","description": "Fast PR reviewer for low-risk frontend-only changes."},
+            {"id": "chatgpt",        "name": "ChatGPT",        "model": "haiku",  "description": "Provides access to OpenAI GPT-4o, o1, o3-mini, o4-mini models."},
+            {"id": "gemini",         "name": "Gemini",         "model": "haiku",  "description": "Google Gemini with 1M token context for large-scale analysis."},
+            {"id": "groq",           "name": "Groq",           "model": "haiku",  "description": "Ultra-fast inference via Groq LPU: Llama 3.3 70B, Mixtral."},
+            {"id": "kimi",           "name": "KIMI",           "model": "haiku",  "description": "Moonshot AI with 2M token context for bilingual analysis."},
+            {"id": "windsurf",       "name": "Windsurf",       "model": "haiku",  "description": "Codeium Windsurf IDE for parallel coding and cross-IDE validation."},
+        ]
+
+        try:
+            metrics_state = self.metrics_store.load()
+            stored_agents = metrics_state.get("agents", {})
+
+            agents_with_status = []
+            now = datetime.utcnow()
+            for agent_def in AGENT_ROSTER:
+                agent_id = agent_def["id"]
+                stored = stored_agents.get(agent_id, {})
+
+                # Determine status from metrics:
+                # Check if agent had activity in the last 60 seconds
+                last_active = stored.get("last_active_at")
+                status = "idle"
+                if last_active:
+                    try:
+                        from datetime import timezone
+                        last_dt = datetime.fromisoformat(last_active.replace("Z", "+00:00"))
+                        now_utc = datetime.now(timezone.utc)
+                        age_secs = (now_utc - last_dt).total_seconds()
+                        if age_secs < 60:
+                            status = "running"
+                        elif stored.get("current_error"):
+                            status = "error"
+                    except (ValueError, TypeError):
+                        pass
+
+                agents_with_status.append({
+                    "id": agent_id,
+                    "name": agent_def["name"],
+                    "model": stored.get("model", agent_def["model"]),
+                    "description": agent_def["description"],
+                    "status": status,
+                    "invocations": stored.get("total_invocations", 0),
+                    "success_rate": stored.get("success_rate", 1.0),
+                    "level": stored.get("level", 1),
+                    "xp": stored.get("xp", 0),
+                })
+
+            return web.json_response({
+                "agents": agents_with_status,
+                "total": len(agents_with_status),
+                "running_count": sum(1 for a in agents_with_status if a["status"] == "running"),
+                "timestamp": now.isoformat() + "Z",
+            })
+        except Exception as e:
+            logger.error(f"Error loading agent status: {e}")
+            # Return default idle status for all agents
+            agents = []
+            for agent_def in AGENT_ROSTER:
+                agents.append({
+                    "id": agent_def["id"],
+                    "name": agent_def["name"],
+                    "model": agent_def["model"],
+                    "description": agent_def["description"],
+                    "status": "idle",
+                    "invocations": 0,
+                    "success_rate": 1.0,
+                    "level": 1,
+                    "xp": 0,
+                })
+            return web.json_response({
+                "agents": agents,
+                "total": 13,
+                "running_count": 0,
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+            })
 
     async def handle_providers(self, request: web.Request) -> web.Response:
         """Get provider availability status.
