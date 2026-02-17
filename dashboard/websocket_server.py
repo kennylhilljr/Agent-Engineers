@@ -32,6 +32,7 @@ Usage:
 """
 
 import asyncio
+import hmac
 import json
 import logging
 import os
@@ -71,19 +72,15 @@ def constant_time_compare(a: str, b: str) -> bool:
         True if strings are equal, False otherwise
 
     Security Note:
-        This function uses bitwise operations to ensure comparison
-        always takes the same amount of time, regardless of where
-        the strings differ. This prevents timing attacks.
+        Uses Python's built-in hmac.compare_digest() which is specifically
+        designed for constant-time comparison to prevent timing side-channel
+        attacks. This prevents attackers from determining the correct token
+        character by character based on response time differences.
+
+        Strings are encoded to UTF-8 bytes before comparison to support
+        unicode characters and ensure compatibility with hmac.compare_digest().
     """
-    if len(a) != len(b):
-        result = 1
-    else:
-        result = 0
-
-    for x, y in zip(a, b):
-        result |= ord(x) ^ ord(y)
-
-    return result == 0
+    return hmac.compare_digest(a.encode('utf-8'), b.encode('utf-8'))
 
 
 def validate_websocket_auth(request: web.Request) -> tuple[bool, Optional[str]]:
