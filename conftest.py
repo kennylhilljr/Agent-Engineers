@@ -52,3 +52,8 @@ for _sub in ["logging_config", "metrics", "metrics_store", "collector"]:
 _worktree_server_path = _WORKTREE_ROOT / "dashboard" / "server.py"
 if _worktree_server_path.exists():
     _load_module_from_file("dashboard.server", _worktree_server_path)
+
+# 4. Override dashboard.rest_api_server with the worktree's AI-169 version
+_worktree_rest_api_path = _WORKTREE_ROOT / "dashboard" / "rest_api_server.py"
+if _worktree_rest_api_path.exists():
+    _load_module_from_file("dashboard.rest_api_server", _worktree_rest_api_path)
