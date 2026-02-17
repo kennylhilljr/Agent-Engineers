@@ -1868,6 +1868,106 @@
         .global-control-btn.resume-all-btn:hover {
             background: rgba(16, 185, 129, 0.35);
         }
+
+        /* Requirements View Panel (AI-154) */
+        .requirements-panel {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-top: 8px;
+            overflow: hidden;
+            max-height: 0;
+            transition: max-height 0.3s ease;
+        }
+        .requirements-panel.open {
+            max-height: 500px;
+        }
+        .requirements-panel-content {
+            padding: 12px;
+        }
+        .requirements-source {
+            margin-bottom: 12px;
+        }
+        .requirements-source:last-child {
+            margin-bottom: 0;
+        }
+        .requirements-source-label {
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted, #6b7280);
+            margin-bottom: 4px;
+        }
+        .requirements-source-text {
+            font-size: 0.78rem;
+            color: var(--text-secondary, #9ca3af);
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .requirements-toggle-btn {
+            background: none;
+            border: none;
+            color: var(--accent-blue, #3b82f6);
+            font-size: 0.7rem;
+            cursor: pointer;
+            padding: 2px 4px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .requirements-toggle-btn:hover {
+            text-decoration: underline;
+        }
+        .req-panel-ticket-title {
+            font-weight: 600;
+            font-size: 0.82rem;
+            color: var(--text-primary, #f1f5f9);
+            margin-bottom: 4px;
+        }
+        .requirements-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 900;
+            align-items: center;
+            justify-content: center;
+        }
+        .requirements-overlay.open {
+            display: flex;
+        }
+        .requirements-modal {
+            background: var(--bg-secondary, #1e2139);
+            border: 1px solid var(--border-color, #2d3748);
+            border-radius: 8px;
+            width: min(600px, 90vw);
+            max-height: 80vh;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        .requirements-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .requirements-modal-title {
+            font-weight: 700;
+            font-size: 1rem;
+        }
+        .requirements-close-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted, #6b7280);
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 2px 6px;
+        }
+        .requirements-close-btn:hover {
+            color: var(--text-primary, #f1f5f9);
+        }
     </style>
 </head>
 <body>
@@ -2074,6 +2174,17 @@
         </footer>
     </div>
 
+    <!-- Requirements View Overlay (AI-154) -->
+    <div class="requirements-overlay" id="requirements-overlay" role="dialog" aria-modal="true" aria-labelledby="requirements-heading">
+        <div class="requirements-modal" id="requirements-modal">
+            <div class="requirements-modal-header">
+                <span class="requirements-modal-title" id="requirements-heading">Current Requirements</span>
+                <button class="requirements-close-btn" id="requirements-close-btn" aria-label="Close requirements view">&#x2715;</button>
+            </div>
+            <div class="requirements-modal-body" id="requirements-modal-body"></div>
+        </div>
+    </div>
+
     <!-- JavaScript -->
     <script>
         // ========================================
@@ -2152,6 +2263,76 @@
             { id: 'kimi',            name: 'KIMI',            model: 'haiku',  status: 'idle', description: 'Moonshot AI with 2M token context.', invocations: 0, level: 1 },
             { id: 'windsurf',        name: 'Windsurf',        model: 'haiku',  status: 'idle', description: 'Windsurf IDE for parallel coding tasks.', invocations: 0, level: 1 },
         ];
+
+        // ========================================
+        // MOCK REQUIREMENTS DATA (AI-154)
+        // ========================================
+        const mockRequirements = {
+            'AI-148': {
+                ticket: 'AI-148',
+                title: 'REQ-METRICS-002: Implement Agent Leaderboard',
+                sources: [
+                    { label: 'Linear Issue', text: 'Display agents ranked by XP from AgentProfile.xp, showing rank, name, level, success rate, avg execution time, total cost, current status.' },
+                    { label: 'App Spec', text: 'Agent Leaderboard: sorted by XP by default, sortable by cost and success rate. TaskCard component for each row.' },
+                    { label: 'Orchestrator Context', text: 'Implement client-side sort with 3 keys: xp, success_rate, cost. Window-expose all functions for testing.' }
+                ]
+            },
+            'AI-149': {
+                ticket: 'AI-149',
+                title: 'REQ-METRICS-003: Implement Cost & Token Charts',
+                sources: [
+                    { label: 'Linear Issue', text: 'Show token usage and cost breakdown per agent using bar charts. Charts must be rendered client-side.' },
+                    { label: 'App Spec', text: 'Analytics panel with token usage by agent and cumulative cost over time charts.' },
+                    { label: 'Orchestrator Context', text: 'Use SVG or Canvas for charting. Data from /api/metrics endpoint with mock fallback.' }
+                ]
+            },
+            'AI-150': {
+                ticket: 'AI-150',
+                title: 'REQ-FEED-001: Implement Live Activity Feed',
+                sources: [
+                    { label: 'Linear Issue', text: 'Real-time activity feed showing agent events with status, timestamps, and filtering by agent.' },
+                    { label: 'App Spec', text: 'Live feed panel with filter controls for agent type and event type. WebSocket integration for real-time updates.' },
+                    { label: 'Orchestrator Context', text: 'Connect to /ws WebSocket endpoint. Implement filter buttons with event delegation.' }
+                ]
+            },
+            'AI-151': {
+                ticket: 'AI-151',
+                title: 'REQ-CONTROL-001: Implement Pause Agent Control',
+                sources: [
+                    { label: 'Linear Issue', text: 'Each running agent needs a pause button. Pausing should change agent status and disable the pause button.' },
+                    { label: 'App Spec', text: 'Agent control buttons: Pause (for running agents), Resume (for paused agents).' },
+                    { label: 'Orchestrator Context', text: 'Use event delegation on agent-list. Call /api/agents/{id}/pause endpoint.' }
+                ]
+            },
+            'AI-152': {
+                ticket: 'AI-152',
+                title: 'REQ-CONTROL-002: Implement Resume Agent Control',
+                sources: [
+                    { label: 'Linear Issue', text: 'Paused agents need a resume button. Resuming should restore running status.' },
+                    { label: 'App Spec', text: 'Resume button shown only for paused agents. Restores running state.' },
+                    { label: 'Orchestrator Context', text: 'Call /api/agents/{id}/resume endpoint. Update local state optimistically.' }
+                ]
+            },
+            'AI-153': {
+                ticket: 'AI-153',
+                title: 'REQ-CONTROL-003: Implement Global Pause/Resume',
+                sources: [
+                    { label: 'Linear Issue', text: 'Global Pause All and Resume All buttons to control all agents simultaneously.' },
+                    { label: 'App Spec', text: 'Header area with Pause All / Resume All controls. Shows global pause banner when all are paused.' },
+                    { label: 'Orchestrator Context', text: 'Call /api/agents/pause-all and /api/agents/resume-all endpoints.' }
+                ]
+            },
+            'AI-154': {
+                ticket: 'AI-154',
+                title: 'REQ-CONTROL-004: Implement View Current Requirements',
+                sources: [
+                    { label: 'Linear Issue', text: 'The dashboard must show the current requirement instructions for each active ticket. Requirements come from Linear issue title/description, app_spec.txt, and orchestrator context.' },
+                    { label: 'App Spec', text: 'Component Reference: TaskCard with expandable requirement details. All requirement sources visible. Source attribution is clear.' },
+                    { label: 'Orchestrator Context', text: 'Add expandable requirements panel shown when clicking on an agent or their current task. Each agent item gets an expandable section showing current ticket requirements with source attribution.' }
+                ]
+            }
+        };
+        window.mockRequirements = mockRequirements;
 
         const mockActivities = [
             { time: '14:23', agent: 'coding', status: 'success', task: 'AI-42' },
@@ -3842,13 +4023,77 @@
         window.openAgentDetail = openAgentDetail;
         window.closeAgentDetail = closeAgentDetail;
 
+        // ========================================
+        // REQUIREMENTS VIEW (AI-154 REQ-CONTROL-004)
+        // ========================================
+
+        /**
+         * Render the requirements modal body HTML from ticket and sources.
+         * @param {string} ticket - Ticket key (e.g. "AI-154")
+         * @param {Array} sources - Array of {label, text} source objects
+         * @returns {string} HTML string
+         */
+        function renderRequirementsContent(ticket, sources) {
+            const ticketHtml = ticket
+                ? `<div class="req-panel-ticket-title">${escapeHtml(String(ticket))}</div>`
+                : '';
+            const sourcesArray = Array.isArray(sources) ? sources : [];
+            const sourcesHtml = sourcesArray.map(function(src) {
+                return `<div class="requirements-source">
+                    <div class="requirements-source-label">${escapeHtml(String(src.label || ''))}</div>
+                    <div class="requirements-source-text">${escapeHtml(String(src.text || ''))}</div>
+                </div>`;
+            }).join('');
+            return ticketHtml + sourcesHtml;
+        }
+        window.renderRequirementsContent = renderRequirementsContent;
+
+        /**
+         * Open the requirements view overlay for the given agent.
+         * @param {string} agentId - The agent id
+         */
+        function openRequirementsView(agentId) {
+            const agent = (state.agents || []).find(function(a) {
+                return (a.id || a.name) === agentId;
+            });
+            const ticket = agent && agent.active_task
+                ? (agent.active_task.ticket_key || agent.ticket || null)
+                : (agent ? (agent.ticket || null) : null);
+            const reqData = ticket ? (mockRequirements[ticket] || null) : null;
+            const title = reqData ? reqData.title : (ticket || 'No active ticket');
+            const sources = reqData ? reqData.sources : [];
+            const bodyHtml = renderRequirementsContent(title, sources);
+            const modalBody = document.getElementById('requirements-modal-body');
+            if (modalBody) {
+                modalBody.innerHTML = bodyHtml;
+            }
+            const overlay = document.getElementById('requirements-overlay');
+            if (overlay) {
+                overlay.classList.add('open');
+            }
+        }
+        window.openRequirementsView = openRequirementsView;
+
+        /**
+         * Close the requirements view overlay.
+         */
+        function closeRequirementsView() {
+            const overlay = document.getElementById('requirements-overlay');
+            if (overlay) {
+                overlay.classList.remove('open');
+            }
+        }
+        window.closeRequirementsView = closeRequirementsView;
+
         function handleAgentClick(event) {
-            // Don't open detail if click is inside the active-task <details>
-            if (event.target.closest('.agent-active-task')) return;
             const agentItem = event.target.closest('.agent-item');
             if (!agentItem) return;
-
             const agentId = agentItem.dataset.agent;
+            // Active task click opens requirements view (AI-154)
+            if (event.target.closest('.agent-active-task')) {
+                openRequirementsView(agentId);
+                return;
+            }
             openAgentDetail(agentId);
         }
 
@@ -4155,6 +4400,12 @@
             document.getElementById('activity-filter-controls').addEventListener('click', function(e) {
                 const btn = e.target.closest('.activity-filter-btn');
                 if (btn) setActivityFilter(btn.dataset.filter);
+            });
+
+            // Requirements view close handlers (AI-154)
+            document.getElementById('requirements-close-btn').addEventListener('click', closeRequirementsView);
+            document.getElementById('requirements-overlay').addEventListener('click', function(e) {
+                if (e.target === this) closeRequirementsView();
             });
 
             // WebSocket integration for real-time activity events
