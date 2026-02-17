@@ -2061,6 +2061,17 @@
         .complexity-badge.simple { background: #10b981; color: #000; }
         .reasoning-detail-row { margin-top: 6px; font-size: 12px; color: #94a3b8; }
         .reasoning-detail-row strong { color: #cbd5e1; }
+        /* AI-75: Tool Call Block styles (teal color) */
+        .tool-call-block { border-left: 3px solid #0d9488; background: rgba(13,148,136,0.08); border-radius: 4px; margin: 8px 0; }
+        .tool-call-header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; user-select: none; }
+        .tool-call-header:hover { background: rgba(13,148,136,0.15); border-radius: 4px; }
+        .tool-call-toggle { color: #0d9488; font-size: 12px; transition: transform 0.2s; }
+        .tool-call-toggle.open { transform: rotate(90deg); }
+        .tool-call-body { padding: 8px 16px 12px; font-size: 13px; color: #ccc; }
+        .tool-call-body.hidden { display: none; }
+        .tool-call-detail-row { margin-top: 6px; font-size: 12px; color: #94a3b8; font-family: monospace; white-space: pre-wrap; word-break: break-word; }
+        .tool-call-detail-row strong { color: #5eead4; font-family: sans-serif; }
+        .tool-call-name-badge { background: rgba(13,148,136,0.25); color: #5eead4; font-size: 11px; padding: 2px 7px; border-radius: 3px; font-family: monospace; }
         .decision-history { border-top: 1px solid #333; padding: 12px; margin-top: 8px; }
         .decision-history-title { font-size: 12px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 6px; }
         .decision-history-list { max-height: 200px; overflow-y: auto; }
@@ -3950,6 +3961,10 @@
                 this.selectedProvider = 'claude';
                 this.selectedModel = 'haiku-4.5';
                 this.providerStatuses = {};
+                // AI-74: Track agent operation state and queued provider switch
+                this.agentOperationInProgress = false;
+                this._pendingProviderSwitch = null;
+                this.previousProvider = null;
 
                 // Provider-Model mapping
                 this.providerModels = {
@@ -4050,6 +4065,39 @@
 
             handleProviderChange(event) {
                 const newProvider = event.target.value;
+
+                // AI-74: Provider display name mapping
+                const providerDisplayNames = {
+                    'claude': 'Claude',
+                    'chatgpt': 'ChatGPT',
+                    'gemini': 'Gemini',
+                    'groq': 'Groq',
+                    'kimi': 'KIMI',
+                    'windsurf': 'Windsurf'
+                };
+
+                // AI-74: Store old provider and detect actual change
+                const oldProvider = this.selectedProvider;
+                const oldName = providerDisplayNames[oldProvider] || oldProvider;
+                const newName = providerDisplayNames[newProvider] || newProvider;
+
+                // AI-74: Non-interruption guard — if an agent operation is in progress, queue the switch
+                if (this.agentOperationInProgress) {
+                    this._pendingProviderSwitch = { newProvider, event };
+                    this.showProviderSwitchQueued(newName);
+                    // Revert selector to old provider
+                    if (this.providerSelector) {
+                        this.providerSelector.value = oldProvider;
+                    }
+                    console.log(`AI-74: Provider switch to ${newName} queued — agent operation in progress`);
+                    return;
+                }
+
+                // AI-74: Only insert system message if provider actually changes
+                if (newProvider !== oldProvider) {
+                    this.previousProvider = oldProvider;
+                }
+
                 this.selectedProvider = newProvider;
 
                 // Save to sessionStorage
@@ -4081,7 +4129,67 @@
                     console.warn('Could not save model to sessionStorage:', error);
                 }
 
+                // AI-74: Insert system message noting the provider change (after state is updated)
+                if (newProvider !== oldProvider) {
+                    this.addMessage(`Switched from ${oldName} to ${newName}`, 'system');
+                    this.notifyProviderSwitch(oldProvider, newProvider);
+                    console.log(`AI-74: Provider switched from ${oldName} to ${newName}`);
+                }
+
                 console.log(`Provider switched to: ${newProvider}, Model: ${defaultModel}`);
+            }
+
+            /**
+             * AI-74: Show a warning UI when a provider switch is queued due to active agent operation
+             */
+            showProviderSwitchQueued(newName) {
+                const banner = document.createElement('div');
+                banner.className = 'provider-switch-queued-toast';
+                banner.setAttribute('data-testid', 'provider-switch-queued-toast');
+                banner.style.cssText = `
+                    position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+                    background: rgba(245, 158, 11, 0.95); color: #1a1a2e;
+                    padding: 12px 20px; border-radius: 8px;
+                    font-size: 13px; font-weight: 600;
+                    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+                    animation: fadeInUp 0.3s ease;
+                `;
+                banner.textContent = `Provider switch queued — will apply after current operation completes`;
+                document.body.appendChild(banner);
+                setTimeout(() => banner.remove(), 4000);
+            }
+
+            /**
+             * AI-74: Notify the backend of a provider switch event
+             */
+            async notifyProviderSwitch(fromProvider, toProvider) {
+                try {
+                    await fetch(`${API_BASE_URL}/api/chat/provider-switch`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            from_provider: fromProvider,
+                            to_provider: toProvider,
+                            timestamp: new Date().toISOString(),
+                            message_count: this.messages.length
+                        })
+                    });
+                } catch (err) {
+                    console.warn('AI-74: Failed to notify backend of provider switch:', err);
+                }
+            }
+
+            /**
+             * AI-74: Get recent conversation context for new provider continuity.
+             * Returns the last 10 messages formatted as a context string.
+             */
+            getConversationContext() {
+                const recent = this.messages.slice(-10);
+                if (recent.length === 0) return '';
+                return recent.map(m => {
+                    const role = m.sender === 'user' ? 'User' : (m.sender === 'ai' ? 'Assistant' : 'System');
+                    return `${role}: ${m.text}`;
+                }).join('\n');
             }
 
             handleModelChange(event) {
@@ -4272,11 +4380,24 @@
                 this.addMessage(text, 'user', provider, model);
                 this.input.value = '';
 
-                // Simulate AI response
+                // AI-74: Get conversation context for the current provider
+                // (last 5 exchanges = up to 10 messages, before the just-added user msg)
+                const contextMessages = this.messages.slice(-11, -1); // exclude the message we just added
+                const contextPrefix = contextMessages
+                    .filter(m => m.sender === 'user' || m.sender === 'ai')
+                    .slice(-10)
+                    .map(m => `${m.sender === 'user' ? 'User' : 'Assistant'}: ${m.text}`)
+                    .join('\n');
+
+                // Simulate AI response (async to support Linear tool calls - AI-75)
                 this.showLoadingIndicator();
-                setTimeout(() => {
+                setTimeout(async () => {
                     this.removeLoadingIndicator();
-                    this.addMessage(this.generateAIResponse(text, provider, model), 'ai', provider, model);
+                    // Check for Linear intent first (AI-75)
+                    const linearHandled = await this.handleLinearIntent(text, provider, model);
+                    if (!linearHandled) {
+                        this.addMessage(this.generateAIResponse(text, provider, model, contextPrefix), 'ai', provider, model);
+                    }
                 }, 800);
             }
 
@@ -4373,6 +4494,111 @@
                 this.scrollToBottom();
             }
 
+            /**
+             * AI-75: Render a Linear tool call block in the chat.
+             * Shows a collapsible teal block with tool name, input, and result.
+             */
+            renderToolCall(toolName, input, result) {
+                const blockId = `tool-call-${Date.now()}`;
+                const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+
+                const inputStr = typeof input === 'object' ? JSON.stringify(input, null, 2) : String(input);
+                const resultStr = typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result);
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'chat-message system';
+                wrapper.setAttribute('data-testid', 'tool-call-message');
+
+                wrapper.innerHTML = `
+                    <div class="chat-message-content tool-call-block" data-testid="tool-call-block" style="max-width:90%;">
+                        <div class="tool-call-header" data-testid="tool-call-header" onclick="this.parentElement.querySelector('.tool-call-body').classList.toggle('hidden'); this.querySelector('.tool-call-toggle').classList.toggle('open');">
+                            <span style="font-size:1.1rem;">&#128295;</span>
+                            <strong style="color:#5eead4; font-size:13px;">Linear Tool:</strong>
+                            <span class="tool-call-name-badge" data-testid="tool-call-name">${this.escapeHtml(toolName)}</span>
+                            <span style="flex:1;"></span>
+                            <span class="tool-call-toggle" data-testid="tool-call-toggle">&#9654;</span>
+                        </div>
+                        <div class="tool-call-body hidden" data-testid="tool-call-body" id="${blockId}">
+                            <div class="tool-call-detail-row"><strong>Input:</strong><br>${this.escapeHtml(inputStr)}</div>
+                            <div class="tool-call-detail-row" style="margin-top:8px;"><strong>Result:</strong><br>${this.escapeHtml(resultStr)}</div>
+                        </div>
+                        <div class="chat-timestamp">${timeStr}</div>
+                    </div>
+                `;
+
+                this.messagesContainer.appendChild(wrapper);
+                this.scrollToBottom();
+            }
+
+            /**
+             * AI-75: Handle Linear integration intents in user messages.
+             * Returns true if a Linear tool call was handled, false otherwise.
+             * Parses message for issue key, list, or status patterns and calls the API.
+             */
+            async handleLinearIntent(message, provider, model) {
+                const lower = message.toLowerCase();
+
+                // Pattern: "status of AI-NNN" or "what is AI-NNN" or just "AI-NNN"
+                const issueKeyMatch = message.match(/\bAI-(\d+)\b/i);
+
+                if (issueKeyMatch) {
+                    const issueKey = `AI-${issueKeyMatch[1]}`;
+                    const toolName = 'get_issue';
+                    const input = { issue_key: issueKey };
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/api/integrations/linear/issue/${issueKey}`);
+                        const data = await response.json();
+                        const issue = data.issue || {};
+                        const resultStr = `${issue.key} is "${issue.status}" — assigned to ${issue.assignee}`;
+                        this.renderToolCall(toolName, input, resultStr);
+                        const aiText = `I queried Linear for ${issueKey}. Here's what I found:\n\n• **Title:** ${issue.title}\n• **Status:** ${issue.status}\n• **Assignee:** ${issue.assignee}\n• **Priority:** ${issue.priority}`;
+                        this.addMessage(aiText, 'ai', provider, model);
+                        return true;
+                    } catch (err) {
+                        console.error('Linear tool call failed:', err);
+                        return false;
+                    }
+                }
+
+                // Pattern: "list issues", "show issues", "backlog", "view board"
+                if (lower.includes('list issues') || lower.includes('show issues') || lower.includes('backlog') || lower.includes('view board') || lower.includes('board info')) {
+                    const toolName = 'list_issues';
+                    const input = {};
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/api/integrations/linear/issues`);
+                        const data = await response.json();
+                        const issues = data.issues || [];
+                        const resultStr = `Found ${issues.length} issues: ${issues.map(i => `${i.key} (${i.status})`).join(', ')}`;
+                        this.renderToolCall(toolName, input, resultStr);
+                        const lines = issues.map(i => `• **${i.key}** — ${i.title} [${i.status}]`).join('\n');
+                        this.addMessage(`Here are the Linear issues:\n\n${lines}`, 'ai', provider, model);
+                        return true;
+                    } catch (err) {
+                        console.error('Linear list issues failed:', err);
+                        return false;
+                    }
+                }
+
+                // Pattern: "linear status" or "linear connected"
+                if (lower.includes('linear status') || lower.includes('linear connected') || lower.includes('linear integration')) {
+                    const toolName = 'linear_status';
+                    const input = {};
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/api/integrations/linear/status`);
+                        const data = await response.json();
+                        const resultStr = `connected: ${data.connected}, tool_count: ${data.tool_count}`;
+                        this.renderToolCall(toolName, input, resultStr);
+                        this.addMessage(`Linear integration status: **Connected** with ${data.tool_count} tools available.`, 'ai', provider, model);
+                        return true;
+                    } catch (err) {
+                        console.error('Linear status check failed:', err);
+                        return false;
+                    }
+                }
+
+                return false;
+            }
+
             showLoadingIndicator() {
                 const div = document.createElement('div');
                 div.className = 'chat-message ai';
@@ -4400,7 +4626,7 @@
                 }
             }
 
-            generateAIResponse(userMessage, provider, model) {
+            generateAIResponse(userMessage, provider, model, conversationContext = '') {
                 // Simple response generation based on keywords
                 const lower = userMessage.toLowerCase();
                 const providerNames = {
@@ -4418,23 +4644,27 @@
                 const modelObj = models.find(m => m.id === model);
                 const modelName = modelObj ? modelObj.name : model;
 
+                // AI-74: Acknowledge context from prior provider if context is present
+                const hasContext = conversationContext && conversationContext.trim().length > 0;
+                const contextNote = hasContext ? ' (I have context from our prior conversation.)' : '';
+
                 if (lower.includes('status') || lower.includes('how')) {
-                    return `[${providerName} - ${modelName}] Your agents are running smoothly. All systems are operational with 99.2% uptime.`;
+                    return `[${providerName} - ${modelName}]${contextNote} Your agents are running smoothly. All systems are operational with 99.2% uptime.`;
                 }
                 if (lower.includes('metric') || lower.includes('performance')) {
-                    return `[${providerName} - ${modelName}] Current metrics show strong performance: 94% success rate, avg response time 245ms.`;
+                    return `[${providerName} - ${modelName}]${contextNote} Current metrics show strong performance: 94% success rate, avg response time 245ms.`;
                 }
                 if (lower.includes('error') || lower.includes('issue') || lower.includes('problem')) {
-                    return `[${providerName} - ${modelName}] No critical errors detected. All monitoring systems are reporting normal status.`;
+                    return `[${providerName} - ${modelName}]${contextNote} No critical errors detected. All monitoring systems are reporting normal status.`;
                 }
                 if (lower.includes('cost') || lower.includes('usage') || lower.includes('token')) {
-                    return `[${providerName} - ${modelName}] Token usage is at 42% of daily allocation. Cost trending 8% below budget.`;
+                    return `[${providerName} - ${modelName}]${contextNote} Token usage is at 42% of daily allocation. Cost trending 8% below budget.`;
                 }
                 if (lower.includes('hello') || lower.includes('hi') || lower.includes('hey')) {
-                    return `[${providerName} - ${modelName}] Hello! I'm here to help you with any questions about your agent dashboard.`;
+                    return `[${providerName} - ${modelName}]${contextNote} Hello! I'm here to help you with any questions about your agent dashboard.`;
                 }
 
-                return `[${providerName} - ${modelName}] I understand. Based on your agent dashboard, everything is performing within expected parameters. Is there anything specific you'd like to know?`;
+                return `[${providerName} - ${modelName}]${contextNote} I understand. Based on your agent dashboard, everything is performing within expected parameters. Is there anything specific you'd like to know?`;
             }
 
             scrollToBottom() {
