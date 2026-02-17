@@ -1924,6 +1924,172 @@
             color: #f87171;
             background: rgba(248, 113, 113, 0.1);
         }
+
+        /* Decision Audit Trail Styles (AI-162) */
+        .decision-summary-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+            padding: 10px 14px;
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            border-radius: 8px;
+            font-size: 0.78rem;
+        }
+
+        .decision-summary-label {
+            color: #64748b;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            font-size: 0.72rem;
+            flex-shrink: 0;
+        }
+
+        .decision-summary-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .decision-summary-count {
+            font-weight: 700;
+            color: #f1f5f9;
+        }
+
+        .decision-summary-type {
+            cursor: pointer;
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border: 1px solid;
+            transition: opacity 0.15s ease, transform 0.1s ease;
+        }
+
+        .decision-summary-type:hover {
+            opacity: 0.8;
+            transform: scale(1.05);
+        }
+
+        .decision-summary-type.agent_selection {
+            background: rgba(59, 130, 246, 0.1);
+            color: #60a5fa;
+            border-color: rgba(59, 130, 246, 0.35);
+        }
+
+        .decision-summary-type.complexity {
+            background: rgba(139, 92, 246, 0.1);
+            color: #a78bfa;
+            border-color: rgba(139, 92, 246, 0.35);
+        }
+
+        .decision-summary-type.verification {
+            background: rgba(16, 185, 129, 0.1);
+            color: #34d399;
+            border-color: rgba(16, 185, 129, 0.35);
+        }
+
+        .decision-summary-type.pr_routing {
+            background: rgba(249, 115, 22, 0.1);
+            color: #fb923c;
+            border-color: rgba(249, 115, 22, 0.35);
+        }
+
+        .decision-summary-type.error_recovery {
+            background: rgba(239, 68, 68, 0.1);
+            color: #f87171;
+            border-color: rgba(239, 68, 68, 0.35);
+        }
+
+        .decision-summary-type.other {
+            background: rgba(148, 163, 184, 0.1);
+            color: #94a3b8;
+            border-color: rgba(148, 163, 184, 0.3);
+        }
+
+        .decision-type-badge {
+            cursor: pointer;
+            transition: opacity 0.15s ease;
+        }
+
+        .decision-type-badge:hover {
+            opacity: 0.75;
+        }
+
+        .decision-entry.expanded .decision-audit-detail {
+            display: block;
+        }
+
+        .decision-audit-detail {
+            display: none;
+            margin-top: 8px;
+            padding: 10px 12px;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(148, 163, 184, 0.12);
+            border-radius: 6px;
+            font-size: 0.78rem;
+        }
+
+        .decision-audit-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 5px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .decision-audit-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .decision-audit-key {
+            color: #64748b;
+            font-weight: 600;
+            min-width: 120px;
+            flex-shrink: 0;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .decision-audit-value {
+            color: #cbd5e1;
+            word-break: break-all;
+            flex: 1;
+        }
+
+        .decision-audit-value.agent-event-link {
+            color: #60a5fa;
+            font-family: monospace;
+            font-size: 0.75rem;
+        }
+
+        .decision-audit-keywords {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .decision-audit-keyword {
+            background: rgba(139, 92, 246, 0.1);
+            color: #a78bfa;
+            border: 1px solid rgba(139, 92, 246, 0.25);
+            border-radius: 3px;
+            padding: 1px 6px;
+            font-size: 0.72rem;
+        }
+
+        .decision-expand-indicator {
+            font-size: 0.7rem;
+            color: #475569;
+            margin-left: 4px;
+            user-select: none;
+        }
     </style>
 </head>
 <body>
@@ -2124,7 +2290,7 @@
             <div id="req-feedback" class="req-feedback" data-testid="req-feedback" role="status"></div>
         </div>
 
-        <!-- Decision Log Panel (AI-161) -->
+        <!-- Decision Log Panel (AI-161 + AI-162 audit trail) -->
         <div id="decision-log-panel" data-testid="decision-log-panel">
             <div class="decision-log-header">
                 <h2 class="decision-log-title">
@@ -2153,6 +2319,19 @@
                         Export JSON
                     </button>
                 </div>
+            </div>
+            <!-- Summary stats bar (AI-162) -->
+            <div class="decision-summary-bar" id="decision-summary-bar" data-testid="decision-summary-bar" style="display:none;">
+                <span class="decision-summary-label">Summary:</span>
+                <span class="decision-summary-item">
+                    <span class="decision-summary-count" id="decision-summary-total">0</span>
+                    <span style="color:#64748b;">total</span>
+                </span>
+                <span id="decision-summary-types"></span>
+                <span class="decision-summary-item" style="margin-left:auto;">
+                    <span style="color:#64748b;">Sessions:</span>
+                    <span class="decision-summary-count" id="decision-summary-sessions">0</span>
+                </span>
             </div>
             <div class="decision-list" id="decision-list" data-testid="decision-list">
                 <div class="decision-list-empty" id="decision-list-empty">No decisions logged yet.</div>
@@ -3777,11 +3956,13 @@
         }
 
         // ==========================================
-        // Decision Log Implementation (AI-161)
-        // ==========================================
+        // Decision Log Implementation (AI-161 + AI-162 audit trail)
+        // ============================================================
 
         // In-memory cache of decisions for search filtering
         var _decisionCache = [];
+        // Active type filter (empty = show all)
+        var _decisionTypeFilter = '';
 
         var DECISION_TYPE_ICONS = {
             'agent_selection': '\u{1F916}',
@@ -3802,6 +3983,78 @@
             }
         }
 
+        function buildDecisionAuditDetailHTML(decision) {
+            var rows = '';
+
+            // Input factors
+            var inputFactors = decision.input_factors || {};
+            var keywords = inputFactors.keywords || [];
+            var verificationStatus = inputFactors.verification_status || '';
+            var context = inputFactors.context || '';
+
+            if (keywords.length > 0) {
+                var kwHTML = keywords.map(function(kw) {
+                    return '<span class="decision-audit-keyword">' + escapeHtmlDecision(kw) + '</span>';
+                }).join('');
+                rows += '<div class="decision-audit-row">'
+                    + '<span class="decision-audit-key">Keywords</span>'
+                    + '<span class="decision-audit-value"><span class="decision-audit-keywords">' + kwHTML + '</span></span>'
+                    + '</div>';
+            }
+
+            if (verificationStatus) {
+                rows += '<div class="decision-audit-row">'
+                    + '<span class="decision-audit-key">Verification</span>'
+                    + '<span class="decision-audit-value">' + escapeHtmlDecision(verificationStatus) + '</span>'
+                    + '</div>';
+            }
+
+            if (context) {
+                rows += '<div class="decision-audit-row">'
+                    + '<span class="decision-audit-key">Context</span>'
+                    + '<span class="decision-audit-value">' + escapeHtmlDecision(context) + '</span>'
+                    + '</div>';
+            }
+
+            if (decision.agent_selected) {
+                rows += '<div class="decision-audit-row">'
+                    + '<span class="decision-audit-key">Agent Selected</span>'
+                    + '<span class="decision-audit-value">' + escapeHtmlDecision(decision.agent_selected) + '</span>'
+                    + '</div>';
+            }
+
+            if (decision.model_used) {
+                rows += '<div class="decision-audit-row">'
+                    + '<span class="decision-audit-key">Model Used</span>'
+                    + '<span class="decision-audit-value">' + escapeHtmlDecision(decision.model_used) + '</span>'
+                    + '</div>';
+            }
+
+            if (decision.duration_ms !== null && decision.duration_ms !== undefined && decision.duration_ms !== '') {
+                rows += '<div class="decision-audit-row">'
+                    + '<span class="decision-audit-key">Duration</span>'
+                    + '<span class="decision-audit-value">' + escapeHtmlDecision(String(decision.duration_ms)) + ' ms</span>'
+                    + '</div>';
+            }
+
+            if (decision.agent_event_id) {
+                rows += '<div class="decision-audit-row">'
+                    + '<span class="decision-audit-key">Agent Event ID</span>'
+                    + '<span class="decision-audit-value agent-event-link">' + escapeHtmlDecision(decision.agent_event_id) + '</span>'
+                    + '</div>';
+            }
+
+            if (decision.session_id) {
+                rows += '<div class="decision-audit-row">'
+                    + '<span class="decision-audit-key">Session ID</span>'
+                    + '<span class="decision-audit-value">' + escapeHtmlDecision(decision.session_id) + '</span>'
+                    + '</div>';
+            }
+
+            if (!rows) return '';
+            return '<div class="decision-audit-detail" data-testid="decision-audit-detail">' + rows + '</div>';
+        }
+
         function buildDecisionEntryHTML(decision) {
             var icon = DECISION_TYPE_ICONS[decision.type] || DECISION_TYPE_ICONS['other'];
             var typeClass = decision.type || 'other';
@@ -3813,21 +4066,42 @@
                 : '';
             var outcomeClass = decision.outcome || 'pending';
             var ts = formatDecisionTimestamp(decision.timestamp);
-            return '<div class="decision-entry" data-id="' + escapeHtmlDecision(decision.id || '') + '">'
+            var auditDetailHTML = buildDecisionAuditDetailHTML(decision);
+            var hasAudit = auditDetailHTML.length > 0;
+            var expandIndicator = hasAudit
+                ? '<span class="decision-expand-indicator" title="Click to expand audit trail">[+]</span>'
+                : '';
+            return '<div class="decision-entry" data-id="' + escapeHtmlDecision(decision.id || '') + '" '
+                + (hasAudit ? 'style="cursor:pointer;" onclick="toggleDecisionExpand(this)"' : '')
+                + '>'
                 + '<span class="decision-entry-icon">' + icon + '</span>'
                 + '<div class="decision-entry-body">'
                 +   '<div class="decision-entry-top">'
-                +     '<span class="decision-type-badge ' + typeClass + '">' + escapeHtmlDecision(decision.type || 'other') + '</span>'
+                +     '<span class="decision-type-badge ' + typeClass + '" '
+                +       'title="Filter by ' + escapeHtmlDecision(typeClass) + '" '
+                +       'onclick="event.stopPropagation(); setDecisionTypeFilter(\'' + escapeHtmlDecision(typeClass) + '\')">'
+                +       escapeHtmlDecision(decision.type || 'other')
+                +     '</span>'
                 +     ticketHTML
+                +     expandIndicator
                 +   '</div>'
                 +   '<div class="decision-text">' + escapeHtmlDecision(decision.decision || '') + '</div>'
                 +   reasonHTML
+                +   auditDetailHTML
                 + '</div>'
                 + '<div class="decision-entry-meta">'
                 +   '<span class="decision-timestamp">' + ts + '</span>'
                 +   '<span class="decision-outcome ' + escapeHtmlDecision(outcomeClass) + '">' + escapeHtmlDecision(outcomeClass) + '</span>'
                 + '</div>'
                 + '</div>';
+        }
+
+        function toggleDecisionExpand(el) {
+            el.classList.toggle('expanded');
+            var indicator = el.querySelector('.decision-expand-indicator');
+            if (indicator) {
+                indicator.textContent = el.classList.contains('expanded') ? '[-]' : '[+]';
+            }
         }
 
         function escapeHtmlDecision(str) {
@@ -3839,10 +4113,25 @@
                 .replace(/'/g, '&#039;');
         }
 
+        function setDecisionTypeFilter(type) {
+            // Toggle: click same type again to clear filter
+            if (_decisionTypeFilter === type) {
+                _decisionTypeFilter = '';
+                var search = document.getElementById('decision-search');
+                if (search) search.value = '';
+            } else {
+                _decisionTypeFilter = type;
+                var search = document.getElementById('decision-search');
+                if (search) search.value = type;
+            }
+            filterDecisions();
+        }
+
         function prependDecisionEntry(decision) {
             // Keep cache in sync (most recent first)
             _decisionCache.unshift(decision);
             renderDecisionList(_decisionCache);
+            updateDecisionSummaryBar();
         }
 
         function renderDecisionList(decisions) {
@@ -3873,6 +4162,8 @@
             var search = document.getElementById('decision-search');
             if (!search) return;
             var term = search.value.toLowerCase().trim();
+            // Sync type filter with search box content
+            _decisionTypeFilter = '';
             if (!term) {
                 renderDecisionList(_decisionCache);
                 return;
@@ -3882,10 +4173,49 @@
                     (d.decision || '').toLowerCase().includes(term) ||
                     (d.ticket || '').toLowerCase().includes(term) ||
                     (d.reason || '').toLowerCase().includes(term) ||
-                    (d.type || '').toLowerCase().includes(term)
+                    (d.type || '').toLowerCase().includes(term) ||
+                    (d.agent_selected || '').toLowerCase().includes(term) ||
+                    (d.model_used || '').toLowerCase().includes(term)
                 );
             });
             renderDecisionList(filtered);
+        }
+
+        async function updateDecisionSummaryBar() {
+            try {
+                var resp = await fetch('/api/decisions/summary');
+                if (!resp.ok) return;
+                var summary = await resp.json();
+                var bar = document.getElementById('decision-summary-bar');
+                var totalEl = document.getElementById('decision-summary-total');
+                var sessionsEl = document.getElementById('decision-summary-sessions');
+                var typesEl = document.getElementById('decision-summary-types');
+                if (!bar || !totalEl || !sessionsEl || !typesEl) return;
+
+                if (summary.total === 0) {
+                    bar.style.display = 'none';
+                    return;
+                }
+                bar.style.display = 'flex';
+                totalEl.textContent = summary.total;
+                sessionsEl.textContent = summary.recent_session_count || 0;
+
+                var typeHTML = '';
+                var byType = summary.by_type || {};
+                Object.keys(byType).forEach(function(type) {
+                    typeHTML += '<span class="decision-summary-item">'
+                        + '<span class="decision-summary-type ' + escapeHtmlDecision(type) + '" '
+                        + 'title="Filter by ' + escapeHtmlDecision(type) + '" '
+                        + 'onclick="setDecisionTypeFilter(\'' + escapeHtmlDecision(type) + '\')" '
+                        + 'data-testid="summary-type-' + escapeHtmlDecision(type) + '">'
+                        + escapeHtmlDecision(type) + ': ' + byType[type]
+                        + '</span>'
+                        + '</span>';
+                });
+                typesEl.innerHTML = typeHTML;
+            } catch (e) {
+                // Summary bar is optional enhancement
+            }
         }
 
         async function exportDecisions() {
@@ -3916,6 +4246,7 @@
                     _decisionCache = data.decisions;
                     renderDecisionList(_decisionCache);
                 }
+                await updateDecisionSummaryBar();
             } catch (e) {
                 console.warn('Could not load decision history:', e);
             }
