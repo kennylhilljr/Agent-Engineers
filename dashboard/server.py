@@ -99,6 +99,11 @@ CHAT_HISTORY_MAX = 1000
 reasoning_history: list = []  # [{"agent", "decision", "complexity", "reasoning", "timestamp"}]
 REASONING_HISTORY_MAX = 100
 
+# Provider Switch History Store (AI-74)
+# Records hot-swap events for analytics (max 50)
+provider_switch_history: list = []  # [{"from_provider", "to_provider", "timestamp", "message_count"}]
+PROVIDER_SWITCH_HISTORY_MAX = 50
+
 # Setup structured logging
 setup_logging(log_level=os.getenv("LOG_LEVEL", "INFO"))
 logger = get_logger(__name__)
@@ -305,6 +310,11 @@ class DashboardServer:
         self.app.router.add_delete('/api/chat/history', self.delete_chat_history)
         self.app.router.add_route('OPTIONS', '/api/chat/history', self.handle_options)
 
+        # Provider Switch endpoint (AI-74)
+        self.app.router.add_post('/api/chat/provider-switch', self.post_provider_switch)
+        self.app.router.add_get('/api/chat/provider-switch', self.get_provider_switch_history)
+        self.app.router.add_route('OPTIONS', '/api/chat/provider-switch', self.handle_options)
+
         # Transparency endpoints (AI-131)
         self.app.router.add_post('/api/transparency/reasoning', self.post_transparency_reasoning)
         self.app.router.add_get('/api/transparency/history', self.get_transparency_history)
@@ -313,6 +323,16 @@ class DashboardServer:
         self.app.router.add_route('OPTIONS', '/api/transparency/reasoning', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/transparency/history', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/transparency/code-stream', self.handle_options)
+
+        # Linear Integration endpoints (AI-75)
+        self.app.router.add_get('/api/integrations/linear/status', self.get_linear_status)
+        self.app.router.add_get('/api/integrations/linear/issues', self.get_linear_issues)
+        self.app.router.add_get('/api/integrations/linear/issue/{issue_key}', self.get_linear_issue)
+        self.app.router.add_post('/api/integrations/linear/query', self.post_linear_query)
+        self.app.router.add_route('OPTIONS', '/api/integrations/linear/status', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/integrations/linear/issues', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/integrations/linear/issue/{issue_key}', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/integrations/linear/query', self.handle_options)
 
         # OPTIONS for CORS preflight
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
@@ -1310,6 +1330,73 @@ class DashboardServer:
             'timestamp': datetime.utcnow().isoformat() + 'Z'
         })
 
+    # -------------------------------------------------------------------------
+    # Provider Switch History - AI-74: Hot-Swap Providers Without Context Loss
+    # -------------------------------------------------------------------------
+
+    async def post_provider_switch(self, request: Request) -> Response:
+        """POST /api/chat/provider-switch - Record a provider switch event.
+
+        Request body:
+            {from_provider, to_provider, timestamp?, message_count?}
+
+        Returns:
+            200 OK with success and context_preserved flag
+            400 Bad Request for invalid input
+        """
+        try:
+            data = await request.json()
+        except (json.JSONDecodeError, ValueError):
+            return web.json_response({'error': 'Invalid JSON'}, status=400)
+
+        if not isinstance(data, dict):
+            return web.json_response({'error': 'Body must be a JSON object'}, status=400)
+
+        # Validate required fields
+        if 'from_provider' not in data or 'to_provider' not in data:
+            return web.json_response(
+                {'error': 'Missing required fields: from_provider, to_provider'},
+                status=400
+            )
+
+        entry = {
+            'from_provider': str(data['from_provider']),
+            'to_provider': str(data['to_provider']),
+            'timestamp': data.get('timestamp', datetime.utcnow().isoformat() + 'Z'),
+            'message_count': int(data.get('message_count', 0))
+        }
+
+        provider_switch_history.append(entry)
+
+        # Enforce max size
+        if len(provider_switch_history) > PROVIDER_SWITCH_HISTORY_MAX:
+            del provider_switch_history[:len(provider_switch_history) - PROVIDER_SWITCH_HISTORY_MAX]
+
+        logger.info(
+            f"AI-74: Provider switch recorded: {entry['from_provider']} -> {entry['to_provider']}, "
+            f"messages={entry['message_count']}"
+        )
+
+        return web.json_response({
+            'success': True,
+            'context_preserved': True,
+            'from_provider': entry['from_provider'],
+            'to_provider': entry['to_provider'],
+            'timestamp': entry['timestamp']
+        })
+
+    async def get_provider_switch_history(self, request: Request) -> Response:
+        """GET /api/chat/provider-switch - Retrieve provider switch history.
+
+        Returns:
+            200 OK with list of provider switch events
+        """
+        return web.json_response({
+            'switches': provider_switch_history[-PROVIDER_SWITCH_HISTORY_MAX:],
+            'count': len(provider_switch_history),
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+
     async def post_transparency_reasoning(self, request: Request) -> Response:
         """POST /api/transparency/reasoning - Emit a reasoning event.
 
@@ -1448,6 +1535,240 @@ class DashboardServer:
 
         logger.info(f"Transparency code-stream emitted: agent={ws_message['agent_id']}, file={ws_message['file_path']}, done={ws_message['done']}")
         return web.json_response({'status': 'ok'})
+
+    # -------------------------------------------------------------------------
+    # Linear Integration - AI-75: Issue Queries and Management (stub/simulation)
+    # -------------------------------------------------------------------------
+
+    # Mock data for Linear issues simulation
+    _LINEAR_MOCK_ISSUES = [
+        {
+            "id": "linear-uuid-001",
+            "key": "AI-1",
+            "title": "Initial project setup and scaffolding",
+            "status": "Done",
+            "assignee": "Kenny H",
+            "priority": "High",
+            "description": "Set up the base project structure, CI/CD pipeline, and initial tooling."
+        },
+        {
+            "id": "linear-uuid-002",
+            "key": "AI-42",
+            "title": "Implement agent metrics collector",
+            "status": "In Progress",
+            "assignee": "Kenny H",
+            "priority": "High",
+            "description": "Build the metrics collector that aggregates agent performance data."
+        },
+        {
+            "id": "linear-uuid-003",
+            "key": "AI-68",
+            "title": "Chat interface with message thread",
+            "status": "Done",
+            "assignee": "Kenny H",
+            "priority": "Medium",
+            "description": "Implement chat interface for the dashboard with message history."
+        },
+        {
+            "id": "linear-uuid-004",
+            "key": "AI-73",
+            "title": "AI provider switcher with 6 providers",
+            "status": "Done",
+            "assignee": "Kenny H",
+            "priority": "Medium",
+            "description": "Support switching between Claude, ChatGPT, Gemini, Groq, KIMI, and Windsurf."
+        },
+        {
+            "id": "linear-uuid-005",
+            "key": "AI-75",
+            "title": "Linear Access - Issue Queries and Management",
+            "status": "In Progress",
+            "assignee": "Kenny H",
+            "priority": "High",
+            "description": "Integrate Linear MCP tools so users can query and manage issues from the chat interface."
+        },
+    ]
+
+    def _get_mock_issue(self, issue_key: str) -> Optional[dict]:
+        """Return mock issue data for the given key, or generate a placeholder."""
+        for issue in self._LINEAR_MOCK_ISSUES:
+            if issue["key"].upper() == issue_key.upper():
+                return issue
+        # Generate a placeholder for unknown keys
+        return {
+            "id": f"linear-uuid-{issue_key.lower().replace('-', '')}",
+            "key": issue_key.upper(),
+            "title": f"Issue {issue_key.upper()}",
+            "status": "Backlog",
+            "assignee": "Unassigned",
+            "priority": "Medium",
+            "description": f"No details found for {issue_key.upper()} in the mock data store."
+        }
+
+    async def get_linear_status(self, request: Request) -> Response:
+        """GET /api/integrations/linear/status - Check Linear connectivity.
+
+        Returns stub connectivity status for the Linear MCP integration.
+
+        Returns:
+            JSON response with connection status
+        """
+        logger.info("GET /api/integrations/linear/status")
+        return web.json_response({
+            "connected": True,
+            "tool_count": 39,
+            "service": "Linear",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        })
+
+    async def get_linear_issues(self, request: Request) -> Response:
+        """GET /api/integrations/linear/issues - List issues with optional status filter.
+
+        Query Parameters:
+            status: Filter by status (e.g. 'In Progress', 'Done', 'Backlog')
+
+        Returns:
+            JSON response with list of issues
+        """
+        logger.info("GET /api/integrations/linear/issues")
+        status_filter = request.query.get("status", "").strip().lower()
+
+        if status_filter:
+            issues = [
+                i for i in self._LINEAR_MOCK_ISSUES
+                if i["status"].lower() == status_filter
+            ]
+        else:
+            issues = list(self._LINEAR_MOCK_ISSUES)
+
+        return web.json_response({
+            "issues": issues,
+            "count": len(issues),
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        })
+
+    async def get_linear_issue(self, request: Request) -> Response:
+        """GET /api/integrations/linear/issue/{issue_key} - Get issue details.
+
+        Path Parameters:
+            issue_key: Issue key such as AI-42
+
+        Returns:
+            JSON response with issue details
+        """
+        issue_key = request.match_info["issue_key"]
+        logger.info(f"GET /api/integrations/linear/issue/{issue_key}")
+
+        issue = self._get_mock_issue(issue_key)
+        return web.json_response({
+            "issue": issue,
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        })
+
+    async def post_linear_query(self, request: Request) -> Response:
+        """POST /api/integrations/linear/query - Route action to Linear MCP stub.
+
+        Request body:
+            {"action": "get_issue"|"list_issues"|"create_issue"|"transition_issue",
+             "params": {...}}
+
+        Returns:
+            JSON response with action result
+        """
+        logger.info("POST /api/integrations/linear/query")
+
+        try:
+            data = await request.json()
+        except (json.JSONDecodeError, ValueError):
+            return web.json_response({"error": "Invalid JSON"}, status=400)
+
+        if not isinstance(data, dict):
+            return web.json_response({"error": "Body must be a JSON object"}, status=400)
+
+        action = data.get("action", "").strip()
+        params = data.get("params", {})
+
+        if not action:
+            return web.json_response({"error": "Missing required field: action"}, status=400)
+
+        # Route to appropriate stub handler
+        if action == "get_issue":
+            issue_key = params.get("issue_key", "AI-1")
+            issue = self._get_mock_issue(issue_key)
+            result = {
+                "action": action,
+                "result": issue,
+                "summary": f"{issue['key']} is \"{issue['status']}\" — assigned to {issue['assignee']}"
+            }
+
+        elif action == "list_issues":
+            status_filter = params.get("status", "").strip().lower()
+            if status_filter:
+                issues = [i for i in self._LINEAR_MOCK_ISSUES if i["status"].lower() == status_filter]
+            else:
+                issues = list(self._LINEAR_MOCK_ISSUES)
+            result = {
+                "action": action,
+                "result": issues,
+                "summary": f"Found {len(issues)} issue(s)"
+            }
+
+        elif action == "create_issue":
+            title = params.get("title", "New Issue")
+            description = params.get("description", "")
+            new_issue = {
+                "id": f"linear-uuid-new-{int(datetime.utcnow().timestamp())}",
+                "key": "AI-NEW",
+                "title": title,
+                "status": "Backlog",
+                "assignee": "Unassigned",
+                "priority": params.get("priority", "Medium"),
+                "description": description
+            }
+            result = {
+                "action": action,
+                "result": new_issue,
+                "summary": f"Created issue \"{title}\" with key AI-NEW"
+            }
+
+        elif action == "transition_issue":
+            issue_key = params.get("issue_key", "AI-1")
+            new_status = params.get("status", "In Progress")
+            issue = self._get_mock_issue(issue_key)
+            issue = dict(issue)  # shallow copy
+            issue["status"] = new_status
+            result = {
+                "action": action,
+                "result": issue,
+                "summary": f"{issue['key']} transitioned to \"{new_status}\""
+            }
+
+        elif action == "get_board":
+            backlog = [i for i in self._LINEAR_MOCK_ISSUES if i["status"] == "Backlog"]
+            in_progress = [i for i in self._LINEAR_MOCK_ISSUES if i["status"] == "In Progress"]
+            done = [i for i in self._LINEAR_MOCK_ISSUES if i["status"] == "Done"]
+            result = {
+                "action": action,
+                "result": {
+                    "backlog": backlog,
+                    "in_progress": in_progress,
+                    "done": done
+                },
+                "summary": f"Board: {len(backlog)} backlog, {len(in_progress)} in progress, {len(done)} done"
+            }
+
+        else:
+            return web.json_response(
+                {"error": f"Unknown action: {action}. Supported: get_issue, list_issues, create_issue, transition_issue, get_board"},
+                status=400
+            )
+
+        return web.json_response({
+            "status": "ok",
+            "tool_name": f"linear_{action}",
+            **result,
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        })
 
     def run(self):
         """Start the HTTP server with WebSocket support.
