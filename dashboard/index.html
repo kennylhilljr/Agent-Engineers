@@ -1968,6 +1968,121 @@
         .requirements-close-btn:hover {
             color: var(--text-primary, #f1f5f9);
         }
+
+        /* Requirement Editor (AI-155/156) */
+        .req-edit-mode .requirements-modal-body {
+            /* editor mode styling */
+        }
+        .req-editor-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .req-editor-textarea {
+            width: 100%;
+            min-height: 200px;
+            background: var(--bg-tertiary, #0f1117);
+            border: 1px solid var(--border-color, #2d3748);
+            border-radius: 6px;
+            color: var(--text-primary, #f1f5f9);
+            font-family: monospace;
+            font-size: 0.82rem;
+            padding: 10px;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+        .req-editor-textarea:focus {
+            outline: none;
+            border-color: var(--accent-blue, #3b82f6);
+        }
+        .req-editor-preview {
+            background: var(--bg-tertiary, #0f1117);
+            border: 1px solid var(--border-color, #2d3748);
+            border-radius: 6px;
+            padding: 10px;
+            font-size: 0.82rem;
+            color: var(--text-secondary, #9ca3af);
+            min-height: 80px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .req-editor-preview-label {
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted, #6b7280);
+            margin-bottom: 4px;
+        }
+        .req-editor-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+        .req-editor-btn {
+            padding: 6px 14px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 4px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: opacity 0.15s;
+        }
+        .req-editor-btn.save-btn {
+            background: var(--accent-blue, #3b82f6);
+            color: white;
+            border-color: var(--accent-blue, #3b82f6);
+        }
+        .req-editor-btn.save-btn:hover { opacity: 0.85; }
+        .req-editor-btn.discard-btn {
+            background: transparent;
+            color: var(--text-muted, #6b7280);
+            border-color: var(--border-color, #2d3748);
+        }
+        .req-editor-btn.discard-btn:hover {
+            color: var(--text-primary, #f1f5f9);
+            border-color: var(--text-muted, #6b7280);
+        }
+        .req-edit-trigger-btn {
+            font-size: 0.7rem;
+            padding: 3px 10px;
+            border-radius: 4px;
+            border: 1px solid rgba(59, 130, 246, 0.4);
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--accent-blue, #3b82f6);
+            cursor: pointer;
+        }
+        .req-edit-trigger-btn:hover {
+            background: rgba(59, 130, 246, 0.2);
+        }
+        /* Approval/confirmation dialog */
+        .req-confirm-dialog {
+            background: var(--bg-secondary, #1e2139);
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 12px;
+            display: none;
+        }
+        .req-confirm-dialog.visible {
+            display: block;
+        }
+        .req-confirm-title {
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: #f59e0b;
+            margin-bottom: 8px;
+        }
+        .req-confirm-text {
+            font-size: 0.78rem;
+            color: var(--text-secondary, #9ca3af);
+            margin-bottom: 12px;
+        }
+        .req-confirm-actions {
+            display: flex;
+            gap: 8px;
+        }
     </style>
 </head>
 <body>
@@ -2179,9 +2294,18 @@
         <div class="requirements-modal" id="requirements-modal">
             <div class="requirements-modal-header">
                 <span class="requirements-modal-title" id="requirements-heading">Current Requirements</span>
+                <button class="req-edit-trigger-btn" id="req-edit-trigger-btn" style="display:none">&#x270F; Edit</button>
                 <button class="requirements-close-btn" id="requirements-close-btn" aria-label="Close requirements view">&#x2715;</button>
             </div>
             <div class="requirements-modal-body" id="requirements-modal-body"></div>
+            <div class="req-confirm-dialog" id="req-confirm-dialog">
+                <div class="req-confirm-title">&#x26A0; Resume with updated requirements?</div>
+                <div class="req-confirm-text" id="req-confirm-text">The requirements for this ticket have been edited. Resume the agent with the updated instructions?</div>
+                <div class="req-confirm-actions">
+                    <button class="req-editor-btn save-btn" id="req-confirm-yes-btn">Resume Agent</button>
+                    <button class="req-editor-btn discard-btn" id="req-confirm-no-btn">Cancel</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -3339,6 +3463,14 @@
         /** Set of paused agent IDs; prevents orchestrator from assigning new tasks */
         window.pausedAgents = new Set();
 
+        /** Map of ticket key -> edited requirement text (AI-155/156) */
+        window.editedRequirements = {};
+        var editedRequirements = window.editedRequirements;
+
+        /** Tracks which agent is currently being edited (AI-155/156) */
+        window.currentEditAgentId = null;
+        var currentEditAgentId = null;
+
         /**
          * Returns true if the given agentId is currently paused.
          * @param {string} agentId
@@ -4071,6 +4203,30 @@
             if (overlay) {
                 overlay.classList.add('open');
             }
+            // Show edit trigger button only when agent is paused (AI-155/156)
+            const editBtn = document.getElementById('req-edit-trigger-btn');
+            if (editBtn) {
+                if (isAgentPaused(agentId)) {
+                    editBtn.style.display = '';
+                    editBtn.onclick = function() { enterRequirementsEditMode(agentId); };
+                } else {
+                    editBtn.style.display = 'none';
+                    editBtn.onclick = null;
+                }
+            }
+            // Show confirmation dialog if requirements have been edited (AI-156)
+            const confirmDialog = document.getElementById('req-confirm-dialog');
+            if (confirmDialog) {
+                if (ticket && window.editedRequirements[ticket]) {
+                    confirmDialog.classList.add('visible');
+                    const yesBtn = document.getElementById('req-confirm-yes-btn');
+                    if (yesBtn) {
+                        yesBtn.onclick = function() { confirmResumeWithEdits(agentId); };
+                    }
+                } else {
+                    confirmDialog.classList.remove('visible');
+                }
+            }
         }
         window.openRequirementsView = openRequirementsView;
 
@@ -4084,6 +4240,196 @@
             }
         }
         window.closeRequirementsView = closeRequirementsView;
+
+        // ========================================
+        // REQUIREMENT EDITOR (AI-155 / AI-156)
+        // ========================================
+
+        /**
+         * Renders the HTML for the requirements editor (textarea + preview + buttons).
+         * @param {string} currentText - Current requirements text to populate editor
+         * @returns {string} HTML string for the editor
+         */
+        function renderRequirementsEditor(currentText) {
+            var escaped = escapeHtml(String(currentText || ''));
+            return '<div class="req-editor-container">'
+                + '<textarea class="req-editor-textarea" id="req-editor-textarea" oninput="window._updateReqPreview(this.value)">'
+                + escaped
+                + '</textarea>'
+                + '<div class="req-editor-preview-label">Preview</div>'
+                + '<div class="req-editor-preview" id="req-editor-preview">'
+                + escaped
+                + '</div>'
+                + '<div class="req-editor-actions">'
+                + '<button class="req-editor-btn discard-btn" onclick="window.discardRequirementsEdit()">Discard</button>'
+                + '<button class="req-editor-btn save-btn" onclick="window._saveCurrentReqEdit()">Save</button>'
+                + '</div>'
+                + '</div>';
+        }
+        window.renderRequirementsEditor = renderRequirementsEditor;
+
+        /**
+         * Updates the preview area as user types in the editor textarea.
+         * @param {string} text - Current textarea value
+         */
+        function _updateReqPreview(text) {
+            var preview = document.getElementById('req-editor-preview');
+            if (preview) {
+                preview.textContent = text;
+            }
+        }
+        window._updateReqPreview = _updateReqPreview;
+
+        /**
+         * Internal: reads textarea value and calls saveRequirementsEdit.
+         */
+        function _saveCurrentReqEdit() {
+            var textarea = document.getElementById('req-editor-textarea');
+            var agentId = window.currentEditAgentId;
+            if (textarea && agentId) {
+                saveRequirementsEdit(agentId, textarea.value);
+            }
+        }
+        window._saveCurrentReqEdit = _saveCurrentReqEdit;
+
+        /**
+         * Enters requirements edit mode for the given agent.
+         * Only available when agent is paused.
+         * @param {string} agentId
+         */
+        function enterRequirementsEditMode(agentId) {
+            if (!isAgentPaused(agentId)) return;
+            window.currentEditAgentId = agentId;
+            currentEditAgentId = agentId;
+
+            var agent = (state.agents || []).find(function(a) {
+                return (a.id || a.name) === agentId;
+            });
+            var ticket = agent && agent.active_task
+                ? (agent.active_task.ticket_key || agent.ticket || null)
+                : (agent ? (agent.ticket || null) : null);
+
+            var currentText = '';
+            if (ticket) {
+                if (window.editedRequirements[ticket]) {
+                    currentText = window.editedRequirements[ticket];
+                } else if (mockRequirements[ticket]) {
+                    var sources = mockRequirements[ticket].sources || [];
+                    currentText = sources.map(function(s) {
+                        return (s.label ? '## ' + s.label + '\n' : '') + (s.text || '');
+                    }).join('\n\n');
+                }
+            }
+
+            var modal = document.getElementById('requirements-modal');
+            if (modal) modal.classList.add('req-edit-mode');
+
+            var modalBody = document.getElementById('requirements-modal-body');
+            if (modalBody) {
+                modalBody.innerHTML = renderRequirementsEditor(currentText);
+            }
+
+            var editBtn = document.getElementById('req-edit-trigger-btn');
+            if (editBtn) editBtn.style.display = 'none';
+        }
+        window.enterRequirementsEditMode = enterRequirementsEditMode;
+
+        /**
+         * Exits requirements edit mode and returns to view mode.
+         */
+        function exitRequirementsEditMode() {
+            var modal = document.getElementById('requirements-modal');
+            if (modal) modal.classList.remove('req-edit-mode');
+            if (window.currentEditAgentId) {
+                openRequirementsView(window.currentEditAgentId);
+            }
+        }
+        window.exitRequirementsEditMode = exitRequirementsEditMode;
+
+        /**
+         * Saves the edited requirements text for the agent's ticket.
+         * @param {string} agentId
+         * @param {string} text - New requirements text
+         */
+        function saveRequirementsEdit(agentId, text) {
+            var agent = (state.agents || []).find(function(a) {
+                return (a.id || a.name) === agentId;
+            });
+            var ticket = agent && agent.active_task
+                ? (agent.active_task.ticket_key || agent.ticket || null)
+                : (agent ? (agent.ticket || null) : null);
+
+            if (ticket) {
+                window.editedRequirements[ticket] = text;
+                editedRequirements[ticket] = text;
+
+                // Update mockRequirements sources with new text
+                if (mockRequirements[ticket]) {
+                    mockRequirements[ticket].sources = [
+                        { label: 'Edited Requirements', text: text }
+                    ];
+                } else {
+                    mockRequirements[ticket] = {
+                        ticket: ticket,
+                        title: ticket,
+                        sources: [{ label: 'Edited Requirements', text: text }]
+                    };
+                }
+
+                addSystemMessage('Requirements updated for ticket ' + ticket);
+            }
+
+            exitRequirementsEditMode();
+        }
+        window.saveRequirementsEdit = saveRequirementsEdit;
+
+        /**
+         * Discards the current requirements edit and returns to view mode.
+         */
+        function discardRequirementsEdit() {
+            addSystemMessage('Requirement edit discarded');
+            exitRequirementsEditMode();
+        }
+        window.discardRequirementsEdit = discardRequirementsEdit;
+
+        /**
+         * Shows the resume confirmation dialog for an agent with edited requirements.
+         * @param {string} agentId
+         */
+        function showResumeConfirmation(agentId) {
+            var dialog = document.getElementById('req-confirm-dialog');
+            var confirmText = document.getElementById('req-confirm-text');
+            var agent = (state.agents || []).find(function(a) {
+                return (a.id || a.name) === agentId;
+            });
+            var agentName = agent ? (agent.name || agentId) : agentId;
+
+            if (confirmText) {
+                confirmText.textContent = 'The requirements for ' + agentName
+                    + ' have been edited. Resume the agent with the updated instructions?';
+            }
+
+            if (dialog) {
+                dialog.classList.add('visible');
+                var yesBtn = document.getElementById('req-confirm-yes-btn');
+                if (yesBtn) {
+                    yesBtn.onclick = function() { confirmResumeWithEdits(agentId); };
+                }
+            }
+        }
+        window.showResumeConfirmation = showResumeConfirmation;
+
+        /**
+         * Confirms resuming an agent with edited requirements.
+         * @param {string} agentId
+         */
+        function confirmResumeWithEdits(agentId) {
+            var dialog = document.getElementById('req-confirm-dialog');
+            if (dialog) dialog.classList.remove('visible');
+            resumeAgent(agentId);
+            closeRequirementsView();
+        }
+        window.confirmResumeWithEdits = confirmResumeWithEdits;
 
         function handleAgentClick(event) {
             const agentItem = event.target.closest('.agent-item');
@@ -4406,6 +4752,11 @@
             document.getElementById('requirements-close-btn').addEventListener('click', closeRequirementsView);
             document.getElementById('requirements-overlay').addEventListener('click', function(e) {
                 if (e.target === this) closeRequirementsView();
+            });
+
+            // Requirement editor confirm dialog cancel (AI-155/156)
+            document.getElementById('req-confirm-no-btn').addEventListener('click', function() {
+                document.getElementById('req-confirm-dialog').classList.remove('visible');
             });
 
             // WebSocket integration for real-time activity events
