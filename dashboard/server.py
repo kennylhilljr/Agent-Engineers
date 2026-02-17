@@ -65,6 +65,7 @@ import json
 import logging
 import os
 import re
+import signal
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Set
@@ -1529,37 +1530,100 @@ class DashboardServer:
         self.websockets.clear()
         logger.info("WebSocket cleanup complete")
 
+    def _print_startup_banner(self):
+        """Print a startup banner listing all available endpoints."""
+        base = f"http://{self.host}:{self.port}"
+        ws_base = f"ws://{self.host}:{self.port}"
+        logger.info("=" * 60)
+        logger.info(f"  Agent Status Dashboard Server")
+        logger.info(f"  Listening on {base}")
+        logger.info("=" * 60)
+        logger.info("  SPA:")
+        logger.info(f"    GET  {base}/")
+        logger.info("  Health:")
+        logger.info(f"    GET  {base}/health")
+        logger.info("  Metrics:")
+        logger.info(f"    GET  {base}/api/metrics")
+        logger.info(f"    GET  {base}/api/agents/{{name}}")
+        logger.info("  Requirements:")
+        logger.info(f"    GET  {base}/api/requirements/{{ticket_key}}")
+        logger.info(f"    PUT  {base}/api/requirements/{{ticket_key}}")
+        logger.info("  Reasoning (AI-158/160):")
+        logger.info(f"    POST {base}/api/reasoning")
+        logger.info(f"    GET  {base}/api/reasoning/blocks")
+        logger.info("  Agent Thinking (AI-159):")
+        logger.info(f"    POST {base}/api/agent-thinking")
+        logger.info("  Decisions (AI-161/162):")
+        logger.info(f"    POST {base}/api/decisions")
+        logger.info(f"    GET  {base}/api/decisions")
+        logger.info(f"    GET  {base}/api/decisions/summary")
+        logger.info(f"    GET  {base}/api/decisions/export")
+        logger.info(f"    GET  {base}/api/decisions/{{id}}")
+        logger.info("  Code Streaming (AI-163):")
+        logger.info(f"    POST {base}/api/code-stream")
+        logger.info(f"    GET  {base}/api/code-streams")
+        logger.info(f"    GET  {base}/api/code-streams/{{id}}")
+        logger.info("  File Changes (AI-164):")
+        logger.info(f"    POST {base}/api/file-changes")
+        logger.info(f"    GET  {base}/api/file-changes")
+        logger.info(f"    GET  {base}/api/file-changes/{{session_id}}")
+        logger.info("  Test Results (AI-165):")
+        logger.info(f"    POST {base}/api/test-results")
+        logger.info(f"    GET  {base}/api/test-results")
+        logger.info(f"    GET  {base}/api/test-results/{{ticket}}")
+        logger.info("  WebSocket:")
+        logger.info(f"    WS   {ws_base}/ws  (broadcast interval: {self.broadcast_interval}s)")
+        logger.info("=" * 60)
+        logger.info("  Press Ctrl+C to stop")
+        logger.info("=" * 60)
+
     def run(self):
         """Start the HTTP server with WebSocket support.
 
-        Runs the aiohttp application and blocks until server is stopped.
+        Runs the aiohttp application using an AppRunner with graceful signal-based
+        shutdown handling (SIGINT / SIGTERM).  Blocks until the server is stopped.
         """
-        logger.info(f"Starting Dashboard Server on {self.host}:{self.port}")
-        logger.info(f"Endpoints available:")
-        logger.info(f"  GET  {self.host}:{self.port}/health")
-        logger.info(f"  GET  {self.host}:{self.port}/api/metrics")
-        logger.info(f"  GET  {self.host}:{self.port}/api/agents/<name>")
-        logger.info(f"  WS   ws://{self.host}:{self.port}/ws")
-        logger.info("")
-        logger.info("WebSocket Real-Time Updates:")
-        logger.info(f"  Broadcast interval: {self.broadcast_interval}s")
-        logger.info(f"  Auto-reconnect supported with exponential backoff")
-        logger.info("")
-        logger.info("A2UI Component Integration:")
-        logger.info("  Components: TaskCard, ProgressRing, ActivityItem, ErrorCard")
-        logger.info("  Location: /Users/bkh223/Documents/GitHub/agent-engineers/reusable/a2ui-components/")
-        logger.info("")
-        logger.info("Press Ctrl+C to stop the server")
+        self._print_startup_banner()
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        stop_event = asyncio.Event()
+
+        def _handle_signal():
+            logger.info("Shutdown signal received — stopping server gracefully…")
+            stop_event.set()
+
+        async def _run():
+            runner = web.AppRunner(self.app)
+            await runner.setup()
+            site = web.TCPSite(runner, self.host, self.port)
+            await site.start()
+            logger.info(f"Server started on http://{self.host}:{self.port}")
+
+            # Register OS signal handlers for graceful shutdown
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                try:
+                    loop.add_signal_handler(sig, _handle_signal)
+                except (NotImplementedError, RuntimeError):
+                    # add_signal_handler is not available on Windows
+                    pass
+
+            try:
+                await stop_event.wait()
+            except asyncio.CancelledError:
+                pass
+            finally:
+                logger.info("Shutting down server…")
+                await runner.cleanup()
+                logger.info("Server stopped.")
 
         try:
-            web.run_app(
-                self.app,
-                host=self.host,
-                port=self.port,
-                print=None  # Disable aiohttp's default logging
-            )
+            loop.run_until_complete(_run())
         except KeyboardInterrupt:
-            logger.info("Server stopped by user")
+            logger.info("Server stopped by user (KeyboardInterrupt)")
+        finally:
+            loop.close()
 
 
 def main():
