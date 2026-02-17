@@ -1625,6 +1625,161 @@
                 min-width: 280px;
             }
         }
+
+        /* ========================================
+           LIVE ACTIVITY FEED ENHANCEMENTS (AI-150)
+           ======================================== */
+
+        .activity-feed-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .activity-feed-title-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .activity-feed-live-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--accent-green);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .activity-feed-live-indicator::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: var(--accent-green);
+            border-radius: 50%;
+            animation: live-pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes live-pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.8); }
+        }
+
+        .activity-feed-count {
+            display: inline-flex;
+            align-items: center;
+            background: var(--bg-tertiary);
+            color: var(--text-muted);
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 0.15rem 0.5rem;
+            border-radius: 9999px;
+            border: 1px solid var(--border-color);
+            white-space: nowrap;
+        }
+
+        .activity-feed-filters {
+            display: flex;
+            gap: 0.25rem;
+            flex-wrap: wrap;
+        }
+
+        .activity-filter-btn {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s, border-color 0.15s;
+        }
+
+        .activity-filter-btn:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .activity-filter-btn.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: #fff;
+        }
+
+        /* Enhanced activity item for richer fields */
+        .activity-item {
+            display: flex;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            font-size: 0.85rem;
+            align-items: center;
+        }
+
+        .activity-ticket {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--accent-blue-light);
+            font-family: monospace;
+            flex-shrink: 0;
+        }
+
+        .activity-description {
+            flex: 1;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .activity-duration {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+
+        /* Status icon styles */
+        .status-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.1em;
+            height: 1.1em;
+            font-size: 0.85em;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .status-icon.success {
+            color: var(--accent-green);
+        }
+
+        .status-icon.error {
+            color: var(--accent-red);
+        }
+
+        .status-icon.running {
+            color: var(--accent-yellow);
+            animation: spin 1.5s linear infinite;
+        }
+
+        .status-icon.pending {
+            color: var(--text-muted);
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -1688,9 +1843,21 @@
                 </section>
 
                 <!-- Activity Feed -->
-                <section class="panel-section">
-                    <h2 class="panel-section-title">Activity Feed</h2>
-                    <div class="activity-feed" id="activity-feed">
+                <section class="panel-section" id="activity-feed-section">
+                    <div class="activity-feed-header">
+                        <div class="activity-feed-title-row">
+                            <h2 class="panel-section-title" style="margin-bottom:0">Activity Feed</h2>
+                            <span class="activity-feed-live-indicator" id="activity-live-indicator">LIVE</span>
+                            <span class="activity-feed-count" id="activity-count-badge">0 events</span>
+                        </div>
+                        <div class="activity-feed-filters" id="activity-filter-controls" aria-label="Filter activity feed">
+                            <button class="activity-filter-btn active" data-filter="all">All</button>
+                            <button class="activity-filter-btn" data-filter="success">Success</button>
+                            <button class="activity-filter-btn" data-filter="error">Error</button>
+                            <button class="activity-filter-btn" data-filter="running">Running</button>
+                        </div>
+                    </div>
+                    <div class="activity-feed" id="activity-feed" aria-live="polite" aria-label="Live activity feed">
                         <!-- Activity items will be populated by JavaScript -->
                     </div>
                 </section>
@@ -1975,17 +2142,147 @@
             }).join('');
         };
 
+        // ========================================
+        // LIVE ACTIVITY FEED (AI-150 REQ-FEED-001)
+        // ========================================
+
+        /** Current filter: 'all' | 'success' | 'error' | 'running' */
+        window.activityFilter = 'all';
+
+        /** Buffer for incoming real-time events before they merge into state */
+        window.liveActivityBuffer = [];
+
+        /** Maximum number of activity items to keep in state to prevent memory issues */
+        window.MAX_ACTIVITY_ITEMS = 100;
+
+        /**
+         * Returns an HTML status icon span based on the event status string.
+         * @param {string} status
+         * @returns {string} HTML string
+         */
+        function getStatusIcon(status) {
+            const s = (status || '').toLowerCase();
+            if (s === 'done' || s === 'success' || s === 'completed') {
+                return '<span class="status-icon success">✓</span>';
+            }
+            if (s === 'error' || s === 'failed') {
+                return '<span class="status-icon error">✗</span>';
+            }
+            if (s === 'running' || s === 'in_progress' || s === 'active') {
+                return '<span class="status-icon running">⟳</span>';
+            }
+            return '<span class="status-icon pending">○</span>';
+        }
+        window.getStatusIcon = getStatusIcon;
+
+        /**
+         * Filters an activities array by the given filter key.
+         * @param {Array} activities
+         * @param {string} filter - 'all' | 'success' | 'error' | 'running'
+         * @returns {Array}
+         */
+        function filterActivities(activities, filter) {
+            if (!filter || filter === 'all') return activities;
+            if (filter === 'success') {
+                return activities.filter(a => {
+                    const s = (a.status || '').toLowerCase();
+                    return s === 'done' || s === 'success' || s === 'completed';
+                });
+            }
+            if (filter === 'error') {
+                return activities.filter(a => {
+                    const s = (a.status || '').toLowerCase();
+                    return s === 'error' || s === 'failed';
+                });
+            }
+            if (filter === 'running') {
+                return activities.filter(a => {
+                    const s = (a.status || '').toLowerCase();
+                    return s === 'running' || s === 'in_progress' || s === 'active';
+                });
+            }
+            return activities;
+        }
+        window.filterActivities = filterActivities;
+
+        /**
+         * Updates the current activity filter, refreshes button active states, and re-renders.
+         * @param {string} filter
+         */
+        function setActivityFilter(filter) {
+            window.activityFilter = filter;
+            const controls = document.getElementById('activity-filter-controls');
+            if (controls) {
+                controls.querySelectorAll('.activity-filter-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.filter === filter);
+                });
+            }
+            renderActivities();
+        }
+        window.setActivityFilter = setActivityFilter;
+
+        /**
+         * Adds a new live event to state.activities (prepends to front, caps at MAX_ACTIVITY_ITEMS).
+         * @param {Object} event
+         */
+        function addLiveActivityEvent(event) {
+            state.activities.unshift(event);
+            if (state.activities.length > window.MAX_ACTIVITY_ITEMS) {
+                state.activities = state.activities.slice(0, window.MAX_ACTIVITY_ITEMS);
+            }
+            renderActivities();
+            updateActivityCount();
+        }
+        window.addLiveActivityEvent = addLiveActivityEvent;
+
+        /**
+         * Updates the event count badge to reflect the current number of activities.
+         */
+        function updateActivityCount() {
+            const badge = document.getElementById('activity-count-badge');
+            if (badge) {
+                const count = state.activities.length;
+                badge.textContent = count + (count === 1 ? ' event' : ' events');
+            }
+        }
+        window.updateActivityCount = updateActivityCount;
+
         function renderActivities() {
             const activityFeed = document.getElementById('activity-feed');
-            activityFeed.innerHTML = state.activities.map(activity => `
+            if (!activityFeed) return;
+
+            // Sort activities latest-first by timestamp if available
+            let activities = state.activities.slice().sort((a, b) => {
+                const ta = a.timestamp || a.started_at || a.time || '';
+                const tb = b.timestamp || b.started_at || b.time || '';
+                if (ta && tb) return tb > ta ? 1 : tb < ta ? -1 : 0;
+                return 0;
+            });
+
+            // Apply current filter
+            const filtered = filterActivities(activities, window.activityFilter);
+
+            activityFeed.innerHTML = filtered.map(activity => {
+                const timeStr = activity.time || (activity.timestamp
+                    ? (() => { try { return new Date(activity.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); } catch(e) { return activity.timestamp; } })()
+                    : '—');
+                const agentName = escapeHtml(activity.agent || activity.agent_name || '—');
+                const ticketKey = escapeHtml(activity.task || activity.ticket_key || '—');
+                const description = escapeHtml(activity.description || activity.task || '');
+                const duration = activity.duration ? escapeHtml(String(activity.duration)) : '';
+                const statusIcon = getStatusIcon(activity.status);
+                return `
                 <div class="activity-item fade-in">
-                    <span class="activity-time">${activity.time}</span>
-                    <span class="activity-agent">${activity.agent}</span>
-                    <span class="activity-status ${activity.status}">
-                        ${activity.status === 'success' ? '✓' : '✗'}
-                    </span>
-                </div>
-            `).join('');
+                    <span class="activity-time">${timeStr}</span>
+                    <span class="activity-agent">${agentName}</span>
+                    ${statusIcon}
+                    <span class="activity-ticket">${ticketKey}</span>
+                    ${description ? `<span class="activity-description">${description}</span>` : ''}
+                    ${duration ? `<span class="activity-duration">${duration}</span>` : ''}
+                </div>`;
+            }).join('');
+
+            updateActivityCount();
         }
 
         function addMessage(role, content) {
@@ -3613,6 +3910,41 @@
             // Render analytics charts (AI-149 REQ-METRICS-003)
             renderAllCharts();
 
+            // Activity filter button listener (AI-150 REQ-FEED-001)
+            document.getElementById('activity-filter-controls').addEventListener('click', function(e) {
+                const btn = e.target.closest('.activity-filter-btn');
+                if (btn) setActivityFilter(btn.dataset.filter);
+            });
+
+            // WebSocket integration for real-time activity events
+            // Connects to /ws if available, handles agent_event / activity message types
+            (function setupActivityWebSocket() {
+                const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = wsProtocol + '//' + location.host + '/ws';
+                let ws;
+                function connect() {
+                    try {
+                        ws = new WebSocket(wsUrl);
+                        ws.onmessage = function(event) {
+                            try {
+                                const msg = JSON.parse(event.data);
+                                if (msg.type === 'agent_event' || msg.type === 'activity') {
+                                    addLiveActivityEvent(msg.data || msg);
+                                }
+                            } catch(e) { /* ignore parse errors */ }
+                        };
+                        ws.onclose = function() {
+                            // Reconnect after 5s if connection drops
+                            setTimeout(connect, 5000);
+                        };
+                    } catch(e) { /* WebSocket not available */ }
+                }
+                // Only connect if not a file:// URL (tests / local dev)
+                if (location.protocol !== 'file:') {
+                    connect();
+                }
+            })();
+
             console.log('Agent Dashboard initialized successfully');
             console.log('- Provider switcher with 6 providers');
             console.log('- Provider status indicators via /api/providers');
@@ -3620,6 +3952,7 @@
             console.log('- Real-time agent polling via /api/agents/status');
             console.log('- Self-contained HTML/CSS/JavaScript');
             console.log('- Ready for backend integration');
+            console.log('- Live activity feed with real-time updates (AI-150)');
         }
 
         // Start the application when DOM is ready
