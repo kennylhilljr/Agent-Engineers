@@ -1548,6 +1548,83 @@
             max-height: 200px;
             overflow-y: auto;
         }
+
+        /* ========================================
+           ANALYTICS CHARTS
+           ======================================== */
+        .charts-section {
+            padding: 0;
+        }
+        .chart-container {
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+        }
+        .chart-container:last-child {
+            margin-bottom: 0;
+        }
+        .chart-title {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            padding: 0.6rem 0.75rem 0.3rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .chart-area {
+            padding: 0.5rem 0.25rem;
+            overflow-x: auto;
+            width: 100%;
+        }
+        .chart-area svg {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .chart-bar {
+            transition: opacity 0.15s ease;
+        }
+        .chart-bar:hover {
+            opacity: 0.85;
+        }
+        .chart-bar-label {
+            font-size: 0.72rem;
+            fill: var(--text-secondary);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        .chart-line {
+            fill: none;
+            stroke: var(--accent-blue);
+            stroke-width: 2;
+        }
+        .chart-axis {
+            stroke: var(--border-color);
+        }
+        .chart-axis-label {
+            font-size: 0.65rem;
+            fill: var(--text-muted);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        .chart-grid {
+            stroke: rgba(71, 85, 105, 0.4);
+            stroke-dasharray: 3 3;
+        }
+        .chart-dot {
+            fill: var(--accent-blue);
+            stroke: var(--bg-primary);
+            stroke-width: 1.5;
+        }
+        /* Responsive: on small screens charts stay scrollable */
+        @media (max-width: 768px) {
+            .chart-area {
+                overflow-x: scroll;
+            }
+            .chart-area svg {
+                min-width: 280px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1630,6 +1707,23 @@
                     </div>
                     <div class="leaderboard-list" id="leaderboard-list" aria-live="polite">
                         <!-- TaskCards will be populated by renderLeaderboard() -->
+                    </div>
+                </section>
+
+                <!-- Analytics Charts -->
+                <section class="panel-section charts-section" id="charts-section">
+                    <h2 class="panel-section-title">Analytics Charts</h2>
+                    <div class="chart-container" id="token-usage-chart-container">
+                        <div class="chart-title">Token Usage by Agent</div>
+                        <div class="chart-area" id="token-usage-chart"></div>
+                    </div>
+                    <div class="chart-container" id="cost-trend-chart-container">
+                        <div class="chart-title">Cost Trend (Recent Sessions)</div>
+                        <div class="chart-area" id="cost-trend-chart"></div>
+                    </div>
+                    <div class="chart-container" id="success-rate-chart-container">
+                        <div class="chart-title">Success Rate by Agent</div>
+                        <div class="chart-area" id="success-rate-chart"></div>
                     </div>
                 </section>
             </aside>
@@ -3248,6 +3342,221 @@
         // ========================================
         // INITIALIZATION
         // ========================================
+        // ANALYTICS CHARTS (AI-149 REQ-METRICS-003)
+        // ========================================
+
+        const mockChartData = {
+            tokensByAgent: [
+                { name: 'Coding',      tokens: 48200 },
+                { name: 'PR Reviewer', tokens: 37600 },
+                { name: 'Research',    tokens: 29800 },
+                { name: 'Orchestrator', tokens: 24100 },
+                { name: 'Docs Writer', tokens: 19300 },
+                { name: 'Linear',      tokens: 15400 },
+                { name: 'GitHub',      tokens: 12800 },
+                { name: 'Slack',       tokens: 9700 },
+                { name: 'Ops',         tokens: 8200 },
+                { name: 'Tester',      tokens: 7600 },
+                { name: 'Security',    tokens: 5400 },
+                { name: 'Analytics',   tokens: 3900 },
+                { name: 'Deploy',      tokens: 2100 }
+            ],
+            costTrend: [
+                { session: 'S1', cost: 0.042 },
+                { session: 'S2', cost: 0.078 },
+                { session: 'S3', cost: 0.055 },
+                { session: 'S4', cost: 0.121 },
+                { session: 'S5', cost: 0.093 },
+                { session: 'S6', cost: 0.147 },
+                { session: 'S7', cost: 0.109 },
+                { session: 'S8', cost: 0.163 }
+            ],
+            successRates: [
+                { name: 'GitHub',      rate: 96 },
+                { name: 'Slack',       rate: 94 },
+                { name: 'Linear',      rate: 91 },
+                { name: 'Deploy',      rate: 88 },
+                { name: 'Orchestrator', rate: 85 },
+                { name: 'Ops',         rate: 83 },
+                { name: 'Security',    rate: 79 },
+                { name: 'PR Reviewer', rate: 74 },
+                { name: 'Coding',      rate: 71 },
+                { name: 'Tester',      rate: 68 },
+                { name: 'Research',    rate: 62 },
+                { name: 'Analytics',   rate: 58 },
+                { name: 'Docs Writer', rate: 44 }
+            ]
+        };
+        window.mockChartData = mockChartData;
+
+        function renderTokenUsageChart(data) {
+            const items = [...data].sort((a, b) => b.tokens - a.tokens).slice(0, 10);
+            const maxTokens = items[0] ? items[0].tokens : 1;
+            const rowH = 22;
+            const labelW = 72;
+            const barMaxW = 180;
+            const valW = 48;
+            const padTop = 8;
+            const padBot = 8;
+            const totalH = padTop + items.length * rowH + padBot;
+            const svgW = labelW + barMaxW + valW + 16;
+
+            let rows = '';
+            items.forEach((item, i) => {
+                const y = padTop + i * rowH;
+                const barW = Math.max(2, Math.round((item.tokens / maxTokens) * barMaxW));
+                const midY = y + rowH / 2;
+                rows += `<text class="chart-bar-label" x="${labelW - 4}" y="${midY + 4}" text-anchor="end">${item.name}</text>`;
+                rows += `<rect class="chart-bar" x="${labelW}" y="${y + 3}" width="${barW}" height="${rowH - 8}" rx="2" fill="#3b82f6" opacity="0.85"/>`;
+                const valStr = item.tokens >= 1000 ? (item.tokens / 1000).toFixed(1) + 'k' : String(item.tokens);
+                rows += `<text class="chart-bar-label" x="${labelW + barW + 4}" y="${midY + 4}">${valStr}</text>`;
+            });
+
+            const svg = `<svg viewBox="0 0 ${svgW} ${totalH}" width="100%" height="auto" aria-label="Token usage by agent" role="img">
+  <title>Token Usage by Agent</title>
+  ${rows}
+</svg>`;
+            const el = document.getElementById('token-usage-chart');
+            if (el) el.innerHTML = svg;
+            return svg;
+        }
+        window.renderTokenUsageChart = renderTokenUsageChart;
+
+        function renderCostTrendChart(data) {
+            const padL = 42;
+            const padR = 16;
+            const padT = 14;
+            const padB = 28;
+            const chartW = 360;
+            const chartH = 130;
+            const svgW = chartW;
+            const svgH = chartH;
+            const innerW = chartW - padL - padR;
+            const innerH = chartH - padT - padB;
+
+            const maxCost = Math.max(...data.map(d => d.cost)) * 1.15;
+            const minCost = 0;
+            const n = data.length;
+
+            const xStep = n > 1 ? innerW / (n - 1) : innerW;
+
+            const toX = i => padL + (n > 1 ? i * xStep : innerW / 2);
+            const toY = v => padT + innerH - ((v - minCost) / (maxCost - minCost)) * innerH;
+
+            // Grid lines (4 horizontal)
+            let gridLines = '';
+            const gridCount = 4;
+            for (let g = 0; g <= gridCount; g++) {
+                const gy = padT + (g / gridCount) * innerH;
+                const gv = maxCost - (g / gridCount) * (maxCost - minCost);
+                gridLines += `<line class="chart-grid" x1="${padL}" y1="${gy}" x2="${padL + innerW}" y2="${gy}"/>`;
+                gridLines += `<text class="chart-axis-label" x="${padL - 4}" y="${gy + 3.5}" text-anchor="end">$${gv.toFixed(2)}</text>`;
+            }
+
+            // Polyline
+            const pts = data.map((d, i) => `${toX(i)},${toY(d.cost)}`).join(' ');
+            const polyline = `<polyline class="chart-line" points="${pts}" stroke="#3b82f6" stroke-width="2" fill="none"/>`;
+
+            // Dots
+            let dots = '';
+            data.forEach((d, i) => {
+                dots += `<circle class="chart-dot" cx="${toX(i)}" cy="${toY(d.cost)}" r="3.5"/>`;
+            });
+
+            // X axis labels
+            let xLabels = '';
+            data.forEach((d, i) => {
+                xLabels += `<text class="chart-axis-label" x="${toX(i)}" y="${padT + innerH + 14}" text-anchor="middle">${d.session}</text>`;
+            });
+
+            // Axes
+            const xAxis = `<line class="chart-axis" x1="${padL}" y1="${padT + innerH}" x2="${padL + innerW}" y2="${padT + innerH}"/>`;
+            const yAxis = `<line class="chart-axis" x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + innerH}"/>`;
+
+            const svg = `<svg viewBox="0 0 ${svgW} ${svgH}" width="100%" height="auto" aria-label="Cost trend over recent sessions" role="img">
+  <title>Cost Trend (Recent Sessions)</title>
+  ${gridLines}
+  ${xAxis}
+  ${yAxis}
+  ${polyline}
+  ${dots}
+  ${xLabels}
+</svg>`;
+            const el = document.getElementById('cost-trend-chart');
+            if (el) el.innerHTML = svg;
+            return svg;
+        }
+        window.renderCostTrendChart = renderCostTrendChart;
+
+        function renderSuccessRateChart(data) {
+            const items = [...data].sort((a, b) => b.rate - a.rate);
+            const n = items.length;
+            const padL = 10;
+            const padR = 10;
+            const padT = 12;
+            const padB = 36;
+            const barW = 18;
+            const barGap = 6;
+            const maxH = 100;
+            const innerW = n * (barW + barGap) - barGap;
+            const svgW = padL + innerW + padR;
+            const svgH = padT + maxH + padB;
+
+            let bars = '';
+            items.forEach((item, i) => {
+                const x = padL + i * (barW + barGap);
+                const bh = Math.max(2, Math.round((item.rate / 100) * maxH));
+                const y = padT + maxH - bh;
+                const fill = item.rate > 80 ? '#10b981' : item.rate >= 50 ? '#f59e0b' : '#ef4444';
+                bars += `<rect class="chart-bar" x="${x}" y="${y}" width="${barW}" height="${bh}" rx="2" fill="${fill}" opacity="0.88"/>`;
+                // Rate label on top
+                bars += `<text class="chart-axis-label" x="${x + barW / 2}" y="${y - 3}" text-anchor="middle">${item.rate}%</text>`;
+                // Agent name label (rotated)
+                const labelY = padT + maxH + 14;
+                const shortName = item.name.length > 6 ? item.name.slice(0, 5) + '\u2026' : item.name;
+                bars += `<text class="chart-axis-label" x="${x + barW / 2}" y="${labelY}" text-anchor="end" transform="rotate(-40,${x + barW / 2},${labelY})">${shortName}</text>`;
+            });
+
+            // Baseline axis
+            const xAxis = `<line class="chart-axis" x1="${padL}" y1="${padT + maxH}" x2="${padL + innerW}" y2="${padT + maxH}"/>`;
+
+            const svg = `<svg viewBox="0 0 ${svgW} ${svgH}" width="100%" height="auto" aria-label="Success rate by agent" role="img">
+  <title>Success Rate by Agent</title>
+  ${xAxis}
+  ${bars}
+</svg>`;
+            const el = document.getElementById('success-rate-chart');
+            if (el) el.innerHTML = svg;
+            return svg;
+        }
+        window.renderSuccessRateChart = renderSuccessRateChart;
+
+        function renderAllCharts(data) {
+            const d = data || window.mockChartData;
+            renderTokenUsageChart(d.tokensByAgent);
+            renderCostTrendChart(d.costTrend);
+            renderSuccessRateChart(d.successRates);
+        }
+        window.renderAllCharts = renderAllCharts;
+
+        async function loadCharts() {
+            try {
+                const resp = await fetch('/api/metrics');
+                if (!resp.ok) throw new Error('metrics fetch failed');
+                const apiData = await resp.json();
+                const chartData = {
+                    tokensByAgent: apiData.tokensByAgent || window.mockChartData.tokensByAgent,
+                    costTrend: apiData.costTrend || window.mockChartData.costTrend,
+                    successRates: apiData.successRates || window.mockChartData.successRates
+                };
+                renderAllCharts(chartData);
+            } catch (e) {
+                renderAllCharts(window.mockChartData);
+            }
+        }
+        window.loadCharts = loadCharts;
+
+        // ========================================
         function init() {
             // Initialize state
             state.agents = [...mockAgents];
@@ -3300,6 +3609,9 @@
 
             // Load global metrics from /api/metrics
             loadGlobalMetrics();
+
+            // Render analytics charts (AI-149 REQ-METRICS-003)
+            renderAllCharts();
 
             console.log('Agent Dashboard initialized successfully');
             console.log('- Provider switcher with 6 providers');
