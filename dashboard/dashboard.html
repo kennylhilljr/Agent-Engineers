@@ -4,6 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Agent Status Dashboard</title>
+    <!-- Prism.js for syntax highlighting - AI-99 -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markdown.min.js"></script>
     <style>
         /* Reset and Base Styles */
         * {
@@ -1431,6 +1440,220 @@
                 transform: translateY(-8px);
                 opacity: 1;
             }
+        }
+
+        /* Code Streaming Styles - AI-99 */
+        .code-stream-container {
+            margin: 12px 0;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .code-stream-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: rgba(15, 23, 42, 0.8);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .code-stream-file-path {
+            font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+            font-size: 0.85rem;
+            color: #94a3b8;
+        }
+
+        .code-stream-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75rem;
+            color: #60a5fa;
+        }
+
+        .code-stream-status.streaming {
+            color: #10b981;
+        }
+
+        .code-stream-status.complete {
+            color: #94a3b8;
+        }
+
+        .streaming-indicator {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #10b981;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        .code-stream-body {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .code-stream-body::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .code-stream-body::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .code-stream-body::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.3);
+            border-radius: 3px;
+        }
+
+        .code-line {
+            display: flex;
+            font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            padding: 2px 0;
+            animation: codeAppear 0.2s ease;
+        }
+
+        @keyframes codeAppear {
+            from {
+                opacity: 0;
+                transform: translateX(-4px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .code-line-number {
+            display: inline-block;
+            min-width: 40px;
+            padding: 0 12px;
+            text-align: right;
+            color: #64748b;
+            user-select: none;
+            border-right: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .code-line-content {
+            flex: 1;
+            padding: 0 12px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        /* Diff highlighting */
+        .code-line.addition {
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .code-line.addition .code-line-content {
+            color: #10b981;
+        }
+
+        .code-line.addition::before {
+            content: '+';
+            color: #10b981;
+            padding: 0 8px;
+            font-weight: bold;
+        }
+
+        .code-line.deletion {
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .code-line.deletion .code-line-content {
+            color: #ef4444;
+            text-decoration: line-through;
+        }
+
+        .code-line.deletion::before {
+            content: '-';
+            color: #ef4444;
+            padding: 0 8px;
+            font-weight: bold;
+        }
+
+        .code-line.unchanged .code-line-content {
+            color: #cbd5e1;
+        }
+
+        /* Syntax highlighting colors (simple, no library needed initially) */
+        .token-keyword {
+            color: #c678dd;
+            font-weight: bold;
+        }
+
+        .token-string {
+            color: #98c379;
+        }
+
+        .token-comment {
+            color: #5c6370;
+            font-style: italic;
+        }
+
+        .token-function {
+            color: #61afef;
+        }
+
+        .token-number {
+            color: #d19a66;
+        }
+
+        .code-stream-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: rgba(15, 23, 42, 0.8);
+            border-top: 1px solid rgba(148, 163, 184, 0.2);
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+
+        .code-stats {
+            display: flex;
+            gap: 12px;
+        }
+
+        .code-stat {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .code-stat.additions {
+            color: #10b981;
+        }
+
+        .code-stat.deletions {
+            color: #ef4444;
+        }
+
+        .copy-code-button {
+            padding: 4px 10px;
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .copy-code-button:hover {
+            background: rgba(59, 130, 246, 0.25);
+            border-color: rgba(59, 130, 246, 0.5);
+        }
+
+        .copy-code-button.copied {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+            border-color: rgba(16, 185, 129, 0.3);
         }
     </style>
 </head>
@@ -2905,13 +3128,23 @@
         }
 
         /**
-         * Handle code stream message
-         * Shows live code generation (optional, for future enhancement)
+         * Handle code stream message - AI-99
+         * Shows live code generation with real-time streaming
          */
         function handleCodeStream(message) {
-            const { content, file_path, line_number, operation } = message;
+            const { content, file_path, line_number, operation, language } = message;
             console.log(`[CODE] ${operation} ${file_path}:${line_number}`);
-            // Future enhancement: show live code diff
+
+            // Forward to chat interface if it exists
+            if (window.chatInterface && window.chatInterface.codeStreamRenderer) {
+                window.chatInterface.codeStreamRenderer.addCodeChunk(
+                    content,
+                    file_path,
+                    line_number,
+                    operation,
+                    language || 'python'
+                );
+            }
         }
 
         /**
@@ -3608,12 +3841,258 @@
             }
         }
 
+        // ==========================================
+        // Code Stream Renderer - AI-99
+        // ==========================================
+
+        class CodeStreamRenderer {
+            constructor(chatInterface) {
+                this.chatInterface = chatInterface;
+                this.currentStream = null;
+                this.codeStreams = new Map(); // Track multiple file streams
+            }
+
+            /**
+             * Add a code chunk to the stream
+             * @param {string} content - Code content
+             * @param {string} filePath - File being edited
+             * @param {number} lineNumber - Line number
+             * @param {string} operation - 'add', 'modify', or 'delete'
+             * @param {string} language - Programming language
+             */
+            addCodeChunk(content, filePath, lineNumber, operation, language = 'python') {
+                const streamKey = filePath;
+
+                // Create new stream if doesn't exist
+                if (!this.codeStreams.has(streamKey)) {
+                    this.createCodeStream(filePath, language);
+                }
+
+                const stream = this.codeStreams.get(streamKey);
+
+                // Add the code line
+                this.addCodeLine(stream, content, lineNumber, operation, language);
+
+                // Update stats
+                this.updateStreamStats(stream, operation);
+
+                // Mark as streaming
+                this.markStreaming(stream);
+            }
+
+            /**
+             * Create a new code stream container
+             */
+            createCodeStream(filePath, language) {
+                const container = document.createElement('div');
+                container.className = 'code-stream-container';
+                container.setAttribute('data-testid', 'code-stream-container');
+                container.setAttribute('data-file-path', filePath);
+
+                container.innerHTML = `
+                    <div class="code-stream-header">
+                        <div class="code-stream-file-path" data-testid="code-stream-file-path">${this.escapeHtml(filePath)}</div>
+                        <div class="code-stream-status streaming" data-testid="code-stream-status">
+                            <div class="streaming-indicator"></div>
+                            <span>Streaming...</span>
+                        </div>
+                    </div>
+                    <div class="code-stream-body" data-testid="code-stream-body">
+                    </div>
+                    <div class="code-stream-footer">
+                        <div class="code-stats">
+                            <div class="code-stat additions" data-testid="code-additions">
+                                <span>+</span>
+                                <span class="additions-count">0</span>
+                            </div>
+                            <div class="code-stat deletions" data-testid="code-deletions">
+                                <span>-</span>
+                                <span class="deletions-count">0</span>
+                            </div>
+                        </div>
+                        <button class="copy-code-button" data-testid="copy-code-button">Copy Code</button>
+                    </div>
+                `;
+
+                // Add copy functionality
+                const copyButton = container.querySelector('.copy-code-button');
+                copyButton.addEventListener('click', () => this.copyCode(container));
+
+                // Add to chat messages
+                this.chatInterface.messagesContainer.appendChild(container);
+                this.chatInterface.scrollToBottom();
+
+                // Store stream reference
+                this.codeStreams.set(filePath, {
+                    container,
+                    body: container.querySelector('.code-stream-body'),
+                    additions: 0,
+                    deletions: 0,
+                    lines: []
+                });
+
+                return this.codeStreams.get(filePath);
+            }
+
+            /**
+             * Add a single code line to the stream
+             */
+            addCodeLine(stream, content, lineNumber, operation, language) {
+                const lineDiv = document.createElement('div');
+                lineDiv.className = `code-line ${operation}`;
+                lineDiv.setAttribute('data-testid', 'code-line');
+                lineDiv.setAttribute('data-operation', operation);
+                lineDiv.setAttribute('data-line-number', lineNumber);
+
+                // Apply syntax highlighting
+                const highlightedCode = this.highlightCode(content, language);
+
+                lineDiv.innerHTML = `
+                    <span class="code-line-number">${lineNumber}</span>
+                    <span class="code-line-content">${highlightedCode}</span>
+                `;
+
+                stream.body.appendChild(lineDiv);
+                stream.lines.push({ content, lineNumber, operation });
+
+                // Auto-scroll to bottom
+                stream.body.scrollTop = stream.body.scrollHeight;
+            }
+
+            /**
+             * Apply syntax highlighting to code
+             */
+            highlightCode(code, language) {
+                // Use Prism.js if available
+                if (typeof Prism !== 'undefined') {
+                    const grammar = Prism.languages[language] || Prism.languages.plaintext;
+                    try {
+                        return Prism.highlight(code, grammar, language);
+                    } catch (e) {
+                        console.warn('Prism highlighting failed:', e);
+                        return this.escapeHtml(code);
+                    }
+                }
+
+                // Fallback: simple highlighting
+                return this.simpleHighlight(code, language);
+            }
+
+            /**
+             * Simple syntax highlighting fallback
+             */
+            simpleHighlight(code, language) {
+                const escaped = this.escapeHtml(code);
+
+                if (language === 'python') {
+                    return escaped
+                        .replace(/\b(def|class|import|from|return|if|else|elif|for|while|try|except|finally|with|as|async|await)\b/g,
+                                '<span class="token-keyword">$1</span>')
+                        .replace(/(["'])(.*?)\1/g, '<span class="token-string">$1$2$1</span>')
+                        .replace(/#.*/g, '<span class="token-comment">$&</span>')
+                        .replace(/\b(\d+)\b/g, '<span class="token-number">$1</span>');
+                }
+
+                return escaped;
+            }
+
+            /**
+             * Update stream statistics
+             */
+            updateStreamStats(stream, operation) {
+                if (operation === 'add') {
+                    stream.additions++;
+                } else if (operation === 'delete') {
+                    stream.deletions++;
+                }
+
+                const additionsCount = stream.container.querySelector('.additions-count');
+                const deletionsCount = stream.container.querySelector('.deletions-count');
+
+                if (additionsCount) additionsCount.textContent = stream.additions;
+                if (deletionsCount) deletionsCount.textContent = stream.deletions;
+            }
+
+            /**
+             * Mark stream as actively streaming
+             */
+            markStreaming(stream) {
+                const status = stream.container.querySelector('.code-stream-status');
+                if (status) {
+                    status.className = 'code-stream-status streaming';
+                    status.innerHTML = `
+                        <div class="streaming-indicator"></div>
+                        <span>Streaming...</span>
+                    `;
+                }
+            }
+
+            /**
+             * Mark stream as complete
+             */
+            completeStream(filePath) {
+                const stream = this.codeStreams.get(filePath);
+                if (!stream) return;
+
+                const status = stream.container.querySelector('.code-stream-status');
+                if (status) {
+                    status.className = 'code-stream-status complete';
+                    status.innerHTML = `<span>Complete</span>`;
+                }
+            }
+
+            /**
+             * Copy code to clipboard
+             */
+            async copyCode(container) {
+                const lines = container.querySelectorAll('.code-line-content');
+                const code = Array.from(lines).map(line => line.textContent).join('\n');
+
+                try {
+                    await navigator.clipboard.writeText(code);
+                    const button = container.querySelector('.copy-code-button');
+                    button.textContent = 'Copied!';
+                    button.classList.add('copied');
+
+                    setTimeout(() => {
+                        button.textContent = 'Copy Code';
+                        button.classList.remove('copied');
+                    }, 2000);
+                } catch (err) {
+                    console.error('Failed to copy code:', err);
+                }
+            }
+
+            /**
+             * Escape HTML to prevent XSS
+             */
+            escapeHtml(text) {
+                const map = {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                };
+                return text.replace(/[&<>"']/g, m => map[m]);
+            }
+
+            /**
+             * Clear all streams
+             */
+            clearStreams() {
+                this.codeStreams.clear();
+                this.currentStream = null;
+            }
+        }
+
         let chatInterface;
 
         function initChat() {
             chatInterface = new ChatInterface();
+            chatInterface.codeStreamRenderer = new CodeStreamRenderer(chatInterface);
             window.chatInterface = chatInterface; // Expose for testing
-            console.log('Chat interface initialized');
+            console.log('Chat interface initialized with code streaming support');
         }
 
         // Start when DOM is ready
