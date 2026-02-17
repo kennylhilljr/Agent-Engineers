@@ -242,9 +242,12 @@ class TestDashboardServer(AioHTTPTestCase):
 
         html = await resp.text()
         assert "<!DOCTYPE html>" in html
-        assert "Agent Status Dashboard" in html
-        assert "loadDashboard()" in html  # Check for JavaScript
-        assert ".agent-card" in html  # Check for CSS
+        # Modern dashboard title (serves dashboard/index.html)
+        assert "Agent Dashboard" in html
+        # Modern dashboard has renderAgents function
+        assert "renderAgents" in html  # Check for JavaScript
+        # Modern dashboard has agent-list class
+        assert "agent-list" in html or "agent-item" in html  # Check for CSS
 
     @unittest_run_loop
     async def test_cors_headers(self):
@@ -279,20 +282,17 @@ class TestDashboardServer(AioHTTPTestCase):
 
         # Check for essential HTML structure
         assert "<!DOCTYPE html>" in html
-        assert "Agent Status Dashboard" in html  # Title is in the HTML, not necessarily in <title> tags
+        # Modern dashboard is served from dashboard/index.html
+        assert "Agent Dashboard" in html  # Title is in the HTML
 
-        # Check for CSS classes
-        assert "agent-card" in html
-        assert "agent-header" in html
-        assert "agent-stats" in html
+        # Check for CSS classes in modern dashboard
+        assert "agent-list" in html or "agent-item" in html
 
-        # Check for JavaScript functions
-        assert "loadDashboard" in html
+        # Check for JavaScript functions in modern dashboard
         assert "renderAgents" in html
-        assert "renderAgentCard" in html
 
-        # Check for API endpoints
-        assert "/api/metrics" in html
+        # Check for provider switcher (new in AI-135)
+        assert "provider-select" in html or "providerModels" in html
 
 
 class TestDashboardServerUnit:
