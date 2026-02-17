@@ -1,0 +1,140 @@
+AI-204 Performance Optimizations - Test Results
+================================================
+Date: 2026-02-17
+Branch: main
+
+SUBPROCESS/ASYNC PATTERN ANALYSIS
+-----------------------------------
+Identified sync subprocess.run usage in:
+  - bridges/windsurf_bridge.py (6 calls)
+  - bridges/gemini_bridge.py (3 calls, 1 Popen)
+  - bridges/openai_bridge.py (1 call)
+  - dashboard/collector.py (4 calls)
+  - daemon/worktree.py (1 call)
+
+Bridge send_message sync patterns identified in:
+  - bridges/kimi_bridge.py    (sync + async variant)
+  - bridges/groq_bridge.py    (sync + async variant)
+  - bridges/gemini_bridge.py  (sync + async variant)
+  - bridges/openai_bridge.py  (sync + async variant)
+
+FILES CREATED
+--------------
+1. /Users/bkh223/Documents/GitHub/agent-engineers/performance.py
+   - LRUCache: Thread-safe LRU cache with TTL support (OrderedDict-backed)
+   - cache_result: Decorator for caching function results with optional TTL
+   - AsyncConnectionPool: Async pool for subprocess/HTTP connections
+   - TokenCache: API authentication token cache with expiry
+   - get_api_cache(): Global API response cache singleton (maxsize=256, ttl=300s)
+   - get_token_cache(): Global token cache singleton
+
+2. /Users/bkh223/Documents/GitHub/agent-engineers/tests/test_performance.py
+   - 60 tests across 8 test classes
+
+TEST RESULTS
+-------------
+Platform: darwin -- Python 3.9.6, pytest-8.4.2
+Command: python -m pytest tests/test_performance.py -v --tb=short
+
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+
+tests/test_performance.py::TestLRUCacheBasic::test_get_missing_key_returns_none PASSED
+tests/test_performance.py::TestLRUCacheBasic::test_set_and_get_returns_value PASSED
+tests/test_performance.py::TestLRUCacheBasic::test_set_integer_value PASSED
+tests/test_performance.py::TestLRUCacheBasic::test_set_dict_value PASSED
+tests/test_performance.py::TestLRUCacheBasic::test_set_list_value PASSED
+tests/test_performance.py::TestLRUCacheBasic::test_set_none_value_stores_and_retrieves PASSED
+tests/test_performance.py::TestLRUCacheBasic::test_overwrite_existing_key PASSED
+tests/test_performance.py::TestLRUCacheBasic::test_size_starts_at_zero PASSED
+tests/test_performance.py::TestLRUCacheBasic::test_size_increments_on_set PASSED
+tests/test_performance.py::TestLRUCacheBasic::test_overwrite_does_not_increase_size PASSED
+tests/test_performance.py::TestLRUCacheEviction::test_evicts_oldest_when_full PASSED
+tests/test_performance.py::TestLRUCacheEviction::test_size_does_not_exceed_maxsize PASSED
+tests/test_performance.py::TestLRUCacheEviction::test_accessed_key_not_evicted_first PASSED
+tests/test_performance.py::TestLRUCacheEviction::test_maxsize_one_always_evicts_previous PASSED
+tests/test_performance.py::TestLRUCacheEviction::test_eviction_order_is_lru PASSED
+tests/test_performance.py::TestLRUCacheTTL::test_item_returned_before_expiry PASSED
+tests/test_performance.py::TestLRUCacheTTL::test_item_not_returned_after_ttl_expires PASSED
+tests/test_performance.py::TestLRUCacheTTL::test_expired_item_removed_from_cache PASSED
+tests/test_performance.py::TestLRUCacheTTL::test_no_ttl_items_never_expire PASSED
+tests/test_performance.py::TestLRUCacheInvalidateAndClear::test_invalidate_existing_key_returns_true PASSED
+tests/test_performance.py::TestLRUCacheInvalidateAndClear::test_invalidate_missing_key_returns_false PASSED
+tests/test_performance.py::TestLRUCacheInvalidateAndClear::test_invalidate_removes_key PASSED
+tests/test_performance.py::TestLRUCacheInvalidateAndClear::test_invalidate_reduces_size PASSED
+tests/test_performance.py::TestLRUCacheInvalidateAndClear::test_clear_removes_all_items PASSED
+tests/test_performance.py::TestLRUCacheInvalidateAndClear::test_clear_makes_all_keys_missing PASSED
+tests/test_performance.py::TestLRUCacheInvalidateAndClear::test_clear_on_empty_cache_does_not_raise PASSED
+tests/test_performance.py::TestLRUCacheStats::test_stats_contains_size_key PASSED
+tests/test_performance.py::TestLRUCacheStats::test_stats_contains_maxsize_key PASSED
+tests/test_performance.py::TestLRUCacheStats::test_stats_contains_ttl_key PASSED
+tests/test_performance.py::TestLRUCacheStats::test_stats_maxsize_matches_init PASSED
+tests/test_performance.py::TestLRUCacheStats::test_stats_ttl_matches_init PASSED
+tests/test_performance.py::TestLRUCacheStats::test_stats_ttl_none_when_not_set PASSED
+tests/test_performance.py::TestLRUCacheStats::test_stats_size_reflects_current_count PASSED
+tests/test_performance.py::TestCacheResultDecorator::test_cached_function_returns_correct_result PASSED
+tests/test_performance.py::TestCacheResultDecorator::test_cached_function_called_only_once_for_same_args PASSED
+tests/test_performance.py::TestCacheResultDecorator::test_cached_function_called_again_for_different_args PASSED
+tests/test_performance.py::TestCacheResultDecorator::test_cache_result_preserves_function_name PASSED
+tests/test_performance.py::TestCacheResultDecorator::test_cache_result_preserves_docstring PASSED
+tests/test_performance.py::TestCacheResultDecorator::test_cache_result_exposes_cache_attribute PASSED
+tests/test_performance.py::TestCacheResultDecorator::test_cache_result_with_kwargs PASSED
+tests/test_performance.py::TestCacheResultDecorator::test_cache_result_with_ttl_returns_fresh_after_expiry PASSED
+tests/test_performance.py::TestCacheResultDecorator::test_cache_result_with_ttl_uses_cache_before_expiry PASSED
+tests/test_performance.py::TestCacheResultDecorator::test_cache_result_maxsize_respected PASSED
+tests/test_performance.py::TestTokenCache::test_get_missing_provider_returns_none PASSED
+tests/test_performance.py::TestTokenCache::test_store_and_get_token PASSED
+tests/test_performance.py::TestTokenCache::test_expired_token_returns_none PASSED
+tests/test_performance.py::TestTokenCache::test_expired_token_removed_from_internal_store PASSED
+tests/test_performance.py::TestTokenCache::test_invalidate_removes_token PASSED
+tests/test_performance.py::TestTokenCache::test_invalidate_missing_provider_does_not_raise PASSED
+tests/test_performance.py::TestTokenCache::test_clear_removes_all_tokens PASSED
+tests/test_performance.py::TestTokenCache::test_clear_empties_internal_dict PASSED
+tests/test_performance.py::TestTokenCache::test_store_overwrites_existing_token PASSED
+tests/test_performance.py::TestTokenCache::test_default_expiry_is_3600 PASSED
+tests/test_performance.py::TestTokenCache::test_multiple_providers_independent PASSED
+tests/test_performance.py::TestGlobalSingletons::test_get_api_cache_returns_lru_cache PASSED
+tests/test_performance.py::TestGlobalSingletons::test_get_token_cache_returns_token_cache PASSED
+tests/test_performance.py::TestGlobalSingletons::test_get_api_cache_same_instance_each_call PASSED
+tests/test_performance.py::TestGlobalSingletons::test_get_token_cache_same_instance_each_call PASSED
+tests/test_performance.py::TestGlobalSingletons::test_api_cache_maxsize_is_256 PASSED
+tests/test_performance.py::TestGlobalSingletons::test_api_cache_ttl_is_300 PASSED
+
+============================== 60 passed in 0.46s ==============================
+
+SUMMARY
+--------
+Total tests: 60
+Passed:      60
+Failed:      0
+Duration:    0.46s
+
+OPTIMIZATIONS IMPLEMENTED
+--------------------------
+1. LRUCache (OrderedDict-backed, O(1) get/set/evict)
+   - TTL-based expiry for automatic cache invalidation
+   - Configurable maxsize (default 128)
+   - invalidate() for manual key removal
+   - clear() for full cache reset
+   - stats property for observability
+
+2. cache_result decorator
+   - Wraps any function with automatic result caching
+   - MD5-keyed on (args, sorted kwargs) for cache-safe hashing
+   - TTL support for time-bounded caching
+   - Preserves __name__ and __doc__ via functools.wraps
+   - Exposes _cache attribute for inspection/testing
+
+3. AsyncConnectionPool
+   - asyncio.Queue-based pool for reusable connections
+   - Configurable max_size and acquire timeout
+   - Prevents repeated TCP/subprocess connection setup overhead
+
+4. TokenCache
+   - Stores API tokens with monotonic-clock expiry
+   - Per-provider invalidation and global clear
+   - Default 3600s (1 hour) TTL matching typical OAuth token lifetimes
+
+5. Global singletons
+   - get_api_cache(): LRUCache(maxsize=256, ttl=300) for API responses
+   - get_token_cache(): TokenCache() for authentication tokens
