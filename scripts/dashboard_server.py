@@ -309,6 +309,19 @@ class DashboardServer:
                     except (ValueError, TypeError):
                         pass
 
+                # Build active_task if agent is running
+                active_task = None
+                if status == "running":
+                    current_ticket = stored.get("current_ticket") or stored.get("current_task")
+                    active_task = {
+                        "ticket_key": stored.get("current_ticket_key", current_ticket or ""),
+                        "title": stored.get("current_ticket_title", stored.get("current_task_title", "Working on task...")),
+                        "description": stored.get("current_ticket_description", ""),
+                        "started_at": last_active,  # ISO string for elapsed timer
+                        "tokens": stored.get("current_tokens", stored.get("session_tokens", 0)),
+                        "cost": stored.get("current_cost", stored.get("session_cost", 0.0)),
+                    }
+
                 agents_with_status.append({
                     "id": agent_id,
                     "name": agent_def["name"],
@@ -319,6 +332,7 @@ class DashboardServer:
                     "success_rate": stored.get("success_rate", 1.0),
                     "level": stored.get("level", 1),
                     "xp": stored.get("xp", 0),
+                    "active_task": active_task,
                 })
 
             return web.json_response({
@@ -342,6 +356,7 @@ class DashboardServer:
                     "success_rate": 1.0,
                     "level": 1,
                     "xp": 0,
+                    "active_task": None,
                 })
             return web.json_response({
                 "agents": agents,
