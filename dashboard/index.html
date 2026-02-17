@@ -655,6 +655,39 @@
             pointer-events: none;
         }
 
+        /* Enhanced Agent Status Panel */
+        .agent-details {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .agent-description {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            line-height: 1.3;
+        }
+        .agent-meta {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 2px;
+            min-width: 80px;
+        }
+        .agent-model-badge {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .agent-invocations {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+        .agent-status-text.running { color: var(--accent-green); }
+        .agent-status-text.idle { color: var(--text-muted); }
+        .agent-status-text.paused { color: var(--accent-yellow); }
+        .agent-status-text.error { color: var(--accent-red); }
+
         /* Tool Call Visualization */
         .tool-call-block {
             margin: 4px 0;
@@ -885,22 +918,22 @@
         };
 
         // ========================================
-        // MOCK DATA - 13 Agents from definitions.py
+        // AGENT ROSTER - 13 Agents from agents/definitions.py
         // ========================================
         const mockAgents = [
-            { name: 'coding', status: 'idle', task: null },
-            { name: 'coding_fast', status: 'idle', task: null },
-            { name: 'github', status: 'idle', task: null },
-            { name: 'linear', status: 'idle', task: null },
-            { name: 'slack', status: 'idle', task: null },
-            { name: 'ops', status: 'idle', task: null },
-            { name: 'pr_reviewer', status: 'idle', task: null },
-            { name: 'pr_reviewer_fast', status: 'idle', task: null },
-            { name: 'implementation_planning', status: 'idle', task: null },
-            { name: 'requirements_analysis', status: 'idle', task: null },
-            { name: 'integration', status: 'idle', task: null },
-            { name: 'migration', status: 'idle', task: null },
-            { name: 'security_review', status: 'idle', task: null }
+            { id: 'linear',          name: 'Linear',          model: 'haiku',  status: 'idle', description: 'Manages Linear issues and project status.', invocations: 0, level: 1 },
+            { id: 'coding',          name: 'Coding',          model: 'sonnet', status: 'idle', description: 'Writes and tests code for complex features.', invocations: 0, level: 1 },
+            { id: 'github',          name: 'GitHub',          model: 'haiku',  status: 'idle', description: 'Handles Git commits, branches, and PRs.', invocations: 0, level: 1 },
+            { id: 'slack',           name: 'Slack',           model: 'haiku',  status: 'idle', description: 'Sends Slack notifications to users.', invocations: 0, level: 1 },
+            { id: 'pr_reviewer',     name: 'PR Reviewer',     model: 'sonnet', status: 'idle', description: 'Reviews PRs for quality and correctness.', invocations: 0, level: 1 },
+            { id: 'ops',             name: 'Ops',             model: 'haiku',  status: 'idle', description: 'Composite ops: Linear + Slack + GitHub.', invocations: 0, level: 1 },
+            { id: 'coding_fast',     name: 'Coding Fast',     model: 'haiku',  status: 'idle', description: 'Fast coding for simple CSS, config changes.', invocations: 0, level: 1 },
+            { id: 'pr_reviewer_fast',name: 'PR Reviewer Fast',model: 'haiku',  status: 'idle', description: 'Fast reviewer for low-risk changes.', invocations: 0, level: 1 },
+            { id: 'chatgpt',         name: 'ChatGPT',         model: 'haiku',  status: 'idle', description: 'OpenAI GPT-4o, o1, o3-mini, o4-mini.', invocations: 0, level: 1 },
+            { id: 'gemini',          name: 'Gemini',          model: 'haiku',  status: 'idle', description: 'Google Gemini with 1M token context.', invocations: 0, level: 1 },
+            { id: 'groq',            name: 'Groq',            model: 'haiku',  status: 'idle', description: 'Ultra-fast Llama 3.3 70B via Groq LPU.', invocations: 0, level: 1 },
+            { id: 'kimi',            name: 'KIMI',            model: 'haiku',  status: 'idle', description: 'Moonshot AI with 2M token context.', invocations: 0, level: 1 },
+            { id: 'windsurf',        name: 'Windsurf',        model: 'haiku',  status: 'idle', description: 'Windsurf IDE for parallel coding tasks.', invocations: 0, level: 1 },
         ];
 
         const mockActivities = [
@@ -917,15 +950,40 @@
         // Expose render functions globally for testing
         window.renderAgents = function renderAgents() {
             const agentList = document.getElementById('agent-list');
-            agentList.innerHTML = state.agents.map(agent => `
-                <div class="agent-item fade-in" data-agent="${agent.name}">
+            if (!agentList) return;
+            agentList.innerHTML = state.agents.map(agent => {
+                const agentId = agent.id || agent.name;
+                const agentName = agent.name || agentId;
+                const status = agent.status || 'idle';
+                const model = agent.model || 'haiku';
+                const desc = agent.description || '';
+                const invocations = agent.invocations || 0;
+                const level = agent.level || 1;
+
+                // Status label with icon
+                const statusIcons = { running: '⚡', idle: '○', paused: '⏸', error: '✗' };
+                const statusIcon = statusIcons[status] || '○';
+
+                // Model badge color
+                const modelColors = { sonnet: '#6366f1', haiku: '#10b981', opus: '#f59e0b' };
+                const modelColor = modelColors[model] || '#94a3b8';
+
+                return `
+                <div class="agent-item fade-in" data-agent="${agentId}">
                     <div class="agent-info">
-                        <span class="agent-status-dot ${agent.status}"></span>
-                        <span class="agent-name">${agent.name}</span>
+                        <span class="agent-status-dot ${status}" title="${status}" aria-label="${status}"></span>
+                        <div class="agent-details">
+                            <span class="agent-name">${escapeHtml(agentName)}</span>
+                            <span class="agent-description">${escapeHtml(desc)}</span>
+                        </div>
                     </div>
-                    <span class="agent-status-text">${agent.status}</span>
-                </div>
-            `).join('');
+                    <div class="agent-meta">
+                        <span class="agent-model-badge" style="color:${modelColor}" title="Model: ${model}">${model}</span>
+                        <span class="agent-status-text ${status}">${statusIcon} ${status}</span>
+                        ${invocations > 0 ? `<span class="agent-invocations" title="Total invocations">×${invocations}</span>` : ''}
+                    </div>
+                </div>`;
+            }).join('');
         };
 
         function renderActivities() {
@@ -1301,6 +1359,67 @@
             }
         }
 
+        // ========================================
+        // AGENT STATUS FUNCTIONS
+        // ========================================
+
+        /**
+         * Load real-time agent status from /api/agents/status.
+         * Updates state.agents with fresh data and re-renders the panel.
+         * Falls back gracefully if the API is unavailable.
+         */
+        async function loadAgentStatus() {
+            try {
+                const response = await fetch('/api/agents/status');
+                if (!response.ok) return;
+
+                const data = await response.json();
+                const agents = data.agents || [];
+
+                if (agents.length > 0) {
+                    // Merge API data with current state (preserve any local overrides)
+                    state.agents = agents.map(apiAgent => ({
+                        id: apiAgent.id,
+                        name: apiAgent.name,
+                        model: apiAgent.model,
+                        description: apiAgent.description,
+                        status: apiAgent.status || 'idle',
+                        invocations: apiAgent.invocations || 0,
+                        level: apiAgent.level || 1,
+                        success_rate: apiAgent.success_rate,
+                    }));
+
+                    // Update running count in header
+                    const runningCount = data.running_count || 0;
+                    const statusEl = document.getElementById('footer-status');
+                    if (statusEl) {
+                        statusEl.textContent = runningCount > 0
+                            ? `${runningCount} agent${runningCount > 1 ? 's' : ''} running`
+                            : 'System Ready';
+                    }
+
+                    renderAgents();
+                }
+            } catch (error) {
+                // API not available — keep existing mock data
+                console.debug('Agent status API not available:', error.message);
+            }
+        }
+
+        /**
+         * Start polling agent status every 5 seconds for real-time updates.
+         */
+        function startAgentStatusPolling() {
+            // Initial load
+            loadAgentStatus();
+            // Poll every 5 seconds
+            setInterval(loadAgentStatus, 5000);
+        }
+
+        // Expose for testing
+        window.loadAgentStatus = loadAgentStatus;
+        window.startAgentStatusPolling = startAgentStatusPolling;
+
         function updateProviderSelectorOptions(providers) {
             const providerSelect = document.getElementById('provider-select');
             if (!providerSelect) return;
@@ -1510,9 +1629,14 @@
             // Load provider status from API (non-blocking)
             loadProviderStatus();
 
+            // Start real-time agent status polling every 5s
+            startAgentStatusPolling();
+
             console.log('Agent Dashboard initialized successfully');
             console.log('- Provider switcher with 6 providers');
             console.log('- Provider status indicators via /api/providers');
+            console.log('- Agent status panel with 13 agents from definitions.py');
+            console.log('- Real-time agent polling via /api/agents/status');
             console.log('- Self-contained HTML/CSS/JavaScript');
             console.log('- Ready for backend integration');
         }
