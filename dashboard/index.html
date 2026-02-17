@@ -403,6 +403,11 @@
             border-color: var(--accent-blue);
         }
 
+        /* Smooth model selector cascade transition */
+        #model-select {
+            transition: opacity 0.15s ease, border-color 0.2s ease;
+        }
+
         /* Provider Status Indicators */
         .provider-status-badge {
             display: inline-flex;
@@ -770,13 +775,17 @@
         // ========================================
         // STATE MANAGEMENT
         // ========================================
+        // Restore session from sessionStorage for model persistence
+        const _savedProvider = sessionStorage.getItem('currentProvider') || 'claude';
+        const _savedModel = sessionStorage.getItem('currentModel') || 'sonnet-4.5';
+
         // Expose state globally for testing
         window.state = {
             agents: [],
             activities: [],
             messages: [],
-            currentProvider: 'claude',
-            currentModel: 'opus-4.6',
+            currentProvider: _savedProvider,
+            currentModel: _savedModel,
             sessionNumber: 1,
             totalTokens: 0,
             totalCost: 0,
@@ -905,17 +914,51 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
-        function updateModelSelector(provider) {
+        // Sensible default models per provider (matches /api/providers default_model)
+        const providerDefaults = {
+            claude: 'sonnet-4.5',
+            openai: 'gpt-4o',
+            gemini: '2.5-flash',
+            groq: 'llama-3.3-70b',
+            kimi: 'moonshot',
+            windsurf: 'cascade'
+        };
+
+        function updateModelSelector(provider, preferredModel) {
             const modelSelect = document.getElementById('model-select');
+            if (!modelSelect) return;
+
             const models = providerModels[provider] || [];
 
-            modelSelect.innerHTML = models.map(model => `
-                <option value="${model.value}">${model.label}</option>
-            `).join('');
+            // Determine which model to select:
+            // 1. preferredModel if specified and valid for this provider
+            // 2. Provider default
+            // 3. First available model
+            const defaultModel = providerDefaults[provider] || (models.length > 0 ? models[0].value : '');
+            const targetModel = preferredModel && models.find(m => m.value === preferredModel)
+                ? preferredModel
+                : defaultModel;
+
+            // Add smooth fade transition
+            modelSelect.style.opacity = '0.5';
+            modelSelect.style.transition = 'opacity 0.15s ease';
+
+            modelSelect.innerHTML = models.map(model => {
+                const isSelected = model.value === targetModel;
+                return `<option value="${model.value}"${isSelected ? ' selected' : ''}>${model.label}</option>`;
+            }).join('');
 
             if (models.length > 0) {
-                state.currentModel = models[0].value;
+                state.currentModel = targetModel;
+                // Persist selection
+                sessionStorage.setItem('currentModel', state.currentModel);
+                sessionStorage.setItem('currentProvider', provider);
             }
+
+            // Restore opacity after update
+            setTimeout(() => {
+                modelSelect.style.opacity = '1';
+            }, 150);
         }
 
         function updateStats() {
@@ -1055,7 +1098,14 @@
 
         function handleProviderChange(event) {
             state.currentProvider = event.target.value;
-            updateModelSelector(state.currentProvider);
+            // Persist provider selection
+            sessionStorage.setItem('currentProvider', state.currentProvider);
+
+            // Get preferred model from provider config (backend or local default)
+            const providerInfo = window.providerStatus[state.currentProvider];
+            const preferredModel = providerInfo ? providerInfo.default_model : null;
+
+            updateModelSelector(state.currentProvider, preferredModel);
             updateStats();
 
             // Update provider status badge for the new selection
@@ -1066,6 +1116,8 @@
 
         function handleModelChange(event) {
             state.currentModel = event.target.value;
+            // Persist model selection for session
+            sessionStorage.setItem('currentModel', state.currentModel);
             addMessage('system', `Switched to model: ${state.currentModel}`);
         }
 
@@ -1120,7 +1172,15 @@
             // Render initial UI
             renderAgents();
             renderActivities();
-            updateModelSelector(state.currentProvider);
+
+            // Restore provider selection in DOM
+            const providerSelect = document.getElementById('provider-select');
+            if (providerSelect && state.currentProvider) {
+                providerSelect.value = state.currentProvider;
+            }
+
+            // Update model selector with persisted model selection
+            updateModelSelector(state.currentProvider, state.currentModel);
             updateStats();
 
             // Add welcome message
