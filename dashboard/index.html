@@ -655,6 +655,31 @@
             pointer-events: none;
         }
 
+        /* ========================================
+           GLOBAL METRICS BAR ENHANCEMENTS
+           ======================================== */
+        #global-metrics-bar {
+            gap: 1.5rem;
+            flex-wrap: wrap;
+        }
+        .global-metrics-ring-item {
+            /* Extra alignment for ring + value */
+        }
+        .global-metrics-ring-wrap {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+        .global-metrics-ring {
+            flex-shrink: 0;
+        }
+        #total-sessions {
+            color: var(--accent-blue-light);
+        }
+        #total-duration {
+            color: var(--text-secondary);
+        }
+
         /* Active Requirement Display */
         .agent-active-task {
             margin-top: 6px;
@@ -1378,18 +1403,32 @@
         <!-- Header -->
         <header class="header">
             <div class="header-title">Agent Dashboard</div>
-            <div class="header-stats">
+            <div class="header-stats" id="global-metrics-bar" aria-label="Global Dashboard Metrics">
                 <div class="stat-item">
                     <span class="stat-label">Session</span>
                     <span class="stat-value" id="session-number">1</span>
                 </div>
                 <div class="stat-item">
+                    <span class="stat-label">Total Sessions</span>
+                    <span class="stat-value" id="total-sessions">1</span>
+                </div>
+                <div class="stat-item global-metrics-ring-item">
                     <span class="stat-label">Total Tokens</span>
-                    <span class="stat-value" id="total-tokens">0</span>
+                    <div class="global-metrics-ring-wrap">
+                        <div class="global-metrics-ring" id="tokens-ring-container" aria-hidden="true"></div>
+                        <span class="stat-value" id="total-tokens">0</span>
+                    </div>
+                </div>
+                <div class="stat-item global-metrics-ring-item">
+                    <span class="stat-label">Total Cost</span>
+                    <div class="global-metrics-ring-wrap">
+                        <div class="global-metrics-ring" id="cost-ring-container" aria-hidden="true"></div>
+                        <span class="stat-value" id="total-cost">$0.00</span>
+                    </div>
                 </div>
                 <div class="stat-item">
-                    <span class="stat-label">Total Cost</span>
-                    <span class="stat-value" id="total-cost">$0.00</span>
+                    <span class="stat-label">Uptime</span>
+                    <span class="stat-value" id="total-duration">0s</span>
                 </div>
                 <div class="stat-item">
                     <span class="stat-label">Provider</span>
@@ -1768,7 +1807,130 @@
             document.getElementById('total-cost').textContent = `$${state.totalCost.toFixed(2)}`;
             document.getElementById('current-provider').textContent =
                 state.currentProvider.charAt(0).toUpperCase() + state.currentProvider.slice(1);
+            // total-sessions and total-duration are updated by loadGlobalMetrics()
         }
+
+        // ========================================
+        // GLOBAL METRICS BAR
+        // ========================================
+
+        /**
+         * Default global metrics thresholds for ProgressRing visualization.
+         * Tokens: 0 → 1M (soft cap), Cost: $0 → $50 (soft cap)
+         */
+        const GLOBAL_METRICS_MAX = {
+            tokens: 1000000,
+            cost: 50.0,
+        };
+
+        /**
+         * Render a small ProgressRing inside the given container element.
+         * Reuses the ProgressRing() function (from AI-146) with a progress fraction.
+         * @param {string} containerId - DOM element id to inject ring SVG into
+         * @param {string} status - 'done'|'active'|'pending'|'error' (visual style)
+         * @param {number} fraction - 0.0 to 1.0 fill fraction
+         */
+        function renderGlobalMetricRing(containerId, status, fraction) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            // Clamp fraction 0-1
+            const f = Math.max(0, Math.min(1, fraction));
+            container.innerHTML = ProgressRing(status, f);
+        }
+
+        /**
+         * Format total duration in seconds to human-readable string.
+         * @param {number} seconds
+         * @returns {string} e.g. "3h 12m" or "45m" or "30s"
+         */
+        function formatDuration(seconds) {
+            if (seconds >= 3600) {
+                const h = Math.floor(seconds / 3600);
+                const m = Math.floor((seconds % 3600) / 60);
+                return `${h}h ${m}m`;
+            } else if (seconds >= 60) {
+                const m = Math.floor(seconds / 60);
+                const s = Math.floor(seconds % 60);
+                return `${m}m ${s}s`;
+            }
+            return `${Math.floor(seconds)}s`;
+        }
+
+        // Expose for testing
+        window.formatDuration = formatDuration;
+        window.renderGlobalMetricRing = renderGlobalMetricRing;
+        window.GLOBAL_METRICS_MAX = GLOBAL_METRICS_MAX;
+
+        /**
+         * Update the global metrics bar with data from DashboardState.
+         * Called by loadGlobalMetrics() after API response.
+         * @param {Object} metrics - { total_sessions, total_tokens, total_cost_usd, total_duration_seconds, session_number }
+         */
+        function updateGlobalMetricsBar(metrics) {
+            const sessions = metrics.total_sessions || 0;
+            const sessionNum = metrics.session_number || state.sessionNumber || 1;
+            const tokens = metrics.total_tokens || 0;
+            const cost = metrics.total_cost_usd || 0;
+            const duration = metrics.total_duration_seconds || 0;
+
+            // Update text values
+            const sessionNumEl = document.getElementById('session-number');
+            if (sessionNumEl) sessionNumEl.textContent = sessionNum;
+
+            const totalSessionsEl = document.getElementById('total-sessions');
+            if (totalSessionsEl) totalSessionsEl.textContent = sessions;
+
+            const totalTokensEl = document.getElementById('total-tokens');
+            if (totalTokensEl) totalTokensEl.textContent = formatCount(tokens);
+
+            const totalCostEl = document.getElementById('total-cost');
+            if (totalCostEl) totalCostEl.textContent = formatCost(cost);
+
+            const totalDurationEl = document.getElementById('total-duration');
+            if (totalDurationEl) totalDurationEl.textContent = formatDuration(duration);
+
+            // Render ProgressRing for tokens
+            const tokenFraction = Math.min(tokens / GLOBAL_METRICS_MAX.tokens, 1);
+            const tokenStatus = tokens === 0 ? 'pending' : (tokenFraction > 0.8 ? 'error' : 'active');
+            renderGlobalMetricRing('tokens-ring-container', tokenStatus, tokenFraction);
+
+            // Render ProgressRing for cost
+            const costFraction = Math.min(cost / GLOBAL_METRICS_MAX.cost, 1);
+            const costStatus = cost === 0 ? 'pending' : (costFraction > 0.8 ? 'error' : 'active');
+            renderGlobalMetricRing('cost-ring-container', costStatus, costFraction);
+        }
+
+        // Expose for testing
+        window.updateGlobalMetricsBar = updateGlobalMetricsBar;
+
+        /**
+         * Load global metrics from /api/metrics and update the bar.
+         * Falls back gracefully if API unavailable.
+         */
+        async function loadGlobalMetrics() {
+            try {
+                const response = await fetch('/api/metrics');
+                if (!response.ok) return;
+                const data = await response.json();
+
+                // DashboardState structure from metrics.py
+                const metrics = {
+                    total_sessions: data.total_sessions || 0,
+                    session_number: (data.sessions || []).length || 1,
+                    total_tokens: data.total_tokens || 0,
+                    total_cost_usd: data.total_cost_usd || 0,
+                    total_duration_seconds: data.total_duration_seconds || 0,
+                };
+
+                updateGlobalMetricsBar(metrics);
+            } catch (error) {
+                // API not available — keep existing values
+                console.debug('Global metrics API not available:', error.message);
+            }
+        }
+
+        // Expose for testing
+        window.loadGlobalMetrics = loadGlobalMetrics;
 
         // ========================================
         // UTILITY FUNCTIONS
@@ -2823,6 +2985,9 @@
 
             // Load orchestrator flow from API (non-blocking, falls back to mock)
             loadOrchestratorFlow();
+
+            // Load global metrics from /api/metrics
+            loadGlobalMetrics();
 
             console.log('Agent Dashboard initialized successfully');
             console.log('- Provider switcher with 6 providers');
