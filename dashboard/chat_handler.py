@@ -13,6 +13,8 @@ import os
 from datetime import datetime
 from typing import AsyncIterator, Dict, Any, Optional
 
+from exceptions import BridgeError, SecurityError
+
 # Optional imports for AI providers
 try:
     from anthropic import AsyncAnthropic
@@ -36,13 +38,22 @@ _openai_client: Optional[Any] = None
 def get_anthropic_client() -> Any:
     """Get or create Anthropic client."""
     if not HAS_ANTHROPIC:
-        raise ImportError("anthropic library not installed")
+        raise BridgeError(
+            message="anthropic library not installed",
+            error_code="BRIDGE_UNSUPPORTED_PROVIDER",
+            provider="claude"
+        )
 
     global _anthropic_client
     if _anthropic_client is None:
         api_key = os.getenv('ANTHROPIC_API_KEY')
         if not api_key:
-            raise ValueError("ANTHROPIC_API_KEY not set in environment")
+            raise SecurityError(
+                message="ANTHROPIC_API_KEY not set in environment",
+                error_code="SECURITY_AUTH_MISSING",
+                auth_type="api_key",
+                details={"provider": "claude"}
+            )
         _anthropic_client = AsyncAnthropic(api_key=api_key)
     return _anthropic_client
 
@@ -50,13 +61,22 @@ def get_anthropic_client() -> Any:
 def get_openai_client() -> Any:
     """Get or create OpenAI client."""
     if not HAS_OPENAI:
-        raise ImportError("openai library not installed")
+        raise BridgeError(
+            message="openai library not installed",
+            error_code="BRIDGE_UNSUPPORTED_PROVIDER",
+            provider="openai"
+        )
 
     global _openai_client
     if _openai_client is None:
         api_key = os.getenv('OPENAI_API_KEY')
         if not api_key:
-            raise ValueError("OPENAI_API_KEY not set in environment")
+            raise SecurityError(
+                message="OPENAI_API_KEY not set in environment",
+                error_code="SECURITY_AUTH_MISSING",
+                auth_type="api_key",
+                details={"provider": "openai"}
+            )
         _openai_client = openai.AsyncOpenAI(api_key=api_key)
     return _openai_client
 
@@ -109,10 +129,11 @@ async def stream_claude_response(
 
     try:
         client = get_anthropic_client()
-    except (ImportError, ValueError) as e:
+    except (BridgeError, SecurityError) as e:
         yield {
             'type': 'error',
             'content': str(e),
+            'error_code': e.error_code,
             'timestamp': datetime.utcnow().isoformat() + 'Z'
         }
         yield {
@@ -167,9 +188,16 @@ Be concise and helpful. Format code blocks with syntax highlighting when appropr
                 }
 
     except Exception as e:
+        # Wrap unexpected errors as BridgeError for consistency
+        bridge_error = BridgeError(
+            message=f'Error streaming from Claude: {str(e)}',
+            error_code="BRIDGE_MODEL_ERROR",
+            provider="claude"
+        )
         yield {
             'type': 'error',
-            'content': f'Error streaming from Claude: {str(e)}',
+            'content': str(bridge_error),
+            'error_code': bridge_error.error_code,
             'timestamp': datetime.utcnow().isoformat() + 'Z'
         }
 
@@ -208,10 +236,11 @@ async def stream_openai_response(
 
     try:
         client = get_openai_client()
-    except (ImportError, ValueError) as e:
+    except (BridgeError, SecurityError) as e:
         yield {
             'type': 'error',
             'content': str(e),
+            'error_code': e.error_code,
             'timestamp': datetime.utcnow().isoformat() + 'Z'
         }
         yield {
@@ -256,9 +285,16 @@ async def stream_openai_response(
                     }
 
     except Exception as e:
+        # Wrap unexpected errors as BridgeError for consistency
+        bridge_error = BridgeError(
+            message=f'Error streaming from OpenAI: {str(e)}',
+            error_code="BRIDGE_MODEL_ERROR",
+            provider="openai"
+        )
         yield {
             'type': 'error',
-            'content': f'Error streaming from OpenAI: {str(e)}',
+            'content': str(bridge_error),
+            'error_code': bridge_error.error_code,
             'timestamp': datetime.utcnow().isoformat() + 'Z'
         }
 
