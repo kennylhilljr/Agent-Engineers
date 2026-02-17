@@ -2463,6 +2463,299 @@
             color: #475569;
             font-style: italic;
         }
+
+        /* Test Results Styles (AI-165) */
+        .test-results-card {
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            border-radius: 8px;
+            margin-bottom: 12px;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .test-results-card.expanded .test-list {
+            display: block;
+        }
+
+        .test-results-card.expanded .test-results-toggle {
+            transform: rotate(180deg);
+        }
+
+        .test-results-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            cursor: pointer;
+            background: rgba(20, 30, 50, 0.8);
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .test-results-header:hover {
+            background: rgba(30, 45, 70, 0.9);
+        }
+
+        .test-results-command {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.75rem;
+            color: #cbd5e1;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .test-status-badge {
+            font-size: 0.68rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            flex-shrink: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .test-status-badge.passed {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.4);
+        }
+
+        .test-status-badge.failed {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+        }
+
+        .test-status-badge.error {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.4);
+        }
+
+        .test-results-toggle {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            flex-shrink: 0;
+            transition: transform 0.2s ease;
+        }
+
+        .test-results-meta {
+            padding: 6px 14px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .pass-rate-label {
+            font-size: 0.72rem;
+            color: #94a3b8;
+            flex-shrink: 0;
+        }
+
+        .pass-rate-bar {
+            flex: 1;
+            min-width: 100px;
+            height: 6px;
+            background: rgba(148, 163, 184, 0.15);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .pass-rate-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.4s ease;
+        }
+
+        .pass-rate-fill.high {
+            background: #10b981;
+        }
+
+        .pass-rate-fill.medium {
+            background: #f59e0b;
+        }
+
+        .pass-rate-fill.low {
+            background: #ef4444;
+        }
+
+        .pass-rate-text {
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: #e2e8f0;
+            flex-shrink: 0;
+        }
+
+        .test-results-duration {
+            font-size: 0.68rem;
+            color: #64748b;
+            flex-shrink: 0;
+        }
+
+        .test-list {
+            display: none;
+            list-style: none;
+            margin: 0;
+            padding: 4px 0;
+        }
+
+        .test-item {
+            border-bottom: 1px solid rgba(148, 163, 184, 0.07);
+            overflow: hidden;
+        }
+
+        .test-item:last-child {
+            border-bottom: none;
+        }
+
+        .test-item-header {
+            display: flex;
+            align-items: center;
+            padding: 5px 14px;
+            cursor: pointer;
+            gap: 8px;
+            font-size: 0.78rem;
+        }
+
+        .test-item-header:hover {
+            background: rgba(30, 45, 70, 0.4);
+        }
+
+        .test-item-icon {
+            font-size: 0.85rem;
+            flex-shrink: 0;
+            width: 20px;
+            text-align: center;
+        }
+
+        .test-item-name {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.76rem;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .test-item-passed .test-item-name {
+            color: #6ee7b7;
+        }
+
+        .test-item-failed .test-item-name {
+            color: #fca5a5;
+        }
+
+        .test-item-error .test-item-name {
+            color: #fcd34d;
+        }
+
+        .test-item-skipped .test-item-name {
+            color: #94a3b8;
+        }
+
+        .test-item-duration {
+            font-size: 0.68rem;
+            color: #64748b;
+            flex-shrink: 0;
+        }
+
+        .test-item-arrow {
+            font-size: 0.65rem;
+            color: #475569;
+            flex-shrink: 0;
+            transition: transform 0.2s ease;
+        }
+
+        .test-item.expanded .test-item-arrow {
+            transform: rotate(180deg);
+        }
+
+        .test-error-output {
+            display: none;
+            max-height: 280px;
+            overflow-y: auto;
+            border-top: 1px solid rgba(148, 163, 184, 0.1);
+            background: rgba(8, 12, 24, 0.9);
+        }
+
+        .test-item.expanded .test-error-output {
+            display: block;
+        }
+
+        .test-error-output pre {
+            margin: 0;
+            padding: 8px 14px;
+            font-size: 0.73rem;
+            line-height: 1.5;
+            font-family: 'Courier New', Courier, monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: #fca5a5;
+        }
+
+        .test-screenshot {
+            display: block;
+            max-width: 180px;
+            max-height: 120px;
+            border-radius: 4px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            margin: 6px 14px;
+            cursor: pointer;
+            transition: opacity 0.2s ease;
+        }
+
+        .test-screenshot:hover {
+            opacity: 0.85;
+        }
+
+        .test-results-actions {
+            padding: 8px 14px;
+            border-top: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .test-full-output {
+            display: none;
+            max-height: 360px;
+            overflow-y: auto;
+            background: rgba(8, 12, 24, 0.9);
+            border-top: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .test-full-output.visible {
+            display: block;
+        }
+
+        .test-full-output pre {
+            margin: 0;
+            padding: 10px 14px;
+            font-size: 0.73rem;
+            line-height: 1.5;
+            font-family: 'Courier New', Courier, monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: #94a3b8;
+        }
+
+        .btn-view-output {
+            font-size: 0.72rem;
+            padding: 3px 10px;
+            border-radius: 4px;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            background: transparent;
+            color: #94a3b8;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .btn-view-output:hover {
+            background: rgba(148, 163, 184, 0.1);
+            color: #cbd5e1;
+        }
     </style>
 </head>
 <body>
@@ -3868,6 +4161,9 @@
                         } else if (message.type === 'file_changes') {
                             console.log('Received file_changes event via WebSocket', message);
                             renderFileChangeSummary(message);
+                        } else if (message.type === 'test_results') {
+                            console.log('Received test_results event via WebSocket', message);
+                            renderTestResults(message);
                         }
                     } catch (error) {
                         console.error('Error processing WebSocket message:', error);
@@ -4207,6 +4503,112 @@
             }
 
             console.log('File change summary rendered for session', sessionId, ':', fileCount, 'files');
+        }
+
+        // Render a test results card in the activity feed (AI-165)
+        function renderTestResults(message) {
+            const container = document.getElementById('activity-feed') || document.body;
+
+            const agent = message.agent || 'unknown';
+            const ticket = message.ticket || '';
+            const command = message.command || '';
+            const status = message.status || 'error';
+            const total = message.total || 0;
+            const passed = message.passed || 0;
+            const failed = message.failed || 0;
+            const errors = message.errors || 0;
+            const durationMs = message.duration_ms || null;
+            const passRate = typeof message.pass_rate === 'number' ? message.pass_rate : (total > 0 ? Math.round((passed / total) * 100) : 0);
+            const tests = Array.isArray(message.tests) ? message.tests : [];
+            const fullOutput = message.full_output || '';
+
+            // Unique ID for this card
+            const cardId = 'tr-' + Date.now();
+
+            // Status badge class
+            const badgeClass = status === 'passed' ? 'passed' : (status === 'failed' ? 'failed' : 'error');
+            const badgeLabel = status.toUpperCase();
+
+            // Pass rate bar fill class
+            const fillClass = passRate >= 80 ? 'high' : (passRate >= 50 ? 'medium' : 'low');
+
+            // Duration label
+            const durationLabel = durationMs !== null ? (durationMs / 1000).toFixed(2) + 's' : '';
+
+            // Test item icon helper
+            function testIcon(s) {
+                if (s === 'passed') return '\u2705'; // ✅
+                if (s === 'failed') return '\u274C'; // ❌
+                if (s === 'error') return '\u26A0\uFE0F'; // ⚠️
+                return '\u23ED\uFE0F'; // ⏭️ skipped
+            }
+
+            // Build test items HTML
+            const testItemsHtml = tests.map((t, idx) => {
+                const tName = (t.name || 'unnamed').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const tStatus = t.status || 'error';
+                const tDuration = t.duration_ms !== null && t.duration_ms !== undefined ? (t.duration_ms) + 'ms' : '';
+                const tError = t.error_output || '';
+                const tScreenshot = t.screenshot_path || '';
+                const hasError = !!(tError);
+                const hasScreenshot = !!(tScreenshot);
+                const hasDetails = hasError || hasScreenshot;
+                const itemId = cardId + '-item-' + idx;
+                const safeError = tError.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const safeScreenshot = tScreenshot.replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
+                return `
+                    <li class="test-item test-item-${tStatus}" id="${itemId}">
+                        <div class="test-item-header" onclick="(function(el){el.closest('.test-item').classList.toggle('expanded');})(this)">
+                            <span class="test-item-icon">${testIcon(tStatus)}</span>
+                            <span class="test-item-name" title="${tName}">${tName}</span>
+                            ${tDuration ? '<span class="test-item-duration">' + tDuration + '</span>' : ''}
+                            ${hasDetails ? '<span class="test-item-arrow">&#9660;</span>' : ''}
+                        </div>
+                        ${hasError ? '<div class="test-error-output"><pre>' + safeError + '</pre></div>' : ''}
+                        ${hasScreenshot ? '<a href="' + safeScreenshot + '" target="_blank"><img class="test-screenshot" src="' + safeScreenshot + '" alt="screenshot" onerror="this.style.display=\'none\'" /></a>' : ''}
+                    </li>`;
+            }).join('');
+
+            const safeCommand = command.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const safeAgent = agent.replace(/</g, '&lt;');
+            const safeTicket = ticket.replace(/</g, '&lt;');
+            const safeFullOutput = fullOutput.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+            const block = document.createElement('div');
+            block.className = 'test-results-card';
+            block.id = cardId;
+
+            block.innerHTML = `
+                <div class="test-results-header" onclick="(function(el){el.closest('.test-results-card').classList.toggle('expanded');})(this)">
+                    <span class="test-results-command" title="${safeCommand}">${safeCommand}</span>
+                    ${safeAgent ? '<span style="font-size:0.72rem;color:#93c5fd;flex-shrink:0">' + safeAgent + '</span>' : ''}
+                    ${safeTicket ? '<span style="font-size:0.68rem;color:#64748b;flex-shrink:0">' + safeTicket + '</span>' : ''}
+                    <span class="test-status-badge ${badgeClass}">${badgeLabel}</span>
+                    <span class="test-results-toggle">&#9660;</span>
+                </div>
+                <div class="test-results-meta">
+                    <span class="pass-rate-label">${passed}/${total} tests (${passRate}%)</span>
+                    <div class="pass-rate-bar">
+                        <div class="pass-rate-fill ${fillClass}" style="width:${Math.min(passRate, 100)}%"></div>
+                    </div>
+                    <span class="pass-rate-text">${passRate}%</span>
+                    ${durationLabel ? '<span class="test-results-duration">' + durationLabel + '</span>' : ''}
+                </div>
+                <ul class="test-list">
+                    ${testItemsHtml}
+                </ul>
+                ${fullOutput ? '<div class="test-results-actions"><button class="btn-view-output" onclick="(function(btn){var card=btn.closest(\'.test-results-card\');var out=card.querySelector(\'.test-full-output\');out.classList.toggle(\'visible\');btn.textContent=out.classList.contains(\'visible\')?\'Hide Full Output\':\'View Full Output\';})(this)">View Full Output</button></div><div class="test-full-output"><pre>' + safeFullOutput + '</pre></div>' : ''}
+            `;
+
+            // Prepend to activity feed (newest first)
+            if (container.firstChild) {
+                container.insertBefore(block, container.firstChild);
+            } else {
+                container.appendChild(block);
+            }
+
+            console.log('Test results rendered:', agent, ticket, status, passed + '/' + total);
         }
 
         // Handle metrics update from WebSocket or HTTP
