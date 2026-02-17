@@ -391,12 +391,13 @@ class TestExportDecisions(TestDecisionLogBase):
 
     @unittest_run_loop
     async def test_export_csv_has_correct_headers(self):
-        """CSV export has expected column headers."""
+        """CSV export has expected column headers (AI-162 extended schema adds more)."""
         resp = await self.client.request("GET", "/api/decisions/export?format=csv")
         text = await resp.text()
         reader = csv.DictReader(io.StringIO(text))
-        expected_fields = {'id', 'type', 'ticket', 'decision', 'reason', 'outcome', 'timestamp'}
-        assert expected_fields == set(reader.fieldnames)
+        # Core fields must always be present; AI-162 adds audit trail fields
+        core_fields = {'id', 'type', 'ticket', 'decision', 'reason', 'outcome', 'timestamp'}
+        assert core_fields.issubset(set(reader.fieldnames))
 
 
 # ---------------------------------------------------------------------------

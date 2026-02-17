@@ -329,6 +329,9 @@ class DashboardServer:
         self.app.router.add_post('/api/decisions', self.post_decision)
         self.app.router.add_get('/api/decisions', self.get_decisions)
         self.app.router.add_get('/api/decisions/export', self.export_decisions)
+        # Decision audit trail endpoints (AI-162)
+        self.app.router.add_get('/api/decisions/summary', self.get_decisions_summary)
+        self.app.router.add_get('/api/decisions/{decision_id}', self.get_decision_by_id)
         # OPTIONS for CORS preflight
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/agents/{agent_name}', self.handle_options)
@@ -338,6 +341,8 @@ class DashboardServer:
         self.app.router.add_route('OPTIONS', '/api/reasoning/blocks', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/decisions', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/decisions/export', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/decisions/summary', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/decisions/{decision_id}', self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
         """Handle CORS preflight OPTIONS requests."""
@@ -754,6 +759,13 @@ class DashboardServer:
             'reason': body.get('reason', ''),
             'outcome': body.get('outcome', 'pending'),
             'timestamp': datetime.now().isoformat(),
+            # NEW AUDIT TRAIL FIELDS (AI-162):
+            'input_factors': body.get('input_factors', {}),
+            'agent_selected': body.get('agent_selected', ''),
+            'model_used': body.get('model_used', ''),
+            'agent_event_id': body.get('agent_event_id', ''),
+            'duration_ms': body.get('duration_ms', None),
+            'session_id': body.get('session_id', ''),
         }
 
         # Append to circular buffer
@@ -825,7 +837,10 @@ class DashboardServer:
 
         if export_format == 'csv':
             output = io.StringIO()
-            fieldnames = ['id', 'type', 'ticket', 'decision', 'reason', 'outcome', 'timestamp']
+            fieldnames = [
+                'id', 'type', 'ticket', 'decision', 'reason', 'outcome', 'timestamp',
+                'agent_selected', 'model_used', 'agent_event_id', 'duration_ms', 'session_id',
+            ]
             writer = csv.DictWriter(output, fieldnames=fieldnames)
             writer.writeheader()
             for record in self._decision_log:
@@ -839,6 +854,52 @@ class DashboardServer:
         else:
             # Default: JSON
             return web.json_response(list(self._decision_log))
+
+    async def get_decision_by_id(self, request: Request) -> Response:
+        """GET /api/decisions/{decision_id} — return a single decision by ID (AI-162).
+
+        Path Parameters:
+            decision_id: UUID of the decision to retrieve
+
+        Returns:
+            JSON decision record, or 404 if not found.
+        """
+        decision_id = request.match_info['decision_id']
+        for record in self._decision_log:
+            if record['id'] == decision_id:
+                return web.json_response(record)
+        raise web.HTTPNotFound(
+            text=json.dumps({'error': 'Decision not found', 'id': decision_id}),
+            content_type='application/json',
+        )
+
+    async def get_decisions_summary(self, request: Request) -> Response:
+        """GET /api/decisions/summary — return aggregate counts (AI-162).
+
+        Returns:
+            JSON summary with total, by_type, by_outcome, and recent_session_count.
+        """
+        by_type: dict = {}
+        by_outcome: dict = {}
+        session_ids: set = set()
+
+        for record in self._decision_log:
+            dtype = record.get('type', 'other')
+            by_type[dtype] = by_type.get(dtype, 0) + 1
+
+            outcome = record.get('outcome', 'pending')
+            by_outcome[outcome] = by_outcome.get(outcome, 0) + 1
+
+            sid = record.get('session_id', '')
+            if sid:
+                session_ids.add(sid)
+
+        return web.json_response({
+            'total': len(self._decision_log),
+            'by_type': by_type,
+            'by_outcome': by_outcome,
+            'recent_session_count': len(session_ids),
+        })
 
     async def websocket_handler(self, request: Request) -> WebSocketResponse:
         """WebSocket endpoint for real-time metrics streaming.
