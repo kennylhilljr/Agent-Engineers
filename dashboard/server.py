@@ -279,12 +279,16 @@ class DashboardServer:
     Uses MetricsStore for data persistence.
     """
 
+    # Maximum number of agent_event messages kept in the backlog for reconnecting clients
+    _AGENT_EVENT_BACKLOG_MAX = 20
+
     def __init__(
         self,
         project_name: str = "agent-status-dashboard",
         metrics_dir: Optional[Path] = None,
         port: int = 8080,
-        host: str = "127.0.0.1"
+        host: str = "127.0.0.1",
+        collector=None,
     ):
         """Initialize DashboardServer.
 
@@ -293,6 +297,10 @@ class DashboardServer:
             metrics_dir: Directory containing .agent_metrics.json
             port: HTTP server port
             host: HTTP server host (default: 127.0.0.1 for localhost-only access)
+            collector: Optional AgentMetricsCollector instance. When provided the
+                server registers itself as a listener so that every event recorded by
+                ``collector._record_event()`` is immediately broadcast to all
+                connected WebSocket clients (AI-171).
 
         Security Notes:
             - Default host is 127.0.0.1 (localhost only) for security
@@ -338,6 +346,14 @@ class DashboardServer:
 
         # In-memory test results store (AI-165): list of test run records, newest last
         self._test_results: list = []
+
+        # Circular backlog of agent_event WS messages for reconnecting clients (AI-171)
+        # Each entry is the fully-formatted WebSocket message dict.
+        self._agent_event_backlog: list = []
+
+        # Register as a listener on the supplied collector (AI-171)
+        if collector is not None:
+            collector.register_event_callback(self._on_new_event)
 
         # Create app with middlewares
         self.app = web.Application(middlewares=[error_middleware, cors_middleware])
@@ -695,6 +711,63 @@ class DashboardServer:
         self.websockets -= disconnected
         if disconnected:
             logger.info(f"Removed {len(disconnected)} disconnected WebSocket clients during broadcast")
+
+    def _on_new_event(self, event: dict) -> None:
+        """Callback invoked by AgentMetricsCollector when a new event is recorded (AI-171).
+
+        Formats the event as an ``agent_event`` WebSocket message and schedules
+        an async broadcast on the running event loop. The method is intentionally
+        synchronous so it can be called from the non-async ``_record_event``.
+
+        The formatted message is also appended to the in-memory backlog so that
+        newly connected WebSocket clients can receive recent events.
+
+        Args:
+            event: An AgentEvent TypedDict produced by AgentTracker.finalize().
+        """
+        message = {
+            "type": "agent_event",
+            "agent": event.get("agent_name", ""),
+            "event_type": event.get("status", ""),
+            "details": {
+                "event_id": event.get("event_id", ""),
+                "session_id": event.get("session_id", ""),
+                "ticket_key": event.get("ticket_key", ""),
+                "model_used": event.get("model_used", ""),
+                "input_tokens": event.get("input_tokens", 0),
+                "output_tokens": event.get("output_tokens", 0),
+                "total_tokens": event.get("total_tokens", 0),
+                "estimated_cost_usd": event.get("estimated_cost_usd", 0.0),
+                "duration_seconds": event.get("duration_seconds", 0.0),
+                "artifacts": event.get("artifacts", []),
+                "error_message": event.get("error_message", ""),
+                "started_at": event.get("started_at", ""),
+                "ended_at": event.get("ended_at", ""),
+            },
+            "timestamp": event.get("ended_at", datetime.utcnow().isoformat() + "Z"),
+        }
+
+        # Maintain backlog circular buffer
+        self._agent_event_backlog.append(message)
+        if len(self._agent_event_backlog) > self._AGENT_EVENT_BACKLOG_MAX:
+            del self._agent_event_backlog[0]
+
+        # Schedule the async broadcast on whichever event loop is running.
+        # If no loop is running (e.g. during unit tests that call _on_new_event
+        # directly without a server), this will be a no-op to avoid RuntimeError.
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.ensure_future(self.broadcast_to_websockets(message), loop=loop)
+        except RuntimeError:
+            pass
+
+        logger.info(
+            "Agent event received from collector: agent=%r, status=%r, ticket=%r",
+            event.get("agent_name"),
+            event.get("status"),
+            event.get("ticket_key"),
+        )
 
     async def broadcast_reasoning(self, request: Request) -> Response:
         """POST /api/reasoning — broadcast a reasoning event to all WebSocket clients.
@@ -1667,6 +1740,22 @@ class DashboardServer:
                 })
             except Exception as e:
                 logger.error(f"Error sending initial metrics to WebSocket {client_id}: {e}")
+
+            # Send backlog of recent agent_event messages so the client can
+            # catch up on events that happened before they connected (AI-171)
+            if self._agent_event_backlog:
+                try:
+                    await ws.send_json({
+                        'type': 'backlog',
+                        'events': list(self._agent_event_backlog),
+                        'timestamp': datetime.utcnow().isoformat() + 'Z',
+                    })
+                    logger.info(
+                        f"Sent backlog of {len(self._agent_event_backlog)} agent events "
+                        f"to WebSocket {client_id}"
+                    )
+                except Exception as e:
+                    logger.error(f"Error sending backlog to WebSocket {client_id}: {e}")
 
             # Listen for client messages (mostly for ping/pong and close)
             async for msg in ws:

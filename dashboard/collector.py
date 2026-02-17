@@ -361,8 +361,37 @@ class AgentMetricsCollector:
         # Active session tracking
         self._active_sessions: dict[str, dict] = {}
 
-        # Event broadcasting callbacks
+        # Event broadcasting callbacks (subscribe/unsubscribe API)
         self._event_callbacks: list[Callable[[str, AgentEvent], None]] = []
+
+        # Single-argument event callbacks registered via register_event_callback (AI-171)
+        # Each callable receives a single AgentEvent dict when _record_event() is called.
+        self._record_event_callbacks: list = []
+
+    def register_event_callback(self, callback) -> None:
+        """Register a callback to be called whenever a new event is recorded.
+
+        The callback is invoked synchronously from ``_record_event()`` with the
+        completed ``AgentEvent`` dict as the sole argument.
+
+        This is the primary integration hook used by ``DashboardServer`` (AI-171).
+
+        Args:
+            callback: A callable that accepts a single AgentEvent dict argument.
+        """
+        if callback not in self._record_event_callbacks:
+            self._record_event_callbacks.append(callback)
+
+    def unregister_event_callback(self, callback) -> None:
+        """Remove a previously registered event callback.
+
+        Args:
+            callback: The callable to remove. No-op if not registered.
+        """
+        try:
+            self._record_event_callbacks.remove(callback)
+        except ValueError:
+            pass  # Not registered; silently ignore
 
     def start_session(
         self,
@@ -577,6 +606,16 @@ class AgentMetricsCollector:
 
         # Save state
         self.store.save(state)
+
+        # Notify single-argument callbacks registered via register_event_callback (AI-171)
+        for callback in list(self._record_event_callbacks):
+            try:
+                callback(event)
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception(
+                    "Error in record_event callback %r; skipping", callback
+                )
 
     def get_state(self) -> DashboardState:
         """Get the current dashboard state.
