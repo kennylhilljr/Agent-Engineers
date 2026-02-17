@@ -1,0 +1,76 @@
+{
+  "project_id": "835051b7-e4b4-4e95-bc3f-8fa573a2c0b7",
+  "project_name": "Agent-Engineers Code Improvements",
+  "meta_issue_id": "7de88d92-d8bd-45cc-a9d6-9945994d02b1",
+  "issues": [
+    {
+      "key": "AI-201",
+      "id": "9c4aa040-e445-4ae5-a044-fc9073440335",
+      "title": "Expand Test Coverage",
+      "status": "Todo"
+    },
+    {
+      "key": "AI-202",
+      "id": "996cec97-b5aa-4ed6-babf-7c30bd8e9c3c",
+      "title": "Address Technical Debt - TODO/FIXME Comments",
+      "status": "Todo"
+    },
+    {
+      "key": "AI-203",
+      "id": "3ed166de-f95b-4fd6-87f2-82429578c7ea",
+      "title": "Reduce Code Duplication in Bridge Classes",
+      "status": "Todo"
+    },
+    {
+      "key": "AI-204",
+      "id": "ee271404-8b41-4474-afdb-2c631953497c",
+      "title": "Performance Optimizations",
+      "status": "Todo"
+    },
+    {
+      "key": "AI-205",
+      "id": "d2bc5154-0d64-48cd-b88f-f9dfaad586f7",
+      "title": "Centralized Configuration Management",
+      "status": "Todo"
+    },
+    {
+      "key": "AI-206",
+      "id": "dea4b0b8-b7fc-43fb-abbe-4203788cfcaf",
+      "title": "Dependency Security Audit",
+      "status": "Todo"
+    },
+    {
+      "key": "AI-207",
+      "id": "df8a335a-64e3-44f3-a808-e8c8695a9272",
+      "title": "Standardize Error Handling",
+      "status": "Todo"
+    },
+    {
+      "key": "AI-208",
+      "id": "25211d0b-3ae3-4f56-9b7e-3d893e3b9f87",
+      "title": "Type Safety Improvements",
+      "status": "Todo"
+    },
+    {
+      "key": "AI-209",
+      "id": "b1cf3a28-c92f-445f-9ab2-7d8da2923722",
+      "title": "Documentation Completeness",
+      "status": "Todo"
+    },
+    {
+      "key": "AI-210",
+      "id": "c088c8ae-ad32-4797-9441-40d78eb0642c",
+      "title": "Monitoring & Observability",
+      "status": "Todo"
+    },
+    {
+      "key": "AI-211",
+      "id": "7de88d92-d8bd-45cc-a9d6-9945994d02b1",
+      "title": "Project Progress Tracker",
+      "status": "Todo"
+    }
+  ],
+  "last_verification_status": "pending",
+  "tickets_since_verification": 0,
+  "session": 1
+}
