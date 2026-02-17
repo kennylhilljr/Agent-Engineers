@@ -4,15 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Agent Status Dashboard</title>
-    <!-- Prism.js for syntax highlighting - AI-99 -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markdown.min.js"></script>
     <style>
         /* Reset and Base Styles */
         * {
@@ -120,70 +111,6 @@
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* Activity Feed Styles - Enhanced for Real-Time Updates (Phase 2) */
-        .activity-item {
-            padding: 12px 16px;
-            background: rgba(15, 23, 42, 0.5);
-            border-radius: 8px;
-            border-left: 3px solid #3b82f6;
-            margin-bottom: 10px;
-            transition: all 0.3s ease;
-        }
-
-        .activity-item:hover {
-            background: rgba(15, 23, 42, 0.8);
-            transform: translateX(4px);
-        }
-
-        .activity-item-recent {
-            background: rgba(59, 130, 246, 0.1);
-            border-left-color: #3b82f6;
-            box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
-        }
-
-        .activity-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 6px;
-        }
-
-        .activity-title {
-            font-size: 0.95rem;
-            font-weight: 600;
-            color: #f1f5f9;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .activity-ticket {
-            display: inline-flex;
-            padding: 2px 8px;
-            background: rgba(59, 130, 246, 0.2);
-            border: 1px solid rgba(59, 130, 246, 0.3);
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: #60a5fa;
-        }
-
-        .agent-chip-active {
-            border-color: rgba(59, 130, 246, 0.6) !important;
-            box-shadow: 0 0 20px rgba(59, 130, 246, 0.3) !important;
         }
 
         /* Grid Layout */
@@ -1223,176 +1150,6 @@
             border: 1px solid rgba(59, 130, 246, 0.3);
         }
 
-        /* Provider Status Indicator Styles - AI-73 */
-        .provider-status-indicator {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            background: rgba(15, 23, 42, 0.6);
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            cursor: help;
-            transition: all 0.2s ease;
-        }
-
-        .provider-status-indicator:hover {
-            background: rgba(15, 23, 42, 0.9);
-            border-color: rgba(148, 163, 184, 0.4);
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            display: inline-block;
-            animation: pulse 2s ease-in-out infinite;
-        }
-
-        /* Status States */
-        .provider-status-indicator.available .status-dot {
-            background: #10b981;
-            box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
-        }
-
-        .provider-status-indicator.available .status-text {
-            color: #10b981;
-        }
-
-        .provider-status-indicator.unconfigured .status-dot {
-            background: #6b7280;
-            box-shadow: 0 0 8px rgba(107, 116, 128, 0.4);
-            animation: none;
-        }
-
-        .provider-status-indicator.unconfigured .status-text {
-            color: #9ca3af;
-        }
-
-        .provider-status-indicator.error .status-dot {
-            background: #ef4444;
-            box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
-        }
-
-        .provider-status-indicator.error .status-text {
-            color: #ef4444;
-        }
-
-        .status-text {
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        @keyframes pulse {
-            0%, 100% {
-                opacity: 1;
-            }
-            50% {
-                opacity: 0.5;
-            }
-        }
-
-        /* Tooltip Styles */
-        .provider-status-indicator .tooltip {
-            visibility: hidden;
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%) translateY(-8px);
-            background: rgba(15, 23, 42, 0.98);
-            color: #f1f5f9;
-            padding: 12px 16px;
-            border-radius: 8px;
-            font-size: 0.8rem;
-            font-weight: 400;
-            white-space: nowrap;
-            z-index: 1000;
-            border: 1px solid rgba(148, 163, 184, 0.3);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.2s ease, transform 0.2s ease;
-        }
-
-        .provider-status-indicator:hover .tooltip {
-            visibility: visible;
-            opacity: 1;
-            transform: translateX(-50%) translateY(-12px);
-        }
-
-        .provider-status-indicator .tooltip::after {
-            content: '';
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            border: 6px solid transparent;
-            border-top-color: rgba(15, 23, 42, 0.98);
-        }
-
-        .model-selector-container {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 12px;
-            padding: 12px;
-            background: rgba(15, 23, 42, 0.4);
-            border-radius: 8px;
-            border: 1px solid rgba(148, 163, 184, 0.1);
-        }
-
-        .model-selector-label {
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: #94a3b8;
-            white-space: nowrap;
-        }
-
-        .model-selector {
-            flex: 1;
-            padding: 8px 12px;
-            background: rgba(15, 23, 42, 0.7);
-            border: 1px solid rgba(148, 163, 184, 0.3);
-            border-radius: 8px;
-            color: #f1f5f9;
-            font-size: 0.9rem;
-            font-family: inherit;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .model-selector:hover {
-            border-color: #3b82f6;
-            background: rgba(15, 23, 42, 0.9);
-        }
-
-        .model-selector:focus {
-            outline: none;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
-        }
-
-        .model-selector option {
-            background: #1e293b;
-            color: #f1f5f9;
-            padding: 8px;
-        }
-
-        .model-badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            background: rgba(34, 197, 94, 0.15);
-            color: #4ade80;
-            border: 1px solid rgba(34, 197, 94, 0.3);
-        }
-
         .chat-input-area {
             display: flex;
             gap: 8px;
@@ -1499,542 +1256,100 @@
             }
         }
 
-        /* Code Streaming Styles - AI-99 */
-        .code-stream-container {
-            margin: 12px 0;
-            background: rgba(15, 23, 42, 0.6);
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            border-radius: 8px;
-            overflow: hidden;
-        }
-
-        .code-stream-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 8px 12px;
-            background: rgba(15, 23, 42, 0.8);
-            border-bottom: 1px solid rgba(148, 163, 184, 0.2);
-        }
-
-        .code-stream-file-path {
-            font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
-            font-size: 0.85rem;
-            color: #94a3b8;
-        }
-
-        .code-stream-status {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 0.75rem;
-            color: #60a5fa;
-        }
-
-        .code-stream-status.streaming {
-            color: #10b981;
-        }
-
-        .code-stream-status.complete {
-            color: #94a3b8;
-        }
-
-        .streaming-indicator {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: #10b981;
-            animation: pulse 1.5s ease-in-out infinite;
-        }
-
-        .code-stream-body {
-            max-height: 400px;
-            overflow-y: auto;
-        }
-
-        .code-stream-body::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .code-stream-body::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .code-stream-body::-webkit-scrollbar-thumb {
-            background: rgba(148, 163, 184, 0.3);
-            border-radius: 3px;
-        }
-
-        .code-line {
-            display: flex;
-            font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
-            font-size: 0.85rem;
-            line-height: 1.5;
-            padding: 2px 0;
-            animation: codeAppear 0.2s ease;
-        }
-
-        @keyframes codeAppear {
-            from {
-                opacity: 0;
-                transform: translateX(-4px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-
-        .code-line-number {
-            display: inline-block;
-            min-width: 40px;
-            padding: 0 12px;
-            text-align: right;
-            color: #64748b;
-            user-select: none;
-            border-right: 1px solid rgba(148, 163, 184, 0.1);
-        }
-
-        .code-line-content {
-            flex: 1;
-            padding: 0 12px;
-            white-space: pre-wrap;
-            word-break: break-word;
-        }
-
-        /* Diff highlighting */
-        .code-line.addition {
-            background: rgba(16, 185, 129, 0.1);
-        }
-
-        .code-line.addition .code-line-content {
-            color: #10b981;
-        }
-
-        .code-line.addition::before {
-            content: '+';
-            color: #10b981;
-            padding: 0 8px;
-            font-weight: bold;
-        }
-
-        .code-line.deletion {
-            background: rgba(239, 68, 68, 0.1);
-        }
-
-        .code-line.deletion .code-line-content {
-            color: #ef4444;
-            text-decoration: line-through;
-        }
-
-        .code-line.deletion::before {
-            content: '-';
-            color: #ef4444;
-            padding: 0 8px;
-            font-weight: bold;
-        }
-
-        .code-line.unchanged .code-line-content {
-            color: #cbd5e1;
-        }
-
-        /* Syntax highlighting colors (simple, no library needed initially) */
-        .token-keyword {
-            color: #c678dd;
-            font-weight: bold;
-        }
-
-        .token-string {
-            color: #98c379;
-        }
-
-        .token-comment {
-            color: #5c6370;
-            font-style: italic;
-        }
-
-        .token-function {
-            color: #61afef;
-        }
-
-        .token-number {
-            color: #d19a66;
-        }
-
-        .code-stream-footer {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 8px 12px;
-            background: rgba(15, 23, 42, 0.8);
-            border-top: 1px solid rgba(148, 163, 184, 0.2);
-            font-size: 0.75rem;
-            color: #64748b;
-        }
-
-        .code-stats {
-            display: flex;
-            gap: 12px;
-        }
-
-        .code-stat {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .code-stat.additions {
-            color: #10b981;
-        }
-
-        .code-stat.deletions {
-            color: #ef4444;
-        }
-
-        .copy-code-button {
-            padding: 4px 10px;
-            background: rgba(59, 130, 246, 0.15);
-            color: #60a5fa;
-            border: 1px solid rgba(59, 130, 246, 0.3);
-            border-radius: 4px;
-            font-size: 0.75rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .copy-code-button:hover {
-            background: rgba(59, 130, 246, 0.25);
-            border-color: rgba(59, 130, 246, 0.5);
-        }
-
-        .copy-code-button.copied {
-            background: rgba(16, 185, 129, 0.15);
-            color: #10b981;
-            border-color: rgba(16, 185, 129, 0.3);
-        }
-
-        /* =====================================================================
-           AI-130: Agent Controls - Pause/Resume & Requirement Editing
-           ===================================================================== */
-
-        /* Global Controls Toolbar */
+        /* === AI-130: Agent Controls === */
         .agent-controls-toolbar {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 14px 20px;
-            background: rgba(15, 23, 42, 0.7);
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            border-radius: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
+            display: flex; align-items: center; gap: 12px; padding: 14px 20px;
+            background: rgba(15,23,42,0.7); border: 1px solid rgba(148,163,184,0.2);
+            border-radius: 10px; margin-bottom: 20px; flex-wrap: wrap;
         }
-
-        .agent-controls-toolbar-title {
-            font-size: 0.95rem;
-            font-weight: 600;
-            color: #94a3b8;
-            margin-right: 8px;
-        }
-
+        .agent-controls-toolbar-title { font-size: .95rem; font-weight: 600; color: #94a3b8; margin-right: 8px; }
         .btn-control {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            cursor: pointer;
-            border: 1px solid;
-            transition: all 0.2s ease;
-            background: transparent;
+            display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;
+            border-radius: 8px; font-size: .85rem; font-weight: 600; cursor: pointer;
+            border: 1px solid; transition: all .2s; background: transparent;
         }
+        .btn-pause { color: #f59e0b; border-color: rgba(245,158,11,.4); background: rgba(245,158,11,.08); }
+        .btn-pause:hover { background: rgba(245,158,11,.2); }
+        .btn-resume { color: #10b981; border-color: rgba(16,185,129,.4); background: rgba(16,185,129,.08); }
+        .btn-resume:hover { background: rgba(16,185,129,.2); }
+        .btn-edit-req { color: #a78bfa; border-color: rgba(167,139,250,.4); background: rgba(167,139,250,.08); }
+        .btn-edit-req:hover { background: rgba(167,139,250,.2); }
+        .btn-sm { padding: 5px 11px; font-size: .78rem; }
+        .agent-controls-section { background: rgba(15,23,42,.8); border: 1px solid rgba(148,163,184,.2); border-radius: 12px; padding: 20px 24px; margin-bottom: 24px; }
+        .agent-controls-section-title { font-size: 1.1rem; font-weight: 600; color: #f1f5f9; display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+        .agent-controls-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(280px,1fr)); gap: 14px; }
+        .agent-control-card { background: rgba(30,41,59,.6); border: 1px solid rgba(148,163,184,.15); border-radius: 10px; padding: 14px 16px; transition: all .2s; }
+        .agent-control-card.is-paused { border-color: rgba(245,158,11,.4); background: rgba(245,158,11,.05); }
+        .agent-control-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+        .agent-control-name { font-size: .9rem; font-weight: 600; color: #f1f5f9; }
+        .agent-control-status { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 5px; font-size: .72rem; font-weight: 700; text-transform: uppercase; border: 1px solid; }
+        .agent-control-status.paused { background: rgba(245,158,11,.15); color: #fbbf24; border-color: rgba(245,158,11,.4); }
+        .agent-control-status.active { background: rgba(148,163,184,.1); color: #94a3b8; border-color: rgba(148,163,184,.25); }
+        .agent-control-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .paused-count-badge { display: none; padding: 3px 10px; border-radius: 20px; font-size: .78rem; font-weight: 700; background: rgba(245,158,11,.15); color: #fbbf24; border: 1px solid rgba(245,158,11,.3); }
+        /* Modal */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        .modal-overlay.active { display: flex; }
+        .modal { background: #1e293b; border: 1px solid rgba(148,163,184,.25); border-radius: 14px; padding: 28px; width: 100%; max-width: 560px; box-shadow: 0 25px 60px rgba(0,0,0,.5); }
+        .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+        .modal-title { font-size: 1.15rem; font-weight: 700; color: #f1f5f9; }
+        .modal-close { background: none; border: none; color: #64748b; font-size: 1.4rem; cursor: pointer; padding: 2px 8px; border-radius: 6px; }
+        .modal-close:hover { color: #f1f5f9; background: rgba(148,163,184,.1); }
+        .modal-agent-id { display: inline-flex; padding: 3px 10px; background: rgba(59,130,246,.15); border: 1px solid rgba(59,130,246,.3); border-radius: 5px; font-size: .78rem; font-weight: 600; color: #60a5fa; margin-bottom: 14px; }
+        .modal-label { display: block; font-size: .85rem; font-weight: 600; color: #94a3b8; margin-bottom: 8px; }
+        .modal-textarea { width: 100%; min-height: 130px; background: rgba(15,23,42,.6); border: 1px solid rgba(148,163,184,.25); border-radius: 8px; padding: 12px; color: #f1f5f9; font-size: .9rem; font-family: inherit; resize: vertical; outline: none; }
+        .modal-textarea:focus { border-color: rgba(99,102,241,.6); }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+        .btn-secondary { color: #94a3b8; border-color: rgba(148,163,184,.3); background: rgba(148,163,184,.05); }
+        .btn-primary { color: #818cf8; border-color: rgba(99,102,241,.4); background: rgba(99,102,241,.1); }
+        .btn-primary:hover { background: rgba(99,102,241,.25); }
+        .modal-success-msg { display: none; color: #10b981; font-size: .85rem; font-weight: 600; margin-top: 8px; }
 
-        .btn-pause {
-            color: #f59e0b;
-            border-color: rgba(245, 158, 11, 0.4);
-            background: rgba(245, 158, 11, 0.08);
-        }
-
-        .btn-pause:hover {
-            background: rgba(245, 158, 11, 0.2);
-            border-color: rgba(245, 158, 11, 0.7);
-            transform: translateY(-1px);
-        }
-
-        .btn-resume {
-            color: #10b981;
-            border-color: rgba(16, 185, 129, 0.4);
-            background: rgba(16, 185, 129, 0.08);
-        }
-
-        .btn-resume:hover {
-            background: rgba(16, 185, 129, 0.2);
-            border-color: rgba(16, 185, 129, 0.7);
-            transform: translateY(-1px);
-        }
-
-        .btn-edit-req {
-            color: #a78bfa;
-            border-color: rgba(167, 139, 250, 0.4);
-            background: rgba(167, 139, 250, 0.08);
-        }
-
-        .btn-edit-req:hover {
-            background: rgba(167, 139, 250, 0.2);
-            border-color: rgba(167, 139, 250, 0.7);
-            transform: translateY(-1px);
-        }
-
-        /* Agent Controls Section */
-        .agent-controls-section {
-            background: rgba(15, 23, 42, 0.8);
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            border-radius: 12px;
-            padding: 20px 24px;
-            margin-bottom: 24px;
-        }
-
-        .agent-controls-section-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 16px;
-        }
-
-        .agent-controls-section-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #f1f5f9;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .agent-controls-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 14px;
-        }
-
-        /* Individual Agent Control Card */
-        .agent-control-card {
-            background: rgba(30, 41, 59, 0.6);
-            border: 1px solid rgba(148, 163, 184, 0.15);
-            border-radius: 10px;
-            padding: 14px 16px;
-            transition: all 0.2s ease;
-        }
-
-        .agent-control-card:hover {
-            border-color: rgba(148, 163, 184, 0.35);
-        }
-
-        .agent-control-card.is-paused {
-            border-color: rgba(245, 158, 11, 0.4);
-            background: rgba(245, 158, 11, 0.05);
-        }
-
-        .agent-control-card-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 10px;
-        }
-
-        .agent-control-name {
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: #f1f5f9;
-        }
-
-        .agent-status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 3px 9px;
-            border-radius: 5px;
-            font-size: 0.72rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            border: 1px solid;
-        }
-
-        .agent-status-badge.status-running {
-            background: rgba(59, 130, 246, 0.1);
-            color: #60a5fa;
-            border-color: rgba(59, 130, 246, 0.3);
-        }
-
-        .agent-status-badge.status-paused {
-            background: rgba(245, 158, 11, 0.15);
-            color: #fbbf24;
-            border-color: rgba(245, 158, 11, 0.4);
-        }
-
-        .agent-status-badge.status-idle {
-            background: rgba(148, 163, 184, 0.1);
-            color: #94a3b8;
-            border-color: rgba(148, 163, 184, 0.25);
-        }
-
-        .agent-control-actions {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .btn-sm {
-            padding: 5px 11px;
-            font-size: 0.78rem;
-        }
-
-        /* Requirements Modal */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.65);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-            backdrop-filter: blur(4px);
-        }
-
-        .modal-overlay.active {
-            display: flex;
-        }
-
-        .modal {
-            background: #1e293b;
-            border: 1px solid rgba(148, 163, 184, 0.25);
-            border-radius: 14px;
-            padding: 28px;
-            width: 100%;
-            max-width: 560px;
-            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
-            animation: fadeIn 0.2s ease-out;
-        }
-
-        .modal-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 20px;
-        }
-
-        .modal-title {
-            font-size: 1.15rem;
-            font-weight: 700;
-            color: #f1f5f9;
-        }
-
-        .modal-close {
-            background: none;
-            border: none;
-            color: #64748b;
-            font-size: 1.4rem;
-            cursor: pointer;
-            padding: 2px 8px;
-            border-radius: 6px;
-            transition: color 0.2s;
-        }
-
-        .modal-close:hover {
-            color: #f1f5f9;
-            background: rgba(148, 163, 184, 0.1);
-        }
-
-        .modal-agent-id {
-            display: inline-flex;
-            padding: 3px 10px;
-            background: rgba(59, 130, 246, 0.15);
-            border: 1px solid rgba(59, 130, 246, 0.3);
-            border-radius: 5px;
-            font-size: 0.78rem;
-            font-weight: 600;
-            color: #60a5fa;
-            margin-bottom: 14px;
-        }
-
-        .modal-label {
-            display: block;
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: #94a3b8;
-            margin-bottom: 8px;
-        }
-
-        .modal-textarea {
-            width: 100%;
-            min-height: 130px;
-            background: rgba(15, 23, 42, 0.6);
-            border: 1px solid rgba(148, 163, 184, 0.25);
-            border-radius: 8px;
-            padding: 12px;
-            color: #f1f5f9;
-            font-size: 0.9rem;
-            font-family: inherit;
-            resize: vertical;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-
-        .modal-textarea:focus {
-            border-color: rgba(99, 102, 241, 0.6);
-        }
-
-        .modal-footer {
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-            margin-top: 18px;
-        }
-
-        .btn-secondary {
-            color: #94a3b8;
-            border-color: rgba(148, 163, 184, 0.3);
-            background: rgba(148, 163, 184, 0.05);
-        }
-
-        .btn-secondary:hover {
-            background: rgba(148, 163, 184, 0.12);
-        }
-
-        .btn-primary {
-            color: #818cf8;
-            border-color: rgba(99, 102, 241, 0.4);
-            background: rgba(99, 102, 241, 0.1);
-        }
-
-        .btn-primary:hover {
-            background: rgba(99, 102, 241, 0.25);
-            border-color: rgba(99, 102, 241, 0.7);
-        }
-
-        .modal-success-msg {
-            display: none;
-            color: #10b981;
-            font-size: 0.85rem;
-            font-weight: 600;
-            margin-top: 8px;
-        }
-
-        .paused-count-badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 3px 10px;
-            border-radius: 20px;
-            font-size: 0.78rem;
-            font-weight: 700;
-            background: rgba(245, 158, 11, 0.15);
-            color: #fbbf24;
-            border: 1px solid rgba(245, 158, 11, 0.3);
-        }
+        /* Reasoning / Transparency Styles - AI-131 */
+        .reasoning-block { border-left: 3px solid #7c3aed; background: rgba(124,58,237,0.08); border-radius: 4px; margin: 8px 0; }
+        .reasoning-header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; user-select: none; }
+        .reasoning-header:hover { background: rgba(124,58,237,0.15); border-radius: 4px; }
+        .reasoning-toggle { color: #7c3aed; font-size: 12px; transition: transform 0.2s; }
+        .reasoning-toggle.open { transform: rotate(90deg); }
+        .reasoning-body { padding: 8px 16px 12px; font-size: 13px; color: #ccc; }
+        .reasoning-body.hidden { display: none; }
+        .complexity-badge { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; }
+        .complexity-badge.complex { background: #f59e0b; color: #000; }
+        .complexity-badge.simple { background: #10b981; color: #000; }
+        .reasoning-detail-row { margin-top: 6px; font-size: 12px; color: #94a3b8; }
+        .reasoning-detail-row strong { color: #cbd5e1; }
+        .decision-history { border-top: 1px solid #333; padding: 12px; margin-top: 8px; }
+        .decision-history-title { font-size: 12px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 6px; }
+        .decision-history-list { max-height: 200px; overflow-y: auto; }
+        .decision-history-list.hidden { display: none; }
+        .decision-history-entry { display: flex; gap: 8px; padding: 4px 0; font-size: 12px; color: #888; border-bottom: 1px solid #222; }
+        .decision-history-entry:last-child { border-bottom: none; }
+        .decision-history-ts { flex-shrink: 0; color: #64748b; }
+        .decision-history-text { flex: 1; }
+        .streaming-block { border-left: 3px solid #06b6d4; }
+        .streaming-badge { background: #06b6d4; color: #000; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: bold; }
+        .streaming-badge.done { background: #10b981; }
     </style>
 </head>
 <body>
+    <!-- AI-130: Requirements Editor Modal -->
+    <div class="modal-overlay" id="requirements-modal" role="dialog" aria-modal="true">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">Edit Requirements</span>
+                <button class="modal-close" onclick="closeRequirementsModal()" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-agent-id" id="modal-agent-id-label"></div>
+            <label class="modal-label" for="requirements-textarea">Requirement Instructions</label>
+            <textarea class="modal-textarea" id="requirements-textarea" placeholder="Enter updated requirement text for this agent..."></textarea>
+            <div class="modal-success-msg" id="modal-success-msg">Requirements saved successfully!</div>
+            <div class="modal-footer">
+                <button class="btn-control btn-secondary" onclick="closeRequirementsModal()">Cancel</button>
+                <button class="btn-control btn-primary" onclick="saveRequirements()">Save Requirements</button>
+            </div>
+        </div>
+    </div>
+
     <div class="container">
         <!-- Header -->
         <div class="header">
@@ -2060,53 +1375,16 @@
         <!-- AI-130: Agent Controls - Global Toolbar -->
         <div class="agent-controls-toolbar" id="agent-controls-toolbar">
             <span class="agent-controls-toolbar-title">Agent Controls</span>
-            <button class="btn-control btn-pause" id="btn-pause-all" onclick="pauseAllAgents()">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                    <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
-                </svg>
-                Pause All
-            </button>
-            <button class="btn-control btn-resume" id="btn-resume-all" onclick="resumeAllAgents()">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                    <polygon points="5,3 19,12 5,21"/>
-                </svg>
-                Resume All
-            </button>
+            <button class="btn-control btn-pause" id="btn-pause-all" onclick="pauseAllAgents()">Pause All</button>
+            <button class="btn-control btn-resume" id="btn-resume-all" onclick="resumeAllAgents()">Resume All</button>
             <span id="paused-count-badge" style="display:none;" class="paused-count-badge"></span>
         </div>
 
-        <!-- AI-130: Agent Control Cards Section -->
+        <!-- AI-130: Per-Agent Controls Section -->
         <div class="agent-controls-section" id="agent-controls-section">
-            <div class="agent-controls-section-header">
-                <span class="agent-controls-section-title">
-                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                              d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/>
-                    </svg>
-                    Agent Pause / Resume Controls
-                </span>
-            </div>
+            <div class="agent-controls-section-title">Agent Pause / Resume Controls</div>
             <div class="agent-controls-grid" id="agent-controls-grid">
-                <div style="color: #64748b; font-size: 0.85rem; padding: 10px 0;">Loading agent controls...</div>
-            </div>
-        </div>
-
-        <!-- AI-130: Requirements Editor Modal -->
-        <div class="modal-overlay" id="requirements-modal" role="dialog" aria-modal="true">
-            <div class="modal">
-                <div class="modal-header">
-                    <span class="modal-title">Edit Requirements</span>
-                    <button class="modal-close" onclick="closeRequirementsModal()" aria-label="Close">&times;</button>
-                </div>
-                <div class="modal-agent-id" id="modal-agent-id-label"></div>
-                <label class="modal-label" for="requirements-textarea">Requirement Instructions</label>
-                <textarea class="modal-textarea" id="requirements-textarea"
-                          placeholder="Enter updated requirement text for this agent..."></textarea>
-                <div class="modal-success-msg" id="modal-success-msg">Requirements saved successfully!</div>
-                <div class="modal-footer">
-                    <button class="btn-control btn-secondary" onclick="closeRequirementsModal()">Cancel</button>
-                    <button class="btn-control btn-primary" onclick="saveRequirements()">Save Requirements</button>
-                </div>
+                <div style="color:#64748b;font-size:.85rem;padding:10px 0;">Loading agent controls...</div>
             </div>
         </div>
 
@@ -2253,32 +1531,14 @@
                         data-testid="ai-provider-selector"
                         aria-label="Select AI Provider"
                     >
-                        <option value="claude" data-testid="provider-option-claude">Claude</option>
-                        <option value="chatgpt" data-testid="provider-option-chatgpt">ChatGPT</option>
-                        <option value="gemini" data-testid="provider-option-gemini">Gemini</option>
-                        <option value="groq" data-testid="provider-option-groq">Groq</option>
-                        <option value="kimi" data-testid="provider-option-kimi">KIMI</option>
-                        <option value="windsurf" data-testid="provider-option-windsurf">Windsurf</option>
+                        <option value="claude" data-testid="provider-option-claude">Claude (Haiku 4.5, Sonnet 4.5, Opus 4.6)</option>
+                        <option value="chatgpt" data-testid="provider-option-chatgpt">ChatGPT (GPT-4o, o1, o3-mini, o4-mini)</option>
+                        <option value="gemini" data-testid="provider-option-gemini">Gemini (2.5 Flash, 2.5 Pro, 2.0 Flash)</option>
+                        <option value="groq" data-testid="provider-option-groq">Groq (Llama 3.3 70B, Mixtral 8x7B)</option>
+                        <option value="kimi" data-testid="provider-option-kimi">KIMI (Moonshot 2M context)</option>
+                        <option value="windsurf" data-testid="provider-option-windsurf">Windsurf (Cascade)</option>
                     </select>
-                    <div class="provider-status-indicator" id="provider-status-indicator" data-testid="provider-status-indicator" title="Checking status...">
-                        <span class="status-dot" data-testid="status-dot"></span>
-                        <span class="status-text" data-testid="status-text">Checking...</span>
-                    </div>
                     <span class="provider-badge" id="provider-badge" data-testid="provider-badge">Claude</span>
-                </div>
-                <div class="model-selector-container">
-                    <label for="ai-model-selector" class="model-selector-label">
-                        Model:
-                    </label>
-                    <select
-                        id="ai-model-selector"
-                        class="model-selector"
-                        data-testid="ai-model-selector"
-                        aria-label="Select AI Model"
-                    >
-                        <!-- Options will be dynamically populated based on provider -->
-                    </select>
-                    <span class="model-badge" id="model-badge" data-testid="model-badge">Haiku 4.5</span>
                 </div>
                 <div id="chat-messages" class="chat-messages">
                     <div class="chat-welcome">
@@ -2306,6 +1566,26 @@
                         </button>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Decision History Panel - AI-131 -->
+    <div class="card" style="margin-top: 24px;" data-testid="decision-history-panel">
+        <div class="card-header">
+            <h2 class="card-title">
+                <span style="font-size:1.2rem;">&#129504;</span>
+                Orchestrator Decision History
+                <span id="decision-history-count" style="font-size:0.75rem; color:#94a3b8; font-weight:400; margin-left:8px;" data-testid="decision-history-count">0 events</span>
+            </h2>
+        </div>
+        <div class="decision-history" id="decision-history-container">
+            <div class="decision-history-title" id="decision-history-toggle" data-testid="decision-history-toggle" onclick="toggleDecisionHistoryList()">
+                <span id="decision-history-toggle-icon">&#9660;</span>
+                Recent Decisions (last 10)
+            </div>
+            <div class="decision-history-list" id="decision-history-list" data-testid="decision-history-list">
+                <div style="color: #64748b; font-size: 12px; padding: 8px 0;" data-testid="decision-history-empty">No reasoning events yet. Events will appear here when the orchestrator makes routing decisions.</div>
             </div>
         </div>
     </div>
@@ -3389,45 +2669,19 @@
                     try {
                         const message = JSON.parse(event.data);
 
-                        // Handle different message types
                         switch (message.type) {
                             case 'metrics_update':
                                 console.log('Received metrics update via WebSocket');
                                 handleMetricsUpdate(message.data);
                                 break;
-
-                            case 'agent_status':
-                                console.log('Received agent status change:', message);
-                                handleAgentStatusChange(message);
-                                break;
-
-                            case 'agent_event':
-                                console.log('Received agent event:', message);
-                                handleAgentEvent(message);
-                                break;
-
                             case 'reasoning':
                                 console.log('Received reasoning:', message);
                                 handleReasoning(message);
                                 break;
-
                             case 'code_stream':
                                 console.log('Received code stream:', message);
                                 handleCodeStream(message);
                                 break;
-
-                            case 'chat_message':
-                                handleChatMessage(message);
-                                break;
-
-                            case 'control_ack':
-                                console.log('Received control ack:', message);
-                                break;
-
-                            case 'connection':
-                                console.log('WebSocket connection established:', message.message);
-                                break;
-
                             default:
                                 console.log('Unknown message type:', message.type);
                         }
@@ -3495,276 +2749,83 @@
             updateConnectionStatus('disconnected', 'Disconnected');
         }
 
-        // ==========================================
-        // Real-Time WebSocket Message Handlers (Phase 2: AI-127)
-        // ==========================================
-
-        // Store recent activity for live feed
-        const liveActivityFeed = [];
-        const MAX_LIVE_ACTIVITY = 50;
-
         /**
-         * Handle agent status change message
-         * Updates agent chip status in real-time
-         */
-        function handleAgentStatusChange(message) {
-            const { agent_name, status, metadata, timestamp } = message;
-
-            console.log(`[REAL-TIME] Agent ${agent_name}: ${status}`, metadata);
-
-            // Update agent chip status visually
-            updateAgentChipStatus(agent_name, status, metadata);
-
-            // Add to live activity feed
-            addToLiveActivityFeed({
-                type: 'agent_status',
-                agent: agent_name,
-                status: status,
-                message: getStatusMessage(agent_name, status, metadata),
-                timestamp: timestamp,
-                metadata: metadata
-            });
-
-            // Play notification sound for status changes (optional)
-            if (status === 'running') {
-                playNotificationSound('start');
-            } else if (status === 'error') {
-                playNotificationSound('error');
-            }
-        }
-
-        /**
-         * Handle agent event message
-         * Shows new events in activity feed
-         */
-        function handleAgentEvent(message) {
-            const { agent_name, event_id, ticket_key, status, duration_seconds, tokens, cost_usd } = message;
-
-            console.log(`[REAL-TIME] Agent event: ${agent_name} completed ${ticket_key}`);
-
-            // Add to live activity feed
-            addToLiveActivityFeed({
-                type: 'agent_event',
-                agent: agent_name,
-                status: status,
-                message: `${agent_name} completed ${ticket_key} (${duration_seconds.toFixed(1)}s, ${tokens} tokens)`,
-                timestamp: message.timestamp,
-                metadata: { ticket_key, duration_seconds, tokens, cost_usd, status }
-            });
-        }
-
-        /**
-         * Handle orchestrator reasoning message
-         * Shows reasoning/decision-making process
+         * AI-131: Handle orchestrator reasoning message
+         * Shows collapsible reasoning blocks in chat and updates decision history panel
          */
         function handleReasoning(message) {
-            const { content, source, context, timestamp } = message;
-
-            console.log(`[REAL-TIME] Reasoning from ${source}: ${content}`);
-
-            // Add to live activity feed
-            addToLiveActivityFeed({
-                type: 'reasoning',
-                agent: source,
-                message: content,
-                timestamp: timestamp,
-                metadata: context
-            });
+            const { agent, decision, complexity, reasoning, timestamp } = message;
+            console.log(`[REAL-TIME] Reasoning from ${agent}: ${decision} (${complexity})`);
+            // Render collapsible reasoning block in chat
+            if (window.chatInterface) {
+                window.chatInterface.addReasoningBlock({ agent, decision, complexity, reasoning, timestamp });
+            }
+            // Update decision history panel
+            updateDecisionHistoryPanel({ agent, decision, complexity, reasoning, timestamp });
         }
 
         /**
-         * Handle code stream message - AI-99
+         * AI-131: Handle code stream message
          * Shows live code generation with real-time streaming
          */
         function handleCodeStream(message) {
-            const { content, file_path, line_number, operation, language } = message;
-            console.log(`[CODE] ${operation} ${file_path}:${line_number}`);
-
-            // Forward to chat interface if it exists
-            if (window.chatInterface && window.chatInterface.codeStreamRenderer) {
-                window.chatInterface.codeStreamRenderer.addCodeChunk(
-                    content,
-                    file_path,
-                    line_number,
-                    operation,
-                    language || 'python'
-                );
-            }
+            const chunk = message.chunk !== undefined ? message.chunk : message.content;
+            const filePath = message.file_path || '';
+            const done = message.done !== undefined ? message.done : false;
+            const agentId = message.agent_id || message.operation || '';
+            console.log(`[CODE-STREAM] agent=${agentId} file=${filePath} done=${done}`);
         }
 
-        /**
-         * Update agent chip visual status
-         */
-        function updateAgentChipStatus(agentName, status, metadata) {
-            const agentElements = document.querySelectorAll(`[data-agent-name="${agentName}"]`);
-
-            agentElements.forEach(element => {
-                // Update status badge
-                const statusBadge = element.querySelector('.task-status-badge');
-                if (statusBadge) {
-                    statusBadge.className = 'task-status-badge';
-
-                    if (status === 'running') {
-                        statusBadge.classList.add('status-in-progress');
-                        statusBadge.textContent = 'RUNNING';
-                    } else if (status === 'idle') {
-                        statusBadge.classList.add('status-completed');
-                        statusBadge.textContent = 'IDLE';
-                    } else if (status === 'error') {
-                        statusBadge.classList.add('status-pending');
-                        statusBadge.textContent = 'ERROR';
-                        statusBadge.style.color = '#ef4444';
-                        statusBadge.style.borderColor = '#ef4444';
-                    } else if (status === 'paused') {
-                        statusBadge.classList.add('status-pending');
-                        statusBadge.textContent = 'PAUSED';
-                    }
-                }
-
-                // Add visual pulse effect for running agents
-                if (status === 'running') {
-                    element.classList.add('agent-chip-active');
-                    element.style.animation = 'pulse 2s ease-in-out infinite';
-                } else {
-                    element.classList.remove('agent-chip-active');
-                    element.style.animation = '';
-                }
-            });
-        }
+        // AI-131: In-memory list of reasoning events for the decision history panel
+        const decisionHistoryLocal = [];
 
         /**
-         * Add item to live activity feed
+         * AI-131: Add a reasoning event to the decision history panel
          */
-        function addToLiveActivityFeed(activity) {
-            liveActivityFeed.unshift(activity); // Add to beginning
+        function updateDecisionHistoryPanel(event) {
+            decisionHistoryLocal.unshift(event);
+            if (decisionHistoryLocal.length > 10) decisionHistoryLocal.pop();
 
-            // Keep only recent activities
-            if (liveActivityFeed.length > MAX_LIVE_ACTIVITY) {
-                liveActivityFeed.pop();
+            const listEl = document.getElementById('decision-history-list');
+            const countEl = document.getElementById('decision-history-count');
+            if (!listEl) return;
+
+            if (countEl) {
+                const n = decisionHistoryLocal.length;
+                countEl.textContent = `${n} event${n !== 1 ? 's' : ''}`;
             }
 
-            // Re-render activity feed with live items at top
-            renderLiveActivityFeed();
-        }
-
-        /**
-         * Render live activity feed with real-time updates
-         */
-        function renderLiveActivityFeed() {
-            const feedElement = document.getElementById('activity-feed');
-            if (!feedElement) return;
-
-            if (liveActivityFeed.length === 0) {
-                feedElement.innerHTML = `
-                    <div style="text-align: center; padding: 40px; color: #64748b;">
-                        <p>Waiting for agent activity...</p>
-                        <p style="font-size: 0.85rem; margin-top: 8px;">Real-time updates will appear here</p>
-                    </div>
-                `;
-                return;
-            }
-
-            const html = liveActivityFeed.map((activity, index) => {
-                const time = new Date(activity.timestamp);
-                const timeAgo = formatTimeAgo(time);
-                const isRecent = index < 3; // Highlight recent 3 items
-
-                const typeColors = {
-                    'agent_status': '#3b82f6',
-                    'agent_event': '#10b981',
-                    'reasoning': '#8b5cf6',
-                    'code_stream': '#f59e0b'
-                };
-
-                const statusColors = {
-                    'running': '#3b82f6',
-                    'idle': '#10b981',
-                    'error': '#ef4444',
-                    'success': '#10b981',
-                    'paused': '#f59e0b'
-                };
-
-                const color = statusColors[activity.status] || typeColors[activity.type] || '#64748b';
-
-                return `
-                    <div class="activity-item ${isRecent ? 'activity-item-recent' : ''}"
-                         style="border-left: 3px solid ${color}; animation: ${isRecent ? 'fadeIn 0.5s ease-out' : 'none'};">
-                        <div class="activity-header">
-                            <div class="activity-title">
-                                <strong>${activity.agent || 'system'}</strong>
-                                ${activity.metadata?.ticket_key ? `<span class="activity-ticket">${activity.metadata.ticket_key}</span>` : ''}
-                            </div>
-                            <div class="activity-time" style="color: #64748b; font-size: 0.75rem;">
-                                ${timeAgo}
-                            </div>
-                        </div>
-                        <div class="activity-message" style="color: #cbd5e1; font-size: 0.9rem; margin-top: 4px;">
-                            ${activity.message}
-                        </div>
-                        ${activity.metadata?.duration_seconds ? `
-                            <div class="activity-metadata" style="margin-top: 6px; font-size: 0.8rem; color: #64748b;">
-                                ⏱️ ${activity.metadata.duration_seconds.toFixed(1)}s
-                                ${activity.metadata.tokens ? `• 🎫 ${activity.metadata.tokens} tokens` : ''}
-                                ${activity.metadata.cost_usd ? `• 💰 $${activity.metadata.cost_usd.toFixed(4)}` : ''}
-                            </div>
-                        ` : ''}
-                    </div>
-                `;
+            listEl.innerHTML = decisionHistoryLocal.map(ev => {
+                const ts = ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'}) : '';
+                const complexClass = (ev.complexity || '').toLowerCase() === 'complex' ? 'complex' : 'simple';
+                return `<div class="decision-history-entry" data-testid="decision-history-entry">
+                    <span class="decision-history-ts">${ts}</span>
+                    <span class="decision-history-text">
+                        <strong>${escapeHtmlGlobal(ev.agent || '')}</strong>:
+                        ${escapeHtmlGlobal(ev.decision || '')}
+                        <span class="complexity-badge ${complexClass}">${escapeHtmlGlobal(ev.complexity || '')}</span>
+                    </span>
+                </div>`;
             }).join('');
-
-            feedElement.innerHTML = html;
         }
 
         /**
-         * Get human-readable status message
+         * AI-131: Toggle decision history list expand/collapse
          */
-        function getStatusMessage(agentName, status, metadata) {
-            const ticket = metadata?.ticket_key ? ` on ${metadata.ticket_key}` : '';
-
-            switch (status) {
-                case 'running':
-                    return `${agentName} started working${ticket}`;
-                case 'idle':
-                    if (metadata?.completion) {
-                        return `${agentName} completed work${ticket}`;
-                    }
-                    return `${agentName} finished${ticket}`;
-                case 'error':
-                    const error = metadata?.error ? `: ${metadata.error.substring(0, 100)}` : '';
-                    return `${agentName} encountered error${error}`;
-                case 'paused':
-                    return `${agentName} paused${ticket}`;
-                default:
-                    return `${agentName} status: ${status}`;
-            }
+        function toggleDecisionHistoryList() {
+            const list = document.getElementById('decision-history-list');
+            const icon = document.getElementById('decision-history-toggle-icon');
+            if (!list) return;
+            list.classList.toggle('hidden');
+            if (icon) icon.textContent = list.classList.contains('hidden') ? '\u25BA' : '\u25BC';
         }
 
         /**
-         * Format time ago (e.g., "2m ago", "just now")
+         * AI-131: Global HTML escape helper used outside ChatInterface class
          */
-        function formatTimeAgo(date) {
-            const seconds = Math.floor((new Date() - date) / 1000);
-
-            if (seconds < 10) return 'just now';
-            if (seconds < 60) return `${seconds}s ago`;
-
-            const minutes = Math.floor(seconds / 60);
-            if (minutes < 60) return `${minutes}m ago`;
-
-            const hours = Math.floor(minutes / 60);
-            if (hours < 24) return `${hours}h ago`;
-
-            const days = Math.floor(hours / 24);
-            return `${days}d ago`;
-        }
-
-        /**
-         * Play notification sound (optional)
-         */
-        function playNotificationSound(type) {
-            // Optional: Add audio feedback for real-time events
-            // For now, just log
-            console.log(`[SOUND] ${type}`);
+        function escapeHtmlGlobal(text) {
+            if (typeof text !== 'string') text = String(text);
+            return text.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
         }
 
         // Handle metrics update from WebSocket or HTTP
@@ -3823,43 +2884,8 @@
                 this.sendBtn = document.getElementById('chat-send-btn');
                 this.providerSelector = document.getElementById('ai-provider-selector');
                 this.providerBadge = document.getElementById('provider-badge');
-                this.modelSelector = document.getElementById('ai-model-selector');
-                this.modelBadge = document.getElementById('model-badge');
-                this.providerStatusIndicator = document.getElementById('provider-status-indicator');
                 this.messages = [];
                 this.selectedProvider = 'claude';
-                this.selectedModel = 'haiku-4.5';
-                this.providerStatuses = {};
-
-                // Provider-Model mapping
-                this.providerModels = {
-                    'claude': [
-                        { id: 'haiku-4.5', name: 'Haiku 4.5', isDefault: true },
-                        { id: 'sonnet-4.5', name: 'Sonnet 4.5', isDefault: false },
-                        { id: 'opus-4.6', name: 'Opus 4.6', isDefault: false }
-                    ],
-                    'chatgpt': [
-                        { id: 'gpt-4o', name: 'GPT-4o', isDefault: true },
-                        { id: 'o1', name: 'o1', isDefault: false },
-                        { id: 'o3-mini', name: 'o3-mini', isDefault: false },
-                        { id: 'o4-mini', name: 'o4-mini', isDefault: false }
-                    ],
-                    'gemini': [
-                        { id: '2.5-flash', name: '2.5 Flash', isDefault: true },
-                        { id: '2.5-pro', name: '2.5 Pro', isDefault: false },
-                        { id: '2.0-flash', name: '2.0 Flash', isDefault: false }
-                    ],
-                    'groq': [
-                        { id: 'llama-3.3-70b', name: 'Llama 3.3 70B', isDefault: true },
-                        { id: 'mixtral-8x7b', name: 'Mixtral 8x7B', isDefault: false }
-                    ],
-                    'kimi': [
-                        { id: 'moonshot', name: 'Moonshot', isDefault: true }
-                    ],
-                    'windsurf': [
-                        { id: 'cascade', name: 'Cascade', isDefault: true }
-                    ]
-                };
 
                 this.init();
             }
@@ -3870,12 +2896,8 @@
                     return;
                 }
 
-                // Load saved provider and model from sessionStorage
+                // Load saved provider from sessionStorage
                 this.loadSavedProvider();
-                this.loadSavedModel();
-
-                // Populate model dropdown for current provider
-                this.updateModelDropdown(this.selectedProvider);
 
                 // Set up event listeners
                 this.sendBtn.addEventListener('click', () => this.sendMessage());
@@ -3890,21 +2912,11 @@
                     this.providerSelector.addEventListener('change', (e) => this.handleProviderChange(e));
                 }
 
-                if (this.modelSelector) {
-                    this.modelSelector.addEventListener('change', (e) => this.handleModelChange(e));
-                }
-
                 // AI-133: Wire up Clear History button
                 const clearBtn = document.getElementById('clear-history-btn');
                 if (clearBtn) {
                     clearBtn.addEventListener('click', () => this.clearHistory());
                 }
-
-                // Load provider status (AI-73)
-                this.loadProviderStatus();
-
-                // Refresh provider status every 30 seconds
-                setInterval(() => this.loadProviderStatus(), 30000);
 
                 // AI-133: Restore message history on page load
                 this.restoreHistory();
@@ -3942,43 +2954,7 @@
                 // Update badge
                 this.updateProviderBadge(newProvider);
 
-                // Update provider status indicator (AI-73)
-                this.updateProviderStatusIndicator(newProvider);
-
-                // Update model dropdown for new provider
-                this.updateModelDropdown(newProvider);
-
-                // Set default model for new provider
-                const defaultModel = this.getDefaultModel(newProvider);
-                this.selectedModel = defaultModel;
-                this.modelSelector.value = defaultModel;
-                this.updateModelBadge(defaultModel);
-
-                // Save model to sessionStorage
-                try {
-                    sessionStorage.setItem('selectedAIModel', defaultModel);
-                } catch (error) {
-                    console.warn('Could not save model to sessionStorage:', error);
-                }
-
-                console.log(`Provider switched to: ${newProvider}, Model: ${defaultModel}`);
-            }
-
-            handleModelChange(event) {
-                const newModel = event.target.value;
-                this.selectedModel = newModel;
-
-                // Save to sessionStorage
-                try {
-                    sessionStorage.setItem('selectedAIModel', newModel);
-                } catch (error) {
-                    console.warn('Could not save model to sessionStorage:', error);
-                }
-
-                // Update badge
-                this.updateModelBadge(newModel);
-
-                console.log(`Model switched to: ${newModel}`);
+                console.log(`Provider switched to: ${newProvider}`);
             }
 
             updateProviderBadge(provider) {
@@ -3996,150 +2972,8 @@
                 this.providerBadge.textContent = providerNames[provider] || provider;
             }
 
-            updateModelBadge(modelId) {
-                if (!this.modelBadge) return;
-
-                // Find model name from current provider's models
-                const models = this.providerModels[this.selectedProvider] || [];
-                const model = models.find(m => m.id === modelId);
-
-                if (model) {
-                    this.modelBadge.textContent = model.name;
-                } else {
-                    this.modelBadge.textContent = modelId;
-                }
-            }
-
-            updateModelDropdown(provider) {
-                if (!this.modelSelector) return;
-
-                const models = this.providerModels[provider] || [];
-
-                // Clear existing options
-                this.modelSelector.innerHTML = '';
-
-                // Populate with models for this provider
-                models.forEach(model => {
-                    const option = document.createElement('option');
-                    option.value = model.id;
-                    option.textContent = model.name;
-                    option.setAttribute('data-testid', `model-option-${model.id}`);
-                    if (model.isDefault) {
-                        option.setAttribute('data-default', 'true');
-                    }
-                    this.modelSelector.appendChild(option);
-                });
-            }
-
-            getDefaultModel(provider) {
-                const models = this.providerModels[provider] || [];
-                const defaultModel = models.find(m => m.isDefault);
-                return defaultModel ? defaultModel.id : (models[0] ? models[0].id : null);
-            }
-
-            // AI-73: Provider Status Indicators
-            async loadProviderStatus() {
-                try {
-                    const response = await fetch(`${API_BASE_URL}/api/providers/status`);
-                    if (!response.ok) {
-                        throw new Error(`Failed to fetch provider status: ${response.status}`);
-                    }
-
-                    const data = await response.json();
-                    this.providerStatuses = data.providers;
-
-                    // Update the status indicator for the currently selected provider
-                    this.updateProviderStatusIndicator(this.selectedProvider);
-                } catch (error) {
-                    console.error('Error loading provider status:', error);
-                    // Show error state if API fails
-                    this.updateProviderStatusIndicator(this.selectedProvider, 'error', 'Unable to check status');
-                }
-            }
-
-            updateProviderStatusIndicator(provider, forceStatus = null, forceMessage = null) {
-                if (!this.providerStatusIndicator) return;
-
-                const status = forceStatus || (this.providerStatuses[provider]?.status || 'unconfigured');
-                const providerData = this.providerStatuses[provider] || {};
-
-                // Update classes
-                this.providerStatusIndicator.className = 'provider-status-indicator ' + status;
-                this.providerStatusIndicator.setAttribute('data-status', status);
-
-                // Update status text
-                const statusText = this.providerStatusIndicator.querySelector('.status-text');
-                if (statusText) {
-                    if (forceMessage) {
-                        statusText.textContent = forceMessage;
-                    } else {
-                        statusText.textContent = status === 'available' ? 'Available' :
-                                                 status === 'unconfigured' ? 'Unconfigured' :
-                                                 status === 'error' ? 'Error' : 'Unknown';
-                    }
-                }
-
-                // Update tooltip
-                let tooltip = this.providerStatusIndicator.querySelector('.tooltip');
-                if (!tooltip) {
-                    tooltip = document.createElement('div');
-                    tooltip.className = 'tooltip';
-                    tooltip.setAttribute('data-testid', 'status-tooltip');
-                    this.providerStatusIndicator.appendChild(tooltip);
-                }
-
-                if (status === 'available') {
-                    tooltip.textContent = `${providerData.name || provider} is configured and ready to use`;
-                } else if (status === 'unconfigured') {
-                    tooltip.textContent = providerData.setup_instructions || `Configure ${providerData.name || provider} API key`;
-                } else if (status === 'error') {
-                    tooltip.textContent = forceMessage || `${providerData.name || provider} is configured but unreachable`;
-                }
-
-                this.providerStatusIndicator.setAttribute('title', tooltip.textContent);
-            }
-
-            loadSavedModel() {
-                try {
-                    const savedModel = sessionStorage.getItem('selectedAIModel');
-                    if (savedModel) {
-                        // Verify model is valid for current provider
-                        const models = this.providerModels[this.selectedProvider] || [];
-                        const modelExists = models.find(m => m.id === savedModel);
-
-                        if (modelExists) {
-                            this.selectedModel = savedModel;
-                            if (this.modelSelector) {
-                                this.modelSelector.value = savedModel;
-                            }
-                            this.updateModelBadge(savedModel);
-                        } else {
-                            // Use default model if saved model not valid for current provider
-                            const defaultModel = this.getDefaultModel(this.selectedProvider);
-                            this.selectedModel = defaultModel;
-                            this.updateModelBadge(defaultModel);
-                        }
-                    } else {
-                        // No saved model, use default
-                        const defaultModel = this.getDefaultModel(this.selectedProvider);
-                        this.selectedModel = defaultModel;
-                        this.updateModelBadge(defaultModel);
-                    }
-                } catch (error) {
-                    console.warn('Could not load saved model:', error);
-                }
-            }
-
             getSelectedProvider() {
                 return this.selectedProvider;
-            }
-
-            getSelectedModel() {
-                return this.selectedModel;
-            }
-
-            getProviderModels(provider) {
-                return this.providerModels[provider] || [];
             }
 
             sendMessage() {
@@ -4147,26 +2981,25 @@
                 if (!text) return;
 
                 const provider = this.selectedProvider;
-                const model = this.selectedModel;
                 // Add user message
-                this.addMessage(text, 'user', provider, model);
+                this.addMessage(text, 'user', provider);
                 this.input.value = '';
 
                 // Simulate AI response
                 this.showLoadingIndicator();
                 setTimeout(() => {
                     this.removeLoadingIndicator();
-                    this.addMessage(this.generateAIResponse(text, provider, model), 'ai', provider, model);
+                    this.addMessage(this.generateAIResponse(text, provider), 'ai', provider);
                 }, 800);
             }
 
-            addMessage(text, sender, provider = null, model = null) {
+            addMessage(text, sender, provider = null) {
                 const message = {
                     id: Date.now(),
                     text,
                     sender,
                     provider: provider || this.selectedProvider,
-                    model: model || this.selectedModel,
+                    model: null,
                     timestamp: new Date()
                 };
 
@@ -4206,6 +3039,48 @@
                 this.messagesContainer.appendChild(div);
             }
 
+            /**
+             * AI-131: Add a collapsible reasoning block to the chat
+             * Shows orchestrator decision with complexity badge and expandable detail
+             */
+            addReasoningBlock({ agent, decision, complexity, reasoning, timestamp }) {
+                // Remove welcome message if present
+                const welcome = this.messagesContainer.querySelector('.chat-welcome');
+                if (welcome) welcome.remove();
+
+                const complexityLower = (complexity || '').toLowerCase();
+                const complexClass = complexityLower === 'complex' ? 'complex' : 'simple';
+                const blockId = `reasoning-${Date.now()}`;
+                const timeStr = timestamp
+                    ? new Date(timestamp).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
+                    : new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'chat-message system';
+                wrapper.setAttribute('data-testid', 'reasoning-message');
+
+                wrapper.innerHTML = `
+                    <div class="chat-message-content reasoning-block" data-testid="reasoning-block" style="max-width:90%;">
+                        <div class="reasoning-header" data-testid="reasoning-header" onclick="this.parentElement.querySelector('.reasoning-body').classList.toggle('hidden'); this.querySelector('.reasoning-toggle').classList.toggle('open');">
+                            <span style="font-size:1.1rem;">&#129504;</span>
+                            <strong style="color:#c4b5fd; font-size:13px;">Orchestrator Reasoning</strong>
+                            <span class="complexity-badge ${complexClass}" data-testid="complexity-badge">${this.escapeHtml(complexity || '')}</span>
+                            <span style="flex:1;"></span>
+                            <span class="reasoning-toggle" data-testid="reasoning-toggle">&#9654;</span>
+                        </div>
+                        <div class="reasoning-body hidden" data-testid="reasoning-body" id="${blockId}">
+                            <div class="reasoning-detail-row"><strong>Agent:</strong> ${this.escapeHtml(agent || '')}</div>
+                            <div class="reasoning-detail-row"><strong>Decision:</strong> ${this.escapeHtml(decision || '')}</div>
+                            <div class="reasoning-detail-row" style="margin-top:8px; color:#e2e8f0;">${this.escapeHtml(reasoning || '')}</div>
+                        </div>
+                        <div class="chat-timestamp">${timeStr}</div>
+                    </div>
+                `;
+
+                this.messagesContainer.appendChild(wrapper);
+                this.scrollToBottom();
+            }
+
             showLoadingIndicator() {
                 const div = document.createElement('div');
                 div.className = 'chat-message ai';
@@ -4233,7 +3108,7 @@
                 }
             }
 
-            generateAIResponse(userMessage, provider, model) {
+            generateAIResponse(userMessage, provider) {
                 // Simple response generation based on keywords
                 const lower = userMessage.toLowerCase();
                 const providerNames = {
@@ -4246,28 +3121,23 @@
                 };
                 const providerName = providerNames[provider] || provider;
 
-                // Get model name
-                const models = this.providerModels[provider] || [];
-                const modelObj = models.find(m => m.id === model);
-                const modelName = modelObj ? modelObj.name : model;
-
                 if (lower.includes('status') || lower.includes('how')) {
-                    return `[${providerName} - ${modelName}] Your agents are running smoothly. All systems are operational with 99.2% uptime.`;
+                    return `[${providerName}] Your agents are running smoothly. All systems are operational with 99.2% uptime.`;
                 }
                 if (lower.includes('metric') || lower.includes('performance')) {
-                    return `[${providerName} - ${modelName}] Current metrics show strong performance: 94% success rate, avg response time 245ms.`;
+                    return `[${providerName}] Current metrics show strong performance: 94% success rate, avg response time 245ms.`;
                 }
                 if (lower.includes('error') || lower.includes('issue') || lower.includes('problem')) {
-                    return `[${providerName} - ${modelName}] No critical errors detected. All monitoring systems are reporting normal status.`;
+                    return `[${providerName}] No critical errors detected. All monitoring systems are reporting normal status.`;
                 }
                 if (lower.includes('cost') || lower.includes('usage') || lower.includes('token')) {
-                    return `[${providerName} - ${modelName}] Token usage is at 42% of daily allocation. Cost trending 8% below budget.`;
+                    return `[${providerName}] Token usage is at 42% of daily allocation. Cost trending 8% below budget.`;
                 }
                 if (lower.includes('hello') || lower.includes('hi') || lower.includes('hey')) {
-                    return `[${providerName} - ${modelName}] Hello! I'm here to help you with any questions about your agent dashboard.`;
+                    return `[${providerName}] Hello! I'm here to help you with any questions about your agent dashboard.`;
                 }
 
-                return `[${providerName} - ${modelName}] I understand. Based on your agent dashboard, everything is performing within expected parameters. Is there anything specific you'd like to know?`;
+                return `[${providerName}] I understand. Based on your agent dashboard, everything is performing within expected parameters. Is there anything specific you'd like to know?`;
             }
 
             scrollToBottom() {
@@ -4302,10 +3172,6 @@
             // AI-133: Message History Persistence Methods
             // ---------------------------------------------------------------
 
-            /**
-             * Persist a single message to the server API and localStorage backup.
-             * API format: {id, type: 'user'|'ai'|'system', content, timestamp, provider, model}
-             */
             async persistMessage(message) {
                 const entry = {
                     id: message.id,
@@ -4316,7 +3182,6 @@
                     model: message.model || null
                 };
 
-                // 1. Persist to server API
                 try {
                     await fetch(`${API_BASE_URL}/api/chat/history`, {
                         method: 'POST',
@@ -4324,21 +3189,15 @@
                         body: JSON.stringify(entry)
                     });
                 } catch (err) {
-                    console.warn('AI-133: Failed to persist message to API, using localStorage fallback:', err);
+                    console.warn('AI-133: Failed to persist message to API:', err);
                 }
 
-                // 2. Always update localStorage as backup
                 this.saveToLocalStorage();
             }
 
-            /**
-             * Restore chat history on page load.
-             * Tries the API first; falls back to localStorage if API fails or is empty.
-             */
             async restoreHistory() {
                 let restored = false;
 
-                // Try API first
                 try {
                     const response = await fetch(`${API_BASE_URL}/api/chat/history`);
                     if (response.ok) {
@@ -4354,7 +3213,6 @@
                     console.warn('AI-133: Could not load history from API:', err);
                 }
 
-                // Fallback to localStorage if API returned nothing
                 if (!restored) {
                     try {
                         const raw = localStorage.getItem('agent_dashboard_chat_history');
@@ -4373,12 +3231,7 @@
                 this.updateHistoryCount();
             }
 
-            /**
-             * Load messages from a stored array (API or localStorage format) into the UI.
-             * Each entry: {id, type, content, timestamp, provider, model}
-             */
             loadMessagesFromStore(entries) {
-                // Remove welcome message
                 const welcome = this.messagesContainer.querySelector('.chat-welcome');
                 if (welcome) welcome.remove();
 
@@ -4386,7 +3239,7 @@
                     const message = {
                         id: entry.id,
                         text: entry.content,
-                        sender: entry.type,  // 'user', 'ai', 'system'
+                        sender: entry.type,
                         provider: entry.provider,
                         model: entry.model,
                         timestamp: new Date(entry.timestamp)
@@ -4397,10 +3250,6 @@
                 this.scrollToBottom();
             }
 
-            /**
-             * Save current messages to localStorage as backup.
-             * Uses key: agent_dashboard_chat_history
-             */
             saveToLocalStorage() {
                 try {
                     const entries = this.messages.map(m => ({
@@ -4419,33 +3268,24 @@
                 }
             }
 
-            /**
-             * Clear all history: server API, localStorage, and in-memory messages.
-             */
             async clearHistory() {
-                // Clear server API
                 try {
                     await fetch(`${API_BASE_URL}/api/chat/history`, { method: 'DELETE' });
                 } catch (err) {
                     console.warn('AI-133: Failed to clear history from API:', err);
                 }
 
-                // Clear localStorage
                 try {
                     localStorage.removeItem('agent_dashboard_chat_history');
                 } catch (err) {
                     console.warn('AI-133: Failed to clear localStorage:', err);
                 }
 
-                // Clear in-memory + DOM
                 this.clearMessages();
                 this.updateHistoryCount();
                 console.log('AI-133: Chat history cleared');
             }
 
-            /**
-             * Update the history count label in the toolbar.
-             */
             updateHistoryCount() {
                 const countEl = document.getElementById('chat-history-count');
                 if (countEl) {
@@ -4455,258 +3295,11 @@
             }
         }
 
-        // ==========================================
-        // Code Stream Renderer - AI-99
-        // ==========================================
-
-        class CodeStreamRenderer {
-            constructor(chatInterface) {
-                this.chatInterface = chatInterface;
-                this.currentStream = null;
-                this.codeStreams = new Map(); // Track multiple file streams
-            }
-
-            /**
-             * Add a code chunk to the stream
-             * @param {string} content - Code content
-             * @param {string} filePath - File being edited
-             * @param {number} lineNumber - Line number
-             * @param {string} operation - 'add', 'modify', or 'delete'
-             * @param {string} language - Programming language
-             */
-            addCodeChunk(content, filePath, lineNumber, operation, language = 'python') {
-                const streamKey = filePath;
-
-                // Create new stream if doesn't exist
-                if (!this.codeStreams.has(streamKey)) {
-                    this.createCodeStream(filePath, language);
-                }
-
-                const stream = this.codeStreams.get(streamKey);
-
-                // Add the code line
-                this.addCodeLine(stream, content, lineNumber, operation, language);
-
-                // Update stats
-                this.updateStreamStats(stream, operation);
-
-                // Mark as streaming
-                this.markStreaming(stream);
-            }
-
-            /**
-             * Create a new code stream container
-             */
-            createCodeStream(filePath, language) {
-                const container = document.createElement('div');
-                container.className = 'code-stream-container';
-                container.setAttribute('data-testid', 'code-stream-container');
-                container.setAttribute('data-file-path', filePath);
-
-                container.innerHTML = `
-                    <div class="code-stream-header">
-                        <div class="code-stream-file-path" data-testid="code-stream-file-path">${this.escapeHtml(filePath)}</div>
-                        <div class="code-stream-status streaming" data-testid="code-stream-status">
-                            <div class="streaming-indicator"></div>
-                            <span>Streaming...</span>
-                        </div>
-                    </div>
-                    <div class="code-stream-body" data-testid="code-stream-body">
-                    </div>
-                    <div class="code-stream-footer">
-                        <div class="code-stats">
-                            <div class="code-stat additions" data-testid="code-additions">
-                                <span>+</span>
-                                <span class="additions-count">0</span>
-                            </div>
-                            <div class="code-stat deletions" data-testid="code-deletions">
-                                <span>-</span>
-                                <span class="deletions-count">0</span>
-                            </div>
-                        </div>
-                        <button class="copy-code-button" data-testid="copy-code-button">Copy Code</button>
-                    </div>
-                `;
-
-                // Add copy functionality
-                const copyButton = container.querySelector('.copy-code-button');
-                copyButton.addEventListener('click', () => this.copyCode(container));
-
-                // Add to chat messages
-                this.chatInterface.messagesContainer.appendChild(container);
-                this.chatInterface.scrollToBottom();
-
-                // Store stream reference
-                this.codeStreams.set(filePath, {
-                    container,
-                    body: container.querySelector('.code-stream-body'),
-                    additions: 0,
-                    deletions: 0,
-                    lines: []
-                });
-
-                return this.codeStreams.get(filePath);
-            }
-
-            /**
-             * Add a single code line to the stream
-             */
-            addCodeLine(stream, content, lineNumber, operation, language) {
-                const lineDiv = document.createElement('div');
-                lineDiv.className = `code-line ${operation}`;
-                lineDiv.setAttribute('data-testid', 'code-line');
-                lineDiv.setAttribute('data-operation', operation);
-                lineDiv.setAttribute('data-line-number', lineNumber);
-
-                // Apply syntax highlighting
-                const highlightedCode = this.highlightCode(content, language);
-
-                lineDiv.innerHTML = `
-                    <span class="code-line-number">${lineNumber}</span>
-                    <span class="code-line-content">${highlightedCode}</span>
-                `;
-
-                stream.body.appendChild(lineDiv);
-                stream.lines.push({ content, lineNumber, operation });
-
-                // Auto-scroll to bottom
-                stream.body.scrollTop = stream.body.scrollHeight;
-            }
-
-            /**
-             * Apply syntax highlighting to code
-             */
-            highlightCode(code, language) {
-                // Use Prism.js if available
-                if (typeof Prism !== 'undefined') {
-                    const grammar = Prism.languages[language] || Prism.languages.plaintext;
-                    try {
-                        return Prism.highlight(code, grammar, language);
-                    } catch (e) {
-                        console.warn('Prism highlighting failed:', e);
-                        return this.escapeHtml(code);
-                    }
-                }
-
-                // Fallback: simple highlighting
-                return this.simpleHighlight(code, language);
-            }
-
-            /**
-             * Simple syntax highlighting fallback
-             */
-            simpleHighlight(code, language) {
-                const escaped = this.escapeHtml(code);
-
-                if (language === 'python') {
-                    return escaped
-                        .replace(/\b(def|class|import|from|return|if|else|elif|for|while|try|except|finally|with|as|async|await)\b/g,
-                                '<span class="token-keyword">$1</span>')
-                        .replace(/(["'])(.*?)\1/g, '<span class="token-string">$1$2$1</span>')
-                        .replace(/#.*/g, '<span class="token-comment">$&</span>')
-                        .replace(/\b(\d+)\b/g, '<span class="token-number">$1</span>');
-                }
-
-                return escaped;
-            }
-
-            /**
-             * Update stream statistics
-             */
-            updateStreamStats(stream, operation) {
-                if (operation === 'add') {
-                    stream.additions++;
-                } else if (operation === 'delete') {
-                    stream.deletions++;
-                }
-
-                const additionsCount = stream.container.querySelector('.additions-count');
-                const deletionsCount = stream.container.querySelector('.deletions-count');
-
-                if (additionsCount) additionsCount.textContent = stream.additions;
-                if (deletionsCount) deletionsCount.textContent = stream.deletions;
-            }
-
-            /**
-             * Mark stream as actively streaming
-             */
-            markStreaming(stream) {
-                const status = stream.container.querySelector('.code-stream-status');
-                if (status) {
-                    status.className = 'code-stream-status streaming';
-                    status.innerHTML = `
-                        <div class="streaming-indicator"></div>
-                        <span>Streaming...</span>
-                    `;
-                }
-            }
-
-            /**
-             * Mark stream as complete
-             */
-            completeStream(filePath) {
-                const stream = this.codeStreams.get(filePath);
-                if (!stream) return;
-
-                const status = stream.container.querySelector('.code-stream-status');
-                if (status) {
-                    status.className = 'code-stream-status complete';
-                    status.innerHTML = `<span>Complete</span>`;
-                }
-            }
-
-            /**
-             * Copy code to clipboard
-             */
-            async copyCode(container) {
-                const lines = container.querySelectorAll('.code-line-content');
-                const code = Array.from(lines).map(line => line.textContent).join('\n');
-
-                try {
-                    await navigator.clipboard.writeText(code);
-                    const button = container.querySelector('.copy-code-button');
-                    button.textContent = 'Copied!';
-                    button.classList.add('copied');
-
-                    setTimeout(() => {
-                        button.textContent = 'Copy Code';
-                        button.classList.remove('copied');
-                    }, 2000);
-                } catch (err) {
-                    console.error('Failed to copy code:', err);
-                }
-            }
-
-            /**
-             * Escape HTML to prevent XSS
-             */
-            escapeHtml(text) {
-                const map = {
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    '"': '&quot;',
-                    "'": '&#039;'
-                };
-                return text.replace(/[&<>"']/g, m => map[m]);
-            }
-
-            /**
-             * Clear all streams
-             */
-            clearStreams() {
-                this.codeStreams.clear();
-                this.currentStream = null;
-            }
-        }
-
         let chatInterface;
 
         function initChat() {
             chatInterface = new ChatInterface();
-            chatInterface.codeStreamRenderer = new CodeStreamRenderer(chatInterface);
-            window.chatInterface = chatInterface; // Expose for testing
-            console.log('Chat interface initialized with code streaming support');
+            console.log('Chat interface initialized');
         }
 
         // Start when DOM is ready
@@ -4730,271 +3323,142 @@
         // =====================================================================
         // AI-130: Agent Controls - Pause/Resume & Requirement Editing
         // =====================================================================
-
-        // State tracking for agent controls (agent_id -> {paused, requirements})
         const agentControlState = {};
         let requirementsModalAgentId = null;
 
-        /**
-         * Escape HTML special characters to prevent XSS when inserting into innerHTML.
-         */
-        function escapeHtmlAgentControls(text) {
-            const div = document.createElement('div');
-            div.appendChild(document.createTextNode(String(text)));
-            return div.innerHTML;
-        }
-
-        /**
-         * Fetch all agent control states from the API and refresh the UI.
-         */
         async function refreshAgentControls() {
             try {
-                const response = await fetch('/api/agent-controls');
-                if (!response.ok) return;
-                const data = await response.json();
-                const controls = data.agent_controls || {};
-                Object.assign(agentControlState, controls);
+                const r = await fetch('/api/agent-controls');
+                if (!r.ok) return;
+                const d = await r.json();
+                Object.assign(agentControlState, d.agent_controls || {});
                 renderAgentControlCards();
                 updatePausedCountBadge();
-            } catch (e) {
-                // silently skip if endpoint not available yet
-            }
+            } catch (e) {}
         }
 
-        /**
-         * Render per-agent control cards in the grid.
-         * Uses the agents from the current metrics state + agentControlState.
-         * Agent IDs are HTML-escaped before insertion to prevent XSS.
-         * Event handlers use data attributes and addEventListener (no inline onclick).
-         */
         function renderAgentControlCards() {
             const grid = document.getElementById('agent-controls-grid');
             if (!grid) return;
-
-            // Collect known agent names from AGENT_META and agentControlState
-            const knownAgents = new Set([
-                ...Object.keys(AGENT_META),
-                ...Object.keys(agentControlState)
-            ]);
-
-            if (knownAgents.size === 0) {
-                grid.innerHTML = '<div style="color:#64748b;font-size:0.85rem;padding:10px 0;">No agents found.</div>';
+            const knownAgents = Object.keys(agentControlState);
+            if (!knownAgents.length) {
+                grid.innerHTML = '<div style="color:#64748b;font-size:.85rem;">No agents found.</div>';
                 return;
             }
-
-            const cards = Array.from(knownAgents).map(agentId => {
-                const control = agentControlState[agentId] || { paused: false, requirements: '' };
-                const isPaused = control.paused;
-                // Escape agentId before inserting into HTML attributes and text content
-                const safeAgentId = escapeHtmlAgentControls(agentId);
-                const displayName = safeAgentId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                const statusClass = isPaused ? 'status-paused' : 'status-idle';
-                const statusLabel = isPaused ? 'Paused' : 'Active';
-                const cardClass = isPaused ? 'agent-control-card is-paused' : 'agent-control-card';
-                const pauseIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
-                const resumeIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>`;
-                const editIcon = `<svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>`;
-
-                // Use data attributes for agent ID - event listeners attached after DOM insert
+            grid.innerHTML = knownAgents.map(agentId => {
+                const ctrl = agentControlState[agentId] || {paused: false, requirements: ''};
+                const isPaused = ctrl.paused;
+                const displayName = agentId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                 return `
-                    <div class="${cardClass}" data-agent-id="${safeAgentId}" id="agent-ctrl-${safeAgentId}">
+                    <div class="agent-control-card ${isPaused ? 'is-paused' : ''}" data-agent-id="${agentId}">
                         <div class="agent-control-card-header">
                             <span class="agent-control-name">${displayName}</span>
-                            <span class="agent-status-badge ${statusClass}">${statusLabel}</span>
+                            <span class="agent-control-status ${isPaused ? 'paused' : 'active'}">${isPaused ? 'Paused' : 'Active'}</span>
                         </div>
                         <div class="agent-control-actions">
                             ${isPaused
-                                ? `<button class="btn-control btn-resume btn-sm" data-agent-id="${safeAgentId}" data-action="resume">${resumeIcon} Resume</button>`
-                                : `<button class="btn-control btn-pause btn-sm" data-agent-id="${safeAgentId}" data-action="pause">${pauseIcon} Pause</button>`
+                                ? `<button class="btn-control btn-resume btn-sm" onclick="toggleAgentPause('${agentId}',false)">Resume</button>`
+                                : `<button class="btn-control btn-pause btn-sm" onclick="toggleAgentPause('${agentId}',true)">Pause</button>`
                             }
-                            <button class="btn-control btn-edit-req btn-sm" data-agent-id="${safeAgentId}" data-action="edit-req">${editIcon} Edit Requirements</button>
+                            <button class="btn-control btn-edit-req btn-sm" onclick="openRequirementsModal('${agentId}')">Edit Requirements</button>
                         </div>
-                    </div>
-                `;
+                    </div>`;
             }).join('');
-
-            grid.innerHTML = cards;
-
-            // Attach event listeners after DOM insertion (avoids inline onclick with agent IDs)
-            grid.querySelectorAll('[data-action="pause"]').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    toggleAgentPause(this.getAttribute('data-agent-id'), true);
-                });
-            });
-            grid.querySelectorAll('[data-action="resume"]').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    toggleAgentPause(this.getAttribute('data-agent-id'), false);
-                });
-            });
-            grid.querySelectorAll('[data-action="edit-req"]').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    openRequirementsModal(this.getAttribute('data-agent-id'));
-                });
-            });
         }
 
-        /**
-         * Pause or resume a single agent.
-         */
         async function toggleAgentPause(agentId, shouldPause) {
-            const action = shouldPause ? 'pause' : 'resume';
             try {
-                const response = await fetch(`/api/agents/${encodeURIComponent(agentId)}/${action}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                if (response.ok) {
-                    if (!agentControlState[agentId]) agentControlState[agentId] = { paused: false, requirements: '' };
-                    agentControlState[agentId].paused = shouldPause;
-                    renderAgentControlCards();
-                    updatePausedCountBadge();
-                }
-            } catch (e) {
-                console.error('Failed to toggle agent pause:', e);
-            }
+                await fetch('/api/agents/' + encodeURIComponent(agentId) + '/' + (shouldPause ? 'pause' : 'resume'), {method: 'POST'});
+            } catch (e) {}
+            if (!agentControlState[agentId]) agentControlState[agentId] = {paused: false, requirements: ''};
+            agentControlState[agentId].paused = shouldPause;
+            renderAgentControlCards();
+            updatePausedCountBadge();
         }
 
-        /**
-         * Pause all agents via the global endpoint.
-         */
         async function pauseAllAgents() {
             try {
-                const response = await fetch('/api/agents/pause-all', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    const agentIds = data.agent_ids || [];
-                    agentIds.forEach(id => {
-                        if (!agentControlState[id]) agentControlState[id] = { paused: false, requirements: '' };
+                const r = await fetch('/api/agents/pause-all', {method: 'POST'});
+                if (r.ok) {
+                    const d = await r.json();
+                    (d.agent_ids || []).forEach(id => {
+                        if (!agentControlState[id]) agentControlState[id] = {paused: false, requirements: ''};
                         agentControlState[id].paused = true;
                     });
                     renderAgentControlCards();
                     updatePausedCountBadge();
                 }
-            } catch (e) {
-                console.error('Failed to pause all agents:', e);
-            }
+            } catch (e) {}
         }
 
-        /**
-         * Resume all agents via the global endpoint.
-         */
         async function resumeAllAgents() {
             try {
-                const response = await fetch('/api/agents/resume-all', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    const agentIds = data.agent_ids || [];
-                    agentIds.forEach(id => {
-                        if (!agentControlState[id]) agentControlState[id] = { paused: false, requirements: '' };
+                const r = await fetch('/api/agents/resume-all', {method: 'POST'});
+                if (r.ok) {
+                    const d = await r.json();
+                    (d.agent_ids || []).forEach(id => {
+                        if (!agentControlState[id]) agentControlState[id] = {paused: false, requirements: ''};
                         agentControlState[id].paused = false;
                     });
                     renderAgentControlCards();
                     updatePausedCountBadge();
                 }
-            } catch (e) {
-                console.error('Failed to resume all agents:', e);
-            }
+            } catch (e) {}
         }
 
-        /**
-         * Update the paused count badge in the toolbar.
-         */
         function updatePausedCountBadge() {
             const badge = document.getElementById('paused-count-badge');
             if (!badge) return;
-            const pausedCount = Object.values(agentControlState).filter(c => c.paused).length;
-            if (pausedCount > 0) {
-                badge.textContent = `${pausedCount} paused`;
-                badge.style.display = 'inline-flex';
-            } else {
-                badge.style.display = 'none';
-            }
+            const cnt = Object.values(agentControlState).filter(c => c.paused).length;
+            if (cnt > 0) { badge.textContent = cnt + ' paused'; badge.style.display = 'inline-flex'; }
+            else { badge.style.display = 'none'; }
         }
 
-        /**
-         * Open the requirements editor modal for a given agent.
-         */
         async function openRequirementsModal(agentId) {
             requirementsModalAgentId = agentId;
-            const labelEl = document.getElementById('modal-agent-id-label');
-            const textarea = document.getElementById('requirements-textarea');
-            const successMsg = document.getElementById('modal-success-msg');
-
-            if (labelEl) labelEl.textContent = agentId;
-            if (successMsg) successMsg.style.display = 'none';
-
-            // Load current requirements from API
+            const label = document.getElementById('modal-agent-id-label');
+            const ta = document.getElementById('requirements-textarea');
+            const msg = document.getElementById('modal-success-msg');
+            if (label) label.textContent = agentId;
+            if (msg) msg.style.display = 'none';
             try {
-                const response = await fetch(`/api/agents/${encodeURIComponent(agentId)}/requirements`);
-                if (response.ok) {
-                    const data = await response.json();
-                    if (textarea) textarea.value = data.requirements || '';
-                } else {
-                    if (textarea) textarea.value = (agentControlState[agentId] || {}).requirements || '';
-                }
-            } catch (e) {
-                if (textarea) textarea.value = (agentControlState[agentId] || {}).requirements || '';
-            }
-
+                const r = await fetch('/api/agents/' + encodeURIComponent(agentId) + '/requirements');
+                if (r.ok) { const d = await r.json(); if (ta) ta.value = d.requirements || ''; }
+                else { if (ta) ta.value = (agentControlState[agentId] || {}).requirements || ''; }
+            } catch (e) { if (ta) ta.value = ''; }
             const modal = document.getElementById('requirements-modal');
             if (modal) modal.classList.add('active');
         }
 
-        /**
-         * Close the requirements editor modal.
-         */
         function closeRequirementsModal() {
             const modal = document.getElementById('requirements-modal');
             if (modal) modal.classList.remove('active');
             requirementsModalAgentId = null;
         }
 
-        /**
-         * Save requirements from the modal textarea to the API.
-         */
         async function saveRequirements() {
             if (!requirementsModalAgentId) return;
-            const textarea = document.getElementById('requirements-textarea');
-            const successMsg = document.getElementById('modal-success-msg');
-            const requirements = textarea ? textarea.value : '';
-
+            const ta = document.getElementById('requirements-textarea');
+            const msg = document.getElementById('modal-success-msg');
+            const requirements = ta ? ta.value : '';
             try {
-                const response = await fetch(
-                    `/api/agents/${encodeURIComponent(requirementsModalAgentId)}/requirements`,
-                    {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ requirements })
-                    }
-                );
-                if (response.ok) {
-                    if (!agentControlState[requirementsModalAgentId]) {
-                        agentControlState[requirementsModalAgentId] = { paused: false, requirements: '' };
-                    }
+                const r = await fetch('/api/agents/' + encodeURIComponent(requirementsModalAgentId) + '/requirements', {
+                    method: 'PUT', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({requirements})
+                });
+                if (r.ok) {
+                    if (!agentControlState[requirementsModalAgentId]) agentControlState[requirementsModalAgentId] = {paused: false, requirements: ''};
                     agentControlState[requirementsModalAgentId].requirements = requirements;
-                    if (successMsg) {
-                        successMsg.style.display = 'block';
-                        setTimeout(() => { successMsg.style.display = 'none'; }, 2000);
-                    }
+                    if (msg) { msg.style.display = 'block'; setTimeout(() => { msg.style.display = 'none'; }, 2000); }
                     setTimeout(closeRequirementsModal, 1500);
                 }
-            } catch (e) {
-                console.error('Failed to save requirements:', e);
-            }
+            } catch (e) {}
         }
 
-        // Close modal when clicking outside
         document.getElementById('requirements-modal').addEventListener('click', function(e) {
             if (e.target === this) closeRequirementsModal();
         });
 
-        // Initialize agent controls on page load and refresh periodically
         setTimeout(refreshAgentControls, 1000);
         setInterval(refreshAgentControls, 15000);
     </script>
