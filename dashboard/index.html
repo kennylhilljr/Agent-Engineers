@@ -403,6 +403,11 @@
             border-color: var(--accent-blue);
         }
 
+        /* Smooth model selector cascade transition */
+        #model-select {
+            transition: opacity 0.15s ease, border-color 0.2s ease;
+        }
+
         /* Provider Status Indicators */
         .provider-status-badge {
             display: inline-flex;
@@ -770,16 +775,21 @@
         // ========================================
         // STATE MANAGEMENT
         // ========================================
+        // Restore session from sessionStorage for model persistence
+        const _savedProvider = sessionStorage.getItem('currentProvider') || 'claude';
+        const _savedModel = sessionStorage.getItem('currentModel') || 'sonnet-4.5';
+
         // Expose state globally for testing
         window.state = {
             agents: [],
             activities: [],
             messages: [],
-            currentProvider: 'claude',
-            currentModel: 'opus-4.6',
+            currentProvider: _savedProvider,
+            currentModel: _savedModel,
             sessionNumber: 1,
             totalTokens: 0,
             totalCost: 0,
+            isAgentRunning: false,  // Hot-swap guard: prevent switching during active agent call
         };
         const state = window.state;
 
@@ -905,17 +915,51 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
-        function updateModelSelector(provider) {
+        // Sensible default models per provider (matches /api/providers default_model)
+        const providerDefaults = {
+            claude: 'sonnet-4.5',
+            openai: 'gpt-4o',
+            gemini: '2.5-flash',
+            groq: 'llama-3.3-70b',
+            kimi: 'moonshot',
+            windsurf: 'cascade'
+        };
+
+        function updateModelSelector(provider, preferredModel) {
             const modelSelect = document.getElementById('model-select');
+            if (!modelSelect) return;
+
             const models = providerModels[provider] || [];
 
-            modelSelect.innerHTML = models.map(model => `
-                <option value="${model.value}">${model.label}</option>
-            `).join('');
+            // Determine which model to select:
+            // 1. preferredModel if specified and valid for this provider
+            // 2. Provider default
+            // 3. First available model
+            const defaultModel = providerDefaults[provider] || (models.length > 0 ? models[0].value : '');
+            const targetModel = preferredModel && models.find(m => m.value === preferredModel)
+                ? preferredModel
+                : defaultModel;
+
+            // Add smooth fade transition
+            modelSelect.style.opacity = '0.5';
+            modelSelect.style.transition = 'opacity 0.15s ease';
+
+            modelSelect.innerHTML = models.map(model => {
+                const isSelected = model.value === targetModel;
+                return `<option value="${model.value}"${isSelected ? ' selected' : ''}>${model.label}</option>`;
+            }).join('');
 
             if (models.length > 0) {
-                state.currentModel = models[0].value;
+                state.currentModel = targetModel;
+                // Persist selection
+                sessionStorage.setItem('currentModel', state.currentModel);
+                sessionStorage.setItem('currentProvider', provider);
             }
+
+            // Restore opacity after update
+            setTimeout(() => {
+                modelSelect.style.opacity = '1';
+            }, 150);
         }
 
         function updateStats() {
@@ -941,6 +985,169 @@
         }
 
         // ========================================
+        // CHAT API - SSE STREAMING
+        // ========================================
+
+        /**
+         * Call /api/chat and stream SSE response into the chat UI.
+         * Handles text, tool_use, tool_result, done, and error events.
+         *
+         * @param {string} userMessage - The user's message
+         * @param {HTMLElement|null} sendBtn - The send button element (for re-enabling)
+         */
+        async function callChatAPI(userMessage, sendBtn) {
+            // Create an assistant message placeholder for streaming
+            const assistantMsgId = 'msg-' + Date.now();
+            let assistantTextContent = '';
+            let assistantMsgElement = null;
+
+            // Helper: create or get the streaming assistant message element
+            function getOrCreateAssistantMsg() {
+                if (assistantMsgElement) return assistantMsgElement;
+                // Create a new message element in the chat
+                const chatMessages = document.getElementById('chat-messages');
+                if (!chatMessages) return null;
+
+                const msgDiv = document.createElement('div');
+                msgDiv.className = 'message assistant-message';
+                msgDiv.id = assistantMsgId;
+                msgDiv.innerHTML = '<span class="msg-content"><span class="streaming-cursor">▋</span></span>';
+                chatMessages.appendChild(msgDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                assistantMsgElement = msgDiv;
+                return msgDiv;
+            }
+
+            // Helper: update the streaming text content
+            function updateStreamingText(text) {
+                assistantTextContent += text;
+                const el = getOrCreateAssistantMsg();
+                if (el) {
+                    const contentSpan = el.querySelector('.msg-content');
+                    if (contentSpan) {
+                        contentSpan.innerHTML = assistantTextContent.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                            .replace(/```([\w]*)\n([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>')
+                            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                            .replace(/\n/g, '<br>') + '<span class="streaming-cursor">▋</span>';
+                        const chatMessages = document.getElementById('chat-messages');
+                        if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
+                    }
+                }
+            }
+
+            // Helper: finalize the assistant message (remove cursor)
+            function finalizeAssistantMsg() {
+                if (assistantMsgElement) {
+                    const contentSpan = assistantMsgElement.querySelector('.msg-content');
+                    if (contentSpan) {
+                        // Remove streaming cursor
+                        contentSpan.innerHTML = contentSpan.innerHTML.replace('<span class="streaming-cursor">▋</span>', '');
+                    }
+                    // Add to state.messages
+                    state.messages.push({
+                        role: 'assistant',
+                        content: assistantTextContent,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            }
+
+            // Helper: add a tool transparency message
+            function addToolMessage(toolName, toolInput, isResult) {
+                addMessage('system', isResult
+                    ? `✅ Tool result from: ${toolName}`
+                    : `🔧 Calling Linear tool: ${toolName}${toolInput ? ' (' + JSON.stringify(toolInput).substring(0, 80) + ')' : ''}`
+                );
+            }
+
+            // Helper: finalize on completion
+            function onDone() {
+                finalizeAssistantMsg();
+                state.isAgentRunning = false;
+                if (sendBtn) {
+                    sendBtn.disabled = false;
+                    sendBtn.textContent = 'Send';
+                }
+                updateStats();
+            }
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: userMessage,
+                        provider: state.currentProvider,
+                        model: state.currentModel,
+                        conversation_history: getConversationContext()
+                    })
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                    addMessage('system', `❌ Chat error: ${errData.error || response.statusText}`);
+                    onDone();
+                    return;
+                }
+
+                const contentType = response.headers.get('content-type') || '';
+
+                if (contentType.includes('text/event-stream')) {
+                    // Parse SSE stream
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let buffer = '';
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop(); // Keep incomplete line in buffer
+
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                try {
+                                    const chunk = JSON.parse(line.slice(6));
+
+                                    if (chunk.type === 'text') {
+                                        updateStreamingText(chunk.content || '');
+                                    } else if (chunk.type === 'tool_use') {
+                                        addToolMessage(chunk.tool_name || 'unknown', chunk.tool_input, false);
+                                    } else if (chunk.type === 'tool_result') {
+                                        addToolMessage(chunk.tool_id || 'unknown', null, true);
+                                    } else if (chunk.type === 'error') {
+                                        addMessage('system', `❌ ${chunk.content || 'Unknown error'}`);
+                                    } else if (chunk.type === 'done') {
+                                        onDone();
+                                        return;
+                                    }
+                                } catch (e) {
+                                    // Skip malformed SSE data
+                                }
+                            }
+                        }
+                    }
+                    // Stream ended without 'done' event
+                    onDone();
+                } else {
+                    // JSON fallback (non-streaming)
+                    const data = await response.json();
+                    if (data.content) {
+                        getOrCreateAssistantMsg();
+                        updateStreamingText(data.content);
+                    }
+                    onDone();
+                }
+
+            } catch (err) {
+                addMessage('system', `❌ Network error: ${err.message}`);
+                onDone();
+            }
+        }
+
+        // ========================================
         // EVENT HANDLERS
         // ========================================
         function handleSendMessage() {
@@ -948,6 +1155,7 @@
             const message = input.value.trim();
 
             if (!message) return;
+            if (state.isAgentRunning) return; // Prevent double-send during active call
 
             // Add user message
             addMessage('user', message);
@@ -955,15 +1163,18 @@
             // Clear input
             input.value = '';
 
-            // Simulate assistant response
-            setTimeout(() => {
-                addMessage('assistant', `You said: "${message}". This is a placeholder response. The chat interface is ready for integration with the backend API.`);
-            }, 500);
+            // Set agent running flag (prevents hot-swap during response)
+            state.isAgentRunning = true;
 
-            // Update stats (mock)
-            state.totalTokens += Math.floor(Math.random() * 500) + 100;
-            state.totalCost += Math.random() * 0.05;
-            updateStats();
+            // Update send button state
+            const sendBtn = document.getElementById('send-button');
+            if (sendBtn) {
+                sendBtn.disabled = true;
+                sendBtn.textContent = 'Sending...';
+            }
+
+            // Call /api/chat with real SSE streaming
+            callChatAPI(message, sendBtn);
         }
 
         // ========================================
@@ -1053,19 +1264,86 @@
             }
         }
 
+        // ========================================
+        // HOT-SWAP HELPERS
+        // ========================================
+        function getConversationContext() {
+            /**
+             * Extract conversation history for context passing to new provider.
+             * Returns array of {role, content} objects from non-system messages.
+             * Exposed as window.getConversationContext for testing.
+             */
+            return state.messages
+                .filter(msg => msg.role !== 'system')
+                .map(msg => ({
+                    role: msg.role,
+                    content: msg.content,
+                    timestamp: msg.timestamp
+                }));
+        }
+        window.getConversationContext = getConversationContext;
+
+        function performHotSwap(previousProvider, previousModel, newProvider, newModel) {
+            /**
+             * Perform a provider hot-swap:
+             * 1. Preserve full conversation history (it's already in state.messages)
+             * 2. Insert a clear system message noting the transition
+             * 3. The conversation context is accessible via getConversationContext()
+             *    for the next API call to the new provider
+             *
+             * Exposed as window.performHotSwap for testing.
+             */
+            const contextCount = getConversationContext().length;
+            const previousName = previousProvider.charAt(0).toUpperCase() + previousProvider.slice(1);
+            const newName = newProvider.charAt(0).toUpperCase() + newProvider.slice(1);
+
+            // Insert clear system message noting the provider change
+            const systemMsg = [
+                `🔄 Provider switched: ${previousName} (${previousModel}) → ${newName} (${newModel})`,
+                `Conversation history preserved (${contextCount} message${contextCount !== 1 ? 's' : ''}).`,
+                `Context will be sent to ${newName} for continuity.`
+            ].join(' ');
+
+            addMessage('system', systemMsg);
+        }
+        window.performHotSwap = performHotSwap;
+
         function handleProviderChange(event) {
-            state.currentProvider = event.target.value;
-            updateModelSelector(state.currentProvider);
+            const previousProvider = state.currentProvider;
+            const previousModel = state.currentModel;
+            const newProvider = event.target.value;
+
+            // Hot-swap guard: don't allow switching while an agent call is running
+            if (state.isAgentRunning) {
+                addMessage('system', '⚠️ Cannot switch provider while an agent response is in progress.');
+                // Reset the selector to the current provider
+                const providerSelect = document.getElementById('provider-select');
+                if (providerSelect) providerSelect.value = previousProvider;
+                return;
+            }
+
+            state.currentProvider = newProvider;
+            // Persist provider selection
+            sessionStorage.setItem('currentProvider', state.currentProvider);
+
+            // Get preferred model from provider config (backend or local default)
+            const providerInfo = window.providerStatus[state.currentProvider];
+            const preferredModel = providerInfo ? providerInfo.default_model : null;
+
+            updateModelSelector(state.currentProvider, preferredModel);
             updateStats();
 
             // Update provider status badge for the new selection
             updateCurrentProviderStatus(state.currentProvider, window.providerStatus);
 
-            addMessage('system', `Switched to provider: ${state.currentProvider}`);
+            // Perform hot-swap: preserve history, insert system message
+            performHotSwap(previousProvider, previousModel, state.currentProvider, state.currentModel);
         }
 
         function handleModelChange(event) {
             state.currentModel = event.target.value;
+            // Persist model selection for session
+            sessionStorage.setItem('currentModel', state.currentModel);
             addMessage('system', `Switched to model: ${state.currentModel}`);
         }
 
@@ -1120,7 +1398,15 @@
             // Render initial UI
             renderAgents();
             renderActivities();
-            updateModelSelector(state.currentProvider);
+
+            // Restore provider selection in DOM
+            const providerSelect = document.getElementById('provider-select');
+            if (providerSelect && state.currentProvider) {
+                providerSelect.value = state.currentProvider;
+            }
+
+            // Update model selector with persisted model selection
+            updateModelSelector(state.currentProvider, state.currentModel);
             updateStats();
 
             // Add welcome message
