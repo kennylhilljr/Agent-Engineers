@@ -48,12 +48,17 @@ for _sub in ["logging_config", "metrics", "metrics_store", "collector"]:
             except Exception:
                 pass  # best-effort; some sub-modules may have further deps
 
-# 3. Override dashboard.server with the worktree's AI-161 version
+# 3. Override dashboard.collector with the worktree's AI-171 version
+_worktree_collector_path = _WORKTREE_ROOT / "dashboard" / "collector.py"
+if _worktree_collector_path.exists():
+    _load_module_from_file("dashboard.collector", _worktree_collector_path)
+
+# 4. Override dashboard.server with the worktree's AI-161 version
 _worktree_server_path = _WORKTREE_ROOT / "dashboard" / "server.py"
 if _worktree_server_path.exists():
     _load_module_from_file("dashboard.server", _worktree_server_path)
 
-# 4. Override dashboard.rest_api_server with the worktree's AI-169 version
+# 5. Override dashboard.rest_api_server with the worktree's AI-169 version
 _worktree_rest_api_path = _WORKTREE_ROOT / "dashboard" / "rest_api_server.py"
 if _worktree_rest_api_path.exists():
     _load_module_from_file("dashboard.rest_api_server", _worktree_rest_api_path)
