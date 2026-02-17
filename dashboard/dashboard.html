@@ -4495,6 +4495,15 @@
         let requirementsModalAgentId = null;
 
         /**
+         * Escape HTML special characters to prevent XSS when inserting into innerHTML.
+         */
+        function escapeHtmlAgentControls(text) {
+            const div = document.createElement('div');
+            div.appendChild(document.createTextNode(String(text)));
+            return div.innerHTML;
+        }
+
+        /**
          * Fetch all agent control states from the API and refresh the UI.
          */
         async function refreshAgentControls() {
@@ -4514,6 +4523,8 @@
         /**
          * Render per-agent control cards in the grid.
          * Uses the agents from the current metrics state + agentControlState.
+         * Agent IDs are HTML-escaped before insertion to prevent XSS.
+         * Event handlers use data attributes and addEventListener (no inline onclick).
          */
         function renderAgentControlCards() {
             const grid = document.getElementById('agent-controls-grid');
@@ -4533,7 +4544,9 @@
             const cards = Array.from(knownAgents).map(agentId => {
                 const control = agentControlState[agentId] || { paused: false, requirements: '' };
                 const isPaused = control.paused;
-                const displayName = agentId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                // Escape agentId before inserting into HTML attributes and text content
+                const safeAgentId = escapeHtmlAgentControls(agentId);
+                const displayName = safeAgentId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                 const statusClass = isPaused ? 'status-paused' : 'status-idle';
                 const statusLabel = isPaused ? 'Paused' : 'Active';
                 const cardClass = isPaused ? 'agent-control-card is-paused' : 'agent-control-card';
@@ -4541,24 +4554,42 @@
                 const resumeIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>`;
                 const editIcon = `<svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>`;
 
+                // Use data attributes for agent ID - event listeners attached after DOM insert
                 return `
-                    <div class="${cardClass}" data-agent-id="${agentId}" id="agent-ctrl-${agentId}">
+                    <div class="${cardClass}" data-agent-id="${safeAgentId}" id="agent-ctrl-${safeAgentId}">
                         <div class="agent-control-card-header">
                             <span class="agent-control-name">${displayName}</span>
                             <span class="agent-status-badge ${statusClass}">${statusLabel}</span>
                         </div>
                         <div class="agent-control-actions">
                             ${isPaused
-                                ? `<button class="btn-control btn-resume btn-sm" onclick="toggleAgentPause('${agentId}', false)">${resumeIcon} Resume</button>`
-                                : `<button class="btn-control btn-pause btn-sm" onclick="toggleAgentPause('${agentId}', true)">${pauseIcon} Pause</button>`
+                                ? `<button class="btn-control btn-resume btn-sm" data-agent-id="${safeAgentId}" data-action="resume">${resumeIcon} Resume</button>`
+                                : `<button class="btn-control btn-pause btn-sm" data-agent-id="${safeAgentId}" data-action="pause">${pauseIcon} Pause</button>`
                             }
-                            <button class="btn-control btn-edit-req btn-sm" onclick="openRequirementsModal('${agentId}')">${editIcon} Edit Requirements</button>
+                            <button class="btn-control btn-edit-req btn-sm" data-agent-id="${safeAgentId}" data-action="edit-req">${editIcon} Edit Requirements</button>
                         </div>
                     </div>
                 `;
             }).join('');
 
             grid.innerHTML = cards;
+
+            // Attach event listeners after DOM insertion (avoids inline onclick with agent IDs)
+            grid.querySelectorAll('[data-action="pause"]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    toggleAgentPause(this.getAttribute('data-agent-id'), true);
+                });
+            });
+            grid.querySelectorAll('[data-action="resume"]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    toggleAgentPause(this.getAttribute('data-agent-id'), false);
+                });
+            });
+            grid.querySelectorAll('[data-action="edit-req"]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    openRequirementsModal(this.getAttribute('data-agent-id'));
+                });
+            });
         }
 
         /**
