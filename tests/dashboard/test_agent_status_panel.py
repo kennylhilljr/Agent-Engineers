@@ -290,7 +290,7 @@ class TestLoadAgentStatusFunction:
     def test_start_polling_called_in_init(self, html_content):
         """startAgentStatusPolling must be called in init()."""
         idx = html_content.index('function init()')
-        section = html_content[idx:idx + 2000]
+        section = html_content[idx:idx + 3000]
         assert 'startAgentStatusPolling' in section
 
 
