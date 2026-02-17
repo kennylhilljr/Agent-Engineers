@@ -62,3 +62,8 @@ if _worktree_server_path.exists():
 _worktree_rest_api_path = _WORKTREE_ROOT / "dashboard" / "rest_api_server.py"
 if _worktree_rest_api_path.exists():
     _load_module_from_file("dashboard.rest_api_server", _worktree_rest_api_path)
+
+# 6. Load dashboard.orchestrator_hook from the worktree (AI-172)
+_worktree_orchestrator_hook_path = _WORKTREE_ROOT / "dashboard" / "orchestrator_hook.py"
+if _worktree_orchestrator_hook_path.exists():
+    _load_module_from_file("dashboard.orchestrator_hook", _worktree_orchestrator_hook_path)
