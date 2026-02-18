@@ -3436,14 +3436,35 @@
         const WS_BASE_URL = `ws://${window.location.host}`;
         const REFRESH_INTERVAL = 30000; // 30 seconds (fallback if WebSocket fails)
         const MAX_RECONNECT_DELAY = 30000; // 30 seconds max delay
-        const INITIAL_RECONNECT_DELAY = 1000; // 1 second initial delay
 
         let refreshTimer;
         let charts = {};
         let websocket = null;
-        let reconnectDelay = INITIAL_RECONNECT_DELAY;
-        let reconnectTimer = null;
         let isManualClose = false;
+
+        // WS_RECONNECT: Exponential backoff reconnection manager (AI-184 / REQ-REL-002)
+        const WS_RECONNECT = {
+          attempts: 0,
+          maxDelay: 30000,
+          baseDelay: 1000,
+          timer: null,
+
+          getDelay() {
+            return Math.min(this.baseDelay * Math.pow(2, this.attempts), this.maxDelay);
+          },
+
+          schedule(connectFn) {
+            const delay = this.getDelay();
+            this.attempts++;
+            console.log(`WebSocket reconnecting in ${delay}ms (attempt ${this.attempts})`);
+            this.timer = setTimeout(connectFn, delay);
+          },
+
+          reset() {
+            this.attempts = 0;
+            if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+          }
+        };
 
         // Utility Functions
         function formatTime(date) {
@@ -4493,7 +4514,10 @@
                 websocket.onopen = () => {
                     console.log('WebSocket connected successfully');
                     updateConnectionStatus('connected', 'Live updates active');
-                    reconnectDelay = INITIAL_RECONNECT_DELAY; // Reset delay on successful connection
+                    WS_RECONNECT.reset(); // Reset exponential backoff counter (AI-184)
+
+                    // Re-fetch current state via REST to resync after reconnect (AI-184 / REQ-REL-002)
+                    fetchMetrics();
 
                     // Clear fallback timer if using WebSocket
                     if (refreshTimer) {
@@ -4536,6 +4560,8 @@
                 websocket.onerror = (error) => {
                     console.error('WebSocket error:', error);
                     updateConnectionStatus('disconnected', 'Connection error');
+                    // Close triggers onclose which schedules reconnect (AI-184)
+                    if (websocket) { websocket.close(); }
                 };
 
                 websocket.onclose = (event) => {
@@ -4544,45 +4570,21 @@
 
                     if (!isManualClose) {
                         updateConnectionStatus('disconnected', 'Reconnecting...');
-                        scheduleReconnect();
+                        // Use WS_RECONNECT for exponential backoff on unclean close (AI-184)
+                        if (!event.wasClean) {
+                            WS_RECONNECT.schedule(connectWebSocket);
+                        }
                     }
                 };
             } catch (error) {
                 console.error('Error creating WebSocket:', error);
                 updateConnectionStatus('disconnected', 'Connection failed');
-                scheduleReconnect();
-            }
-        }
-
-        function scheduleReconnect() {
-            if (reconnectTimer) {
-                clearTimeout(reconnectTimer);
-            }
-
-            console.log(`Scheduling reconnect in ${reconnectDelay}ms`);
-
-            reconnectTimer = setTimeout(() => {
-                console.log('Attempting to reconnect WebSocket...');
-                connectWebSocket();
-
-                // Exponential backoff with max delay
-                reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
-            }, reconnectDelay);
-
-            // Enable fallback polling while disconnected
-            if (!refreshTimer) {
-                refreshTimer = setInterval(updateDashboard, REFRESH_INTERVAL);
-                console.log('Fallback polling enabled');
+                WS_RECONNECT.schedule(connectWebSocket);
             }
         }
 
         function closeWebSocket() {
             isManualClose = true;
-
-            if (reconnectTimer) {
-                clearTimeout(reconnectTimer);
-                reconnectTimer = null;
-            }
 
             if (websocket) {
                 websocket.close();
