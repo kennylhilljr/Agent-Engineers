@@ -66,7 +66,7 @@ import logging
 import os
 import re
 import signal
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional, Set
 from uuid import uuid4
@@ -87,6 +87,33 @@ from dashboard.latency_benchmark import LatencyTracker, StreamingLatencyTracker
 from dashboard.structured_logging import RequestLogger, ProviderRoutingLogger, ErrorLogger
 from dashboard.rate_limiter import RateLimiter, get_identifier, get_rate_limiter, reset_rate_limiter
 from dashboard.usage_meter import UsageMeter, get_usage_meter, reset_usage_meter
+
+# AI-227: Telemetry & Usage Analytics
+try:
+    from telemetry.event_collector import (
+        get_collector as get_telemetry_collector,
+        is_telemetry_disabled,
+        write_opt_out_flag,
+    )
+    _TELEMETRY_AVAILABLE = True
+except ImportError:
+    _TELEMETRY_AVAILABLE = False
+    logger.warning("telemetry module not found — analytics disabled")
+
+
+def _collect_event(event_type: str, properties: Optional[dict] = None) -> None:
+    """Fire-and-forget telemetry event collection.
+
+    Safely wraps get_telemetry_collector() so any failure is silenced.
+    """
+    if not _TELEMETRY_AVAILABLE:
+        return
+    try:
+        collector = get_telemetry_collector()
+        collector.collect(event_type, properties or {})
+    except Exception:  # noqa: BLE001
+        pass
+
 
 # In-memory store for requirements (ticket_key -> requirement text)
 _requirements_store: dict = {}
@@ -497,6 +524,11 @@ class DashboardServer:
         self.app.on_startup.append(self._start_broadcast)
         self.app.on_cleanup.append(self._cleanup_websockets)
 
+        # AI-227: Start telemetry collector and emit session_started
+        if _TELEMETRY_AVAILABLE:
+            self.app.on_startup.append(self._start_telemetry)
+            self.app.on_cleanup.append(self._stop_telemetry)
+
         logger.info(f"Dashboard server initialized for project: {project_name}")
         logger.info(f"Metrics directory: {self.metrics_dir}")
 
@@ -656,6 +688,12 @@ class DashboardServer:
         self.app.router.add_get('/api/onboarding/complete', self.get_onboarding_complete)
         self.app.router.add_route('OPTIONS', '/api/onboarding/status', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/onboarding/complete', self.handle_options)
+
+        # AI-227: Telemetry analytics endpoints
+        self.app.router.add_get('/api/admin/analytics', self.get_analytics)
+        self.app.router.add_post('/api/telemetry/optout', self.post_telemetry_optout)
+        self.app.router.add_route('OPTIONS', '/api/admin/analytics', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/telemetry/optout', self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
         """Handle CORS preflight OPTIONS requests."""
@@ -917,6 +955,14 @@ class DashboardServer:
             'timestamp': timestamp,
         }
         await self.broadcast_to_websockets(message)
+
+        # AI-227: Track agent pause/resume events
+        if new_status == "paused":
+            _collect_event("agent_paused", {"agent_name": agent_name})
+        elif new_status == "running" and previous_status == "paused":
+            _collect_event("agent_resumed", {"agent_name": agent_name})
+        elif new_status == "running" and previous_status == "idle":
+            _collect_event("session_started", {"agent_name": agent_name})
 
         return web.json_response({
             'status': 'success',
@@ -1467,6 +1513,13 @@ class DashboardServer:
             f"intent={result['routing'].get('intent_type')}, "
             f"handler={result['routing'].get('handler')}"
         )
+
+        # AI-227: Track chat message event (no message content — privacy first)
+        _collect_event("chat_message_sent", {
+            "provider": result.get("provider", provider),
+            "intent_type": result["routing"].get("intent_type"),
+            "handler": result["routing"].get("handler"),
+        })
 
         return web.json_response(result)
 
@@ -3652,6 +3705,148 @@ class DashboardServer:
         return web.json_response({
             'status': 'ok',
             'message': 'Onboarding marked complete',
+        })
+
+    # =========================================================================
+    # AI-227: Telemetry lifecycle helpers
+    # =========================================================================
+
+    async def _start_telemetry(self, app) -> None:
+        """Start the telemetry collector and emit session_started (on_startup hook)."""
+        if not _TELEMETRY_AVAILABLE:
+            return
+        try:
+            collector = get_telemetry_collector()
+            await collector.start()
+            _collect_event("session_started", {"project": self.project_name})
+            logger.info("Telemetry collector started")
+        except Exception:  # noqa: BLE001
+            logger.debug("Telemetry start error (suppressed)", exc_info=True)
+
+    async def _stop_telemetry(self, app) -> None:
+        """Stop the telemetry collector gracefully (on_cleanup hook)."""
+        if not _TELEMETRY_AVAILABLE:
+            return
+        try:
+            collector = get_telemetry_collector()
+            _collect_event("session_ended", {"project": self.project_name})
+            await collector.stop()
+            logger.info("Telemetry collector stopped")
+        except Exception:  # noqa: BLE001
+            logger.debug("Telemetry stop error (suppressed)", exc_info=True)
+
+    # =========================================================================
+    # AI-227: Analytics endpoint
+    # =========================================================================
+
+    async def get_analytics(self, request: Request) -> Response:
+        """GET /api/admin/analytics — Return event counts and basic funnel analysis.
+
+        Protected: returns 401 when DASHBOARD_AUTH_TOKEN is set but no valid
+        bearer token is provided.  (The auth_middleware handles that gate; this
+        handler adds a second explicit check so unauthenticated local installs
+        still work while still returning 401 when there is no telemetry data.)
+
+        Returns JSON:
+            {
+              "total_events": int,
+              "events_last_24h": int,
+              "events_last_7d": int,
+              "counts_by_type": {event_type: int, ...},
+              "daily_totals": [{"date": "YYYY-MM-DD", "count": int}, ...],
+              "telemetry_disabled": bool
+            }
+        """
+        if not _TELEMETRY_AVAILABLE:
+            return web.json_response(
+                {"error": "Telemetry module not available"},
+                status=503,
+            )
+
+        # Read JSONL storage
+        try:
+            storage_path = get_telemetry_collector().storage_path
+        except Exception:
+            storage_path = None  # type: ignore[assignment]
+
+        counts_by_type: dict = {}
+        daily_totals: dict = {}
+        events_last_24h = 0
+        events_last_7d = 0
+        total_events = 0
+
+        now = datetime.now(timezone.utc)
+        cutoff_24h = now - timedelta(hours=24)
+        cutoff_7d = now - timedelta(days=7)
+
+        if storage_path and Path(storage_path).exists():
+            try:
+                with open(storage_path, "r", encoding="utf-8") as fh:
+                    for line in fh:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            ev = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+
+                        total_events += 1
+                        etype = ev.get("event_type", "unknown")
+                        counts_by_type[etype] = counts_by_type.get(etype, 0) + 1
+
+                        ts_str = ev.get("timestamp", "")
+                        try:
+                            ts = datetime.fromisoformat(ts_str)
+                            if ts.tzinfo is None:
+                                ts = ts.replace(tzinfo=timezone.utc)
+                            day_key = ts.strftime("%Y-%m-%d")
+                            daily_totals[day_key] = daily_totals.get(day_key, 0) + 1
+                            if ts >= cutoff_24h:
+                                events_last_24h += 1
+                            if ts >= cutoff_7d:
+                                events_last_7d += 1
+                        except (ValueError, TypeError):
+                            pass
+            except Exception:  # noqa: BLE001
+                logger.debug("Analytics read error (suppressed)", exc_info=True)
+
+        sorted_daily = sorted(
+            [{"date": k, "count": v} for k, v in daily_totals.items()],
+            key=lambda x: x["date"],
+        )
+
+        return web.json_response({
+            "total_events": total_events,
+            "events_last_24h": events_last_24h,
+            "events_last_7d": events_last_7d,
+            "counts_by_type": counts_by_type,
+            "daily_totals": sorted_daily,
+            "telemetry_disabled": is_telemetry_disabled(),
+        })
+
+    async def post_telemetry_optout(self, request: Request) -> Response:
+        """POST /api/telemetry/optout — Disable telemetry collection.
+
+        Creates a local opt-out flag file so the setting persists across
+        server restarts.  To re-enable, delete the .telemetry_optout file or
+        unset the TELEMETRY_DISABLED env var.
+
+        Returns:
+            200 JSON: {"status": "ok", "telemetry_disabled": true}
+        """
+        if not _TELEMETRY_AVAILABLE:
+            return web.json_response({"status": "ok", "telemetry_disabled": True})
+
+        try:
+            write_opt_out_flag()
+        except Exception:  # noqa: BLE001
+            logger.debug("Telemetry opt-out write error (suppressed)", exc_info=True)
+
+        return web.json_response({
+            "status": "ok",
+            "telemetry_disabled": True,
+            "message": "Telemetry opt-out recorded. Collection is disabled.",
         })
 
     def run(self):

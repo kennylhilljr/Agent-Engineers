@@ -11287,5 +11287,268 @@
         }
     });
     </script>
+
+    <!-- =====================================================================
+         AI-227: Analytics Widget (Telemetry & Usage Analytics)
+         Collapsible section showing event summary cards + bar chart.
+         ===================================================================== -->
+    <style>
+        /* ---- Analytics section ---- */
+        #analytics-section {
+            position: fixed;
+            bottom: 16px;
+            right: 16px;
+            width: 340px;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 10px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+            z-index: 900;
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            font-size: 13px;
+            color: #e2e8f0;
+            overflow: hidden;
+        }
+        #analytics-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            background: #0f172a;
+            cursor: pointer;
+            user-select: none;
+            border-bottom: 1px solid #334155;
+        }
+        #analytics-header:hover { background: #1e293b; }
+        #analytics-header h4 {
+            margin: 0;
+            font-size: 13px;
+            font-weight: 600;
+            color: #94a3b8;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+        #analytics-toggle-btn {
+            background: none;
+            border: none;
+            color: #64748b;
+            font-size: 16px;
+            cursor: pointer;
+            line-height: 1;
+        }
+        #analytics-body {
+            padding: 12px 14px 14px;
+        }
+        .analytics-cards {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .analytics-card {
+            flex: 1;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 7px;
+            padding: 8px 10px;
+            text-align: center;
+        }
+        .analytics-card .ac-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #38bdf8;
+            display: block;
+        }
+        .analytics-card .ac-label {
+            font-size: 10px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 2px;
+        }
+        .analytics-bar-chart {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .analytics-bar-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .analytics-bar-label {
+            width: 120px;
+            font-size: 11px;
+            color: #94a3b8;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex-shrink: 0;
+        }
+        .analytics-bar-track {
+            flex: 1;
+            background: #0f172a;
+            border-radius: 4px;
+            height: 12px;
+            overflow: hidden;
+        }
+        .analytics-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #0ea5e9, #38bdf8);
+            border-radius: 4px;
+            transition: width 0.4s ease;
+        }
+        .analytics-bar-count {
+            font-size: 11px;
+            color: #64748b;
+            min-width: 24px;
+            text-align: right;
+        }
+        #analytics-most-common {
+            margin-top: 10px;
+            font-size: 11px;
+            color: #64748b;
+        }
+        #analytics-most-common span {
+            color: #38bdf8;
+            font-weight: 600;
+        }
+        #analytics-status {
+            font-size: 11px;
+            color: #475569;
+            margin-top: 8px;
+            text-align: right;
+        }
+        #analytics-disabled-badge {
+            display: inline-block;
+            background: #f43f5e22;
+            color: #f43f5e;
+            border: 1px solid #f43f5e44;
+            border-radius: 4px;
+            font-size: 10px;
+            padding: 1px 6px;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+        .analytics-section-hidden { display: none !important; }
+    </style>
+
+    <div id="analytics-section">
+        <div id="analytics-header" onclick="analyticsToggle()">
+            <h4>
+                Analytics
+                <span id="analytics-disabled-badge" style="display:none">OPT-OUT</span>
+            </h4>
+            <button id="analytics-toggle-btn" type="button" title="Toggle analytics">&#9660;</button>
+        </div>
+        <div id="analytics-body">
+            <div class="analytics-cards">
+                <div class="analytics-card">
+                    <span class="ac-value" id="ac-total">—</span>
+                    <div class="ac-label">Total</div>
+                </div>
+                <div class="analytics-card">
+                    <span class="ac-value" id="ac-today">—</span>
+                    <div class="ac-label">Today</div>
+                </div>
+                <div class="analytics-card">
+                    <span class="ac-value" id="ac-week">—</span>
+                    <div class="ac-label">7 Days</div>
+                </div>
+            </div>
+            <div id="analytics-bar-chart" class="analytics-bar-chart"></div>
+            <div id="analytics-most-common"></div>
+            <div id="analytics-status">Refreshing...</div>
+        </div>
+    </div>
+
+    <script>
+    // ---- AI-227: Analytics Widget JS ----
+    (function () {
+        var _analyticsOpen = true;
+
+        function analyticsToggle() {
+            _analyticsOpen = !_analyticsOpen;
+            var body = document.getElementById('analytics-body');
+            var btn = document.getElementById('analytics-toggle-btn');
+            if (body) body.style.display = _analyticsOpen ? '' : 'none';
+            if (btn) btn.innerHTML = _analyticsOpen ? '&#9660;' : '&#9650;';
+        }
+        window.analyticsToggle = analyticsToggle;
+
+        function renderBarChart(countsByType) {
+            var container = document.getElementById('analytics-bar-chart');
+            if (!container) return;
+            var entries = Object.entries(countsByType || {})
+                .sort(function(a, b) { return b[1] - a[1]; })
+                .slice(0, 6);
+            var max = entries.length ? entries[0][1] : 1;
+            var html = '';
+            entries.forEach(function(entry) {
+                var label = entry[0].replace(/_/g, ' ');
+                var count = entry[1];
+                var pct = max > 0 ? Math.round((count / max) * 100) : 0;
+                html += '<div class="analytics-bar-row">' +
+                    '<div class="analytics-bar-label" title="' + entry[0] + '">' + label + '</div>' +
+                    '<div class="analytics-bar-track"><div class="analytics-bar-fill" style="width:' + pct + '%"></div></div>' +
+                    '<div class="analytics-bar-count">' + count + '</div>' +
+                    '</div>';
+            });
+            container.innerHTML = html || '<div style="color:#475569;font-size:11px">No events yet</div>';
+        }
+
+        function loadAnalytics() {
+            fetch('/api/admin/analytics')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var el;
+
+                    // Cards
+                    el = document.getElementById('ac-total');
+                    if (el) el.textContent = data.total_events !== undefined ? data.total_events : '—';
+                    el = document.getElementById('ac-today');
+                    if (el) el.textContent = data.events_last_24h !== undefined ? data.events_last_24h : '—';
+                    el = document.getElementById('ac-week');
+                    if (el) el.textContent = data.events_last_7d !== undefined ? data.events_last_7d : '—';
+
+                    // Bar chart
+                    renderBarChart(data.counts_by_type || {});
+
+                    // Most common
+                    var entries = Object.entries(data.counts_by_type || {});
+                    entries.sort(function(a,b){return b[1]-a[1];});
+                    var mcEl = document.getElementById('analytics-most-common');
+                    if (mcEl) {
+                        if (entries.length > 0) {
+                            mcEl.innerHTML = 'Top event: <span>' + entries[0][0].replace(/_/g,' ') + '</span>';
+                        } else {
+                            mcEl.innerHTML = '';
+                        }
+                    }
+
+                    // Opt-out badge
+                    var badge = document.getElementById('analytics-disabled-badge');
+                    if (badge) badge.style.display = data.telemetry_disabled ? '' : 'none';
+
+                    // Status
+                    var status = document.getElementById('analytics-status');
+                    if (status) {
+                        var now = new Date();
+                        status.textContent = 'Updated ' + now.toLocaleTimeString();
+                    }
+                })
+                .catch(function() {
+                    var status = document.getElementById('analytics-status');
+                    if (status) status.textContent = 'Analytics unavailable';
+                });
+        }
+
+        // Load on ready, then refresh every 30 s
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAnalytics();
+            setInterval(loadAnalytics, 30000);
+        });
+    }());
+    // ---- END AI-227 Analytics Widget ----
+    </script>
 </body>
 </html>
