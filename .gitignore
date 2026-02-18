@@ -28,3 +28,23 @@ screenshots/
 
 # Worktrees
 .worktrees/
+
+# Auto-generated agent reports (root-level litter)
+AI-*_*.txt
+AI-*_*.md
+SETUP_REPORT_*.md
+FINAL_SETUP_REPORT.md
+FINAL_VERIFICATION.txt
+LINEAR_*.md
+LINEAR_*.txt
+SETUP_SUMMARY.txt
+ALL_ISSUES_CHECKLIST.txt
+
+# PM task output
+.pm_task_output.log
+
+# Agent metrics locking
+.agent_metrics.lock
+
+# Coverage
+.coverage

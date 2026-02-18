@@ -45,6 +45,9 @@ DEFAULT_MODELS: Final[dict[str, ModelOption]] = {
     "groq": "haiku",
     "kimi": "haiku",
     "windsurf": "haiku",
+    "openrouter_dev": "haiku",
+    "product_manager": "sonnet",
+    "designer": "haiku",
 }
 
 
@@ -105,6 +108,13 @@ AGENT_GIT_IDENTITIES: Final[dict[str, GitIdentity]] = {
     "groq": GitIdentity("Groq Bridge Agent", "groq-agent@claude-agents.dev"),
     "kimi": GitIdentity("KIMI Bridge Agent", "kimi-agent@claude-agents.dev"),
     "windsurf": GitIdentity("Windsurf Bridge Agent", "windsurf-agent@claude-agents.dev"),
+    "openrouter_dev": GitIdentity(
+        "OpenRouter Dev Agent", "openrouter-dev-agent@claude-agents.dev"
+    ),
+    "product_manager": GitIdentity(
+        "Product Manager Agent", "product-manager-agent@claude-agents.dev"
+    ),
+    "designer": GitIdentity("Designer Agent", "designer-agent@claude-agents.dev"),
 }
 
 
@@ -141,6 +151,19 @@ def _get_pr_reviewer_tools() -> list[str]:
 def _get_ops_agent_tools() -> list[str]:
     """Tools for ops agent — Linear + Slack + GitHub + file ops."""
     return get_linear_tools() + get_slack_tools() + get_github_tools() + FILE_TOOLS
+
+
+def _get_pm_agent_tools() -> list[str]:
+    """Tools for product manager — Slack + Linear + GitHub + file ops + bash."""
+    return (
+        get_slack_tools() + get_linear_tools() + get_github_tools()
+        + FILE_TOOLS + ["Bash", "Grep"]
+    )
+
+
+def _get_designer_agent_tools() -> list[str]:
+    """Tools for designer agent — file ops + bash + Slack for collaboration."""
+    return get_slack_tools() + FILE_TOOLS + ["Bash", "Grep"]
 
 
 def create_agent_definitions() -> dict[str, AgentDefinition]:
@@ -261,6 +284,36 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
             tools=_get_bridge_agent_tools(),
             model=_get_model("windsurf"),
         ),
+        "openrouter_dev": AgentDefinition(
+            description=(
+                "Provides access to 200+ models via OpenRouter (DeepSeek, Llama, Gemma, "
+                "Mistral). Use for multi-provider fallback, free-tier parallel coding, "
+                "or cost-optimized bulk tasks."
+            ),
+            prompt=_prompt("openrouter_dev", "openrouter_dev_agent_prompt"),
+            tools=_get_bridge_agent_tools(),
+            model=_get_model("openrouter_dev"),
+        ),
+        "product_manager": AgentDefinition(
+            description=(
+                "Manages product strategy, backlog grooming, sprint planning, and "
+                "cross-agent coordination. Creates and assigns issues including "
+                "[DESIGN]-prefixed tasks for the Designer agent."
+            ),
+            prompt=_prompt("product_manager", "product_manager_agent_prompt"),
+            tools=_get_pm_agent_tools(),
+            model=_get_model("product_manager"),
+        ),
+        "designer": AgentDefinition(
+            description=(
+                "UI/UX design specialist. Creates design systems, component specs, "
+                "CSS implementations, and accessibility audits. Works on [DESIGN]-prefixed "
+                "issues assigned by the Product Manager."
+            ),
+            prompt=_prompt("designer", "designer_agent_prompt"),
+            tools=_get_designer_agent_tools(),
+            model=_get_model("designer"),
+        ),
     }
 
 
@@ -304,3 +357,6 @@ GEMINI_AGENT = AGENT_DEFINITIONS["gemini"]
 GROQ_AGENT = AGENT_DEFINITIONS["groq"]
 KIMI_AGENT = AGENT_DEFINITIONS["kimi"]
 WINDSURF_AGENT = AGENT_DEFINITIONS["windsurf"]
+OPENROUTER_DEV_AGENT = AGENT_DEFINITIONS["openrouter_dev"]
+PRODUCT_MANAGER_AGENT = AGENT_DEFINITIONS["product_manager"]
+DESIGNER_AGENT = AGENT_DEFINITIONS["designer"]

@@ -29,6 +29,8 @@ import asyncio
 import hmac
 import json
 import os
+import signal
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -132,13 +134,17 @@ _REST_DEFAULT_MODELS: Dict[str, str] = {
     "groq": "haiku",
     "kimi": "haiku",
     "windsurf": "haiku",
+    "openrouter_dev": "haiku",
+    "product_manager": "sonnet",
+    "designer": "haiku",
 }
 
-# The 13 canonical agents for the status panel (excludes orchestrator)
+# The 16 canonical agents for the status panel (excludes orchestrator)
 PANEL_AGENT_NAMES = [
     "linear", "coding", "github", "slack", "pr_reviewer",
     "ops", "coding_fast", "pr_reviewer_fast", "chatgpt",
     "gemini", "groq", "kimi", "windsurf",
+    "openrouter_dev", "product_manager", "designer",
 ]
 
 # AI-89: Global system pause flag
@@ -153,10 +159,24 @@ _rest_chart_token_usage: Dict[str, int] = {
         "linear", "coding", "github", "slack", "pr_reviewer",
         "ops", "coding_fast", "pr_reviewer_fast", "chatgpt",
         "gemini", "groq", "kimi", "windsurf",
+        "openrouter_dev", "product_manager", "designer",
     ]
 }
 _rest_chart_cost_trend: list = []  # list of {"session": int, "cost": float}
 _REST_CHART_COST_TREND_MAX = 10
+
+# PM Task Launcher state
+_pm_process: Optional[subprocess.Popen] = None
+_pm_task_log: list[Dict[str, Any]] = []
+_REPO_ROOT = Path(__file__).parent.parent
+PM_TASKS: Dict[str, str] = {
+    "full-review": "Comprehensive project review: issues, PRs, agents, risks",
+    "backlog-review": "Backlog grooming: stale issues, gaps, priorities",
+    "sprint-planning": "Sprint planning: prioritize, estimate, organize",
+    "prompt-review": "Audit agent prompts for quality and alignment",
+    "agent-analysis": "Agent performance analysis and optimization",
+    "custom": "Custom task with user-provided prompt",
+}
 
 
 def get_auth_token() -> Optional[str]:
@@ -449,12 +469,21 @@ class RESTAPIServer:
         self.app.router.add_route('OPTIONS', '/api/github/issues', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/github/repo', self.handle_options)
 
+        # PM Task Launcher endpoints
+        self.app.router.add_get('/api/pm/tasks', self.get_pm_tasks)
+        self.app.router.add_post('/api/pm/run', self.run_pm_task)
+        self.app.router.add_get('/api/pm/status', self.get_pm_status)
+        self.app.router.add_post('/api/pm/stop', self.stop_pm_task)
+        self.app.router.add_get('/api/pm/history', self.get_pm_history)
+
         # OPTIONS for CORS preflight
         for route in ['/api/metrics', '/api/agents', '/api/sessions', '/api/providers',
                       '/api/chat', '/api/decisions', '/api/agents/status',
                       '/api/orchestrator/pipeline', '/api/metrics/global',
                       '/api/charts/token-usage', '/api/charts/cost-trend',
-                      '/api/charts/success-rate']:
+                      '/api/charts/success-rate',
+                      '/api/pm/tasks', '/api/pm/run', '/api/pm/status',
+                      '/api/pm/stop', '/api/pm/history']:
             self.app.router.add_route('OPTIONS', route, self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
@@ -3195,6 +3224,85 @@ class RESTAPIServer:
             'error': 'Dashboard HTML not found',
             'message': 'index.html or dashboard.html not found in dashboard directory'
         }, status=404)
+
+    # ── PM Task Launcher endpoints ──────────────────────────────────────
+
+    async def get_pm_tasks(self, request: Request) -> Response:
+        """GET /api/pm/tasks - List available PM task types."""
+        return web.json_response({"tasks": PM_TASKS})
+
+    async def run_pm_task(self, request: Request) -> Response:
+        """POST /api/pm/run - Start a PM task as a background subprocess."""
+        global _pm_process
+        if _pm_process is not None and _pm_process.poll() is None:
+            return web.json_response(
+                {"error": "A PM task is already running"}, status=409
+            )
+        body = await request.json()
+        task = body.get("task", "full-review")
+        model = body.get("model", "sonnet")
+        custom_prompt = body.get("custom_prompt", "")
+
+        if task not in PM_TASKS:
+            return web.json_response({"error": f"Unknown task: {task}"}, status=400)
+
+        cmd = [
+            "uv", "run", "python", str(_REPO_ROOT / "scripts" / "product_manager_runner.py"),
+            "--task", task, "--model", model,
+        ]
+        if task == "custom" and custom_prompt:
+            cmd += ["--custom-prompt", custom_prompt]
+
+        log_path = _REPO_ROOT / ".pm_task_output.log"
+        log_file = open(log_path, "w")
+        _pm_process = subprocess.Popen(
+            cmd, stdout=log_file, stderr=subprocess.STDOUT, cwd=str(_REPO_ROOT)
+        )
+        entry = {
+            "task": task, "model": model, "pid": _pm_process.pid,
+            "started_at": datetime.utcnow().isoformat() + "Z",
+            "status": "running",
+        }
+        _pm_task_log.append(entry)
+        return web.json_response({"ok": True, **entry})
+
+    async def get_pm_status(self, request: Request) -> Response:
+        """GET /api/pm/status - Get current PM task status and log tail."""
+        global _pm_process
+        if _pm_process is None:
+            return web.json_response({"running": False, "log_tail": ""})
+
+        running = _pm_process.poll() is None
+        log_path = _REPO_ROOT / ".pm_task_output.log"
+        log_tail = ""
+        if log_path.exists():
+            lines = log_path.read_text(errors="replace").splitlines()
+            log_tail = "\n".join(lines[-50:])
+
+        if not running and _pm_task_log:
+            _pm_task_log[-1]["status"] = "completed"
+
+        return web.json_response({
+            "running": running,
+            "pid": _pm_process.pid,
+            "returncode": _pm_process.returncode,
+            "log_tail": log_tail,
+        })
+
+    async def stop_pm_task(self, request: Request) -> Response:
+        """POST /api/pm/stop - Stop the running PM task."""
+        global _pm_process
+        if _pm_process is None or _pm_process.poll() is not None:
+            return web.json_response({"error": "No running PM task"}, status=404)
+        _pm_process.send_signal(signal.SIGTERM)
+        _pm_process.wait(timeout=10)
+        if _pm_task_log:
+            _pm_task_log[-1]["status"] = "stopped"
+        return web.json_response({"ok": True, "stopped": True})
+
+    async def get_pm_history(self, request: Request) -> Response:
+        """GET /api/pm/history - List past PM task runs."""
+        return web.json_response({"history": _pm_task_log})
 
     def run(self):
         """Start the REST API server.

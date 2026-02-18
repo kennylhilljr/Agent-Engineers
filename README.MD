@@ -5,7 +5,7 @@
 
 ### _Autonomous Multi-Model AI Engineering Teams_
 
-**Deploy a team of specialized AI agents that plan, code, review, and ship software — across Claude, Gemini, and beyond.**
+**Deploy a team of 16 specialized AI agents that plan, code, review, design, and ship software — across Claude, ChatGPT, Gemini, Groq, KIMI, Windsurf, and OpenRouter.**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Claude Agent SDK](https://img.shields.io/badge/Claude_Agent_SDK-0.1.25-D4A574?style=for-the-badge&logo=anthropic&logoColor=white)](https://github.com/anthropics/claude-code/tree/main/agent-sdk-python)
@@ -22,8 +22,11 @@
 <img src="https://img.shields.io/badge/Playwright-Browser_Testing-2EAD33?style=flat-square" alt="Playwright" />
 
 **Long-Running Autonomy**: Harness architecture enables extended coding sessions across multiple iterations
-**Multi-Agent Orchestration**: 11 specialized agents handle distinct concerns coordinated by an orchestrator
-**Multi-AI Providers**: Claude (primary), ChatGPT, Gemini, Groq, KIMI, and Windsurf agents for cross-validation, parallel coding, and specialized tasks
+**Multi-Agent Orchestration**: 16 specialized agents handle distinct concerns coordinated by an orchestrator
+**Multi-AI Providers**: Claude (primary), ChatGPT, Gemini, Groq, KIMI, Windsurf, and OpenRouter agents for cross-validation, parallel coding, and specialized tasks
+**Web Dashboard**: Real-time monitoring dashboard with agent status, leaderboard, activity feed, and PM task launcher
+**Product Management**: Autonomous PM agent for backlog grooming, sprint planning, and project health monitoring
+**Design Agent**: Expert designer for UI/UX specifications, wireframes, and CSS implementation
 **Linear Integration**: Automatic issue tracking with real-time status updates and session handoff
 **GitHub Integration**: Automatic commits, branches, PR creation, and automated PR review with merge
 **Slack Notifications**: Mandatory progress updates at every task lifecycle event
@@ -46,27 +49,38 @@ flowchart TB
         ORCH[Coordinates all agents<br/>Passes context between them<br/>Manages session flow]
     end
 
-    subgraph WorkflowAgents["Workflow Agents"]
+    subgraph WorkflowAgents["Workflow Agents (10)"]
         LINEAR["Linear Agent<br/>(Haiku)<br/>Issues & project tracking"]
         CODING["Coding Agent<br/>(Sonnet)<br/>Implementation + Playwright"]
+        CODING_FAST["Coding Fast<br/>(Haiku)<br/>Simple changes"]
         GITHUB["GitHub Agent<br/>(Haiku)<br/>Commits, branches, PRs"]
-        PR_REVIEW["PR Reviewer Agent<br/>(Sonnet)<br/>Code review & auto-merge"]
+        PR_REVIEW["PR Reviewer<br/>(Sonnet)<br/>Code review & auto-merge"]
+        PR_FAST["PR Reviewer Fast<br/>(Haiku)<br/>Quick PR review"]
         SLACK["Slack Agent<br/>(Haiku)<br/>Team notifications"]
+        OPS["Ops Agent<br/>(Haiku)<br/>Batch operations"]
+        PM["Product Manager<br/>(Sonnet)<br/>Backlog & sprint planning"]
+        DESIGNER["Designer<br/>(Haiku)<br/>UI/UX design & CSS"]
     end
 
-    subgraph AIProviders["AI Provider Agents (Cross-Validation & Parallel Coding)"]
-        CHATGPT["ChatGPT Agent<br/>(Haiku → OpenAI Bridge)<br/>GPT-4o, o1, o3-mini, o4-mini"]
-        GEMINI["Gemini Agent<br/>(Haiku → Gemini Bridge)<br/>2.5 Flash, 2.5 Pro, 2.0 Flash"]
-        GROQ["Groq Agent<br/>(Haiku → Groq Bridge)<br/>Llama 70B, Mixtral, Gemma"]
-        KIMI["KIMI Agent<br/>(Haiku → KIMI Bridge)<br/>Moonshot v1, Kimi k2"]
-        WINDSURF["Windsurf Agent<br/>(Haiku → Windsurf Bridge)<br/>Cascade (CLI/Docker)"]
+    subgraph AIProviders["AI Provider Agents (6)"]
+        CHATGPT["ChatGPT<br/>(OpenAI Bridge)<br/>GPT-4o, o1, o3-mini"]
+        GEMINI["Gemini<br/>(Gemini Bridge)<br/>2.5 Flash, 2.5 Pro"]
+        GROQ["Groq<br/>(Groq Bridge)<br/>Llama 70B, Mixtral"]
+        KIMI["KIMI<br/>(KIMI Bridge)<br/>Moonshot v1, Kimi k2"]
+        WINDSURF["Windsurf<br/>(Windsurf Bridge)<br/>Cascade (CLI/Docker)"]
+        OPENROUTER["OpenRouter Dev<br/>(OpenRouter Bridge)<br/>200+ models"]
     end
 
     subgraph ExternalServices["External Services (Arcade MCP Gateway)"]
         LINEAR_API[Linear API<br/>39 tools]
         GITHUB_API[GitHub API<br/>46 tools]
-        SLACK_API[Slack API<br/>8 tools]
+        SLACK_API[Slack API<br/>21 tools]
         PLAYWRIGHT[Playwright MCP<br/>Browser automation]
+    end
+
+    subgraph Dashboard["Web Dashboard (localhost:8420)"]
+        DASH_MAIN[Main Dashboard<br/>Agent status & PM launcher]
+        DASH_ARCH[Architecture View<br/>Provider metrics]
     end
 
     subgraph State["Shared State"]
@@ -76,20 +90,24 @@ flowchart TB
     end
 
     SPEC --> ORCH
-    ORCH --> LINEAR & CODING & GITHUB & PR_REVIEW & SLACK
-    ORCH --> CHATGPT & GEMINI & GROQ & KIMI & WINDSURF
+    ORCH --> LINEAR & CODING & CODING_FAST & GITHUB & PR_REVIEW & PR_FAST & SLACK & OPS & PM & DESIGNER
+    ORCH --> CHATGPT & GEMINI & GROQ & KIMI & WINDSURF & OPENROUTER
+    PM --> DESIGNER
     LINEAR --> LINEAR_API
     GITHUB --> GITHUB_API
     SLACK --> SLACK_API
+    OPS --> LINEAR_API & SLACK_API & GITHUB_API
     CODING --> PLAYWRIGHT
     CODING --> PROJECT
     GITHUB --> PROJECT
     LINEAR --> STATE_FILE & META
+    DASH_MAIN -.-> ORCH
 
     style Orchestrator fill:#1a1a2e,stroke:#e94560,color:#fff
     style WorkflowAgents fill:#16213e,stroke:#0f3460,color:#fff
     style AIProviders fill:#1a1a2e,stroke:#e94560,color:#fff
     style ExternalServices fill:#0f3460,stroke:#533483,color:#fff
+    style Dashboard fill:#1a1a2e,stroke:#a855f7,color:#fff
     style State fill:#16213e,stroke:#e94560,color:#fff
 ```
 
@@ -114,7 +132,7 @@ Session 1 (Initialization)              Sessions 2-N (Implementation Loop)
 
 ## Agents
 
-The system uses 11 specialized agents plus an orchestrator. Each agent has a focused responsibility, its own system prompt, and a configurable Claude model. Agents do not share memory — the orchestrator passes context between them.
+The system uses 16 specialized agents plus an orchestrator. Each agent has a focused responsibility, its own system prompt, and a configurable Claude model. Agents do not share memory — the orchestrator passes context between them.
 
 ### Orchestrator
 
@@ -132,9 +150,14 @@ The central coordinator that reads project state, decides what to work on, and d
 |-------|---------------|---------|-------|--------|
 | **Linear** | Haiku | Issue tracking via Linear API (projects, issues, status, comments, META tracking) | 39 Linear MCP tools + file ops | `linear_agent_prompt.md` |
 | **Coding** | Sonnet | Feature implementation, test writing, Playwright browser testing, screenshot evidence | File ops + Bash + Playwright MCP | `coding_agent_prompt.md` |
+| **Coding Fast** | Haiku | Simple changes: copy updates, CSS fixes, config, tests, renaming | File ops + Bash + Playwright MCP | `coding_agent_prompt.md` |
 | **GitHub** | Haiku | Git commits, branches, remote push, PR creation per story | GitHub MCP tools + file ops + Bash | `github_agent_prompt.md` |
 | **PR Reviewer** | Sonnet | Automated code review against a 5-point checklist; approves and merges or requests changes | GitHub MCP tools + file ops + Bash | `pr_reviewer_agent_prompt.md` |
-| **Slack** | Haiku | Mandatory notifications at every task lifecycle event (start, PR ready, complete, blocked) | 8 Slack MCP tools + file ops | `slack_agent_prompt.md` |
+| **PR Reviewer Fast** | Haiku | Quick PR review for low-risk, frontend-only changes | GitHub MCP tools + file ops + Bash | `pr_reviewer_agent_prompt.md` |
+| **Slack** | Haiku | Mandatory notifications at every task lifecycle event (start, PR ready, complete, blocked) | 21 Slack MCP tools + file ops | `slack_agent_prompt.md` |
+| **Ops** | Haiku | Composite operations: Linear transitions + Slack notifications + GitHub labels in one delegation | Linear + Slack + GitHub + file ops | `ops_agent_prompt.md` |
+| **Product Manager** | Sonnet | Backlog grooming, sprint planning, agent performance analysis, project health monitoring | Slack + Linear + GitHub + file ops + Bash | `product_manager_agent_prompt.md` |
+| **Designer** | Haiku | UI/UX design, wireframes, mockups, CSS implementation, design systems | Slack + file ops + Bash | `designer_agent_prompt.md` |
 
 ### AI Provider Agents (Cross-Validation & Parallel Coding)
 
@@ -147,6 +170,7 @@ These agents bridge to external AI providers, enabling the orchestrator to get s
 | **Groq** | Haiku (host) | Ultra-fast inference on open-source models (Llama, Mixtral, Gemma) | `groq_bridge.py` | `groq_agent_prompt.md` |
 | **KIMI** | Haiku (host) | Ultra-long context (2M tokens), bilingual Chinese/English analysis | `kimi_bridge.py` | `kimi_agent_prompt.md` |
 | **Windsurf** | Haiku (host) | Parallel coding via Codeium Windsurf IDE headless/Docker mode | `windsurf_bridge.py` | `windsurf_agent_prompt.md` |
+| **OpenRouter Dev** | Haiku (host) | 200+ models via OpenRouter unified API, multi-model fallback | `multi_provider.py` | `openrouter_dev_agent_prompt.md` |
 
 ---
 
@@ -331,17 +355,17 @@ python scripts/gemini_cli.py --status                  # Check auth status
 
 ### Provider Comparison
 
-| Capability | Claude | ChatGPT | Gemini | Groq | KIMI | Windsurf |
-|------------|--------|---------|--------|------|------|----------|
-| **Role** | Primary | Cross-validation | Cross-validation | Cross-validation | Cross-validation | Parallel coding |
-| **Tool use** | Native (SDK) | Text bridge | Text bridge | Text bridge | Text bridge | File-based I/O |
-| **Max context** | 200K | 128K (GPT-4o) | 1M | 128K (Llama) | 2M | IDE-managed |
-| **Speed** | Fast | Fast | Fast | Ultra-fast (LPU) | Medium | Varies |
-| **Free tier** | No | Session token | CLI OAuth + API key | Yes (generous) | No | Free tier |
-| **Auth methods** | 1 | 2 | 3 | 1 (API key) | 1 (API key) | 1 (CLI/Docker) |
-| **Streaming** | Yes | Yes (Codex OAuth) | Yes (API/Vertex) | Yes | Yes | N/A |
-| **Code generation** | Excellent | Excellent | Good | Good (Llama 70B) | Good | IDE-level |
-| **Unique strength** | Agentic workflow | Reasoning (o1) | Search grounding | 10-20x speed | 2M context | IDE autonomy |
+| Capability | Claude | ChatGPT | Gemini | Groq | KIMI | Windsurf | OpenRouter |
+|------------|--------|---------|--------|------|------|----------|------------|
+| **Role** | Primary | Cross-validation | Cross-validation | Cross-validation | Cross-validation | Parallel coding | Multi-model |
+| **Tool use** | Native (SDK) | Text bridge | Text bridge | Text bridge | Text bridge | File-based I/O | Text bridge |
+| **Max context** | 200K | 128K (GPT-4o) | 1M | 128K (Llama) | 2M | IDE-managed | Varies |
+| **Speed** | Fast | Fast | Fast | Ultra-fast (LPU) | Medium | Varies | Varies |
+| **Free tier** | No | Session token | CLI OAuth + API key | Yes (generous) | No | Free tier | Per-model |
+| **Auth methods** | 1 | 2 | 3 | 1 (API key) | 1 (API key) | 1 (CLI/Docker) | 1 (API key) |
+| **Streaming** | Yes | Yes (Codex OAuth) | Yes (API/Vertex) | Yes | Yes | N/A | Yes |
+| **Code generation** | Excellent | Excellent | Good | Good (Llama 70B) | Good | IDE-level | Varies |
+| **Unique strength** | Agentic workflow | Reasoning (o1) | Search grounding | 10-20x speed | 2M context | IDE autonomy | 200+ models |
 
 ### When to Use Each Provider
 
@@ -493,57 +517,71 @@ WINDSURF_TIMEOUT=300
 
 ## 🧬 What Is This?
 
-Agent Engineers is a **multi-agent harness** built on the [Claude Agent SDK](https://github.com/anthropics/claude-code/tree/main/agent-sdk-python) that orchestrates a team of specialized AI agents to autonomously build software — end to end.
+Agent Engineers is a **multi-agent harness** built on the [Claude Agent SDK](https://github.com/anthropics/claude-code/tree/main/agent-sdk-python) that orchestrates a team of 16 specialized AI agents to autonomously build software — end to end.
 
-It doesn't just write code. It **manages a project board**, **creates feature branches**, **writes tests**, **takes browser screenshots for verification**, **opens PRs**, **runs code reviews**, and **posts progress updates to Slack** — all without human intervention.
+It doesn't just write code. It **manages a project board**, **creates feature branches**, **writes tests**, **takes browser screenshots for verification**, **opens PRs**, **runs code reviews**, **posts progress updates to Slack**, and **provides a real-time web dashboard** — all without human intervention.
 
-The multi-model architecture means the right AI handles the right job: Claude Sonnet writes code, Claude Haiku manages lightweight coordination, and Google Gemini handles research with Google Search grounding — no single model bottleneck.
+The multi-model architecture means the right AI handles the right job: Claude Sonnet writes code, Claude Haiku manages lightweight coordination, Google Gemini handles research, and the Product Manager agent autonomously grooms backlogs and plans sprints — across 7 AI providers with 200+ models available.
 
 <br/>
 
-## ⚡ The Agent Team
+## ⚡ The Agent Team (16 Agents)
 
 ```
                           ┌─────────────────────┐
                           │    ORCHESTRATOR      │
-                          │    Claude Haiku      │
+                          │  Haiku/Sonnet/Opus   │
                           │  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄  │
                           │  Plans · Delegates   │
                           │  Passes Context      │
                           └──────────┬──────────┘
                                      │
-            ┌────────────┬───────────┼───────────┬────────────┐
-            │            │           │           │            │
-    ┌───────▼──────┐ ┌───▼────┐ ┌───▼────┐ ┌───▼─────┐ ┌───▼──────┐
-    │   LINEAR     │ │ CODER  │ │ GITHUB │ │  SLACK  │ │ GEMINI   │
-    │    Linear    │ │ Sonnet │ │ Haiku  │ │  Haiku  │ │  Haiku   │
-    │    Haiku     │ │        │ │        │ │         │ │    ↓     │
-    ├──────────────┤ ├────────┤ ├────────┤ ├─────────┤ │ gemini   │
-    │ Create issues│ │ Write  │ │ Branch │ │ Notify  │ │  -cli    │
-    │ Track status │ │ Test   │ │ Commit │ │ on start│ │    ↓     │
-    │ Transition   │ │ Verify │ │ PR     │ │ on done │ │ Google   │
-    │ Comment      │ │ Screen │ │ Push   │ │ on block│ │ Gemini   │
-    └──────────────┘ └────────┘ └────────┘ └─────────┘ │ 2.5 Pro  │
-                                                        └──────────┘
-                          ┌─────────────────────┐
-                          │   PR REVIEWER        │
-                          │   Claude Sonnet      │
-                          │  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄  │
-                          │  Review · Approve    │
-                          │  Request Changes     │
-                          │  Auto-Merge          │
-                          └─────────────────────┘
+     ┌──────────┬──────────┬─────────┼─────────┬──────────┬──────────┐
+     │          │          │         │         │          │          │
+ ┌───▼────┐ ┌──▼───┐ ┌───▼──┐ ┌───▼───┐ ┌──▼────┐ ┌──▼────┐ ┌──▼────┐
+ │LINEAR  │ │CODER │ │GITHUB│ │ SLACK │ │  OPS  │ │  PM   │ │DESIGN │
+ │ Haiku  │ │Sonnet│ │Haiku │ │ Haiku │ │ Haiku │ │Sonnet │ │ Haiku │
+ ├────────┤ ├──────┤ ├──────┤ ├───────┤ ├───────┤ ├───────┤ ├───────┤
+ │Issues  │ │Write │ │Branch│ │Notify │ │Batch  │ │Backlog│ │UI/UX  │
+ │Track   │ │Test  │ │Commit│ │Start  │ │Linear │ │Sprint │ │Wire-  │
+ │Transit │ │Screen│ │PR    │ │Done   │ │+Slack │ │Health │ │frames │
+ │Comment │ │Verify│ │Push  │ │Block  │ │+GitHub│ │Review │ │CSS    │
+ └────────┘ └──────┘ └──────┘ └───────┘ └───────┘ └───┬───┘ └───────┘
+                                                       │ assigns to
+     ┌──────────┬──────────┬──────────┬──────────┬─────▼─────┐
+     │          │          │          │          │           │
+ ┌───▼────┐ ┌──▼────┐ ┌──▼────┐ ┌──▼────┐ ┌──▼─────┐ ┌──▼──────┐
+ │CHATGPT │ │GEMINI │ │ GROQ  │ │ KIMI  │ │WINDSURF│ │OPENROUTER│
+ │OpenAI  │ │Google │ │ LPU   │ │Moon-  │ │Codeium │ │200+     │
+ │Bridge  │ │Bridge │ │Bridge │ │shot   │ │IDE     │ │models   │
+ ├────────┤ ├───────┤ ├───────┤ ├───────┤ ├────────┤ ├─────────┤
+ │GPT-4o  │ │2.5    │ │Llama  │ │2M ctx │ │Cascade │ │DeepSeek │
+ │o1, o3  │ │Flash  │ │70B    │ │k2     │ │CLI/    │ │Qwen     │
+ │o4-mini │ │Pro    │ │Mixtral│ │v1     │ │Docker  │ │Mistral  │
+ └────────┘ └───────┘ └───────┘ └───────┘ └────────┘ └─────────┘
+
+ + PR Reviewer (Sonnet)  + PR Reviewer Fast (Haiku)  + Coding Fast (Haiku)
 ```
 
 | Agent | Model | Role |
 |:------|:------|:-----|
 | **Orchestrator** | Claude Haiku | Coordinates all agents, passes context between them, enforces quality gates |
 | **Linear** | Claude Haiku | Creates/updates Linear issues, manages project status, session handoff via META issue |
-| **Coder** | Claude Sonnet | Implements features, writes tests, browser-tests with Playwright, provides screenshot evidence |
+| **Coding** | Claude Sonnet | Implements features, writes tests, browser-tests with Playwright, provides screenshot evidence |
+| **Coding Fast** | Claude Haiku | Simple changes: CSS fixes, config updates, renaming, test additions |
 | **GitHub** | Claude Haiku | Creates branches, commits code, pushes to remote, opens pull requests |
 | **PR Reviewer** | Claude Sonnet | Reviews PRs for quality, approves or requests changes, auto-merges approved PRs |
+| **PR Reviewer Fast** | Claude Haiku | Quick review for low-risk, frontend-only PRs with <= 3 files changed |
 | **Slack** | Claude Haiku | Sends real-time notifications — task started, PR ready, completed, blocked |
-| **Gemini** | Claude Haiku → gemini-cli | Research with Google Search grounding, long-context analysis, second opinions. Uses OAuth — no API key, no per-token billing |
+| **Ops** | Claude Haiku | Composite operations: Linear + Slack + GitHub in a single delegation |
+| **Product Manager** | Claude Sonnet | Backlog grooming, sprint planning, agent analysis, project health. Communicates via Slack |
+| **Designer** | Claude Haiku | UI/UX design specs, wireframes, CSS implementation, design system maintenance |
+| **ChatGPT** | Haiku → OpenAI | Cross-validation via GPT-4o, o1, o3-mini, o4-mini |
+| **Gemini** | Haiku → Google | Research with Search grounding, 1M token context, free CLI OAuth |
+| **Groq** | Haiku → Groq LPU | Ultra-fast inference on Llama 3.3 70B, Mixtral 8x7B |
+| **KIMI** | Haiku → Moonshot | Ultra-long context (2M tokens), bilingual Chinese/English |
+| **Windsurf** | Haiku → Codeium | Parallel coding via Windsurf IDE headless/Docker mode |
+| **OpenRouter Dev** | Haiku → OpenRouter | 200+ models (DeepSeek, Qwen, Mistral) with multi-provider fallback |
 
 <br/>
 
@@ -682,6 +720,8 @@ npm install -g @google/gemini-cli && gemini
 | `WINDSURF_MODE` | `cli` (default) or `docker` | No |
 | `WINDSURF_DOCKER_IMAGE` | Docker image for Windsurf (default: windsurfinabox:latest) | If docker mode |
 | `WINDSURF_TIMEOUT` | Max seconds per Windsurf task (default: 300) | No |
+| **OpenRouter** | | |
+| `OPENROUTER_API_KEY` | OpenRouter API key from [openrouter.ai/keys](https://openrouter.ai/keys) | If using OpenRouter |
 
 </details>
 
@@ -761,7 +801,15 @@ See the [Gemini section above](#gemini-google--cross-validation-provider) or `GE
 | `GITHUB_AGENT_MODEL` | `haiku` | `haiku`, `sonnet`, `opus`, `inherit` |
 | `SLACK_AGENT_MODEL` | `haiku` | `haiku`, `sonnet`, `opus`, `inherit` |
 | `PR_REVIEWER_AGENT_MODEL` | `sonnet` | `haiku`, `sonnet`, `opus`, `inherit` |
+| `OPS_AGENT_MODEL` | `haiku` | `haiku`, `sonnet`, `opus`, `inherit` |
+| `CHATGPT_AGENT_MODEL` | `haiku` | `haiku`, `sonnet`, `opus`, `inherit` |
 | `GEMINI_AGENT_MODEL` | `haiku` | `haiku`, `sonnet`, `opus`, `inherit` |
+| `GROQ_AGENT_MODEL` | `haiku` | `haiku`, `sonnet`, `opus`, `inherit` |
+| `KIMI_AGENT_MODEL` | `haiku` | `haiku`, `sonnet`, `opus`, `inherit` |
+| `WINDSURF_AGENT_MODEL` | `haiku` | `haiku`, `sonnet`, `opus`, `inherit` |
+| `OPENROUTER_DEV_AGENT_MODEL` | `haiku` | `haiku`, `sonnet`, `opus`, `inherit` |
+| `PRODUCT_MANAGER_AGENT_MODEL` | `sonnet` | `haiku`, `sonnet`, `opus`, `inherit` |
+| `DESIGNER_AGENT_MODEL` | `haiku` | `haiku`, `sonnet`, `opus`, `inherit` |
 
 <br/>
 
@@ -775,7 +823,7 @@ Agent-Engineers/
 ├── progress.py                  # Progress tracking utilities
 ├── prompts.py                   # Prompt loading utilities
 ├── agents/
-│   ├── definitions.py           # 13 agent definitions with model config
+│   ├── definitions.py           # 16 agent definitions with model config
 │   └── orchestrator.py          # Orchestrator session runner
 ├── bridges/                     # External AI provider bridges
 │   ├── openai_bridge.py         # ChatGPT (Codex OAuth + Session Token)
@@ -783,7 +831,15 @@ Agent-Engineers/
 │   ├── groq_bridge.py           # Groq (LPU inference)
 │   ├── kimi_bridge.py           # KIMI/Moonshot (OpenAI-compatible)
 │   ├── windsurf_bridge.py       # Windsurf (CLI/Docker)
+│   ├── multi_provider.py        # Multi-provider fallback (OpenRouter → Groq → Gemini)
 │   └── *_INTEGRATION.md         # Per-provider setup docs
+├── dashboard/                   # Web Dashboard (localhost:8420)
+│   ├── rest_api_server.py       # aiohttp REST API (42+ endpoints)
+│   ├── index.html               # Main dashboard (agent status, PM launcher)
+│   ├── dashboard.html           # Architecture view (provider metrics)
+│   ├── chat_handler.py          # AI chat SSE streaming
+│   ├── metrics_store.py         # Persistent metrics storage
+│   └── xp.py                    # Agent XP/level calculations
 ├── daemon/                      # Scalable ticket processing
 │   ├── control_plane.py         # HTTP control plane (port 9100)
 │   ├── worker_pool.py           # Typed worker pool manager
@@ -793,6 +849,7 @@ Agent-Engineers/
 │   ├── autonomous_agent_demo.py # Main entry point / CLI
 │   ├── daemon.py                # Simple ticket polling daemon
 │   ├── daemon_v2.py             # Scalable daemon with worker pools
+│   ├── product_manager_runner.py # PM agent task runner
 │   ├── chatgpt_cli.py           # Standalone ChatGPT CLI
 │   ├── gemini_cli.py            # Standalone Gemini CLI
 │   ├── groq_cli.py              # Standalone Groq CLI
@@ -803,9 +860,9 @@ Agent-Engineers/
 │   └── test_security.py         # Security hook test suite
 ├── prompts/
 │   ├── orchestrator_prompt.md   # Orchestrator system prompt
-│   ├── *_agent_prompt.md        # Per-agent system prompts (13 total)
+│   ├── *_agent_prompt.md        # Per-agent system prompts (16 total)
 │   ├── initializer_task.md      # First-run task template
-│   └── continuation_task.md    # Continuation task template
+│   └── continuation_task.md     # Continuation task template
 ├── specs/                       # Application specifications
 │   ├── app_spec.txt             # Default spec
 │   └── *.txt                    # Additional spec templates
@@ -882,10 +939,28 @@ Defense-in-depth — multiple layers protect against unintended operations:
 
 | Where | What You See |
 |:------|:-------------|
+| **Web Dashboard** | Real-time agent status, leaderboard, activity feed, PM task launcher (`localhost:8420`) |
+| **Architecture View** | Provider metrics, rate limits, agent-to-provider mapping (`localhost:8420/architecture`) |
 | **Linear** | Real-time issue transitions, implementation comments, session summaries on META issue |
 | **GitHub** | Feature branches, commits, pull requests with linked issues |
 | **Slack** | Live notifications for every task lifecycle event (start → PR → review → done) |
 | **Terminal** | Agent coordination logs, tool calls, iteration progress |
+
+### Web Dashboard
+
+Start the dashboard server:
+
+```bash
+uv run python dashboard/rest_api_server.py --port 8420
+```
+
+The dashboard provides:
+- **Agent Status Panel** — Real-time status of all 16 agents (idle/running/paused/error)
+- **Agent Leaderboard** — XP-based ranking with level progression
+- **PM Task Launcher** — Run Product Manager tasks (backlog review, sprint planning, custom prompts) directly from the UI
+- **Orchestrator Flow** — Pipeline visualization of current work
+- **Live Activity Feed** — Real-time event stream from all agents
+- **Architecture View** — Provider rate limits, token usage, and cost tracking across all 7 AI providers
 
 **"OPENAI_API_KEY not set"**
 For ChatGPT integration, run `codex` to sign in via OAuth, or set the key manually in `.env`
