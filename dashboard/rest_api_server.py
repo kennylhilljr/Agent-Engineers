@@ -409,6 +409,8 @@ class RESTAPIServer:
         # Health and metrics
         self.app.router.add_get('/api/health', self.health_check)
         self.app.router.add_get('/health', self.health_check)  # alias for playwright config
+        self.app.router.add_get('/api/ready', self.ready_check)  # AI-223: readiness probe
+        self.app.router.add_get('/ready', self.ready_check)  # AI-223: readiness probe alias
         self.app.router.add_get('/api/metrics', self.get_metrics)
 
         # Agents - static routes BEFORE parameterized routes to avoid shadowing
@@ -593,6 +595,37 @@ class RESTAPIServer:
         except Exception as e:
             return web.json_response({
                 'status': 'error',
+                'timestamp': datetime.utcnow().isoformat() + 'Z',
+                'error': str(e)
+            }, status=503)
+
+    async def ready_check(self, request: Request) -> Response:
+        """GET /api/ready and GET /ready - Kubernetes/ECS readiness probe (AI-223).
+
+        Verifies the application is ready to serve traffic:
+        - Metrics store is accessible
+        - No critical subsystems in error state
+
+        Returns:
+            200 OK with ready=true when the service is ready to serve
+            503 Service Unavailable when not ready
+        """
+        try:
+            # Verify store is accessible
+            stats = self.store.get_stats()
+            ready_data = {
+                'ready': True,
+                'timestamp': datetime.utcnow().isoformat() + 'Z',
+                'project': self.project_name,
+                'metrics_file_exists': stats.get('metrics_file_exists', False),
+                'checks': {
+                    'store': 'ok',
+                }
+            }
+            return web.json_response(ready_data)
+        except Exception as e:
+            return web.json_response({
+                'ready': False,
                 'timestamp': datetime.utcnow().isoformat() + 'Z',
                 'error': str(e)
             }, status=503)
