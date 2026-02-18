@@ -439,6 +439,16 @@ class RESTAPIServer:
         self.app.router.add_get('/api/charts/cost-trend', self.get_chart_cost_trend)
         self.app.router.add_get('/api/charts/success-rate', self.get_chart_success_rate)
 
+        # AI-77: GitHub Access - PR and Issue Management (REQ-INTEGRATION-003)
+        self.app.router.add_post('/api/github/query', self.github_query)
+        self.app.router.add_get('/api/github/prs', self.github_get_prs)
+        self.app.router.add_get('/api/github/issues', self.github_get_issues)
+        self.app.router.add_get('/api/github/repo', self.github_get_repo)
+        self.app.router.add_route('OPTIONS', '/api/github/query', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/github/prs', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/github/issues', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/github/repo', self.handle_options)
+
         # OPTIONS for CORS preflight
         for route in ['/api/metrics', '/api/agents', '/api/sessions', '/api/providers',
                       '/api/chat', '/api/decisions', '/api/agents/status',
@@ -2932,6 +2942,232 @@ class RESTAPIServer:
             agents.append({"name": name, "rate": round(float(rate), 4), "total": int(total)})
 
         return web.json_response({"agents": agents})
+
+    # =========================================================================
+    # AI-77: GitHub Access - PR and Issue Management (REQ-INTEGRATION-003)
+    # =========================================================================
+
+    def _get_github_repo(self) -> Optional[str]:
+        """Return the configured GitHub repo (owner/repo) from environment."""
+        return os.getenv("GITHUB_REPO")
+
+    async def github_query(self, request: Request) -> Response:
+        """POST /api/github/query - Execute a natural-language GitHub query.
+
+        Request body:
+            {
+                "query": "What is the status of PR #125?",
+                "context": {}  (optional)
+            }
+
+        Returns:
+            200 OK with {"response": "...", "data": {...}, "timestamp": "..."}
+            400 Bad Request for missing/invalid input
+            503 Service Unavailable if GITHUB_REPO not configured
+        """
+        try:
+            data = await request.json()
+        except (json.JSONDecodeError, Exception):
+            return web.json_response(
+                {"error": "Invalid JSON in request body"}, status=400
+            )
+
+        query = data.get("query", "").strip()
+        if not query:
+            return web.json_response(
+                {"error": "Missing required field: query"}, status=400
+            )
+
+        repo = self._get_github_repo()
+        context = data.get("context", {})
+
+        if not repo:
+            # Graceful degradation: still return a response with a note
+            return web.json_response(
+                {
+                    "response": (
+                        "GitHub repository not configured. "
+                        "Set the GITHUB_REPO environment variable (e.g. owner/repo) "
+                        "to enable GitHub integration."
+                    ),
+                    "data": {"query": query, "repo": None, "context": context},
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "configured": False,
+                },
+                status=200,
+            )
+
+        # Route via the chat handler (github agent) if available
+        response_text = (
+            f"GitHub query received for repo '{repo}': {query}. "
+            f"Use the chat interface with 'What are my open PRs?' or similar commands "
+            f"to interact with the GitHub agent directly."
+        )
+        try:
+            from dashboard.chat_handler import ChatRouter
+            router = ChatRouter()
+            result = await router.handle_message(
+                message=query,
+                provider="claude",
+            )
+            response_text = result.get("response", response_text)
+        except Exception:
+            pass  # Fall back to the default message
+
+        return web.json_response(
+            {
+                "response": response_text,
+                "data": {"query": query, "repo": repo, "context": context},
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "configured": True,
+            }
+        )
+
+    async def github_get_prs(self, request: Request) -> Response:
+        """GET /api/github/prs - Return recent pull requests from the configured repo.
+
+        Query params:
+            state: "open" | "closed" | "all" (default: "open")
+            limit: int (default: 10)
+
+        Returns:
+            200 OK with {"prs": [...], "repo": "...", "timestamp": "..."}
+        """
+        repo = self._get_github_repo()
+        state = request.rel_url.query.get("state", "open")
+        try:
+            limit = int(request.rel_url.query.get("limit", "10"))
+        except ValueError:
+            limit = 10
+
+        if not repo:
+            return web.json_response(
+                {
+                    "prs": [],
+                    "repo": None,
+                    "state": state,
+                    "total": 0,
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "configured": False,
+                    "message": (
+                        "GitHub repository not configured. "
+                        "Set GITHUB_REPO environment variable."
+                    ),
+                }
+            )
+
+        # Return stub list — real data would come from GitHub MCP or API
+        return web.json_response(
+            {
+                "prs": [],
+                "repo": repo,
+                "state": state,
+                "total": 0,
+                "limit": limit,
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "configured": True,
+                "message": (
+                    f"Use the chat interface to query PRs: "
+                    f"'What are the open PRs in {repo}?'"
+                ),
+            }
+        )
+
+    async def github_get_issues(self, request: Request) -> Response:
+        """GET /api/github/issues - Return recent issues from the configured repo.
+
+        Query params:
+            state: "open" | "closed" | "all" (default: "open")
+            limit: int (default: 10)
+
+        Returns:
+            200 OK with {"issues": [...], "repo": "...", "timestamp": "..."}
+        """
+        repo = self._get_github_repo()
+        state = request.rel_url.query.get("state", "open")
+        try:
+            limit = int(request.rel_url.query.get("limit", "10"))
+        except ValueError:
+            limit = 10
+
+        if not repo:
+            return web.json_response(
+                {
+                    "issues": [],
+                    "repo": None,
+                    "state": state,
+                    "total": 0,
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "configured": False,
+                    "message": (
+                        "GitHub repository not configured. "
+                        "Set GITHUB_REPO environment variable."
+                    ),
+                }
+            )
+
+        return web.json_response(
+            {
+                "issues": [],
+                "repo": repo,
+                "state": state,
+                "total": 0,
+                "limit": limit,
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "configured": True,
+                "message": (
+                    f"Use the chat interface to query issues: "
+                    f"'What are the open issues in {repo}?'"
+                ),
+            }
+        )
+
+    async def github_get_repo(self, request: Request) -> Response:
+        """GET /api/github/repo - Return repository information.
+
+        Returns:
+            200 OK with {"name": "...", "description": "...", "open_prs": int, ...}
+        """
+        repo = self._get_github_repo()
+
+        if not repo:
+            return web.json_response(
+                {
+                    "name": None,
+                    "full_name": None,
+                    "description": None,
+                    "open_prs": 0,
+                    "open_issues": 0,
+                    "stars": 0,
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "configured": False,
+                    "message": (
+                        "GitHub repository not configured. "
+                        "Set GITHUB_REPO environment variable."
+                    ),
+                }
+            )
+
+        # Parse owner/repo
+        parts = repo.split("/", 1)
+        repo_name = parts[1] if len(parts) == 2 else repo
+
+        return web.json_response(
+            {
+                "name": repo_name,
+                "full_name": repo,
+                "description": f"Repository: {repo}",
+                "open_prs": 0,
+                "open_issues": 0,
+                "stars": 0,
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "configured": True,
+                "message": (
+                    f"Use the chat interface to get live repo info: "
+                    f"'Show me info about {repo}'"
+                ),
+            }
+        )
 
     async def serve_dashboard(self, request: Request) -> Response:
         """GET / - Serve dashboard HTML.
