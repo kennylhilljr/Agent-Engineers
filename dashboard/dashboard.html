@@ -6650,6 +6650,11 @@
                     <span class="panel-nav-icon">&#128100;</span>
                     <span>Account</span>
                 </button>
+                <!-- AI-221: Billing nav item -->
+                <button class="panel-nav-item" id="nav-billing" onclick="showBillingPage()" data-testid="nav-billing">
+                    <span class="panel-nav-icon">&#128179;</span>
+                    <span>Billing</span>
+                </button>
                 <button class="panel-nav-item" id="nav-login-link" onclick="window.location.href='/auth/login'" style="display:none;">
                     <span class="panel-nav-icon">&#128274;</span>
                     <span>Sign In</span>
@@ -7455,6 +7460,89 @@
                 </span>
             </div>
         </section>
+
+        <!-- AI-221: Billing Page -->
+        <section class="card" id="billing-section" data-testid="billing-section"
+            style="margin:20px;padding:28px;display:none;">
+            <h2 style="margin-bottom:20px;color:var(--accent,#58a6ff);font-size:1.2rem;">&#128179; Billing &amp; Subscription</h2>
+
+            <!-- Stripe not configured notice -->
+            <div id="billing-stripe-notice" style="display:none;margin-bottom:16px;padding:12px 16px;background:rgba(88,166,255,0.08);border:1px solid rgba(88,166,255,0.3);border-radius:8px;font-size:0.85rem;color:var(--text-secondary,#8b949e);">
+                <strong style="color:var(--accent,#58a6ff);">Stripe not configured</strong> &mdash;
+                Set <code>STRIPE_SECRET_KEY</code> to enable real billing. Showing mock data.
+            </div>
+
+            <!-- Current Plan Card -->
+            <div id="billing-plan-card" style="margin-bottom:20px;padding:20px;background:var(--bg-secondary,#161b22);border-radius:10px;border:1px solid var(--border-color,#30363d);">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
+                    <div>
+                        <div style="font-size:0.8rem;color:var(--text-secondary,#8b949e);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">Current Plan</div>
+                        <div id="billing-plan-name" style="font-size:1.6rem;font-weight:700;color:var(--text-primary,#e6edf3);">Explorer</div>
+                        <div id="billing-plan-price" style="font-size:1rem;color:var(--text-secondary,#8b949e);margin-top:2px;">Free</div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+                        <span id="billing-status-badge" data-testid="billing-status-badge"
+                            style="padding:4px 12px;border-radius:20px;font-size:0.75rem;font-weight:600;background:#1f6b1f;color:#56d364;border:1px solid #2ea043;">
+                            Active
+                        </span>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                            <button id="billing-manage-btn" onclick="openBillingPortal()"
+                                data-testid="billing-manage-btn"
+                                style="padding:8px 16px;background:#21262d;border:1px solid var(--border-color,#30363d);border-radius:6px;color:var(--text-primary,#e6edf3);font-size:0.85rem;cursor:pointer;font-weight:500;">
+                                Manage Subscription
+                            </button>
+                            <button id="billing-upgrade-btn" onclick="openUpgradeModal()"
+                                data-testid="billing-upgrade-btn"
+                                style="padding:8px 16px;background:#238636;border:none;border-radius:6px;color:#fff;font-size:0.85rem;cursor:pointer;font-weight:600;">
+                                Upgrade Plan
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <!-- Features list -->
+                <div id="billing-plan-features" style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;"></div>
+            </div>
+
+            <!-- Usage this month -->
+            <div id="billing-usage-card" style="margin-bottom:20px;padding:20px;background:var(--bg-secondary,#161b22);border-radius:10px;border:1px solid var(--border-color,#30363d);">
+                <h3 style="margin:0 0 14px;font-size:1rem;color:var(--text-primary,#e6edf3);">Usage This Month</h3>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:16px;">
+                    <div>
+                        <div style="font-size:0.75rem;color:var(--text-secondary,#8b949e);margin-bottom:4px;">Agent Hours Used</div>
+                        <div id="billing-hours-used" style="font-size:1.4rem;font-weight:700;color:var(--text-primary,#e6edf3);">--</div>
+                    </div>
+                    <div>
+                        <div style="font-size:0.75rem;color:var(--text-secondary,#8b949e);margin-bottom:4px;">Hours Limit</div>
+                        <div id="billing-hours-limit" style="font-size:1.4rem;font-weight:700;color:var(--text-primary,#e6edf3);">--</div>
+                    </div>
+                    <div>
+                        <div style="font-size:0.75rem;color:var(--text-secondary,#8b949e);margin-bottom:4px;">Reset Date</div>
+                        <div id="billing-reset-date" style="font-size:1.4rem;font-weight:700;color:var(--text-primary,#e6edf3);">--</div>
+                    </div>
+                </div>
+                <!-- Usage bar -->
+                <div style="background:var(--bg-primary,#0d1117);border-radius:6px;height:10px;overflow:hidden;margin-bottom:6px;">
+                    <div id="billing-usage-bar" style="height:100%;width:0%;background:#238636;border-radius:6px;transition:width 0.4s ease;"></div>
+                </div>
+                <div id="billing-usage-pct" style="font-size:0.8rem;color:var(--text-secondary,#8b949e);">0% used</div>
+            </div>
+
+            <!-- Invoice History -->
+            <div id="billing-invoices-card" style="padding:20px;background:var(--bg-secondary,#161b22);border-radius:10px;border:1px solid var(--border-color,#30363d);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                    <h3 style="margin:0;font-size:1rem;color:var(--text-primary,#e6edf3);">Invoice History</h3>
+                    <button onclick="fetchBillingInvoices()" data-testid="billing-refresh-invoices"
+                        style="padding:4px 12px;background:#21262d;border:1px solid var(--border-color,#30363d);border-radius:6px;color:var(--text-secondary,#8b949e);font-size:0.8rem;cursor:pointer;">
+                        Refresh
+                    </button>
+                </div>
+                <div id="billing-invoices-table-wrap" data-testid="billing-invoices-table">
+                    <!-- Populated by JS -->
+                    <div style="text-align:center;padding:20px;color:var(--text-secondary,#8b949e);font-size:0.875rem;">Loading invoices...</div>
+                </div>
+            </div>
+        </section>
+
         </main>
     </div><!-- /.app-layout -->
 
@@ -10294,18 +10382,262 @@
 
         async function requestUpgrade(targetPlan) {
             try {
-                const resp = await fetch(`${API_BASE_URL}/api/billing/upgrade`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ plan: targetPlan })
-                });
+                // AI-221: Use Stripe Checkout via /api/billing/checkout
+                const resp = await fetch(
+                    `${API_BASE_URL}/api/billing/checkout?plan=${encodeURIComponent(targetPlan)}`
+                );
                 const data = await resp.json();
-                // In production this would redirect to a payment page
-                const url = data.upgrade_url || 'https://agentdashboard.ai/upgrade';
-                alert(`Upgrade to ${targetPlan}!\n\nIn production this would redirect to:\n${url}\n\n(Billing integration coming in AI-221)`);
+
+                if (data.mock) {
+                    // Stripe not configured - show informational message
+                    alert(
+                        `Upgrade to ${targetPlan} plan!\n\n` +
+                        `Stripe is not yet configured.\n` +
+                        `Set STRIPE_SECRET_KEY to enable real checkout.\n\n` +
+                        `(Mock mode - no payment required)`
+                    );
+                    closeUpgradeModal();
+                    return;
+                }
+
+                if (data.url && data.url !== '#stripe-not-configured') {
+                    // Real Stripe Checkout - redirect
+                    closeUpgradeModal();
+                    window.location.href = data.url;
+                } else {
+                    alert(`Upgrade to ${targetPlan}!\nCheckout URL: ${data.url || 'N/A'}`);
+                }
             } catch (err) {
-                console.error('[AI-220] Upgrade request error:', err);
+                console.error('[AI-221] Upgrade request error:', err);
                 alert('Upgrade request failed. Please try again.');
+            }
+        }
+
+        // ==========================================
+        // AI-221: Billing Page
+        // ==========================================
+
+        let _billingData = null;
+
+        function showBillingPage() {
+            // Hide all main sections, show billing
+            const mainSections = document.querySelectorAll('.main-content section.card');
+            mainSections.forEach(s => { s.style.display = 'none'; });
+            const billingSection = document.getElementById('billing-section');
+            if (billingSection) {
+                billingSection.style.display = 'block';
+                billingSection.scrollIntoView({ behavior: 'smooth' });
+            }
+            // Load billing data
+            fetchBillingSubscription();
+            fetchBillingUsageForPage();
+            fetchBillingInvoices();
+        }
+
+        async function fetchBillingSubscription() {
+            try {
+                const resp = await fetch(`${API_BASE_URL}/api/billing/subscription`);
+                if (!resp.ok) return;
+                const data = await resp.json();
+                _billingData = data;
+                renderBillingPlanCard(data);
+            } catch (err) {
+                console.warn('[AI-221] fetchBillingSubscription error:', err);
+            }
+        }
+
+        function renderBillingPlanCard(data) {
+            // Stripe notice
+            const notice = document.getElementById('billing-stripe-notice');
+            if (notice) notice.style.display = data.stripe_configured ? 'none' : 'block';
+
+            // Plan name and price
+            const planNames = {
+                explorer: 'Explorer', builder: 'Builder',
+                team: 'Team', organization: 'Organization', fleet: 'Fleet'
+            };
+            const planPrices = {
+                explorer: 'Free', builder: '$49/month',
+                team: '$199/month', organization: '$799/month', fleet: 'Custom'
+            };
+            const planFeatures = {
+                explorer: ['10 agent-hours/month', 'Claude Haiku only', '1 concurrent agent', 'GitHub integration'],
+                builder: ['50 agent-hours/month', 'All Claude models', '5 concurrent agents', 'GitHub, Slack, Jira, Linear'],
+                team: ['200 agent-hours/month', 'All Claude models', '20 concurrent agents', 'All integrations', 'Priority support'],
+                organization: ['Unlimited agent-hours', 'All Claude models', 'Unlimited agents', 'All integrations', 'SSO & Audit logs'],
+                fleet: ['Custom limits', 'Dedicated infrastructure', 'SLA guarantees', 'Enterprise support']
+            };
+
+            const plan = data.plan || 'explorer';
+            const nameEl = document.getElementById('billing-plan-name');
+            const priceEl = document.getElementById('billing-plan-price');
+            const featuresEl = document.getElementById('billing-plan-features');
+            const statusBadge = document.getElementById('billing-status-badge');
+
+            if (nameEl) nameEl.textContent = planNames[plan] || plan;
+            if (priceEl) priceEl.textContent = planPrices[plan] || '';
+
+            if (featuresEl) {
+                const features = planFeatures[plan] || [];
+                featuresEl.innerHTML = features.map(f =>
+                    `<span style="padding:4px 10px;background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.2);border-radius:20px;font-size:0.75rem;color:var(--text-secondary,#8b949e);">${f}</span>`
+                ).join('');
+            }
+
+            if (statusBadge) {
+                const status = data.status || 'free';
+                const isActive = data.is_active !== undefined ? data.is_active : true;
+                const statusConfig = {
+                    active: { bg: '#1f6b1f', color: '#56d364', border: '#2ea043', label: 'Active' },
+                    trialing: { bg: '#1b3a5e', color: '#58a6ff', border: '#1f6feb', label: 'Trial' },
+                    past_due: { bg: '#5a3a00', color: '#e3b341', border: '#9e6a03', label: 'Past Due' },
+                    canceled: { bg: '#3d1a1a', color: '#f85149', border: '#da3633', label: 'Canceled' },
+                    free: { bg: '#1f2937', color: '#8b949e', border: '#30363d', label: 'Free Tier' },
+                };
+                const cfg = statusConfig[status] || statusConfig.free;
+                statusBadge.style.background = cfg.bg;
+                statusBadge.style.color = cfg.color;
+                statusBadge.style.border = `1px solid ${cfg.border}`;
+                statusBadge.textContent = cfg.label;
+            }
+
+            // Hide upgrade button for non-explorer or show manage for paid plans
+            const upgradeBtn = document.getElementById('billing-upgrade-btn');
+            const manageBtn = document.getElementById('billing-manage-btn');
+            if (upgradeBtn) upgradeBtn.style.display = plan === 'explorer' ? 'inline-block' : 'none';
+            if (manageBtn) manageBtn.style.display = plan !== 'explorer' ? 'inline-block' : 'none';
+        }
+
+        async function fetchBillingUsageForPage() {
+            try {
+                const resp = await fetch(`${API_BASE_URL}/api/billing/usage`);
+                if (!resp.ok) return;
+                const data = await resp.json();
+                renderBillingUsage(data);
+            } catch (err) {
+                console.warn('[AI-221] fetchBillingUsageForPage error:', err);
+            }
+        }
+
+        function renderBillingUsage(data) {
+            const hoursUsedEl = document.getElementById('billing-hours-used');
+            const hoursLimitEl = document.getElementById('billing-hours-limit');
+            const resetDateEl = document.getElementById('billing-reset-date');
+            const usageBarEl = document.getElementById('billing-usage-bar');
+            const usagePctEl = document.getElementById('billing-usage-pct');
+
+            const hoursUsed = parseFloat(data.hours_used || 0);
+            const hoursLimit = data.hours_limit !== null && data.hours_limit !== undefined
+                ? parseFloat(data.hours_limit) : null;
+            const pct = data.percent_used || 0;
+
+            if (hoursUsedEl) hoursUsedEl.textContent = hoursUsed.toFixed(2) + 'h';
+            if (hoursLimitEl) hoursLimitEl.textContent = hoursLimit !== null ? hoursLimit.toFixed(1) + 'h' : '\u221e';
+
+            if (resetDateEl && data.reset_date) {
+                try {
+                    const d = new Date(data.reset_date);
+                    resetDateEl.textContent = d.toLocaleDateString();
+                } catch(e) { resetDateEl.textContent = data.reset_date; }
+            }
+
+            if (usageBarEl) {
+                usageBarEl.style.width = Math.min(pct, 100) + '%';
+                usageBarEl.style.background = pct >= 90 ? '#f85149' : pct >= 75 ? '#e3b341' : '#238636';
+            }
+            if (usagePctEl) usagePctEl.textContent = pct.toFixed(1) + '% used';
+        }
+
+        async function fetchBillingInvoices() {
+            const wrap = document.getElementById('billing-invoices-table-wrap');
+            if (!wrap) return;
+            wrap.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-secondary,#8b949e);font-size:0.875rem;">Loading invoices...</div>';
+
+            try {
+                const resp = await fetch(`${API_BASE_URL}/api/billing/invoices`);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                renderInvoiceTable(wrap, data.invoices || [], data.mock);
+            } catch (err) {
+                console.warn('[AI-221] fetchBillingInvoices error:', err);
+                wrap.innerHTML = '<div style="text-align:center;padding:20px;color:#f85149;font-size:0.875rem;">Failed to load invoices.</div>';
+            }
+        }
+
+        function renderInvoiceTable(container, invoices, isMock) {
+            if (invoices.length === 0) {
+                container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-secondary,#8b949e);font-size:0.875rem;">No invoices found.</div>';
+                return;
+            }
+
+            const mockBadge = isMock ? ' <span style="font-size:0.65rem;background:#21262d;border:1px solid #30363d;color:#8b949e;padding:1px 5px;border-radius:3px;vertical-align:middle;">mock</span>' : '';
+            const rows = invoices.map(inv => {
+                const amount = inv.amount_paid !== undefined
+                    ? '$' + (inv.amount_paid / 100).toFixed(2)
+                    : '--';
+                const date = inv.created
+                    ? new Date(inv.created * 1000).toLocaleDateString()
+                    : '--';
+                const status = inv.status || 'unknown';
+                const statusColor = status === 'paid' ? '#56d364' : status === 'open' ? '#e3b341' : '#f85149';
+                const desc = (inv.lines && inv.lines.data && inv.lines.data[0])
+                    ? inv.lines.data[0].description || inv.number || inv.id
+                    : inv.number || inv.id;
+                const pdfLink = inv.invoice_pdf && inv.invoice_pdf !== '#'
+                    ? `<a href="${inv.invoice_pdf}" target="_blank" style="color:var(--accent,#58a6ff);font-size:0.8rem;">PDF</a>`
+                    : '<span style="color:var(--text-secondary,#8b949e);font-size:0.8rem;">--</span>';
+
+                return `<tr data-testid="invoice-row-${inv.id}">
+                    <td style="padding:10px 12px;color:var(--text-secondary,#8b949e);font-size:0.85rem;">${date}</td>
+                    <td style="padding:10px 12px;color:var(--text-primary,#e6edf3);font-size:0.85rem;">${desc}</td>
+                    <td style="padding:10px 12px;color:var(--text-primary,#e6edf3);font-size:0.85rem;font-weight:600;">${amount}</td>
+                    <td style="padding:10px 12px;font-size:0.85rem;">
+                        <span style="color:${statusColor};text-transform:capitalize;">${status}</span>
+                    </td>
+                    <td style="padding:10px 12px;">${pdfLink}</td>
+                </tr>`;
+            }).join('');
+
+            container.innerHTML = `
+                <div style="font-size:0.75rem;color:var(--text-secondary,#8b949e);margin-bottom:8px;">
+                    ${invoices.length} invoice(s)${mockBadge}
+                </div>
+                <table style="width:100%;border-collapse:collapse;" data-testid="invoice-history-table">
+                    <thead>
+                        <tr style="border-bottom:1px solid var(--border-color,#30363d);">
+                            <th style="padding:8px 12px;text-align:left;font-size:0.75rem;color:var(--text-secondary,#8b949e);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Date</th>
+                            <th style="padding:8px 12px;text-align:left;font-size:0.75rem;color:var(--text-secondary,#8b949e);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Description</th>
+                            <th style="padding:8px 12px;text-align:left;font-size:0.75rem;color:var(--text-secondary,#8b949e);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Amount</th>
+                            <th style="padding:8px 12px;text-align:left;font-size:0.75rem;color:var(--text-secondary,#8b949e);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Status</th>
+                            <th style="padding:8px 12px;text-align:left;font-size:0.75rem;color:var(--text-secondary,#8b949e);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Download</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>`;
+        }
+
+        async function openBillingPortal() {
+            try {
+                const resp = await fetch(`${API_BASE_URL}/api/billing/portal`);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+
+                if (data.mock) {
+                    alert(
+                        'Customer Portal is not available.\n\n' +
+                        (data.message || 'Stripe is not configured.')
+                    );
+                    return;
+                }
+
+                if (data.url && !data.url.startsWith('#')) {
+                    window.location.href = data.url;
+                } else {
+                    alert('Unable to open billing portal: ' + (data.message || data.url));
+                }
+            } catch (err) {
+                console.error('[AI-221] openBillingPortal error:', err);
+                alert('Failed to open billing portal. Please try again.');
             }
         }
 
