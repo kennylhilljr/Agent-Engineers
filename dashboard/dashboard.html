@@ -5736,6 +5736,270 @@
             border-color: var(--accent, #58a6ff);
             color: var(--accent, #58a6ff);
         }
+
+        /* AI-225: Project Switcher */
+        .project-switcher-wrap {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .project-switcher-label {
+            font-size: 0.82rem;
+            color: #64748b;
+            white-space: nowrap;
+        }
+
+        #project-switcher-select {
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            color: #e2e8f0;
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            min-width: 160px;
+            max-width: 260px;
+        }
+
+        #project-switcher-select:focus {
+            outline: 2px solid #3b82f6;
+            outline-offset: 2px;
+        }
+
+        .btn-manage-projects {
+            background: transparent;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            color: #94a3b8;
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 0.82rem;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: border-color 0.2s, color 0.2s;
+        }
+
+        .btn-manage-projects:hover {
+            border-color: #3b82f6;
+            color: #60a5fa;
+        }
+
+        /* Projects panel overlay */
+        #projects-panel-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 1200;
+            align-items: flex-start;
+            justify-content: center;
+            padding-top: 60px;
+        }
+
+        #projects-panel-overlay.open {
+            display: flex;
+        }
+
+        .projects-panel {
+            background: #0f172a;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 14px;
+            padding: 28px;
+            width: 680px;
+            max-width: 96vw;
+            max-height: 82vh;
+            overflow-y: auto;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .projects-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+        }
+
+        .projects-panel-header h2 {
+            font-size: 1.25rem;
+            color: #f1f5f9;
+            font-weight: 600;
+        }
+
+        .projects-panel-close {
+            background: none;
+            border: none;
+            color: #94a3b8;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+            line-height: 1;
+        }
+
+        .projects-panel-close:hover { background: rgba(148, 163, 184, 0.15); color: #f1f5f9; }
+
+        .project-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            border: 1px solid rgba(148, 163, 184, 0.12);
+            margin-bottom: 8px;
+            background: rgba(30, 41, 59, 0.4);
+            transition: border-color 0.15s;
+        }
+
+        .project-row.active-project {
+            border-color: rgba(59, 130, 246, 0.6);
+            background: rgba(59, 130, 246, 0.08);
+        }
+
+        .project-row-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .project-row-name {
+            font-weight: 600;
+            color: #e2e8f0;
+            font-size: 0.95rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .project-row-meta {
+            font-size: 0.78rem;
+            color: #64748b;
+            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .project-active-badge {
+            background: #3b82f6;
+            color: #fff;
+            font-size: 0.7rem;
+            font-weight: 700;
+            border-radius: 5px;
+            padding: 2px 7px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            flex-shrink: 0;
+        }
+
+        .btn-activate-project {
+            background: transparent;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            color: #94a3b8;
+            border-radius: 7px;
+            padding: 5px 10px;
+            font-size: 0.78rem;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: border-color 0.15s, color 0.15s;
+            flex-shrink: 0;
+        }
+
+        .btn-activate-project:hover {
+            border-color: #3b82f6;
+            color: #60a5fa;
+        }
+
+        .btn-delete-project {
+            background: transparent;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #f87171;
+            border-radius: 7px;
+            padding: 5px 10px;
+            font-size: 0.78rem;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: border-color 0.15s, color 0.15s;
+            flex-shrink: 0;
+        }
+
+        .btn-delete-project:hover {
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+
+        .projects-empty-state {
+            text-align: center;
+            color: #64748b;
+            padding: 24px 0;
+            font-size: 0.9rem;
+        }
+
+        /* New Project form */
+        .new-project-form {
+            margin-top: 20px;
+            padding-top: 18px;
+            border-top: 1px solid rgba(148, 163, 184, 0.15);
+        }
+
+        .new-project-form h3 {
+            font-size: 1rem;
+            color: #f1f5f9;
+            margin-bottom: 14px;
+            font-weight: 600;
+        }
+
+        .new-project-fields {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .new-project-fields input {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            border-radius: 8px;
+            padding: 8px 12px;
+            color: #e2e8f0;
+            font-size: 0.85rem;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .new-project-fields input:focus {
+            outline: 2px solid #3b82f6;
+            outline-offset: 2px;
+        }
+
+        .new-project-fields input::placeholder { color: #475569; }
+
+        .new-project-fields .full-width {
+            grid-column: span 2;
+        }
+
+        .btn-create-project {
+            background: #3b82f6;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .btn-create-project:hover { background: #2563eb; }
+        .btn-create-project:disabled { background: #1e3a5f; color: #475569; cursor: not-allowed; }
+
+        #projects-error-msg {
+            color: #f87171;
+            font-size: 0.82rem;
+            margin-top: 6px;
+            min-height: 18px;
+        }
     </style>
 </head>
 <body>
@@ -5885,6 +6149,26 @@
                     title="Toggle dark/light mode"
                 ><span id="theme-toggle-icon">&#9728;&#65039;</span> <span id="theme-toggle-label">Light</span></button>
             </div>
+            <!-- AI-225: Project Switcher -->
+            <div class="project-switcher-wrap" id="project-switcher-wrap">
+                <span class="project-switcher-label">Project:</span>
+                <select
+                    id="project-switcher-select"
+                    aria-label="Switch project"
+                    title="Switch active project"
+                    onchange="onProjectSwitcherChange(this.value)"
+                >
+                    <option value="">-- No project --</option>
+                </select>
+                <button
+                    class="btn-manage-projects"
+                    id="btn-manage-projects"
+                    onclick="openProjectsPanel()"
+                    title="Manage projects"
+                    aria-haspopup="dialog"
+                >&#128193; Manage Projects</button>
+            </div>
+
             <!-- AI-89: Global Pause All / Resume All controls -->
             <div class="global-controls">
                 <button
@@ -10183,6 +10467,32 @@
 
     <!-- AI-81: Agent Detail View (REQ-MONITOR-003) -->
     <!-- Overlay backdrop -->
+    <!-- AI-225: Projects Management Panel -->
+    <div id="projects-panel-overlay" role="dialog" aria-modal="true" aria-labelledby="projects-panel-title" onclick="if(event.target===this)closeProjectsPanel()">
+        <div class="projects-panel" id="projects-panel">
+            <div class="projects-panel-header">
+                <h2 id="projects-panel-title">&#128193; Manage Projects</h2>
+                <button class="projects-panel-close" onclick="closeProjectsPanel()" aria-label="Close projects panel">&times;</button>
+            </div>
+            <!-- Project list -->
+            <div id="projects-list-container">
+                <div class="projects-empty-state" id="projects-empty-state">No projects yet. Create one below.</div>
+            </div>
+            <!-- New Project form -->
+            <div class="new-project-form">
+                <h3>New Project</h3>
+                <div class="new-project-fields">
+                    <input type="text" id="new-project-name" placeholder="Project name *" />
+                    <input type="text" id="new-project-git-url" placeholder="Git repo URL (optional)" />
+                    <input type="text" id="new-project-linear-id" placeholder="Linear project ID (optional)" />
+                    <input type="text" id="new-project-directory" placeholder="Directory path (optional)" />
+                </div>
+                <button class="btn-create-project" id="btn-create-project" onclick="createProject()">Create Project</button>
+                <div id="projects-error-msg"></div>
+            </div>
+        </div>
+    </div>
+
     <div class="agent-detail-overlay" id="agent-detail-overlay" onclick="closeAgentDetail()"></div>
     <!-- Slide-in detail panel -->
     <div class="agent-detail-panel" id="agent-detail-panel" role="dialog" aria-modal="true" aria-label="Agent Detail">
@@ -11549,6 +11859,257 @@
         });
     }());
     // ---- END AI-227 Analytics Widget ----
+    </script>
+
+    <!-- AI-225: Project Switcher + Projects Panel JavaScript -->
+    <script>
+    (function () {
+        'use strict';
+
+        // ----------------------------------------------------------------
+        // State
+        // ----------------------------------------------------------------
+        var _projects = [];
+        var _activeProjectId = null;
+
+        // ----------------------------------------------------------------
+        // API helpers
+        // ----------------------------------------------------------------
+        function apiGet(path) {
+            return fetch(path).then(function (r) { return r.json(); });
+        }
+
+        function apiPost(path, body) {
+            return fetch(path, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            }).then(function (r) {
+                return r.json().then(function (data) {
+                    return { status: r.status, data: data };
+                });
+            });
+        }
+
+        function apiDelete(path) {
+            return fetch(path, { method: 'DELETE' }).then(function (r) {
+                return r.json().then(function (data) {
+                    return { status: r.status, data: data };
+                });
+            });
+        }
+
+        // ----------------------------------------------------------------
+        // Load projects from server
+        // ----------------------------------------------------------------
+        function loadProjects() {
+            apiGet('/api/projects').then(function (resp) {
+                _projects = resp.projects || [];
+                _activeProjectId = resp.active_project_id || null;
+                renderSwitcherDropdown();
+                renderProjectsList();
+            }).catch(function () {
+                // server may not have projects module — hide switcher gracefully
+                var wrap = document.getElementById('project-switcher-wrap');
+                if (wrap) wrap.style.display = 'none';
+            });
+        }
+
+        // ----------------------------------------------------------------
+        // Render project switcher dropdown
+        // ----------------------------------------------------------------
+        function renderSwitcherDropdown() {
+            var sel = document.getElementById('project-switcher-select');
+            if (!sel) return;
+
+            // Preserve current value
+            var prev = sel.value;
+
+            // Rebuild options
+            sel.innerHTML = '<option value="">-- No project --</option>';
+            _projects.forEach(function (p) {
+                var opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.name;
+                if (p.id === _activeProjectId) opt.selected = true;
+                sel.appendChild(opt);
+            });
+
+            // Restore if still valid
+            if (prev && prev !== '' && !_activeProjectId) {
+                sel.value = prev;
+            } else if (_activeProjectId) {
+                sel.value = _activeProjectId;
+            }
+        }
+
+        // ----------------------------------------------------------------
+        // Render the projects list inside the panel
+        // ----------------------------------------------------------------
+        function renderProjectsList() {
+            var container = document.getElementById('projects-list-container');
+            var emptyState = document.getElementById('projects-empty-state');
+            if (!container) return;
+
+            // Remove existing project rows (keep the empty-state element)
+            var rows = container.querySelectorAll('.project-row');
+            rows.forEach(function (r) { r.parentNode.removeChild(r); });
+
+            if (_projects.length === 0) {
+                if (emptyState) emptyState.style.display = 'block';
+                return;
+            }
+            if (emptyState) emptyState.style.display = 'none';
+
+            _projects.forEach(function (p) {
+                var isActive = (p.id === _activeProjectId);
+                var row = document.createElement('div');
+                row.className = 'project-row' + (isActive ? ' active-project' : '');
+                row.setAttribute('data-project-id', p.id);
+
+                var createdDate = '';
+                try {
+                    createdDate = new Date(p.created_at).toLocaleDateString();
+                } catch (e) { createdDate = p.created_at || ''; }
+
+                var meta = [p.git_repo_url || '', createdDate].filter(Boolean).join(' &bull; ');
+
+                row.innerHTML =
+                    '<div class="project-row-info">' +
+                        '<div class="project-row-name">' + escapeHtml(p.name) + '</div>' +
+                        (meta ? '<div class="project-row-meta">' + escapeHtml(p.git_repo_url || '') + (createdDate ? ' &bull; ' + escapeHtml(createdDate) : '') + '</div>' : '') +
+                    '</div>' +
+                    (isActive ? '<span class="project-active-badge">Active</span>' : '') +
+                    (!isActive ? '<button class="btn-activate-project" onclick="activateProject(\'' + p.id + '\')">Activate</button>' : '') +
+                    '<button class="btn-delete-project" onclick="deleteProject(\'' + p.id + '\')">Delete</button>';
+
+                container.appendChild(row);
+            });
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        // ----------------------------------------------------------------
+        // Actions
+        // ----------------------------------------------------------------
+        window.onProjectSwitcherChange = function (projectId) {
+            if (!projectId) return;
+            apiPost('/api/projects/' + projectId + '/activate', {}).then(function (resp) {
+                if (resp.status === 200) {
+                    _activeProjectId = projectId;
+                    renderSwitcherDropdown();
+                    renderProjectsList();
+                }
+            });
+        };
+
+        window.openProjectsPanel = function () {
+            var overlay = document.getElementById('projects-panel-overlay');
+            if (overlay) {
+                overlay.classList.add('open');
+                loadProjects();
+            }
+        };
+
+        window.closeProjectsPanel = function () {
+            var overlay = document.getElementById('projects-panel-overlay');
+            if (overlay) overlay.classList.remove('open');
+        };
+
+        window.activateProject = function (projectId) {
+            apiPost('/api/projects/' + projectId + '/activate', {}).then(function (resp) {
+                if (resp.status === 200) {
+                    _activeProjectId = projectId;
+                    renderSwitcherDropdown();
+                    renderProjectsList();
+                }
+            });
+        };
+
+        window.deleteProject = function (projectId) {
+            if (!confirm('Delete this project? This cannot be undone.')) return;
+            apiDelete('/api/projects/' + projectId).then(function (resp) {
+                if (resp.status === 200) {
+                    _projects = _projects.filter(function (p) { return p.id !== projectId; });
+                    if (_activeProjectId === projectId) _activeProjectId = null;
+                    renderSwitcherDropdown();
+                    renderProjectsList();
+                } else {
+                    setProjectsError(resp.data.error || 'Delete failed');
+                }
+            });
+        };
+
+        window.createProject = function () {
+            var nameEl = document.getElementById('new-project-name');
+            var gitEl = document.getElementById('new-project-git-url');
+            var linearEl = document.getElementById('new-project-linear-id');
+            var dirEl = document.getElementById('new-project-directory');
+            var btn = document.getElementById('btn-create-project');
+
+            var name = nameEl ? nameEl.value.trim() : '';
+            if (!name) {
+                setProjectsError('Project name is required.');
+                return;
+            }
+
+            if (btn) btn.disabled = true;
+            setProjectsError('');
+
+            apiPost('/api/projects', {
+                name: name,
+                git_repo_url: gitEl ? gitEl.value.trim() : '',
+                linear_project_id: linearEl ? linearEl.value.trim() : '',
+                directory: dirEl ? dirEl.value.trim() : '',
+            }).then(function (resp) {
+                if (btn) btn.disabled = false;
+                if (resp.status === 201) {
+                    _projects.push(resp.data.project);
+                    renderSwitcherDropdown();
+                    renderProjectsList();
+                    // Clear form
+                    if (nameEl) nameEl.value = '';
+                    if (gitEl) gitEl.value = '';
+                    if (linearEl) linearEl.value = '';
+                    if (dirEl) dirEl.value = '';
+                } else {
+                    setProjectsError(resp.data.error || 'Failed to create project.');
+                }
+            }).catch(function () {
+                if (btn) btn.disabled = false;
+                setProjectsError('Network error — could not reach server.');
+            });
+        };
+
+        function setProjectsError(msg) {
+            var el = document.getElementById('projects-error-msg');
+            if (el) el.textContent = msg;
+        }
+
+        // ----------------------------------------------------------------
+        // Keyboard close
+        // ----------------------------------------------------------------
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                closeProjectsPanel();
+            }
+        });
+
+        // ----------------------------------------------------------------
+        // Init — load on page ready
+        // ----------------------------------------------------------------
+        document.addEventListener('DOMContentLoaded', function () {
+            loadProjects();
+        });
+    }());
+    // ---- END AI-225 Project Switcher ----
     </script>
 </body>
 </html>
