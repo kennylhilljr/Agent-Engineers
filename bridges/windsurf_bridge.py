@@ -25,6 +25,9 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
+from bridges.base_bridge import BaseBridge
+from bridges.base_bridge import BridgeResponse as BridgeBaseResponse
+
 
 class WindsurfMode(StrEnum):
     CLI = "cli"
@@ -231,12 +234,29 @@ class WindsurfDockerClient:
             instructions_path.unlink(missing_ok=True)
 
 
-class WindsurfBridge:
+class WindsurfBridge(BaseBridge):
     """Unified bridge for Windsurf access."""
+
+    @property
+    def provider_name(self) -> str:
+        return "windsurf"
 
     def __init__(self, mode: WindsurfMode, client) -> None:
         self.mode = mode
         self._client = client
+
+    async def send_task(self, task: str, **kwargs) -> BridgeBaseResponse:
+        """Send a task to Windsurf and return a BridgeResponse."""
+        workspace = kwargs.get("workspace") or os.environ.get("WINDSURF_WORKSPACE", "")
+        if not workspace:
+            workspace = tempfile.mkdtemp(prefix="windsurf-")
+        session = self.create_session(workspace=workspace)
+        response = self._client.send_task(session, task)
+        return BridgeBaseResponse(
+            content=response.content,
+            model=response.model,
+            provider=self.provider_name,
+        )
 
     @classmethod
     def from_env(cls) -> "WindsurfBridge":
