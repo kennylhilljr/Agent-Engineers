@@ -80,6 +80,7 @@ from dashboard.metrics_store import MetricsStore
 from dashboard.chat_bridge import ChatBridge, IntentParser, AgentRouter
 from dashboard.auth import auth_middleware
 from dashboard.config import get_config
+from dashboard.compat import check_python_version
 from dashboard.latency_benchmark import LatencyTracker, StreamingLatencyTracker
 from dashboard.structured_logging import RequestLogger, ProviderRoutingLogger, ErrorLogger
 
@@ -2170,6 +2171,7 @@ class DashboardServer:
 
 def main():
     """CLI entry point for dashboard server."""
+    check_python_version()
     parser = argparse.ArgumentParser(
         description='Agent Status Dashboard HTTP Server',
         formatter_class=argparse.RawDescriptionHelpFormatter,
