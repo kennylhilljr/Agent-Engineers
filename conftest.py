@@ -98,6 +98,14 @@ if _worktree_latency_benchmark_path.exists() and "dashboard.latency_benchmark" n
     except Exception:
         pass
 
+# 4g. Load dashboard.load_time_benchmark from the worktree (AI-181 / REQ-PERF-002)
+_worktree_load_time_benchmark_path = _WORKTREE_ROOT / "dashboard" / "load_time_benchmark.py"
+if _worktree_load_time_benchmark_path.exists() and "dashboard.load_time_benchmark" not in sys.modules:
+    try:
+        _load_module_from_file("dashboard.load_time_benchmark", _worktree_load_time_benchmark_path)
+    except Exception:
+        pass
+
 # 4b. Override dashboard.server with the worktree's AI-161 version
 _worktree_server_path = _WORKTREE_ROOT / "dashboard" / "server.py"
 if _worktree_server_path.exists():
