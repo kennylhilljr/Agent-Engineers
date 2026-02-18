@@ -3492,42 +3492,96 @@
          * Pauses all agents simultaneously. Sets globalPaused flag, marks all
          * non-idle agents as paused, shows the banner, and updates the header buttons.
          */
-        function pauseAll() {
-            window.globalPaused = true;
-            state.agents.forEach(function(agent) {
-                const id = agent.id || agent.name;
-                window.pausedAgents.add(id);
-                agent.status = 'paused';
-            });
+        /**
+         * Apply the system-paused visual state: show/hide banner and toggle buttons.
+         * @param {boolean} paused
+         */
+        function applySystemPausedState(paused) {
+            window.globalPaused = paused;
             const banner = document.getElementById('global-pause-banner');
-            if (banner) banner.classList.add('visible');
+            if (banner) {
+                if (paused) {
+                    banner.classList.add('visible');
+                } else {
+                    banner.classList.remove('visible');
+                }
+            }
             const pauseBtn = document.getElementById('pause-all-btn');
             const resumeBtn = document.getElementById('resume-all-btn');
-            if (pauseBtn) pauseBtn.style.display = 'none';
-            if (resumeBtn) resumeBtn.style.display = '';
-            addSystemMessage('All agents paused — system is idle');
-            window.renderAgents();
+            if (pauseBtn) pauseBtn.style.display = paused ? 'none' : '';
+            if (resumeBtn) resumeBtn.style.display = paused ? '' : 'none';
+        }
+        window.applySystemPausedState = applySystemPausedState;
+
+        /**
+         * Fetch system-status from backend and sync banner state on page load (AI-89).
+         */
+        async function fetchSystemStatus() {
+            try {
+                const resp = await fetch('/api/agents/system-status');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                applySystemPausedState(data.system_paused);
+            } catch (err) {
+                console.warn('[AI-89] fetchSystemStatus failed:', err);
+            }
+        }
+        window.fetchSystemStatus = fetchSystemStatus;
+
+        /**
+         * Pauses all agents simultaneously via backend API (AI-89).
+         * Sets _system_paused on server, adds feed event, shows banner.
+         */
+        async function pauseAll() {
+            const pauseBtn = document.getElementById('pause-all-btn');
+            if (pauseBtn) { pauseBtn.disabled = true; }
+            try {
+                const resp = await fetch('/api/agents/pause-all', { method: 'POST' });
+                if (resp.ok) {
+                    applySystemPausedState(true);
+                    state.agents.forEach(function(agent) {
+                        const id = agent.id || agent.name;
+                        window.pausedAgents.add(id);
+                        agent.status = 'paused';
+                    });
+                    addSystemMessage('All agents paused — system is idle');
+                    window.renderAgents();
+                } else {
+                    console.error('[AI-89] pause-all failed:', resp.status);
+                }
+            } catch (err) {
+                console.error('[AI-89] pause-all error:', err);
+            } finally {
+                if (pauseBtn) { pauseBtn.disabled = false; }
+            }
         }
         window.pauseAll = pauseAll;
 
         /**
-         * Resumes all paused agents. Clears globalPaused flag, restores all agents
-         * to idle, hides the banner, and updates the header buttons.
+         * Resumes all paused agents via backend API (AI-89).
+         * Clears _system_paused on server, adds feed event, hides banner.
          */
-        function resumeAll() {
-            window.globalPaused = false;
-            window.pausedAgents.clear();
-            state.agents.forEach(function(agent) {
-                agent.status = 'idle';
-            });
-            const banner = document.getElementById('global-pause-banner');
-            if (banner) banner.classList.remove('visible');
-            const pauseBtn = document.getElementById('pause-all-btn');
+        async function resumeAll() {
             const resumeBtn = document.getElementById('resume-all-btn');
-            if (pauseBtn) pauseBtn.style.display = '';
-            if (resumeBtn) resumeBtn.style.display = 'none';
-            addSystemMessage('All agents resumed');
-            window.renderAgents();
+            if (resumeBtn) { resumeBtn.disabled = true; }
+            try {
+                const resp = await fetch('/api/agents/resume-all', { method: 'POST' });
+                if (resp.ok) {
+                    applySystemPausedState(false);
+                    window.pausedAgents.clear();
+                    state.agents.forEach(function(agent) {
+                        agent.status = 'idle';
+                    });
+                    addSystemMessage('All agents resumed');
+                    window.renderAgents();
+                } else {
+                    console.error('[AI-89] resume-all failed:', resp.status);
+                }
+            } catch (err) {
+                console.error('[AI-89] resume-all error:', err);
+            } finally {
+                if (resumeBtn) { resumeBtn.disabled = false; }
+            }
         }
         window.resumeAll = resumeAll;
 
@@ -4773,6 +4827,10 @@
                                 const msg = JSON.parse(event.data);
                                 if (msg.type === 'agent_event' || msg.type === 'activity') {
                                     addLiveActivityEvent(msg.data || msg);
+                                } else if (msg.type === 'system_status_change') {
+                                    // AI-89: Global pause/resume state changed
+                                    console.log('[AI-89] system_status_change:', msg);
+                                    applySystemPausedState(msg.system_paused);
                                 }
                             } catch(e) { /* ignore parse errors */ }
                         };
@@ -4787,6 +4845,9 @@
                     connect();
                 }
             })();
+
+            // AI-89: Load system-paused state on startup (banner + buttons)
+            fetchSystemStatus();
 
             console.log('Agent Dashboard initialized successfully');
             console.log('- Provider switcher with 6 providers');
