@@ -135,7 +135,7 @@ The main repository root is: {repo_root}
 Perform an AGENT PERFORMANCE ANALYSIS:
 
 1. Post to Slack (channel: ai-cli-macz) that you're starting agent analysis.
-2. Read {repo_root}/agents/definitions.py to understand all 15 agents.
+2. Read {repo_root}/agents/definitions.py to understand all 16 agents.
 3. Read {repo_root}/CLAUDE.md for project conventions.
 4. Read agent prompts in {repo_root}/prompts/ for each agent.
 5. Analyze:
@@ -146,6 +146,14 @@ Perform an AGENT PERFORMANCE ANALYSIS:
    - What new agents might be needed?
 6. Check {repo_root}/bridges/ for AI provider integration status.
 7. Post your analysis and recommendations to Slack (channel: ai-cli-macz).
+""",
+    "custom": """
+You are running as the Product Manager agent. Your working directory is: {project_dir}
+The main repository root is: {repo_root}
+
+{custom_prompt}
+
+Post all findings and recommendations to Slack (channel: ai-cli-macz).
 """,
 }
 
@@ -161,11 +169,13 @@ Tasks:
   sprint-planning Plan the next sprint based on current state
   prompt-review   Review and improve all agent prompts
   agent-analysis  Analyze agent performance and configuration
+  custom          Run a custom task with --custom-prompt
 
 Examples:
   uv run python scripts/product_manager_runner.py
   uv run python scripts/product_manager_runner.py --task sprint-planning
   uv run python scripts/product_manager_runner.py --task backlog-review --model sonnet
+  uv run python scripts/product_manager_runner.py --task custom --custom-prompt "Audit design system"
         """,
     )
     parser.add_argument(
@@ -186,20 +196,33 @@ Examples:
         default=PROJECT_DIR,
         help=f"Project directory (default: {PROJECT_DIR})",
     )
+    parser.add_argument(
+        "--custom-prompt",
+        type=str,
+        default="",
+        help="Custom task prompt (required when --task=custom)",
+    )
     return parser.parse_args()
 
 
-async def run_pm_session(task: str, model: str, project_dir: Path) -> None:
+async def run_pm_session(
+    task: str, model: str, project_dir: Path, custom_prompt: str = "",
+) -> None:
     """Run the PM agent session."""
     print(f"{'=' * 70}")
     print(f"Product Manager Agent - Task: {task}")
     print(f"Model: {model} | Project: {project_dir}")
     print(f"{'=' * 70}\n")
 
+    if task == "custom" and not custom_prompt:
+        print("ERROR: --custom-prompt is required when --task=custom")
+        sys.exit(1)
+
     # Build task prompt
     task_prompt = TASK_TEMPLATES[task].format(
         project_dir=project_dir,
         repo_root=REPO_ROOT,
+        custom_prompt=custom_prompt,
     )
 
     # Create client with agent definitions
@@ -250,6 +273,7 @@ def main() -> None:
         task=args.task,
         model=args.model,
         project_dir=args.project_dir,
+        custom_prompt=args.custom_prompt,
     ))
 
 
