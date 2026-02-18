@@ -415,17 +415,21 @@ class ChatBridge:
         self,
         message: str,
         session_id: Optional[str] = None,
+        latency_tracker: Any = None,
     ) -> AsyncIterator[Dict[str, Any]]:
         """Handle a user message and stream back response chunks.
 
         Args:
             message: Raw user chat message
             session_id: Optional session identifier for context
+            latency_tracker: Optional StreamingLatencyTracker instance.
+                When provided, records stream_start at call time and
+                first_chunk when the first chunk is yielded (AI-182).
 
         Yields:
             Response chunk dicts with type, content, metadata, timestamp
         """
-        return self._stream_response(message, session_id)
+        return self._stream_response(message, session_id, latency_tracker=latency_tracker)
 
     # ------------------------------------------------------------------
     # Internal streaming generator
@@ -435,11 +439,27 @@ class ChatBridge:
         self,
         message: str,
         session_id: Optional[str],
+        latency_tracker: Any = None,
     ) -> AsyncIterator[Dict[str, Any]]:
         """Core async generator that drives the intent → route → execute → stream pipeline."""
+        import time as _time
+
+        # Record stream start for latency tracking (AI-182)
+        stream_id: Optional[str] = None
+        if latency_tracker is not None:
+            stream_id = session_id or str(id(self))
+            latency_tracker.record_stream_start(stream_id)
+        _first_chunk_recorded = False
+
+        def _maybe_record_first_chunk():
+            nonlocal _first_chunk_recorded
+            if latency_tracker is not None and stream_id is not None and not _first_chunk_recorded:
+                latency_tracker.record_first_chunk(stream_id)
+                _first_chunk_recorded = True
 
         # --- Step 1: validate input ---
         if not message or not isinstance(message, str):
+            _maybe_record_first_chunk()
             yield self._chunk(
                 "error",
                 "Empty or invalid message received.",
@@ -451,6 +471,7 @@ class ChatBridge:
         try:
             # --- Step 2: parse intent ---
             intent = self.intent_parser.parse_intent(message)
+            _maybe_record_first_chunk()
             yield self._chunk(
                 "intent",
                 f"Detected intent: {intent['intent_type']} (confidence: {intent['confidence']})",

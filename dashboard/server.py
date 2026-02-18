@@ -80,7 +80,7 @@ from dashboard.metrics_store import MetricsStore
 from dashboard.chat_bridge import ChatBridge, IntentParser, AgentRouter
 from dashboard.auth import auth_middleware
 from dashboard.config import get_config
-from dashboard.latency_benchmark import LatencyTracker
+from dashboard.latency_benchmark import LatencyTracker, StreamingLatencyTracker
 
 # In-memory store for requirements (ticket_key -> requirement text)
 _requirements_store: dict = {}
@@ -356,6 +356,9 @@ class DashboardServer:
         # WebSocket latency tracker (AI-180 / REQ-PERF-001)
         self.latency_tracker = LatencyTracker()
 
+        # Streaming latency tracker (AI-182 / REQ-PERF-003)
+        self.streaming_latency_tracker = StreamingLatencyTracker()
+
         # Register as a listener on the supplied collector (AI-171)
         if collector is not None:
             collector.register_event_callback(self._on_new_event)
@@ -426,6 +429,9 @@ class DashboardServer:
         # Latency statistics endpoint (AI-180 / REQ-PERF-001)
         self.app.router.add_get('/api/latency', self.get_latency_stats)
 
+        # Streaming latency statistics endpoint (AI-182 / REQ-PERF-003)
+        self.app.router.add_get('/api/streaming-latency', self.get_streaming_latency_stats)
+
         # OPTIONS for CORS preflight
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/agents/{agent_name}', self.handle_options)
@@ -494,6 +500,22 @@ class DashboardServer:
         stats = self.latency_tracker.get_stats()
         stats["target_ms"] = 100
         stats["target_met"] = self.latency_tracker.check_target(100)
+        stats["timestamp"] = datetime.utcnow().isoformat() + "Z"
+        return web.json_response(stats)
+
+    async def get_streaming_latency_stats(self, request: Request) -> Response:
+        """GET /api/streaming-latency — return chat streaming start latency stats.
+
+        Returns JSON with p50, p95, p99, max, mean, count, within_500ms_pct.
+        Latency is measured from handle_message() call to the first chunk
+        yielded by the ChatBridge pipeline (AI-182 / REQ-PERF-003).
+
+        Returns:
+            JSON response with current streaming latency statistics.
+        """
+        stats = self.streaming_latency_tracker.get_streaming_stats()
+        stats["target_ms"] = 500
+        stats["target_met"] = self.streaming_latency_tracker.check_streaming_target(500)
         stats["timestamp"] = datetime.utcnow().isoformat() + "Z"
         return web.json_response(stats)
 
