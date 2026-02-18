@@ -1842,7 +1842,7 @@ class DashboardServer:
         Query Parameters:
             type: Filter by decision type (e.g. agent_selection)
             ticket: Filter by ticket key (e.g. AI-42)
-            limit: Maximum number of results to return (default: all)
+            limit: Maximum number of results to return (default: 50)
 
         Returns:
             JSON ``{"decisions": [...], "total": N}``
@@ -1862,12 +1862,16 @@ class DashboardServer:
         # Most recent first
         results = list(reversed(results))
 
+        # Apply limit — default 50 (AI-97)
+        default_limit = 50
         if limit_str:
             try:
                 limit = int(limit_str)
                 results = results[:limit]
             except ValueError:
-                pass
+                results = results[:default_limit]
+        else:
+            results = results[:default_limit]
 
         return web.json_response({
             'decisions': results,
