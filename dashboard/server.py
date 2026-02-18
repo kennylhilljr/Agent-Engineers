@@ -81,6 +81,7 @@ from dashboard.chat_bridge import ChatBridge, IntentParser, AgentRouter
 from dashboard.auth import auth_middleware
 from dashboard.config import get_config
 from dashboard.latency_benchmark import LatencyTracker, StreamingLatencyTracker
+from dashboard.structured_logging import RequestLogger, ProviderRoutingLogger, ErrorLogger
 
 # In-memory store for requirements (ticket_key -> requirement text)
 _requirements_store: dict = {}
@@ -135,6 +136,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Structured loggers (AI-186 / REQ-OBS-001)
+_request_logger = RequestLogger()
+_error_logger = ErrorLogger()
 
 # Get CORS allowed origins from environment via DashboardConfig
 def get_cors_origins() -> str:
@@ -192,6 +196,7 @@ async def error_middleware(request: Request, handler):
         raise
     except Exception as ex:
         logger.exception(f"Error handling request {request.method} {request.path}")
+        _error_logger.log_error(ex, context={"method": request.method, "path": request.path})
         return web.json_response(
             {
                 'error': type(ex).__name__,
@@ -359,6 +364,11 @@ class DashboardServer:
         # Streaming latency tracker (AI-182 / REQ-PERF-003)
         self.streaming_latency_tracker = StreamingLatencyTracker()
 
+        # Structured loggers (AI-186 / REQ-OBS-001)
+        self._ws_logger = RequestLogger()
+        self._provider_routing_logger = ProviderRoutingLogger()
+        self._error_logger = ErrorLogger()
+
         # Register as a listener on the supplied collector (AI-171)
         if collector is not None:
             collector.register_event_callback(self._on_new_event)
@@ -432,6 +442,9 @@ class DashboardServer:
         # Streaming latency statistics endpoint (AI-182 / REQ-PERF-003)
         self.app.router.add_get('/api/streaming-latency', self.get_streaming_latency_stats)
 
+        # Metrics health endpoint (AI-185 / REQ-REL-003)
+        self.app.router.add_get('/api/health/metrics', self.get_metrics_health)
+
         # OPTIONS for CORS preflight
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/agents/{agent_name}', self.handle_options)
@@ -454,6 +467,7 @@ class DashboardServer:
         self.app.router.add_route('OPTIONS', '/api/agent-event', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/chat-stream', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/control-ack', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/health/metrics', self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
         """Handle CORS preflight OPTIONS requests."""
@@ -485,6 +499,54 @@ class DashboardServer:
             'event_count': stats['event_count'],
             'session_count': stats['session_count'],
             'agent_count': stats['agent_count']
+        })
+
+    async def get_metrics_health(self, request: Request) -> Response:
+        """GET /api/health/metrics — collector health status (AI-185 / REQ-REL-003).
+
+        Reports whether the ``.agent_metrics.json`` file is present and contains
+        valid JSON.  When degraded, a human-readable reason is included so the
+        frontend can display the "Metrics unavailable" banner.
+
+        Response shape:
+            {
+                "healthy": true/false,
+                "degradation_reason": null | "<string>",
+                "metrics_file_exists": true/false,
+                "timestamp": "<ISO-8601>",
+                "project": "<name>"
+            }
+
+        Returns:
+            200 JSON response with health status.
+        """
+        metrics_path = self.store.metrics_path
+        file_exists = metrics_path.exists()
+
+        # Determine health and degradation reason
+        healthy = False
+        degradation_reason = None
+
+        if not file_exists:
+            degradation_reason = f"Metrics file missing: {metrics_path}"
+        else:
+            try:
+                import json as _json
+                with open(metrics_path, "r", encoding="utf-8") as fh:
+                    data = _json.load(fh)
+                if self.store._validate_state(data):
+                    healthy = True
+                else:
+                    degradation_reason = f"Metrics file has invalid structure: {metrics_path}"
+            except Exception as exc:
+                degradation_reason = f"Metrics file corrupted (invalid JSON): {metrics_path} — {exc}"
+
+        return web.json_response({
+            "healthy": healthy,
+            "degradation_reason": degradation_reason,
+            "metrics_file_exists": file_exists,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "project": self.project_name,
         })
 
     async def get_latency_stats(self, request: Request) -> Response:
@@ -1730,6 +1792,16 @@ class DashboardServer:
                     chunk_type = bridge_chunk.get('type', 'text')
                     is_final = (chunk_type == 'done')
 
+                    # Log routing decisions (AI-186 / REQ-OBS-001)
+                    if chunk_type == 'intent':
+                        meta = bridge_chunk.get('metadata', {})
+                        self._provider_routing_logger.log_routing(
+                            message=user_message,
+                            intent_type=meta.get('intent_type', ''),
+                            agent=meta.get('agent'),
+                            confidence=float(meta.get('confidence', 0.0)),
+                        )
+
                     ws_message = {
                         'type': 'chat_response',
                         'chunk_type': chunk_type,
@@ -1871,6 +1943,8 @@ class DashboardServer:
         self.websockets.add(ws)
         client_id = id(ws)
         logger.info(f"WebSocket client connected: {client_id} (total: {len(self.websockets)})")
+        remote = request.remote if request else None
+        self._ws_logger.log_ws_connect(str(client_id), remote=remote)
 
         try:
             # Send initial metrics immediately
@@ -1919,6 +1993,7 @@ class DashboardServer:
             # Remove from active connections
             self.websockets.discard(ws)
             logger.info(f"WebSocket client disconnected: {client_id} (remaining: {len(self.websockets)})")
+            self._ws_logger.log_ws_disconnect(str(client_id))
 
         return ws
 
