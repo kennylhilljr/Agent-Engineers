@@ -48,6 +48,20 @@ _agent_states: Dict[str, str] = {}  # agent_name -> "running" | "paused" | "idle
 _requirements_cache: Dict[str, str] = {}  # ticket_key -> requirement text
 _decisions_log: list[Dict[str, Any]] = []  # Decision history
 
+# Agent Status Panel (AI-79 / REQ-MONITOR-001): extended per-agent status details
+# Tracks: status (idle|running|paused|error), current_ticket, elapsed_time start
+_agent_status_details: Dict[str, Dict[str, Any]] = {}
+
+# Valid agent statuses for the status panel
+VALID_AGENT_STATUSES = ("idle", "running", "paused", "error")
+
+# The 13 canonical agents for the status panel (excludes orchestrator)
+PANEL_AGENT_NAMES = [
+    "linear", "coding", "github", "slack", "pr_reviewer",
+    "ops", "coding_fast", "pr_reviewer_fast", "chatgpt",
+    "gemini", "groq", "kimi", "windsurf",
+]
+
 # WebSocket clients connected to /api/ws for agent_status broadcasts
 _ws_clients: set = set()
 
@@ -187,6 +201,25 @@ class RESTAPIServer:
         for agent_name in ALL_AGENT_NAMES:
             _agent_states[agent_name] = "idle"
 
+        # Initialize agent status details for all panel agents (AI-79 / REQ-MONITOR-001)
+        for agent_name in PANEL_AGENT_NAMES:
+            if agent_name not in _agent_status_details:
+                _agent_status_details[agent_name] = {
+                    "name": agent_name,
+                    "status": "idle",
+                    "current_ticket": None,
+                    "started_at": None,
+                }
+        # Also ensure ALL_AGENT_NAMES have entries (covers orchestrator etc.)
+        for agent_name in ALL_AGENT_NAMES:
+            if agent_name not in _agent_status_details:
+                _agent_status_details[agent_name] = {
+                    "name": agent_name,
+                    "status": "idle",
+                    "current_ticket": None,
+                    "started_at": None,
+                }
+
     @middleware
     async def _cors_middleware(self, request: Request, handler):
         """Add CORS headers to all responses."""
@@ -229,10 +262,13 @@ class RESTAPIServer:
         self.app.router.add_post('/api/agents/pause-all', self.pause_all_agents)
         self.app.router.add_post('/api/agents/resume-all', self.resume_all_agents)
         self.app.router.add_get('/api/agent-controls', self.get_all_agent_controls)
+        # Agent Status Panel endpoints (AI-79 / REQ-MONITOR-001)
+        self.app.router.add_get('/api/agents/status', self.get_all_agents_status)
         self.app.router.add_get('/api/agents/{name}', self.get_agent)
         self.app.router.add_get('/api/agents/{name}/events', self.get_agent_events)
         self.app.router.add_post('/api/agents/{name}/pause', self.pause_agent)
         self.app.router.add_post('/api/agents/{name}/resume', self.resume_agent)
+        self.app.router.add_post('/api/agents/{name}/status', self.update_agent_status)
         self.app.router.add_get('/api/agents/{name}/requirements', self.get_agent_requirements_by_name)
         self.app.router.add_put('/api/agents/{name}/requirements', self.update_agent_requirements_by_name)
 
@@ -259,7 +295,7 @@ class RESTAPIServer:
 
         # OPTIONS for CORS preflight
         for route in ['/api/metrics', '/api/agents', '/api/sessions', '/api/providers',
-                      '/api/chat', '/api/decisions']:
+                      '/api/chat', '/api/decisions', '/api/agents/status']:
             self.app.router.add_route('OPTIONS', route, self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
@@ -1057,6 +1093,129 @@ class RESTAPIServer:
             _ws_clients.discard(ws)
 
         return ws
+
+    # -------------------------------------------------------------------------
+    # AI-79: Agent Status Panel - REQ-MONITOR-001
+    # -------------------------------------------------------------------------
+
+    async def get_all_agents_status(self, request: Request) -> Response:
+        """GET /api/agents/status - Get current status of all 13 agents.
+
+        Returns a list of all panel agents with their status (idle/running/paused/error),
+        current ticket (if running), and elapsed_time (if running).
+
+        Returns:
+            200 OK with list of agent status objects
+        """
+        timestamp = datetime.utcnow().isoformat() + 'Z'
+        agents_status = []
+
+        for agent_name in PANEL_AGENT_NAMES:
+            detail = _agent_status_details.get(agent_name, {
+                "name": agent_name,
+                "status": "idle",
+                "current_ticket": None,
+                "started_at": None,
+            })
+            elapsed_time = None
+            if detail.get("status") == "running" and detail.get("started_at"):
+                try:
+                    started = datetime.fromisoformat(detail["started_at"].rstrip('Z'))
+                    elapsed_time = round((datetime.utcnow() - started).total_seconds())
+                except (ValueError, AttributeError):
+                    elapsed_time = None
+
+            agents_status.append({
+                "name": agent_name,
+                "status": detail.get("status", "idle"),
+                "current_ticket": detail.get("current_ticket"),
+                "elapsed_time": elapsed_time,
+            })
+
+        return web.json_response({
+            "agents": agents_status,
+            "total": len(agents_status),
+            "timestamp": timestamp,
+        })
+
+    async def update_agent_status(self, request: Request) -> Response:
+        """POST /api/agents/{name}/status - Update agent status.
+
+        Supports status transitions:
+            idle -> running, idle -> paused, idle -> error
+            running -> idle, running -> paused, running -> error
+            paused -> idle, paused -> running, paused -> error
+            any -> error
+
+        Request body:
+            {
+                "status": "idle|running|paused|error",
+                "current_ticket": "AI-XX"  (optional, used when running)
+            }
+
+        Returns:
+            200 OK with updated agent status
+            400 Bad Request for invalid status
+            404 Not Found if agent name not in panel agents
+        """
+        agent_name = request.match_info['name']
+
+        # Validate agent name - must be one of the 13 panel agents
+        if agent_name not in PANEL_AGENT_NAMES:
+            return web.json_response({
+                'error': 'Agent not found',
+                'agent_name': agent_name,
+                'available_agents': PANEL_AGENT_NAMES,
+            }, status=404)
+
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        new_status = body.get('status', '')
+        if new_status not in VALID_AGENT_STATUSES:
+            return web.json_response({
+                'error': f'Invalid status. Must be one of: {list(VALID_AGENT_STATUSES)}',
+                'provided': new_status,
+            }, status=400)
+
+        current_ticket = body.get('current_ticket', None)
+        timestamp = datetime.utcnow().isoformat() + 'Z'
+
+        # Update in-memory details
+        if agent_name not in _agent_status_details:
+            _agent_status_details[agent_name] = {
+                "name": agent_name,
+                "status": "idle",
+                "current_ticket": None,
+                "started_at": None,
+            }
+
+        previous_status = _agent_status_details[agent_name].get("status", "idle")
+        _agent_status_details[agent_name]["status"] = new_status
+        _agent_status_details[agent_name]["current_ticket"] = current_ticket if new_status == "running" else None
+
+        # Track start time for elapsed_time calculation
+        if new_status == "running":
+            _agent_status_details[agent_name]["started_at"] = timestamp
+        elif new_status in ("idle", "error"):
+            _agent_status_details[agent_name]["started_at"] = None
+
+        # Also keep _agent_states in sync (for backward compat with pause/resume endpoints)
+        _agent_states[agent_name] = new_status
+
+        # Broadcast via WebSocket
+        await self._broadcast_agent_status(agent_name, new_status)
+
+        return web.json_response({
+            'status': 'success',
+            'agent_name': agent_name,
+            'previous_status': previous_status,
+            'new_status': new_status,
+            'current_ticket': current_ticket if new_status == "running" else None,
+            'timestamp': timestamp,
+        })
 
     async def _broadcast_agent_status(self, agent_name: str, status: str) -> None:
         """Broadcast an agent_status event to all connected WebSocket clients.

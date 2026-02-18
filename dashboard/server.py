@@ -89,6 +89,19 @@ from dashboard.structured_logging import RequestLogger, ProviderRoutingLogger, E
 # In-memory store for requirements (ticket_key -> requirement text)
 _requirements_store: dict = {}
 
+# AI-79: Agent Status Panel (REQ-MONITOR-001) - in-memory status store for DashboardServer
+_dashboard_agent_status: dict = {}
+
+# The 13 canonical panel agents (excludes orchestrator)
+_PANEL_AGENT_NAMES = [
+    "linear", "coding", "github", "slack", "pr_reviewer",
+    "ops", "coding_fast", "pr_reviewer_fast", "chatgpt",
+    "gemini", "groq", "kimi", "windsurf",
+]
+
+# Valid statuses for the status panel
+_VALID_PANEL_STATUSES = ("idle", "running", "paused", "error")
+
 # Max size of per-instance reasoning history circular buffer (AI-160)
 _REASONING_HISTORY_MAX = 100
 
@@ -382,6 +395,16 @@ class DashboardServer:
         # Register routes
         self._setup_routes()
 
+        # AI-79: Initialize agent status panel store for all 13 panel agents
+        for _name in _PANEL_AGENT_NAMES:
+            if _name not in _dashboard_agent_status:
+                _dashboard_agent_status[_name] = {
+                    "name": _name,
+                    "status": "idle",
+                    "current_ticket": None,
+                    "started_at": None,
+                }
+
         # Setup WebSocket broadcasting
         self.app.on_startup.append(self._start_broadcast)
         self.app.on_cleanup.append(self._cleanup_websockets)
@@ -394,6 +417,9 @@ class DashboardServer:
         self.app.router.add_get('/', self.serve_dashboard)
         self.app.router.add_get('/health', self.health_check)
         self.app.router.add_get('/api/metrics', self.get_metrics)
+        # AI-79: Agent Status Panel endpoint - must be registered BEFORE /{agent_name}
+        self.app.router.add_get('/api/agents/status', self.get_all_agents_status)
+        self.app.router.add_post('/api/agents/{agent_name}/status', self.update_agent_status_handler)
         self.app.router.add_get('/api/agents/{agent_name}', self.get_agent)
         self.app.router.add_get('/ws', self.websocket_handler)
 
@@ -456,6 +482,7 @@ class DashboardServer:
 
         # OPTIONS for CORS preflight
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/agents/status', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/agents/{agent_name}', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/requirements/{ticket_key}', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/chat', self.handle_options)
@@ -632,6 +659,103 @@ class DashboardServer:
                 text=json.dumps({'error': str(e)}),
                 content_type='application/json'
             )
+
+    # =========================================================================
+    # AI-79: Agent Status Panel (REQ-MONITOR-001)
+    # =========================================================================
+
+    async def get_all_agents_status(self, request: Request) -> Response:
+        """GET /api/agents/status - Get current status of all 13 panel agents."""
+        timestamp = datetime.utcnow().isoformat() + 'Z'
+        agents_status = []
+
+        for agent_name in _PANEL_AGENT_NAMES:
+            detail = _dashboard_agent_status.get(agent_name, {
+                "name": agent_name,
+                "status": "idle",
+                "current_ticket": None,
+                "started_at": None,
+            })
+            elapsed_time = None
+            if detail.get("status") == "running" and detail.get("started_at"):
+                try:
+                    started = datetime.fromisoformat(detail["started_at"].rstrip('Z'))
+                    elapsed_time = round((datetime.utcnow() - started).total_seconds())
+                except (ValueError, AttributeError):
+                    elapsed_time = None
+
+            agents_status.append({
+                "name": agent_name,
+                "status": detail.get("status", "idle"),
+                "current_ticket": detail.get("current_ticket"),
+                "elapsed_time": elapsed_time,
+            })
+
+        return web.json_response({
+            "agents": agents_status,
+            "total": len(agents_status),
+            "timestamp": timestamp,
+        })
+
+    async def update_agent_status_handler(self, request: Request) -> Response:
+        """POST /api/agents/{agent_name}/status - Update agent status."""
+        agent_name = request.match_info['agent_name']
+
+        if agent_name not in _PANEL_AGENT_NAMES:
+            return web.json_response({
+                'error': 'Agent not found',
+                'agent_name': agent_name,
+                'available_agents': _PANEL_AGENT_NAMES,
+            }, status=404)
+
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        new_status = body.get('status', '')
+        if new_status not in _VALID_PANEL_STATUSES:
+            return web.json_response({
+                'error': f'Invalid status. Must be one of: {list(_VALID_PANEL_STATUSES)}',
+                'provided': new_status,
+            }, status=400)
+
+        current_ticket = body.get('current_ticket', None)
+        timestamp = datetime.utcnow().isoformat() + 'Z'
+
+        if agent_name not in _dashboard_agent_status:
+            _dashboard_agent_status[agent_name] = {
+                "name": agent_name, "status": "idle",
+                "current_ticket": None, "started_at": None,
+            }
+
+        previous_status = _dashboard_agent_status[agent_name].get("status", "idle")
+        _dashboard_agent_status[agent_name]["status"] = new_status
+        _dashboard_agent_status[agent_name]["current_ticket"] = current_ticket if new_status == "running" else None
+
+        if new_status == "running":
+            _dashboard_agent_status[agent_name]["started_at"] = timestamp
+        elif new_status in ("idle", "error"):
+            _dashboard_agent_status[agent_name]["started_at"] = None
+
+        # Broadcast via WebSocket
+        message = {
+            'type': 'agent_status',
+            'agent': agent_name,
+            'status': new_status,
+            'ticket': current_ticket or '',
+            'timestamp': timestamp,
+        }
+        await self.broadcast_to_websockets(message)
+
+        return web.json_response({
+            'status': 'success',
+            'agent_name': agent_name,
+            'previous_status': previous_status,
+            'new_status': new_status,
+            'current_ticket': current_ticket if new_status == "running" else None,
+            'timestamp': timestamp,
+        })
 
     async def get_agent(self, request: Request) -> Response:
         """Get specific agent profile by name.
