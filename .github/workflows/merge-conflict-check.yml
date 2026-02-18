@@ -1,0 +1,116 @@
+name: Merge Conflict Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  check-conflicts:
+    name: Check PR merge conflicts
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check open PRs for merge conflicts
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pulls } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            });
+
+            const conflicting = [];
+            for (const pr of pulls) {
+              // Re-fetch each PR to get current mergeable state
+              const { data: detail } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+              });
+
+              // GitHub may need a moment to compute mergeable status
+              if (detail.mergeable === null) {
+                // Wait and retry once
+                await new Promise(r => setTimeout(r, 5000));
+                const { data: retry } = await github.rest.pulls.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                });
+                if (retry.mergeable === false) {
+                  conflicting.push(retry);
+                }
+              } else if (detail.mergeable === false) {
+                conflicting.push(detail);
+              }
+            }
+
+            if (conflicting.length > 0) {
+              const prList = conflicting
+                .map(pr => `- #${pr.number}: **${pr.title}** (\`${pr.head.ref}\`)`)
+                .join('\n');
+
+              core.warning(
+                `${conflicting.length} open PR(s) now have merge conflicts after this push to main:\n${prList}`
+              );
+
+              // Post a comment on each conflicting PR
+              for (const pr of conflicting) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  body: [
+                    '⚠️ **Merge Conflict Detected**',
+                    '',
+                    `This PR now has merge conflicts after [recent changes to \`main\`](${context.payload.compare}).`,
+                    '',
+                    'Please rebase or merge `main` into this branch to resolve:',
+                    '```bash',
+                    `git checkout ${pr.head.ref}`,
+                    'git merge origin/main',
+                    '# resolve any conflicts, then:',
+                    'git push',
+                    '```',
+                  ].join('\n'),
+                });
+              }
+            } else {
+              core.info('All open PRs merge cleanly with main.');
+            }
+
+  check-pr-mergeable:
+    name: Verify PR is mergeable
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Attempt trial merge
+        run: |
+          git fetch origin main
+          if ! git merge-tree $(git merge-base origin/main HEAD) origin/main HEAD | grep -q '<<<<<<'; then
+            echo "✅ No merge conflicts detected"
+          else
+            echo "❌ Merge conflicts detected with main"
+            echo ""
+            echo "Conflicting sections:"
+            git merge-tree $(git merge-base origin/main HEAD) origin/main HEAD | grep -A 3 '<<<<<<' || true
+            echo ""
+            echo "Please rebase or merge main into this branch."
+            exit 1
+          fi
