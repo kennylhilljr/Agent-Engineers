@@ -1684,6 +1684,50 @@
             line-height: 1.5;
         }
 
+        /* AI-86: Live Feed Item Enhancements (REQ-FEED-001) */
+        .feed-item-agent-pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-right: 6px;
+        }
+        .feed-item-ticket {
+            display: inline-flex;
+            align-items: center;
+            padding: 1px 7px;
+            border-radius: 4px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            background: rgba(88, 166, 255, 0.12);
+            color: #58a6ff;
+            border: 1px solid rgba(88, 166, 255, 0.25);
+            margin-right: 6px;
+            font-family: monospace;
+        }
+        .feed-item-duration {
+            font-size: 0.72rem;
+            color: #64748b;
+        }
+        .feed-item-meta {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 4px;
+        }
+        .feed-status-icon {
+            font-size: 0.85rem;
+            margin-right: 4px;
+        }
+        .feed-status-success { color: #10b981; }
+        .feed-status-error   { color: #ef4444; }
+        .feed-status-in_progress { color: #60a5fa; }
+
         /* ErrorCard Component (Adapted from A2UI) */
         .error-card {
             border-left: 4px solid;
@@ -5168,6 +5212,115 @@
             }).join('');
         }
 
+        // =====================================================================
+        // AI-86: Live Activity Feed (REQ-FEED-001)
+        // =====================================================================
+
+        // Agent -> color pill bg/text
+        const FEED_AGENT_COLORS = {
+            'coding':          { bg: 'rgba(59,130,246,0.18)', text: '#60a5fa' },
+            'coding_fast':     { bg: 'rgba(59,130,246,0.12)', text: '#93c5fd' },
+            'ops':             { bg: 'rgba(139,92,246,0.18)', text: '#c4b5fd' },
+            'github':          { bg: 'rgba(34,197,94,0.15)',  text: '#4ade80' },
+            'linear':          { bg: 'rgba(99,102,241,0.18)', text: '#a5b4fc' },
+            'slack':           { bg: 'rgba(234,88,12,0.15)',  text: '#fb923c' },
+            'pr_reviewer':     { bg: 'rgba(20,184,166,0.15)', text: '#2dd4bf' },
+            'pr_reviewer_fast':{ bg: 'rgba(20,184,166,0.10)', text: '#5eead4' },
+            'chatgpt':         { bg: 'rgba(16,185,129,0.15)', text: '#34d399' },
+            'gemini':          { bg: 'rgba(245,158,11,0.15)', text: '#fbbf24' },
+            'groq':            { bg: 'rgba(239,68,68,0.15)',  text: '#f87171' },
+            'kimi':            { bg: 'rgba(236,72,153,0.15)', text: '#f472b6' },
+            'windsurf':        { bg: 'rgba(14,165,233,0.15)', text: '#38bdf8' },
+        };
+
+        const FEED_STATUS_ICONS = {
+            'success':     '<span class="feed-status-icon feed-status-success">&#10003;</span>',
+            'error':       '<span class="feed-status-icon feed-status-error">&#10007;</span>',
+            'in_progress': '<span class="feed-status-icon feed-status-in_progress">&#9654;</span>',
+        };
+
+        // In-memory list of live feed events (newest first, max 50)
+        let _liveFeedEvents = [];
+
+        function _agentPill(agent) {
+            const c = FEED_AGENT_COLORS[agent] || { bg: 'rgba(148,163,184,0.15)', text: '#94a3b8' };
+            return `<span class="feed-item-agent-pill" style="background:${c.bg};color:${c.text};">${agent}</span>`;
+        }
+
+        function _renderOneFeedItem(event, isLast) {
+            const statusIcon = FEED_STATUS_ICONS[event.status] || '';
+            const agentPill = _agentPill(event.agent || 'unknown');
+            const ticketBadge = event.ticket_key
+                ? `<span class="feed-item-ticket">${event.ticket_key}</span>` : '';
+            const duration = (event.duration_s != null)
+                ? `<span class="feed-item-duration">${parseFloat(event.duration_s).toFixed(0)}s</span>` : '';
+            const desc = (event.description || '').substring(0, 60) +
+                ((event.description || '').length > 60 ? '…' : '');
+            const relTime = event.timestamp ? formatRelativeTime(event.timestamp) : '';
+            const showLine = !isLast;
+            return `
+                <div class="activity-item" data-feed-id="${event.id || ''}">
+                    <div class="activity-timeline">
+                        <div class="activity-dot" style="background:${
+                            event.status === 'success' ? '#10b981' :
+                            event.status === 'error'   ? '#ef4444' : '#60a5fa'
+                        };">${statusIcon}</div>
+                        ${showLine ? '<div class="activity-line"></div>' : ''}
+                    </div>
+                    <div class="activity-content">
+                        <div class="activity-header">
+                            <div class="activity-title">${statusIcon}${agentPill}</div>
+                            <div class="activity-time">${relTime}</div>
+                        </div>
+                        <div class="feed-item-meta">${ticketBadge}${duration}</div>
+                        <div class="activity-description">${desc}</div>
+                    </div>
+                </div>`;
+        }
+
+        function renderLiveFeed() {
+            const feed = document.getElementById('activity-feed');
+            if (!feed) return;
+            if (_liveFeedEvents.length === 0) {
+                // Keep existing content (legacy events from /api/metrics); don't clear
+                return;
+            }
+            feed.innerHTML = _liveFeedEvents.map(function(ev, i) {
+                return _renderOneFeedItem(ev, i === _liveFeedEvents.length - 1);
+            }).join('');
+        }
+
+        function prependFeedEvent(event) {
+            // Remove duplicate id if already present
+            _liveFeedEvents = _liveFeedEvents.filter(function(e) { return e.id !== event.id; });
+            // Prepend (newest first)
+            _liveFeedEvents.unshift(event);
+            // Cap at 50
+            if (_liveFeedEvents.length > 50) {
+                _liveFeedEvents = _liveFeedEvents.slice(0, 50);
+            }
+            // Re-render
+            renderLiveFeed();
+
+            // Auto-scroll to top of feed
+            const feed = document.getElementById('activity-feed');
+            if (feed) feed.scrollTop = 0;
+        }
+
+        async function fetchLiveFeed() {
+            try {
+                const resp = await fetch('/api/feed');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                if (Array.isArray(data) && data.length > 0) {
+                    _liveFeedEvents = data.slice(0, 50); // already newest-first
+                    renderLiveFeed();
+                }
+            } catch (err) {
+                console.warn('Could not fetch /api/feed:', err);
+            }
+        }
+
         // Chart Functions
         function createSuccessRateChart(agents) {
             const ctx = document.getElementById('success-rate-chart');
@@ -5749,6 +5902,11 @@
                             console.log('Received leaderboard_update via WebSocket', message);
                             if (message.data) {
                                 renderLeaderboard(message.data);
+                            }
+                        } else if (message.type === 'feed_update') {
+                            // AI-86: Live Activity Feed (REQ-FEED-001) - prepend new event
+                            if (message.event) {
+                                prependFeedEvent(message.event);
                             }
                         }
                     } catch (error) {
@@ -7413,12 +7571,14 @@
                 initChat();
                 loadDecisionHistory();
                 fetchLeaderboard();
+                fetchLiveFeed(); // AI-86: Live Activity Feed (REQ-FEED-001)
             });
         } else {
             init();
             initChat();
             loadDecisionHistory();
             fetchLeaderboard();
+            fetchLiveFeed(); // AI-86: Live Activity Feed (REQ-FEED-001)
         }
 
         // Cleanup on page unload

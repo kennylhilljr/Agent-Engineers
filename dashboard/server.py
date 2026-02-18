@@ -112,6 +112,11 @@ _global_metrics: dict = {
 # {agent_name: {"xp": int, "level": int, "success_rate": float, "avg_duration_s": float, "total_cost_usd": float, "status": str}}
 _agent_xp_store: dict = {}
 
+# AI-86: Live Activity Feed (REQ-FEED-001) - in-memory event feed store (newest last, capped at 50)
+# Each entry: {"id": str, "timestamp": str, "agent": str, "status": str, "ticket_key": str, "duration_s": float, "description": str}
+_feed_events: list = []
+_FEED_MAX = 50
+
 # AI-81: Fallback DEFAULT_MODELS dict (avoids importing claude_agent_sdk)
 _DEFAULT_MODELS = {
     "linear": "haiku",
@@ -547,6 +552,11 @@ class DashboardServer:
         self.app.router.add_post('/api/orchestrator/pipeline/step', self.update_pipeline_step)
         self.app.router.add_route('OPTIONS', '/api/orchestrator/pipeline', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/orchestrator/pipeline/step', self.handle_options)
+
+        # AI-86: Live Activity Feed (REQ-FEED-001)
+        self.app.router.add_get('/api/feed', self.get_feed)
+        self.app.router.add_post('/api/feed', self.post_feed)
+        self.app.router.add_route('OPTIONS', '/api/feed', self.handle_options)
 
         # Latency statistics endpoint (AI-180 / REQ-PERF-001)
         self.app.router.add_get('/api/latency', self.get_latency_stats)
@@ -2992,6 +3002,97 @@ class DashboardServer:
             'level': _agent_xp_store[agent_name]['level'],
             'leaderboard': leaderboard,
         })
+
+    # =========================================================================
+    # AI-86: Live Activity Feed (REQ-FEED-001)
+    # =========================================================================
+
+    async def get_feed(self, request: Request) -> Response:
+        """GET /api/feed — Return last 50 events across all agents.
+
+        Returns:
+            200 JSON list of feed events, newest first.
+        """
+        # Return newest-first (reverse of internal storage which is newest-last)
+        return web.json_response(list(reversed(_feed_events)))
+
+    async def post_feed(self, request: Request) -> Response:
+        """POST /api/feed — Add a new event to the activity feed.
+
+        Request body (all fields except agent and description are optional):
+            {
+                "agent": "coding",          # required
+                "description": "...",       # required
+                "status": "success",        # optional, default "success"
+                "ticket_key": "AI-86",      # optional
+                "duration_s": 12.3          # optional
+            }
+
+        Returns:
+            201 Created with the new event.
+            400 Bad Request for invalid input.
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        agent = body.get('agent', '').strip()
+        description = body.get('description', '').strip()
+
+        if not agent:
+            return web.json_response({'error': 'agent is required'}, status=400)
+        if not description:
+            return web.json_response({'error': 'description is required'}, status=400)
+
+        # Warn but don't block unknown agents
+        if agent not in _PANEL_AGENT_NAMES:
+            logger.warning(f"POST /api/feed: unknown agent {agent!r}")
+
+        status = body.get('status', 'success')
+        valid_statuses = ('success', 'error', 'in_progress')
+        if status not in valid_statuses:
+            return web.json_response({
+                'error': f'Invalid status. Must be one of: {list(valid_statuses)}',
+                'provided': status,
+            }, status=400)
+
+        ticket_key = body.get('ticket_key', None) or None
+        duration_s = body.get('duration_s', None)
+        if duration_s is not None:
+            try:
+                duration_s = float(duration_s)
+            except (TypeError, ValueError):
+                duration_s = None
+
+        event = {
+            'id': str(uuid4()),
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'agent': agent,
+            'status': status,
+            'ticket_key': ticket_key,
+            'duration_s': duration_s,
+            'description': description[:120],
+        }
+
+        _feed_events.append(event)
+        # Cap at _FEED_MAX (drop oldest)
+        while len(_feed_events) > _FEED_MAX:
+            del _feed_events[0]
+
+        # Broadcast feed_update via WebSocket
+        await self.broadcast_to_websockets({
+            'type': 'feed_update',
+            'event': event,
+            'timestamp': event['timestamp'],
+        })
+
+        logger.info(
+            f"Feed event added: agent={agent!r}, status={status!r}, "
+            f"ticket={ticket_key!r}, total={len(_feed_events)}"
+        )
+
+        return web.json_response({'event': event, 'total': len(_feed_events)}, status=201)
 
     async def websocket_handler(self, request: Request) -> WebSocketResponse:
         """WebSocket endpoint for real-time metrics streaming.
