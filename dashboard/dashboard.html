@@ -1812,6 +1812,64 @@
             letter-spacing: 0.5px;
         }
 
+        /* AI-83: Global Metrics Bar (REQ-METRICS-001) */
+        .global-metrics-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(148, 163, 184, 0.15);
+            border-radius: 12px;
+            align-items: center;
+        }
+        .global-metrics-bar .gm-card {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.15);
+            border-radius: 8px;
+            flex: 1 1 140px;
+            min-width: 120px;
+        }
+        .global-metrics-bar .gm-card .gm-icon {
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+        .global-metrics-bar .gm-card .gm-body {
+            display: flex;
+            flex-direction: column;
+        }
+        .global-metrics-bar .gm-card .gm-value {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #60a5fa;
+            white-space: nowrap;
+        }
+        .global-metrics-bar .gm-card .gm-label {
+            font-size: 0.72rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        [data-theme="light"] .global-metrics-bar {
+            background: rgba(241, 245, 249, 0.8);
+            border-color: rgba(148, 163, 184, 0.3);
+        }
+        [data-theme="light"] .global-metrics-bar .gm-card {
+            background: rgba(255, 255, 255, 0.9);
+            border-color: rgba(148, 163, 184, 0.3);
+        }
+        [data-theme="light"] .global-metrics-bar .gm-card .gm-value {
+            color: #2563eb;
+        }
+        [data-theme="light"] .global-metrics-bar .gm-card .gm-label {
+            color: #64748b;
+        }
+
         /* Loading State */
         .loading {
             display: flex;
@@ -3903,6 +3961,45 @@
             </div>
         </div>
 
+        <!-- AI-83: Global Metrics Bar (REQ-METRICS-001) -->
+        <div class="global-metrics-bar" id="global-metrics-bar">
+            <div class="gm-card" id="gm-sessions">
+                <span class="gm-icon">&#128202;</span>
+                <div class="gm-body">
+                    <span class="gm-value" id="gm-val-sessions">--</span>
+                    <span class="gm-label">Sessions</span>
+                </div>
+            </div>
+            <div class="gm-card" id="gm-tokens">
+                <span class="gm-icon">&#128290;</span>
+                <div class="gm-body">
+                    <span class="gm-value" id="gm-val-tokens">--</span>
+                    <span class="gm-label">Tokens</span>
+                </div>
+            </div>
+            <div class="gm-card" id="gm-cost">
+                <span class="gm-icon">&#128176;</span>
+                <div class="gm-body">
+                    <span class="gm-value" id="gm-val-cost">--</span>
+                    <span class="gm-label">Cost</span>
+                </div>
+            </div>
+            <div class="gm-card" id="gm-uptime">
+                <span class="gm-icon">&#9201;</span>
+                <div class="gm-body">
+                    <span class="gm-value" id="gm-val-uptime">--</span>
+                    <span class="gm-label">Uptime</span>
+                </div>
+            </div>
+            <div class="gm-card" id="gm-active">
+                <span class="gm-icon">&#129302;</span>
+                <div class="gm-body">
+                    <span class="gm-value" id="gm-val-active">--</span>
+                    <span class="gm-label">Active Agents</span>
+                </div>
+            </div>
+        </div>
+
         <!-- Global Stats -->
         <div class="stats-grid" id="stats-grid">
             <div class="loading">
@@ -5372,6 +5469,12 @@
                             if (message.pipeline) {
                                 renderPipelinePanel(message.pipeline);
                             }
+                        } else if (message.type === 'global_metrics_update') {
+                            // AI-83: Real-time global metrics bar update (REQ-METRICS-001)
+                            console.log('Received global_metrics_update via WebSocket', message);
+                            if (message.data) {
+                                renderGlobalMetricsBar(message.data);
+                            }
                         }
                     } catch (error) {
                         console.error('Error processing WebSocket message:', error);
@@ -6185,6 +6288,84 @@
             }
         }
 
+        // =========================================================
+        // AI-83: Global Metrics Bar (REQ-METRICS-001)
+        // =========================================================
+
+        /**
+         * Format a token count to a short human-readable string.
+         * e.g. 250000 -> "250K", 1500000 -> "1.5M"
+         */
+        function formatTokenCount(n) {
+            if (n === null || n === undefined) return '0';
+            if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+            if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'K';
+            return String(n);
+        }
+
+        /**
+         * Format cost in USD: "$12.50"
+         */
+        function formatCostUSD(v) {
+            if (v === null || v === undefined) return '$0.00';
+            return '$' + Number(v).toFixed(2);
+        }
+
+        /**
+         * Format uptime seconds into "Xd Yh Zm" human-readable string.
+         */
+        function formatUptime(seconds) {
+            if (!seconds || seconds < 0) return '0s';
+            const d = Math.floor(seconds / 86400);
+            const h = Math.floor((seconds % 86400) / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = seconds % 60;
+            if (d > 0) return `${d}d ${h}h ${m}m`;
+            if (h > 0) return `${h}h ${m}m`;
+            if (m > 0) return `${m}m ${s}s`;
+            return `${s}s`;
+        }
+
+        /**
+         * Render the global metrics bar with the provided data.
+         * Updates element text content in-place for smooth updates.
+         */
+        function renderGlobalMetricsBar(data) {
+            if (!data) return;
+            const sessions = document.getElementById('gm-val-sessions');
+            const tokens = document.getElementById('gm-val-tokens');
+            const cost = document.getElementById('gm-val-cost');
+            const uptime = document.getElementById('gm-val-uptime');
+            const active = document.getElementById('gm-val-active');
+
+            if (sessions) sessions.textContent = (data.total_sessions || 0).toLocaleString();
+            if (tokens) tokens.textContent = formatTokenCount(data.total_tokens || 0);
+            if (cost) cost.textContent = formatCostUSD(data.total_cost_usd || 0);
+            if (uptime) uptime.textContent = formatUptime(data.uptime_seconds || 0);
+            if (active) active.textContent = (data.agents_active || 0) + ' agents';
+        }
+
+        /**
+         * Fetch global metrics from REST API and update bar.
+         */
+        async function fetchGlobalMetrics() {
+            try {
+                const resp = await fetch(`${API_BASE_URL}/api/metrics/global`);
+                if (!resp.ok) return;
+                const data = await resp.json();
+                renderGlobalMetricsBar(data);
+            } catch (err) {
+                console.warn('Global metrics fetch failed:', err);
+            }
+        }
+
+        /** Poll global metrics every 10 seconds as WebSocket fallback. */
+        let _globalMetricsTimer = null;
+        function startGlobalMetricsPolling() {
+            if (_globalMetricsTimer) return;
+            _globalMetricsTimer = setInterval(fetchGlobalMetrics, 10000);
+        }
+
         // Initialize Dashboard
         async function init() {
             console.log('Initializing Agent Status Dashboard...');
@@ -6203,6 +6384,10 @@
 
             // AI-82: Initialize Pipeline Panel
             await fetchPipelinePanel();
+
+            // AI-83: Initialize Global Metrics Bar
+            await fetchGlobalMetrics();
+            startGlobalMetricsPolling();
 
             console.log('Dashboard initialized');
             console.log('WebSocket live updates enabled with auto-reconnect');
