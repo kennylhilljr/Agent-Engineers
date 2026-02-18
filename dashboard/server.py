@@ -77,6 +77,8 @@ from aiohttp.web import Request, Response, WebSocketResponse, middleware
 from aiohttp_cors import ResourceOptions, setup as cors_setup
 
 from dashboard.metrics_store import MetricsStore
+from dashboard.intent_parser import parse_intent
+from dashboard.chat_handler import ChatRouter, get_chat_history, clear_chat_history
 from dashboard.chat_bridge import ChatBridge, IntentParser, AgentRouter
 from dashboard.auth import auth_middleware
 from dashboard.config import get_config
@@ -399,6 +401,11 @@ class DashboardServer:
         self.app.router.add_get('/api/requirements/{ticket_key}', self.get_requirement)
         self.app.router.add_put('/api/requirements/{ticket_key}', self.put_requirement)
 
+        # Chat-to-Agent Bridge endpoints (REQ-TECH-008)
+        self.app.router.add_post('/api/chat', self.post_chat)
+        self.app.router.add_post('/api/chat/route', self.post_chat_route)
+        self.app.router.add_get('/api/chat/history', self.get_chat_history)
+
         # Reasoning broadcast endpoint (AI-158)
         self.app.router.add_post('/api/reasoning', self.broadcast_reasoning)
 
@@ -450,6 +457,9 @@ class DashboardServer:
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/agents/{agent_name}', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/requirements/{ticket_key}', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/chat', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/chat/route', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/chat/history', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/reasoning', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/agent-thinking', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/reasoning/blocks', self.handle_options)
@@ -802,6 +812,132 @@ class DashboardServer:
             'ticket_key': ticket_key,
             'linear_synced': linear_synced,
         })
+
+    async def post_chat(self, request: Request) -> Response:
+        """Handle a chat message via the Chat-to-Agent Bridge.
+
+        POST /api/chat
+
+        Request Body (JSON):
+            message (str): User message text
+            provider (str, optional): AI provider (claude, chatgpt, etc.). Default: "claude"
+            message_id (str, optional): Client-supplied message ID for tracking
+
+        Returns:
+            JSON response with:
+                - message_id: str
+                - routing: routing decision
+                - response: str (agent or AI response)
+                - timestamp: ISO timestamp
+                - provider: AI provider used
+
+        Raises:
+            400: If message is missing or empty
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response(
+                {'error': 'Invalid JSON in request body'},
+                status=400,
+            )
+
+        message = body.get('message', '').strip()
+        if not message:
+            return web.json_response(
+                {'error': 'Missing required field: message'},
+                status=400,
+            )
+
+        provider = body.get('provider', 'claude')
+        message_id = body.get('message_id')
+
+        # Create a router with current WebSocket connections for streaming
+        router = ChatRouter(
+            websockets=self.websockets,
+            linear_api_key=os.environ.get('LINEAR_API_KEY'),
+        )
+
+        result = await router.enqueue_message(message, provider=provider, message_id=message_id)
+
+        logger.info(
+            f"POST /api/chat: '{message[:50]}' -> "
+            f"intent={result['routing'].get('intent_type')}, "
+            f"handler={result['routing'].get('handler')}"
+        )
+
+        return web.json_response(result)
+
+    async def post_chat_route(self, request: Request) -> Response:
+        """Route a chat message without executing it.
+
+        POST /api/chat/route
+
+        Returns only the routing decision without executing the action.
+        Useful for previewing routing decisions.
+
+        Request Body (JSON):
+            message (str): User message text
+
+        Returns:
+            JSON response with routing decision:
+                - intent_type: "agent_action" | "query" | "conversation"
+                - handler: "agent_executor" | "linear_api" | "ai_provider"
+                - agent: target agent name or None
+                - action: action to perform or None
+                - params: action parameters
+                - description: human-readable routing description
+
+        Raises:
+            400: If message is missing or empty
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response(
+                {'error': 'Invalid JSON in request body'},
+                status=400,
+            )
+
+        message = body.get('message', '').strip()
+        if not message:
+            return web.json_response(
+                {'error': 'Missing required field: message'},
+                status=400,
+            )
+
+        # Parse and route without executing
+        intent = parse_intent(message)
+        router = ChatRouter()
+        routing = router.get_routing_decision(intent)
+
+        logger.info(f"POST /api/chat/route: '{message[:50]}' -> {routing['intent_type']}")
+
+        return web.json_response({
+            'message': message,
+            'intent': {
+                'intent_type': intent.intent_type,
+                'agent': intent.agent,
+                'action': intent.action,
+                'params': intent.params,
+            },
+            'routing': routing,
+        })
+
+    async def get_chat_history(self, request: Request) -> Response:
+        """Get recent chat history.
+
+        GET /api/chat/history
+
+        Query Parameters:
+            limit (int, optional): Max messages to return. Default: 100.
+
+        Returns:
+            JSON array of chat message objects
+        """
+        limit = int(request.query.get('limit', 100))
+        history = get_chat_history(limit=limit)
+        return web.json_response({'messages': history, 'count': len(history)})
 
     async def broadcast_to_websockets(self, message: dict) -> None:
         """Broadcast a JSON message to all connected WebSocket clients.
