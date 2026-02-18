@@ -108,6 +108,10 @@ _global_metrics: dict = {
     "_server_start_time": None,  # set at server startup
 }
 
+# AI-84: Agent Leaderboard (REQ-METRICS-002) - in-memory per-agent XP/stats override store
+# {agent_name: {"xp": int, "level": int, "success_rate": float, "avg_duration_s": float, "total_cost_usd": float, "status": str}}
+_agent_xp_store: dict = {}
+
 # AI-81: Fallback DEFAULT_MODELS dict (avoids importing claude_agent_sdk)
 _DEFAULT_MODELS = {
     "linear": "haiku",
@@ -477,6 +481,8 @@ class DashboardServer:
         self.app.router.add_get('/api/metrics', self.get_metrics)
         # AI-79: Agent Status Panel endpoint - must be registered BEFORE /{agent_name}
         self.app.router.add_get('/api/agents/status', self.get_all_agents_status)
+        # AI-84: Agent Leaderboard (REQ-METRICS-002) - must be BEFORE /{agent_name}
+        self.app.router.add_get('/api/agents/leaderboard', self.get_agent_leaderboard)
         self.app.router.add_post('/api/agents/{agent_name}/status', self.update_agent_status_handler)
         # AI-81: Agent Detail View (REQ-MONITOR-003) - profile and events
         self.app.router.add_get('/api/agents/{agent_name}/profile', self.get_agent_profile)
@@ -555,6 +561,11 @@ class DashboardServer:
         self.app.router.add_get('/api/metrics/global', self.get_global_metrics)
         self.app.router.add_post('/api/metrics/global', self.post_global_metrics)
         self.app.router.add_route('OPTIONS', '/api/metrics/global', self.handle_options)
+
+        # AI-84: Agent Leaderboard POST XP (REQ-METRICS-002)
+        self.app.router.add_post('/api/agents/{agent_name}/xp', self.post_agent_xp)
+        self.app.router.add_route('OPTIONS', '/api/agents/leaderboard', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/agents/{agent_name}/xp', self.handle_options)
 
         # OPTIONS for CORS preflight
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
@@ -2845,6 +2856,142 @@ class DashboardServer:
         })
 
         return web.json_response(metrics)
+
+    def _build_leaderboard(self) -> list:
+        """Build the agent leaderboard ranked by XP descending (AI-84 / REQ-METRICS-002).
+
+        Merges in-memory XP store overrides with persisted metrics store data.
+
+        Returns:
+            List of agent dicts ranked by XP descending with rank numbers assigned.
+        """
+        from dashboard.xp import calculate_level_from_xp, calculate_xp_progress_in_level
+
+        # Try to load persisted agent data from metrics store
+        persisted_agents: dict = {}
+        try:
+            state = self.store.load()
+            persisted_agents = state.get('agents', {}) or {}
+        except Exception:
+            pass
+
+        entries = []
+        for name in _PANEL_AGENT_NAMES:
+            persisted = persisted_agents.get(name, {})
+            xp_override = _agent_xp_store.get(name, {})
+
+            # XP: in-memory override takes precedence over persisted
+            xp = xp_override.get('xp', persisted.get('xp', 0))
+            level = calculate_level_from_xp(xp)
+
+            success_rate = xp_override.get(
+                'success_rate', persisted.get('success_rate', 0.0))
+            avg_duration_s = xp_override.get(
+                'avg_duration_s', persisted.get('avg_duration_seconds', 0.0))
+            total_cost_usd = xp_override.get(
+                'total_cost_usd', persisted.get('total_cost_usd', 0.0))
+
+            # Status from panel status or xp override
+            status = xp_override.get(
+                'status',
+                _dashboard_agent_status.get(name, {}).get('status', 'idle'))
+
+            entries.append({
+                'name': name,
+                'xp': xp,
+                'level': level,
+                'success_rate': success_rate,
+                'avg_duration_s': avg_duration_s,
+                'total_cost_usd': round(total_cost_usd, 4),
+                'status': status,
+            })
+
+        # Sort descending by XP, then ascending by name for stable ties
+        entries.sort(key=lambda e: (-e['xp'], e['name']))
+
+        # Assign rank numbers (1-indexed)
+        for i, entry in enumerate(entries):
+            entry['rank'] = i + 1
+
+        return entries
+
+    async def get_agent_leaderboard(self, request: Request) -> Response:
+        """GET /api/agents/leaderboard — return agents ranked by XP (AI-84 / REQ-METRICS-002).
+
+        Response: list of agent objects sorted by XP descending.
+
+        Returns:
+            200 JSON list with all 13 agents ranked.
+        """
+        return web.json_response(self._build_leaderboard())
+
+    async def post_agent_xp(self, request: Request) -> Response:
+        """POST /api/agents/{agent_name}/xp — add XP to an agent (AI-84 / REQ-METRICS-002).
+
+        Request body:
+            {"xp": 50}        - add 50 XP to the agent's total
+            {"xp": 50, "set": true}  - set XP to exactly 50
+
+        Returns:
+            200 JSON with updated leaderboard
+            400 if body is invalid
+            404 if agent_name is not a known panel agent
+        """
+        from dashboard.xp import calculate_level_from_xp
+
+        agent_name = request.match_info['agent_name']
+        if agent_name not in _PANEL_AGENT_NAMES:
+            return web.json_response({
+                'error': 'Agent not found',
+                'agent_name': agent_name,
+                'available_agents': _PANEL_AGENT_NAMES,
+            }, status=404)
+
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        xp_delta = body.get('xp')
+        if xp_delta is None or not isinstance(xp_delta, (int, float)):
+            return web.json_response({'error': 'Missing or invalid "xp" field (must be a number)'}, status=400)
+
+        # Initialize agent XP store entry if needed
+        if agent_name not in _agent_xp_store:
+            # Seed from persisted data if available
+            persisted_xp = 0
+            try:
+                state = self.store.load()
+                persisted_xp = state.get('agents', {}).get(agent_name, {}).get('xp', 0)
+            except Exception:
+                pass
+            _agent_xp_store[agent_name] = {'xp': persisted_xp}
+
+        if body.get('set'):
+            _agent_xp_store[agent_name]['xp'] = int(xp_delta)
+        else:
+            _agent_xp_store[agent_name]['xp'] = int(
+                _agent_xp_store[agent_name].get('xp', 0) + xp_delta)
+
+        # Recompute level after XP change
+        new_xp = _agent_xp_store[agent_name]['xp']
+        _agent_xp_store[agent_name]['level'] = calculate_level_from_xp(new_xp)
+
+        leaderboard = self._build_leaderboard()
+
+        # Broadcast leaderboard update via WebSocket
+        await self.broadcast_to_websockets({
+            'type': 'leaderboard_update',
+            'data': leaderboard,
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+        })
+
+        return web.json_response({
+            'agent': agent_name,
+            'xp': new_xp,
+            'level': _agent_xp_store[agent_name]['level'],
+            'leaderboard': leaderboard,
+        })
 
     async def websocket_handler(self, request: Request) -> WebSocketResponse:
         """WebSocket endpoint for real-time metrics streaming.
