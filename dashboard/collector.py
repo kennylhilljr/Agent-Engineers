@@ -361,8 +361,37 @@ class AgentMetricsCollector:
         # Active session tracking
         self._active_sessions: dict[str, dict] = {}
 
-        # Event broadcasting callbacks
+        # Event broadcasting callbacks (subscribe/unsubscribe API)
         self._event_callbacks: list[Callable[[str, AgentEvent], None]] = []
+
+        # Single-argument event callbacks registered via register_event_callback (AI-171)
+        # Each callable receives a single AgentEvent dict when _record_event() is called.
+        self._record_event_callbacks: list = []
+
+    def register_event_callback(self, callback) -> None:
+        """Register a callback to be called whenever a new event is recorded.
+
+        The callback is invoked synchronously from ``_record_event()`` with the
+        completed ``AgentEvent`` dict as the sole argument.
+
+        This is the primary integration hook used by ``DashboardServer`` (AI-171).
+
+        Args:
+            callback: A callable that accepts a single AgentEvent dict argument.
+        """
+        if callback not in self._record_event_callbacks:
+            self._record_event_callbacks.append(callback)
+
+    def unregister_event_callback(self, callback) -> None:
+        """Remove a previously registered event callback.
+
+        Args:
+            callback: The callable to remove. No-op if not registered.
+        """
+        try:
+            self._record_event_callbacks.remove(callback)
+        except ValueError:
+            pass  # Not registered; silently ignore
 
     def start_session(
         self,
@@ -578,6 +607,16 @@ class AgentMetricsCollector:
         # Save state
         self.store.save(state)
 
+        # Notify single-argument callbacks registered via register_event_callback (AI-171)
+        for callback in list(self._record_event_callbacks):
+            try:
+                callback(event)
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception(
+                    "Error in record_event callback %r; skipping", callback
+                )
+
     def get_state(self) -> DashboardState:
         """Get the current dashboard state.
 
@@ -585,6 +624,51 @@ class AgentMetricsCollector:
             Current DashboardState
         """
         return self.store.load()
+
+    def is_healthy(self) -> bool:
+        """Return True if the metrics file is present and contains valid JSON.
+
+        This implements the health check required by REQ-REL-003.  A collector
+        is considered *healthy* when ``.agent_metrics.json`` exists AND can be
+        parsed as valid JSON.  A missing file or corrupted JSON both result in
+        False.
+
+        Returns:
+            True when metrics file exists and is valid JSON, False otherwise.
+        """
+        metrics_path = self.store.metrics_path
+        if not metrics_path.exists():
+            return False
+        try:
+            import json as _json
+            with open(metrics_path, "r", encoding="utf-8") as fh:
+                data = _json.load(fh)
+            return self.store._validate_state(data)
+        except Exception:
+            return False
+
+    def get_degradation_reason(self) -> Optional[str]:
+        """Return None when healthy; otherwise a string describing the problem.
+
+        This implements REQ-REL-003 graceful degradation reporting.
+
+        Returns:
+            None   – collector is healthy (metrics file exists and is valid).
+            str    – human-readable reason for degradation (file missing or
+                     JSON corrupted).
+        """
+        metrics_path = self.store.metrics_path
+        if not metrics_path.exists():
+            return f"Metrics file missing: {metrics_path}"
+        try:
+            import json as _json
+            with open(metrics_path, "r", encoding="utf-8") as fh:
+                data = _json.load(fh)
+            if not self.store._validate_state(data):
+                return f"Metrics file has invalid structure: {metrics_path}"
+            return None
+        except Exception as exc:
+            return f"Metrics file corrupted (invalid JSON): {metrics_path} — {exc}"
 
     def subscribe(self, callback: Callable[[str, AgentEvent], None]) -> None:
         """Subscribe to agent event notifications.

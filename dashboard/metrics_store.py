@@ -296,7 +296,13 @@ class MetricsStore:
                                 raise ValueError("Invalid state structure")
 
                         except (json.JSONDecodeError, ValueError) as e:
-                            # Main file is corrupted, try backup
+                            # Main file is corrupted, log a warning and try backup
+                            import logging as _logging
+                            _logging.getLogger(__name__).warning(
+                                "Metrics file corrupted (%s): %s — falling back to backup or fresh state",
+                                self.metrics_path,
+                                e,
+                            )
                             if self.backup_path.exists():
                                 try:
                                     with open(self.backup_path, 'r', encoding='utf-8') as f:
