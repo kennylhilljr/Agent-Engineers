@@ -1,25 +1,17 @@
-"""Optional bearer token authentication for the dashboard (AI-176 / REQ-TECH-011).
+"""Authentication package for Agent Dashboard (AI-222).
 
-When DASHBOARD_AUTH_TOKEN is set, all API endpoints and WebSocket connections
-require a valid bearer token.  When the variable is not set the dashboard is
-open (suitable for local development).
+Provides:
+- user_store: User creation, storage, password hashing/verification
+- session_manager: JWT/token session management, rate limiting, CSRF
+- oauth_handler: GitHub and Google OAuth flow
 
-Usage
------
-Import ``auth_middleware`` and register it BEFORE ``cors_middleware``::
-
-    from dashboard.auth import auth_middleware
-    app = web.Application(middlewares=[auth_middleware, cors_middleware])
-
-Token delivery
---------------
-HTTP requests:
-    Authorization: Bearer <token>
-
-WebSocket connections:
-    ?token=<token>          (query parameter, preferred)
-    Authorization: Bearer <token>  (header fallback)
+Backward compatibility:
+- verify_token, extract_bearer_token, extract_ws_token, auth_middleware
+  are re-exported from this package to maintain compatibility with callers
+  that previously imported from dashboard.auth (the old auth.py module).
 """
+
+# ── Backward-compatible re-exports from old auth.py (AI-176 / REQ-TECH-011) ──
 
 import hmac
 import os
@@ -73,8 +65,7 @@ def extract_ws_token(request: Request) -> 'str | None':
     """Extract token from a WebSocket upgrade request.
 
     Checks the ``?token=...`` query parameter first, then falls back to the
-    ``Authorization: Bearer <token>`` header so that clients unable to set
-    custom headers can still authenticate.
+    ``Authorization: Bearer <token>`` header.
 
     Args:
         request: Incoming aiohttp request (WebSocket upgrade).
@@ -82,16 +73,14 @@ def extract_ws_token(request: Request) -> 'str | None':
     Returns:
         The bare token string, or *None* if not found in either location.
     """
-    # Prefer query parameter (browser WebSocket APIs cannot set custom headers)
     token = request.rel_url.query.get('token')
     if token:
         return token.strip() or None
-    # Fall back to Authorization header
     return extract_bearer_token(request)
 
 
 def _unauthorized(message: str = 'Unauthorized') -> Response:
-    """Return a 401 JSON response with a descriptive error body.
+    """Return a 401 JSON response.
 
     Args:
         message: Human-readable error description.
@@ -109,35 +98,30 @@ def _unauthorized(message: str = 'Unauthorized') -> Response:
 async def auth_middleware(request: Request, handler):
     """Enforce bearer-token authentication when DASHBOARD_AUTH_TOKEN is set.
 
-    - If the environment variable is **not** set the middleware is a no-op and
-      every request passes through unchanged (open / development mode).
-    - The ``/health`` endpoint is always exempt so that load-balancers and
-      infrastructure health checks never require a token.
-    - WebSocket connections (``/ws``) may supply the token via the ``?token=``
-      query parameter or the ``Authorization: Bearer`` header.
-    - All other endpoints must supply the token in the ``Authorization: Bearer``
-      header.
+    - If the environment variable is **not** set the middleware is a no-op.
+    - The ``/health`` endpoint is always exempt.
+    - WebSocket connections (``/ws``) may supply the token via ``?token=``
+      or the ``Authorization: Bearer`` header.
+    - AI-222: ``/auth/`` routes are always open (they manage their own auth).
 
     Returns:
-        The upstream handler's response, or a 401 JSON response when the token
-        is missing or invalid.
+        The upstream handler's response, or a 401 JSON response.
     """
     config = get_config()
 
-    # No token configured → open dashboard (local development mode)
     if not config.auth_required:
         return await handler(request)
 
-    # /health is always accessible so health-check infrastructure can work
     if request.path == '/health':
         return await handler(request)
 
-    # OPTIONS preflight requests must not be blocked by auth so that browsers
-    # can discover CORS support before sending the actual credentialed request.
     if request.method == 'OPTIONS':
         return await handler(request)
 
-    # Extract token depending on whether this is a WebSocket upgrade
+    # AI-222: Auth endpoints manage their own authentication
+    if request.path.startswith('/auth/'):
+        return await handler(request)
+
     if request.path == '/ws':
         provided = extract_ws_token(request)
     else:
@@ -155,3 +139,24 @@ async def auth_middleware(request: Request, handler):
         return _unauthorized('Invalid or expired bearer token.')
 
     return await handler(request)
+
+
+# ── New AI-222 auth sub-modules ───────────────────────────────────────────────
+
+from dashboard.auth.user_store import UserStore, User
+from dashboard.auth.session_manager import SessionManager
+from dashboard.auth.oauth_handler import OAuthHandler, OAuthNotConfiguredError
+
+__all__ = [
+    # Backward-compat exports (old auth.py)
+    "verify_token",
+    "extract_bearer_token",
+    "extract_ws_token",
+    "auth_middleware",
+    # New AI-222 exports
+    "UserStore",
+    "User",
+    "SessionManager",
+    "OAuthHandler",
+    "OAuthNotConfiguredError",
+]
