@@ -51,6 +51,14 @@ _requirements_cache: Dict[str, str] = {}  # ticket_key -> requirement text (lega
 _requirements_store: Dict[str, Dict[str, Any]] = {}
 _decisions_log: list[Dict[str, Any]] = []  # Decision history
 
+# AI-92: Pause→Edit→Resume cycle tracking
+# Maps agent_name -> {ticket_key, requirement, acknowledged: bool, updated_at}
+_agent_active_requirements: Dict[str, Dict[str, Any]] = {}
+
+# AI-93: Linear sync queue
+# List of {ticket_key, edited_description, queued_at, processed: bool}
+_linear_sync_queue: list = []
+
 # Agent Status Panel (AI-79 / REQ-MONITOR-001): extended per-agent status details
 # Tracks: status (idle|running|paused|error), current_ticket, elapsed_time start
 # AI-80 / REQ-MONITOR-002: also tracks ticket_title, description, token_count, estimated_cost
@@ -378,10 +386,18 @@ class RESTAPIServer:
         # Chat
         self.app.router.add_post('/api/chat', self.chat)
 
-        # Requirements (AI-90/AI-91: view + edit)
+        # Requirements - static routes BEFORE parameterized to avoid shadowing
+        # AI-93: Linear sync queue (static paths first)
+        self.app.router.add_get('/api/requirements/sync-queue', self.get_sync_queue)
+        self.app.router.add_post('/api/requirements/process-sync', self.process_sync)
+        # AI-90/AI-91: parameterized routes
         self.app.router.add_put('/api/requirements/{ticket_key}', self.update_requirement)
         self.app.router.add_get('/api/requirements/{ticket_key}', self.get_requirement)
         self.app.router.add_post('/api/requirements/{ticket_key}/sync', self.sync_requirement_to_linear)
+
+        # AI-92: Pause→Edit→Resume cycle
+        self.app.router.add_get('/api/agents/{name}/active-requirement', self.get_active_requirement)
+        self.app.router.add_post('/api/agents/{name}/acknowledge-requirement', self.acknowledge_requirement)
 
         # Decisions
         self.app.router.add_get('/api/decisions', self.get_decisions)
@@ -902,6 +918,17 @@ class RESTAPIServer:
         if agent_name in _agent_status_details:
             current_ticket = _agent_status_details[agent_name].get('current_ticket')
 
+        # AI-92: Store active requirement entry (unacknowledged) so resume can return it
+        if current_ticket:
+            existing_active = _agent_active_requirements.get(agent_name, {})
+            # Only reset acknowledgement if this is a new ticket
+            if existing_active.get('ticket_key') != current_ticket:
+                _agent_active_requirements[agent_name] = {
+                    'ticket_key': current_ticket,
+                    'acknowledged': False,
+                    'updated_at': datetime.utcnow().isoformat() + 'Z',
+                }
+
         # Log decision
         _decisions_log.append({
             'timestamp': datetime.utcnow().isoformat() + 'Z',
@@ -1050,13 +1077,30 @@ class RESTAPIServer:
             except Exception:
                 pass
 
-        return web.json_response({
+        # AI-92: Check for an edited (unacknowledged) requirement for this agent
+        updated_requirement = None
+        active_req = _agent_active_requirements.get(agent_name)
+        if active_req and not active_req.get('acknowledged', False):
+            ticket_key = active_req.get('ticket_key')
+            req_entry = _requirements_store.get(ticket_key) if ticket_key else None
+            if req_entry:
+                updated_requirement = {
+                    'ticket_key': ticket_key,
+                    'edited_description': req_entry.get('edited_description', ''),
+                    'last_edited': req_entry.get('last_edited'),
+                }
+
+        response_body = {
             'name': agent_name,
             'previous_status': previous_status,
             'new_status': 'idle',
             'message': f'Agent {agent_name} resumed',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        })
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+        }
+        if updated_requirement is not None:
+            response_body['updated_requirement'] = updated_requirement
+
+        return web.json_response(response_body)
 
     # -------------------------------------------------------------------------
     # AI-130: Global Pause/Resume & Agent Controls
@@ -1365,12 +1409,25 @@ class RESTAPIServer:
         # Also keep legacy cache in sync
         _requirements_cache[ticket_key] = edited_description
 
+        # AI-93: if sync_to_linear is requested, add to sync queue
+        queued_for_sync = False
+        sync_to_linear = entry.get('sync_to_linear', False)
+        if sync_to_linear:
+            _linear_sync_queue.append({
+                'ticket_key': ticket_key,
+                'edited_description': edited_description,
+                'queued_at': now,
+                'processed': False,
+            })
+            queued_for_sync = True
+
         # Log decision
         _decisions_log.append({
             'timestamp': now,
             'decision_type': 'requirement_update',
             'ticket_key': ticket_key,
-            'requirements_length': len(edited_description)
+            'requirements_length': len(edited_description),
+            'queued_for_sync': queued_for_sync,
         })
 
         return web.json_response({
@@ -1378,6 +1435,7 @@ class RESTAPIServer:
             'ticket_key': ticket_key,
             'message': f'Requirements for {ticket_key} updated',
             'requirement': entry,
+            'queued_for_sync': queued_for_sync,
             'timestamp': now
         })
 
@@ -1475,6 +1533,188 @@ class RESTAPIServer:
             'message': f'Requirement for {ticket_key} marked as synced to Linear',
             'linear_synced': True,
             'timestamp': now
+        })
+
+    # -------------------------------------------------------------------------
+    # AI-92: Pause → Edit → Resume cycle endpoints
+    # -------------------------------------------------------------------------
+
+    async def get_active_requirement(self, request: Request) -> Response:
+        """GET /api/agents/{name}/active-requirement - Return current active requirement for an agent.
+
+        AI-92: Returns the requirement the agent is currently working on, including
+        a ``used_on_resume`` flag indicating whether it has been acknowledged since
+        the last edit.
+
+        Returns:
+            200 OK with {agent_name, ticket_key, requirement, acknowledged, used_on_resume}
+            404 Not Found if no active requirement is set for this agent
+        """
+        agent_name = request.match_info['name']
+
+        if agent_name not in ALL_AGENT_NAMES:
+            return web.json_response({
+                'error': 'Agent not found',
+                'agent_name': agent_name,
+            }, status=404)
+
+        active_req = _agent_active_requirements.get(agent_name)
+        if active_req is None:
+            return web.json_response({
+                'error': 'No active requirement found',
+                'agent_name': agent_name,
+            }, status=404)
+
+        ticket_key = active_req.get('ticket_key')
+        req_entry = _requirements_store.get(ticket_key, {}) if ticket_key else {}
+        acknowledged = active_req.get('acknowledged', False)
+
+        return web.json_response({
+            'agent_name': agent_name,
+            'ticket_key': ticket_key,
+            'requirement': req_entry,
+            'acknowledged': acknowledged,
+            'used_on_resume': acknowledged,
+            'updated_at': active_req.get('updated_at'),
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+        })
+
+    async def acknowledge_requirement(self, request: Request) -> Response:
+        """POST /api/agents/{name}/acknowledge-requirement - Acknowledge the active requirement.
+
+        AI-92: Marks the requirement as acknowledged (i.e., used after resume).
+        The orchestrator calls this after resuming an agent so the dashboard
+        knows the edited requirement has been consumed.
+
+        Returns:
+            200 OK with {agent_name, ticket_key, acknowledged}
+            404 Not Found if no active requirement is set for this agent
+        """
+        agent_name = request.match_info['name']
+
+        if agent_name not in ALL_AGENT_NAMES:
+            return web.json_response({
+                'error': 'Agent not found',
+                'agent_name': agent_name,
+            }, status=404)
+
+        active_req = _agent_active_requirements.get(agent_name)
+        if active_req is None:
+            # Allow creating an acknowledgement via request body
+            try:
+                body = await request.json()
+            except Exception:
+                body = {}
+            ticket_key = body.get('ticket_key', '')
+            if not ticket_key:
+                return web.json_response({
+                    'error': 'No active requirement to acknowledge',
+                    'agent_name': agent_name,
+                }, status=404)
+            _agent_active_requirements[agent_name] = {
+                'ticket_key': ticket_key,
+                'acknowledged': True,
+                'updated_at': datetime.utcnow().isoformat() + 'Z',
+            }
+            return web.json_response({
+                'agent_name': agent_name,
+                'ticket_key': ticket_key,
+                'acknowledged': True,
+                'timestamp': datetime.utcnow().isoformat() + 'Z',
+            })
+
+        active_req['acknowledged'] = True
+        active_req['acknowledged_at'] = datetime.utcnow().isoformat() + 'Z'
+        _agent_active_requirements[agent_name] = active_req
+
+        now = datetime.utcnow().isoformat() + 'Z'
+        _decisions_log.append({
+            'timestamp': now,
+            'decision_type': 'requirement_acknowledged',
+            'agent_name': agent_name,
+            'ticket_key': active_req.get('ticket_key'),
+        })
+
+        return web.json_response({
+            'agent_name': agent_name,
+            'ticket_key': active_req.get('ticket_key'),
+            'acknowledged': True,
+            'timestamp': now,
+        })
+
+    # -------------------------------------------------------------------------
+    # AI-93: Linear sync queue endpoints
+    # -------------------------------------------------------------------------
+
+    async def get_sync_queue(self, request: Request) -> Response:
+        """GET /api/requirements/sync-queue - Return list of tickets queued for Linear sync.
+
+        AI-93: Returns all items in the sync queue with their processing status.
+        Query param ``pending_only=true`` filters to only unprocessed items.
+
+        Returns:
+            200 OK with {queue, total, pending_count}
+        """
+        pending_only = request.query.get('pending_only', 'false').lower() == 'true'
+        if pending_only:
+            queue = [item for item in _linear_sync_queue if not item.get('processed', False)]
+        else:
+            queue = list(_linear_sync_queue)
+
+        pending_count = sum(1 for item in _linear_sync_queue if not item.get('processed', False))
+
+        return web.json_response({
+            'queue': queue,
+            'total': len(_linear_sync_queue),
+            'pending_count': pending_count,
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+        })
+
+    async def process_sync(self, request: Request) -> Response:
+        """POST /api/requirements/process-sync - Mark sync queue items as processed.
+
+        AI-93: The orchestrator calls this after successfully syncing requirement
+        changes to Linear. Accepts a list of ticket_keys to mark as processed.
+        If no ticket_keys provided, marks ALL pending items as processed.
+
+        Request body (optional):
+            {"ticket_keys": ["AI-123", "AI-456"]}
+
+        Returns:
+            200 OK with {processed_count, items}
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+
+        ticket_keys = body.get('ticket_keys')
+        now = datetime.utcnow().isoformat() + 'Z'
+        processed_items = []
+
+        for item in _linear_sync_queue:
+            if item.get('processed', False):
+                continue
+            if ticket_keys is None or item.get('ticket_key') in ticket_keys:
+                item['processed'] = True
+                item['processed_at'] = now
+                processed_items.append(item.get('ticket_key'))
+
+                # Mark linear_synced in requirements store
+                tk = item.get('ticket_key')
+                if tk and tk in _requirements_store:
+                    _requirements_store[tk]['linear_synced'] = True
+
+        _decisions_log.append({
+            'timestamp': now,
+            'decision_type': 'sync_processed',
+            'processed_ticket_keys': processed_items,
+        })
+
+        return web.json_response({
+            'processed_count': len(processed_items),
+            'items': processed_items,
+            'timestamp': now,
         })
 
     async def get_decisions(self, request: Request) -> Response:
