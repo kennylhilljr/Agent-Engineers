@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Agent Status Dashboard</title>
     <style>
         /* Reset and Base Styles */
@@ -4988,9 +4988,396 @@
             color: #24292f;
             border-color: #d0d7de;
         }
+
+        /* ============================================================
+           AI-228: Mobile-Responsive Dashboard Improvements
+           Breakpoints: Mobile <640px | Tablet 640-1024px | Desktop >1024px
+           ============================================================ */
+
+        /* ---- Touch Targets: All interactive elements min 44x44px ---- */
+        button,
+        .panel-nav-item,
+        .collapse-icon-btn,
+        .left-panel-toggle,
+        .leaderboard-refresh-btn,
+        .chat-send-btn,
+        .agent-pause-btn,
+        .agent-resume-btn,
+        .theme-toggle-btn,
+        .btn-pause-all,
+        .btn-resume-all,
+        a[href] {
+            min-height: 44px;
+            min-width: 44px;
+        }
+
+        /* Keep small inline badges/labels exempt (they are not tappable actions) */
+        .agent-status-label,
+        .agent-paused-badge,
+        .agent-detail-model-badge,
+        .agent-detail-status-badge {
+            min-height: unset;
+            min-width: unset;
+        }
+
+        /* ---- Pull-to-Refresh placeholder (CSS only) ---- */
+        .ptr-indicator {
+            display: none;
+            text-align: center;
+            padding: 12px;
+            font-size: 0.8rem;
+            color: var(--text-secondary, #8b949e);
+            transition: transform 0.2s ease;
+        }
+
+        @media (max-width: 639px) {
+            .ptr-indicator {
+                display: block;
+            }
+        }
+
+        /* ---- Long-press context menu on agent cards ---- */
+        .agent-context-menu {
+            display: none;
+            position: absolute;
+            z-index: 500;
+            background: var(--bg-secondary, #161b22);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: 8px;
+            padding: 6px 0;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            min-width: 160px;
+        }
+
+        .agent-context-menu.open {
+            display: block;
+        }
+
+        .agent-context-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            font-size: 0.85rem;
+            color: var(--text-primary, #e6edf3);
+            cursor: pointer;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            min-height: 44px;
+        }
+
+        .agent-context-menu-item:hover {
+            background: var(--border-color, #30363d);
+        }
+
+        /* ---- Mobile Bottom Navigation Bar (< 640px) ---- */
+        .mobile-bottom-nav {
+            display: none;
+        }
+
+        @media (max-width: 639px) {
+            /* Show bottom nav, hide left panel */
+            .mobile-bottom-nav {
+                display: flex;
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                z-index: 200;
+                background: var(--bg-secondary, #161b22);
+                border-top: 1px solid var(--border-color, #30363d);
+                height: 56px;
+                align-items: stretch;
+                justify-content: space-around;
+                box-shadow: 0 -2px 12px rgba(0,0,0,0.3);
+                /* Safe area padding for iOS home indicator */
+                padding-bottom: env(safe-area-inset-bottom);
+            }
+
+            .mobile-bottom-nav-item {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                flex: 1;
+                gap: 2px;
+                padding: 6px 4px;
+                color: var(--text-secondary, #8b949e);
+                background: none;
+                border: none;
+                cursor: pointer;
+                font-size: 0.6rem;
+                font-weight: 500;
+                min-height: 44px;
+                min-width: 44px;
+                transition: color 0.15s ease;
+                -webkit-tap-highlight-color: transparent;
+            }
+
+            .mobile-bottom-nav-item:active,
+            .mobile-bottom-nav-item.active {
+                color: var(--accent, #58a6ff);
+            }
+
+            .mobile-bottom-nav-icon {
+                font-size: 1.2rem;
+                line-height: 1;
+            }
+
+            /* Hide left panel on mobile - replaced by bottom nav */
+            .left-panel {
+                display: none !important;
+            }
+
+            /* Main content takes full width, add bottom padding for nav bar */
+            .main-content {
+                padding: 12px 12px 72px 12px;
+            }
+
+            /* Minimum 16px font for inputs to prevent iOS auto-zoom */
+            input,
+            textarea,
+            select {
+                font-size: 16px !important;
+            }
+
+            /* Agent status as horizontal scrollable cards */
+            .agent-status-list {
+                display: flex;
+                flex-direction: row;
+                overflow-x: auto;
+                gap: 10px;
+                padding: 8px 4px;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+            }
+
+            .agent-status-list::-webkit-scrollbar {
+                display: none;
+            }
+
+            .agent-status-item {
+                min-width: 160px;
+                max-width: 200px;
+                flex-shrink: 0;
+                border: 1px solid var(--border-color, #30363d);
+                border-radius: 8px;
+                padding: 10px 12px;
+                background: var(--bg-secondary, #161b22);
+            }
+
+            /* Activity feed simple list on mobile (no sidebar) */
+            .activity-feed-sidebar {
+                display: none;
+            }
+
+            .activity-feed-main {
+                width: 100%;
+            }
+
+            /* No horizontal scroll on mobile */
+            body {
+                overflow-x: hidden;
+            }
+
+            .container {
+                padding: 0;
+            }
+
+            /* Header adjustments */
+            .header h1 {
+                font-size: 1.4rem;
+            }
+
+            .header {
+                padding: 12px 16px;
+            }
+
+            /* Stats grid: 2 columns on mobile */
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+            }
+
+            /* Dashboard grid: single column */
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            /* Cards take full width */
+            .card {
+                border-radius: 8px;
+                padding: 12px;
+            }
+
+            /* Global metrics bar: scrollable horizontally */
+            .global-metrics-bar {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                flex-wrap: nowrap;
+                padding-bottom: 4px;
+            }
+
+            .gm-card {
+                min-width: 80px;
+                flex-shrink: 0;
+            }
+
+            /* Leaderboard: hide Avg Duration column */
+            .leaderboard-table .col-avg-duration,
+            .leaderboard-table th:nth-child(6),
+            .leaderboard-table td:nth-child(6) {
+                display: none;
+            }
+
+            /* Charts: single column */
+            .charts-grid {
+                grid-template-columns: 1fr !important;
+            }
+
+            /* Global controls: stack vertically */
+            .global-controls {
+                flex-direction: column;
+                gap: 6px;
+            }
+
+            /* Chat interface: full width */
+            .chat-container {
+                height: calc(100vh - 160px);
+                min-height: 300px;
+            }
+        }
+
+        /* ============================================================
+           AI-228: Tablet Layout (640px - 1024px)
+           ============================================================ */
+        @media (min-width: 640px) and (max-width: 1024px) {
+            /* Left panel: 180px compact mode with text labels */
+            .left-panel {
+                width: 180px;
+                min-width: 180px;
+            }
+
+            /* Force show panel content (compact text labels) */
+            .left-panel .panel-content {
+                display: flex !important;
+            }
+
+            .left-panel .collapse-icon {
+                display: none !important;
+            }
+
+            .left-panel .left-panel-logo {
+                display: block;
+                font-size: 0.75rem;
+            }
+
+            /* Slightly smaller nav items for compact mode */
+            .panel-nav-item {
+                padding: 7px 8px;
+                font-size: 0.78rem;
+            }
+
+            /* Main content: remaining width after 180px panel */
+            .main-content {
+                padding: 16px;
+            }
+
+            /* Leaderboard: hide "Avg Duration" column (show 5 of 6 data cols + rank + agent) */
+            .leaderboard-table .col-avg-duration,
+            .leaderboard-table th:nth-child(6),
+            .leaderboard-table td:nth-child(6) {
+                display: none;
+            }
+
+            /* Charts: scale proportionally to 2 columns */
+            .charts-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            /* Stats: 2-3 columns */
+            .stats-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+
+            /* Header */
+            .header h1 {
+                font-size: 1.6rem;
+            }
+
+            /* Minimum font size for inputs */
+            input,
+            textarea,
+            select {
+                font-size: 16px;
+            }
+        }
+
+        /* ============================================================
+           AI-228: Tablet - reset left panel collapse override from AI-178
+           On 640-768px we want the panel visible at 180px, not icon-only
+           ============================================================ */
+        @media (min-width: 640px) and (max-width: 768px) {
+            .left-panel {
+                width: 180px !important;
+                min-width: 180px !important;
+            }
+
+            .left-panel .panel-content {
+                display: flex !important;
+            }
+
+            .left-panel .collapse-icon {
+                display: none !important;
+            }
+
+            .left-panel .left-panel-logo {
+                display: block !important;
+            }
+        }
     </style>
 </head>
 <body>
+    <!-- AI-228: Pull-to-refresh placeholder (CSS only) -->
+    <div class="ptr-indicator" id="ptr-indicator" aria-hidden="true">&#8595; Pull to refresh</div>
+
+    <!-- AI-228: Mobile Bottom Navigation Bar (visible < 640px) -->
+    <nav class="mobile-bottom-nav" id="mobile-bottom-nav" aria-label="Mobile navigation" data-testid="mobile-bottom-nav">
+        <button class="mobile-bottom-nav-item active" id="mob-nav-home" onclick="document.getElementById('stats-grid').scrollIntoView({behavior:'smooth'}); setMobileNavActive(this)" aria-label="Home" data-testid="mob-nav-home">
+            <span class="mobile-bottom-nav-icon">&#127968;</span>
+            <span>Home</span>
+        </button>
+        <button class="mobile-bottom-nav-item" id="mob-nav-agents" onclick="document.getElementById('agent-cards').scrollIntoView({behavior:'smooth'}); setMobileNavActive(this)" aria-label="Agents" data-testid="mob-nav-agents">
+            <span class="mobile-bottom-nav-icon">&#129302;</span>
+            <span>Agents</span>
+        </button>
+        <button class="mobile-bottom-nav-item" id="mob-nav-chat" onclick="document.getElementById('chat-container').scrollIntoView({behavior:'smooth'}); setMobileNavActive(this)" aria-label="Chat" data-testid="mob-nav-chat">
+            <span class="mobile-bottom-nav-icon">&#128172;</span>
+            <span>Chat</span>
+        </button>
+        <button class="mobile-bottom-nav-item" id="mob-nav-leaderboard" onclick="document.getElementById('leaderboard-section').scrollIntoView({behavior:'smooth'}); setMobileNavActive(this)" aria-label="Leaderboard" data-testid="mob-nav-leaderboard">
+            <span class="mobile-bottom-nav-icon">&#127942;</span>
+            <span>Leaderboard</span>
+        </button>
+        <button class="mobile-bottom-nav-item" id="mob-nav-settings" onclick="document.getElementById('github-section') && document.getElementById('github-section').scrollIntoView({behavior:'smooth'}); setMobileNavActive(this)" aria-label="Settings" data-testid="mob-nav-settings">
+            <span class="mobile-bottom-nav-icon">&#9881;</span>
+            <span>Settings</span>
+        </button>
+    </nav>
+
+    <!-- AI-228: Agent context menu (long-press on mobile) -->
+    <div class="agent-context-menu" id="agent-context-menu" role="menu" aria-label="Agent actions" data-testid="agent-context-menu">
+        <button class="agent-context-menu-item" id="ctx-menu-pause" role="menuitem" data-testid="ctx-menu-pause">
+            <span>&#9646;&#9646;</span> Pause Agent
+        </button>
+        <button class="agent-context-menu-item" id="ctx-menu-resume" role="menuitem" data-testid="ctx-menu-resume">
+            <span>&#9654;</span> Resume Agent
+        </button>
+    </div>
+
     <!-- AI-178: App layout with collapsible left panel -->
     <div class="app-layout">
         <!-- AI-178: Left Panel / Sidebar -->
@@ -9833,6 +10220,145 @@
             _toastTimer = setTimeout(() => {
                 toast.className = 'req-modal-toast' + (isError ? ' error' : '');
             }, 3000);
+        }
+    })();
+
+    /* ============================================================
+       AI-228: Mobile Responsive Dashboard - JavaScript
+       ============================================================ */
+    (function() {
+        'use strict';
+
+        // ---- Mobile Bottom Nav active state ----
+        window.setMobileNavActive = function(el) {
+            const items = document.querySelectorAll('.mobile-bottom-nav-item');
+            items.forEach(function(item) { item.classList.remove('active'); });
+            if (el) el.classList.add('active');
+        };
+
+        // ---- Long-press context menu on agent cards ----
+        var _ctxMenuTimer = null;
+        var _ctxMenuAgentId = null;
+        var LONG_PRESS_DELAY = 500; // ms
+
+        function _showContextMenu(x, y, agentId) {
+            _ctxMenuAgentId = agentId;
+            var menu = document.getElementById('agent-context-menu');
+            if (!menu) return;
+            // Position menu near the touch point
+            var menuW = 170;
+            var menuH = 100;
+            var left = Math.min(x, window.innerWidth - menuW - 8);
+            var top = Math.min(y, window.innerHeight - menuH - 8);
+            menu.style.left = left + 'px';
+            menu.style.top = top + 'px';
+            menu.classList.add('open');
+        }
+
+        function _hideContextMenu() {
+            var menu = document.getElementById('agent-context-menu');
+            if (menu) menu.classList.remove('open');
+            _ctxMenuAgentId = null;
+        }
+
+        // Wire context menu buttons
+        document.addEventListener('DOMContentLoaded', function() {
+            var pauseBtn = document.getElementById('ctx-menu-pause');
+            var resumeBtn = document.getElementById('ctx-menu-resume');
+
+            if (pauseBtn) {
+                pauseBtn.addEventListener('click', function() {
+                    if (_ctxMenuAgentId && typeof pauseAgent === 'function') {
+                        pauseAgent(_ctxMenuAgentId);
+                    }
+                    _hideContextMenu();
+                });
+            }
+
+            if (resumeBtn) {
+                resumeBtn.addEventListener('click', function() {
+                    if (_ctxMenuAgentId && typeof resumeAgent === 'function') {
+                        resumeAgent(_ctxMenuAgentId);
+                    }
+                    _hideContextMenu();
+                });
+            }
+
+            // Dismiss context menu on outside tap
+            document.addEventListener('touchstart', function(e) {
+                var menu = document.getElementById('agent-context-menu');
+                if (menu && menu.classList.contains('open') && !menu.contains(e.target)) {
+                    _hideContextMenu();
+                }
+            }, { passive: true });
+
+            document.addEventListener('click', function(e) {
+                var menu = document.getElementById('agent-context-menu');
+                if (menu && menu.classList.contains('open') && !menu.contains(e.target)) {
+                    _hideContextMenu();
+                }
+            });
+        });
+
+        // Attach long-press listeners to agent status items (runs after render)
+        window._attachAgentLongPress = function() {
+            var items = document.querySelectorAll('.agent-status-item[data-agent-id]');
+            items.forEach(function(item) {
+                // Remove existing listeners to avoid duplicates
+                item.removeEventListener('touchstart', item._lpStart);
+                item.removeEventListener('touchend', item._lpEnd);
+                item.removeEventListener('touchmove', item._lpMove);
+
+                item._lpStart = function(e) {
+                    var touch = e.touches[0];
+                    var agentId = item.getAttribute('data-agent-id');
+                    _ctxMenuTimer = setTimeout(function() {
+                        _showContextMenu(touch.clientX, touch.clientY, agentId);
+                        if (navigator.vibrate) navigator.vibrate(30);
+                    }, LONG_PRESS_DELAY);
+                };
+                item._lpEnd = function() {
+                    clearTimeout(_ctxMenuTimer);
+                };
+                item._lpMove = function() {
+                    clearTimeout(_ctxMenuTimer);
+                };
+
+                item.addEventListener('touchstart', item._lpStart, { passive: true });
+                item.addEventListener('touchend', item._lpEnd, { passive: true });
+                item.addEventListener('touchmove', item._lpMove, { passive: true });
+            });
+        };
+
+        // ---- Leaderboard Avg Duration column: add class for CSS targeting ----
+        document.addEventListener('DOMContentLoaded', function() {
+            var table = document.getElementById('leaderboard-table');
+            if (table) {
+                // Mark the "Avg Duration" column header (index 5, 0-based)
+                var headers = table.querySelectorAll('thead tr th');
+                headers.forEach(function(th, i) {
+                    if (th.textContent.trim() === 'Avg Duration') {
+                        th.classList.add('col-avg-duration');
+                    }
+                });
+            }
+        });
+
+        // Patch renderLeaderboard to add col class to td cells too
+        var _origRenderLeaderboard = window.renderLeaderboard;
+        if (typeof _origRenderLeaderboard === 'function') {
+            window.renderLeaderboard = function(entries) {
+                _origRenderLeaderboard(entries);
+                // After render, mark avg-duration td cells (column index 5)
+                var tbody = document.getElementById('leaderboard-tbody');
+                if (tbody) {
+                    var rows = tbody.querySelectorAll('tr');
+                    rows.forEach(function(row) {
+                        var cells = row.querySelectorAll('td');
+                        if (cells[5]) cells[5].classList.add('col-avg-duration');
+                    });
+                }
+            };
         }
     })();
     </script>
