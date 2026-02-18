@@ -3858,6 +3858,234 @@
             background: rgba(148, 163, 184, 0.1);
             color: #cbd5e1;
         }
+
+        /* AI-84: Agent Leaderboard (REQ-METRICS-002) */
+        .leaderboard-section {
+            margin-bottom: 24px;
+        }
+
+        .leaderboard-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .leaderboard-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-primary, #e6edf3);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .leaderboard-refresh-btn {
+            background: none;
+            border: 1px solid var(--border-color, #30363d);
+            color: var(--text-secondary, #8b949e);
+            cursor: pointer;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            transition: background 0.15s ease, color 0.15s ease;
+        }
+
+        .leaderboard-refresh-btn:hover {
+            background: var(--border-color, #30363d);
+            color: var(--text-primary, #e6edf3);
+        }
+
+        .leaderboard-table-wrap {
+            overflow-x: auto;
+        }
+
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+        }
+
+        .leaderboard-table th {
+            text-align: left;
+            padding: 8px 12px;
+            font-size: 0.68rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-secondary, #8b949e);
+            border-bottom: 1px solid var(--border-color, #30363d);
+            white-space: nowrap;
+        }
+
+        .leaderboard-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid rgba(48,54,61,0.5);
+            vertical-align: middle;
+            color: var(--text-primary, #e6edf3);
+        }
+
+        .leaderboard-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .leaderboard-table tr:hover td {
+            background: rgba(255,255,255,0.02);
+        }
+
+        /* Rank badge */
+        .lb-rank {
+            font-size: 0.85rem;
+            font-weight: 800;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .lb-rank.rank-1 {
+            background: rgba(255, 215, 0, 0.15);
+            color: #ffd700;
+            border: 1px solid rgba(255, 215, 0, 0.4);
+        }
+
+        .lb-rank.rank-2 {
+            background: rgba(192, 192, 192, 0.15);
+            color: #c0c0c0;
+            border: 1px solid rgba(192, 192, 192, 0.4);
+        }
+
+        .lb-rank.rank-3 {
+            background: rgba(205, 127, 50, 0.15);
+            color: #cd7f32;
+            border: 1px solid rgba(205, 127, 50, 0.4);
+        }
+
+        .lb-rank.rank-other {
+            background: rgba(71, 85, 105, 0.15);
+            color: #64748b;
+            border: 1px solid rgba(71, 85, 105, 0.3);
+            font-size: 0.72rem;
+        }
+
+        /* Agent name in leaderboard */
+        .lb-agent-name {
+            font-weight: 600;
+            color: var(--text-primary, #e6edf3);
+            text-transform: capitalize;
+        }
+
+        /* Level badge */
+        .lb-level-badge {
+            display: inline-block;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 8px;
+            background: rgba(99, 102, 241, 0.15);
+            color: #818cf8;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            white-space: nowrap;
+        }
+
+        /* XP progress bar */
+        .lb-xp-wrap {
+            min-width: 100px;
+        }
+
+        .lb-xp-label {
+            font-size: 0.67rem;
+            color: var(--text-secondary, #8b949e);
+            margin-bottom: 3px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .lb-xp-bar-bg {
+            height: 5px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .lb-xp-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            background: linear-gradient(90deg, #6366f1, #818cf8);
+            transition: width 0.4s ease;
+        }
+
+        /* Success rate */
+        .lb-success-rate {
+            font-weight: 600;
+            color: #22c55e;
+        }
+
+        .lb-success-rate.low {
+            color: #ef4444;
+        }
+
+        .lb-success-rate.medium {
+            color: #eab308;
+        }
+
+        /* Duration */
+        .lb-duration {
+            color: var(--text-secondary, #8b949e);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Cost */
+        .lb-cost {
+            color: #fbbf24;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Status dot in leaderboard */
+        .lb-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            flex-shrink: 0;
+        }
+
+        .lb-status-dot.s-idle { background: #475569; }
+        .lb-status-dot.s-running { background: #22c55e; animation: pulse-green 1.5s ease-in-out infinite; }
+        .lb-status-dot.s-paused { background: #eab308; }
+        .lb-status-dot.s-error { background: #ef4444; }
+
+        .lb-status-cell {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .lb-status-text {
+            font-size: 0.72rem;
+            color: var(--text-secondary, #8b949e);
+            text-transform: capitalize;
+        }
+
+        /* Loading/empty leaderboard */
+        .lb-loading {
+            padding: 24px;
+            text-align: center;
+            color: var(--text-secondary, #8b949e);
+            font-size: 0.8rem;
+            opacity: 0.7;
+        }
+
+        [data-theme="light"] .leaderboard-table td {
+            border-bottom-color: rgba(208,215,222,0.5);
+        }
+
+        [data-theme="light"] .lb-xp-bar-bg {
+            background: rgba(0,0,0,0.08);
+        }
     </style>
 </head>
 <body>
@@ -3897,6 +4125,10 @@
                 <button class="panel-nav-item" onclick="document.getElementById('provider-usage').scrollIntoView({behavior:'smooth'})">
                     <span class="panel-nav-icon">&#9889;</span>
                     <span>Provider Usage</span>
+                </button>
+                <button class="panel-nav-item" onclick="document.getElementById('leaderboard-section').scrollIntoView({behavior:'smooth'})">
+                    <span class="panel-nav-icon">&#127942;</span>
+                    <span>Leaderboard</span>
                 </button>
                 <span class="panel-section-label">Tools</span>
                 <button class="panel-nav-item" onclick="document.getElementById('requirement-editor').scrollIntoView({behavior:'smooth'})">
@@ -4112,6 +4344,43 @@
                 <div class="chart-container">
                     <canvas id="allocation-chart"></canvas>
                 </div>
+            </div>
+        </div>
+
+        <!-- AI-84: Agent Leaderboard (REQ-METRICS-002) -->
+        <div class="card leaderboard-section" id="leaderboard-section" data-testid="leaderboard-section">
+            <div class="card-header">
+                <div class="leaderboard-header">
+                    <h2 class="leaderboard-title">
+                        <span>&#127942;</span>
+                        <span>Agent Leaderboard — XP Rankings</span>
+                    </h2>
+                    <button
+                        class="leaderboard-refresh-btn"
+                        id="leaderboard-refresh-btn"
+                        onclick="fetchLeaderboard()"
+                        aria-label="Refresh leaderboard"
+                    >&#8635; Refresh</button>
+                </div>
+            </div>
+            <div class="leaderboard-table-wrap">
+                <table class="leaderboard-table" id="leaderboard-table" aria-label="Agent XP Leaderboard">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Agent</th>
+                            <th>Level</th>
+                            <th>XP Progress</th>
+                            <th>Success</th>
+                            <th>Avg Duration</th>
+                            <th>Cost</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboard-tbody">
+                        <tr><td colspan="8" class="lb-loading">Loading leaderboard...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
 
@@ -5474,6 +5743,12 @@
                             console.log('Received global_metrics_update via WebSocket', message);
                             if (message.data) {
                                 renderGlobalMetricsBar(message.data);
+                            }
+                        } else if (message.type === 'leaderboard_update') {
+                            // AI-84: Real-time leaderboard update (REQ-METRICS-002)
+                            console.log('Received leaderboard_update via WebSocket', message);
+                            if (message.data) {
+                                renderLeaderboard(message.data);
                             }
                         }
                     } catch (error) {
@@ -7024,17 +7299,126 @@
             }
         }
 
+        // =====================================================================
+        // AI-84: Agent Leaderboard (REQ-METRICS-002)
+        // =====================================================================
+
+        const _LB_XP_THRESHOLDS = [0, 50, 150, 400, 800, 1500, 3000, 5000];
+        const _LB_LEVEL_TITLES = ['', 'Intern', 'Junior', 'Mid-Level', 'Senior', 'Staff', 'Principal', 'Distinguished', 'Fellow'];
+
+        function _lbGetXpProgress(xp) {
+            const lvl = Math.min(
+                _LB_XP_THRESHOLDS.reduce((l, t, i) => (xp >= t ? i + 1 : l), 1),
+                8
+            );
+            const start = _LB_XP_THRESHOLDS[lvl - 1] || 0;
+            const end = _LB_XP_THRESHOLDS[lvl] !== undefined ? _LB_XP_THRESHOLDS[lvl] : _LB_XP_THRESHOLDS[7];
+            const inLevel = xp - start;
+            const needed = end - start || 1;
+            const pct = Math.min(Math.round((inLevel / needed) * 100), 100);
+            return { level: lvl, title: _LB_LEVEL_TITLES[lvl] || 'Fellow', pct, inLevel, needed };
+        }
+
+        function _lbRankBadge(rank) {
+            const cls = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : 'rank-other';
+            return `<span class="lb-rank ${cls}">${rank}</span>`;
+        }
+
+        function _lbStatusDot(status) {
+            const dotClass = ['idle','running','paused','error'].includes(status) ? `s-${status}` : 's-idle';
+            return `<span class="lb-status-dot ${dotClass}"></span>`;
+        }
+
+        function _lbFormatDuration(secs) {
+            if (!secs || secs <= 0) return '—';
+            if (secs < 60) return secs.toFixed(1) + 's';
+            return (secs / 60).toFixed(1) + 'm';
+        }
+
+        function _lbFormatCost(cost) {
+            if (!cost || cost <= 0) return '$0.00';
+            return '$' + Number(cost).toFixed(2);
+        }
+
+        function _lbSuccessRateClass(rate) {
+            if (rate >= 0.9) return '';
+            if (rate >= 0.7) return 'medium';
+            return 'low';
+        }
+
+        function renderLeaderboard(entries) {
+            const tbody = document.getElementById('leaderboard-tbody');
+            if (!tbody) return;
+            if (!entries || entries.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="lb-loading">No data available</td></tr>';
+                return;
+            }
+
+            const rows = entries.map(agent => {
+                const xpInfo = _lbGetXpProgress(agent.xp || 0);
+                const successPct = ((agent.success_rate || 0) * 100).toFixed(1);
+                const successCls = _lbSuccessRateClass(agent.success_rate || 0);
+                const statusStr = agent.status || 'idle';
+
+                return `<tr data-agent="${agent.name}" data-testid="lb-row-${agent.name}">
+                    <td>${_lbRankBadge(agent.rank)}</td>
+                    <td><span class="lb-agent-name">${agent.name.replace(/_/g, ' ')}</span></td>
+                    <td><span class="lb-level-badge" title="${xpInfo.title}">Lv${xpInfo.level} ${xpInfo.title}</span></td>
+                    <td>
+                        <div class="lb-xp-wrap">
+                            <div class="lb-xp-label">
+                                <span>${(agent.xp || 0).toLocaleString()} XP</span>
+                                <span>${xpInfo.inLevel}/${xpInfo.needed}</span>
+                            </div>
+                            <div class="lb-xp-bar-bg">
+                                <div class="lb-xp-bar-fill" style="width:${xpInfo.pct}%"></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="lb-success-rate ${successCls}">${successPct}%</span></td>
+                    <td><span class="lb-duration">${_lbFormatDuration(agent.avg_duration_s)}</span></td>
+                    <td><span class="lb-cost">${_lbFormatCost(agent.total_cost_usd)}</span></td>
+                    <td>
+                        <div class="lb-status-cell">
+                            ${_lbStatusDot(statusStr)}
+                            <span class="lb-status-text">${statusStr}</span>
+                        </div>
+                    </td>
+                </tr>`;
+            });
+
+            tbody.innerHTML = rows.join('');
+        }
+
+        async function fetchLeaderboard() {
+            try {
+                const baseUrl = (typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '').replace(/\/$/, '');
+                const resp = await fetch(`${baseUrl}/api/agents/leaderboard`);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                renderLeaderboard(data);
+            } catch (e) {
+                console.error('Leaderboard fetch error:', e);
+                const tbody = document.getElementById('leaderboard-tbody');
+                if (tbody) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="lb-loading">Failed to load leaderboard</td></tr>';
+                }
+            }
+        }
+
         // Start when DOM is ready
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
                 init();
                 initChat();
                 loadDecisionHistory();
+                fetchLeaderboard();
             });
         } else {
             init();
             initChat();
             loadDecisionHistory();
+            fetchLeaderboard();
         }
 
         // Cleanup on page unload
