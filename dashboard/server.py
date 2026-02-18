@@ -92,6 +92,27 @@ _requirements_store: dict = {}
 # AI-79: Agent Status Panel (REQ-MONITOR-001) - in-memory status store for DashboardServer
 _dashboard_agent_status: dict = {}
 
+# AI-81: Agent Detail View (REQ-MONITOR-003) - per-agent recent events store
+# {agent_name: [list of last 20 event dicts]}
+_agent_recent_events: dict = {}
+
+# AI-81: Fallback DEFAULT_MODELS dict (avoids importing claude_agent_sdk)
+_DEFAULT_MODELS = {
+    "linear": "haiku",
+    "coding": "sonnet",
+    "github": "haiku",
+    "slack": "haiku",
+    "pr_reviewer": "sonnet",
+    "ops": "haiku",
+    "coding_fast": "haiku",
+    "pr_reviewer_fast": "haiku",
+    "chatgpt": "haiku",
+    "gemini": "haiku",
+    "groq": "haiku",
+    "kimi": "haiku",
+    "windsurf": "haiku",
+}
+
 # The 13 canonical panel agents (excludes orchestrator)
 _PANEL_AGENT_NAMES = [
     "linear", "coding", "github", "slack", "pr_reviewer",
@@ -425,6 +446,9 @@ class DashboardServer:
         # AI-79: Agent Status Panel endpoint - must be registered BEFORE /{agent_name}
         self.app.router.add_get('/api/agents/status', self.get_all_agents_status)
         self.app.router.add_post('/api/agents/{agent_name}/status', self.update_agent_status_handler)
+        # AI-81: Agent Detail View (REQ-MONITOR-003) - profile and events
+        self.app.router.add_get('/api/agents/{agent_name}/profile', self.get_agent_profile)
+        self.app.router.add_post('/api/agents/{agent_name}/events', self.post_agent_recent_event)
         self.app.router.add_get('/api/agents/{agent_name}', self.get_agent)
         self.app.router.add_get('/ws', self.websocket_handler)
         # AI-80 / REQ-MONITOR-002: Active Requirement Display endpoints
@@ -492,6 +516,8 @@ class DashboardServer:
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/agents/status', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/agents/{agent_name}', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/agents/{agent_name}/profile', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/agents/{agent_name}/events', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/requirements/{ticket_key}', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/chat', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/chat/route', self.handle_options)
@@ -789,6 +815,192 @@ class DashboardServer:
             'estimated_cost': estimated_cost if new_status == "running" else 0.0,
             'timestamp': timestamp,
         })
+
+    # =========================================================================
+    # AI-81: Agent Detail View (REQ-MONITOR-003)
+    # =========================================================================
+
+    async def get_agent_profile(self, request: Request) -> Response:
+        """GET /api/agents/{agent_name}/profile - Full agent profile for detail view.
+
+        Returns agent profile data including:
+        - name, model (from DEFAULT_MODELS), status
+        - lifetime_stats: tasks_completed, tasks_failed, success_rate, total_tokens, total_cost, avg_duration
+        - gamification: xp, level, streak, achievements
+        - contribution_counters: commits, prs_created, prs_merged, linear_issues_closed
+        - strengths, weaknesses
+        - recent_events: last 20 events
+
+        Returns:
+            200 OK with profile data
+            404 Not Found if agent not in panel list
+        """
+        agent_name = request.match_info['agent_name']
+
+        if agent_name not in _PANEL_AGENT_NAMES:
+            return web.json_response({
+                'error': 'Agent not found',
+                'agent_name': agent_name,
+                'available_agents': _PANEL_AGENT_NAMES,
+            }, status=404)
+
+        # Get status info
+        status_info = _dashboard_agent_status.get(agent_name, {})
+        current_status = status_info.get('status', 'idle')
+        model = _DEFAULT_MODELS.get(agent_name, 'haiku')
+
+        # Try to load from metrics store for real data
+        agent_profile_data = {}
+        try:
+            state = self.store.load()
+            agent_profile_data = state.get('agents', {}).get(agent_name, {})
+        except Exception:
+            pass
+
+        # Build lifetime_stats from profile or defaults
+        total_inv = agent_profile_data.get('total_invocations', 0)
+        successful_inv = agent_profile_data.get('successful_invocations', 0)
+        failed_inv = agent_profile_data.get('failed_invocations', 0)
+        total_tokens = agent_profile_data.get('total_tokens', 0)
+        total_cost = agent_profile_data.get('total_cost_usd', 0.0)
+        total_duration = agent_profile_data.get('total_duration_seconds', 0.0)
+        success_rate = agent_profile_data.get('success_rate', 0.0)
+        avg_duration = agent_profile_data.get('avg_duration_seconds', 0.0)
+
+        # Build gamification data
+        xp = agent_profile_data.get('xp', 0)
+        level = agent_profile_data.get('level', 1)
+        streak = agent_profile_data.get('current_streak', 0)
+        best_streak = agent_profile_data.get('best_streak', 0)
+        achievements = agent_profile_data.get('achievements', [])
+
+        # Build contribution counters
+        commits = agent_profile_data.get('commits_made', 0)
+        prs_created = agent_profile_data.get('prs_created', 0)
+        prs_merged = agent_profile_data.get('prs_merged', 0)
+        issues_closed = agent_profile_data.get('issues_completed', 0)
+        files_created = agent_profile_data.get('files_created', 0)
+        files_modified = agent_profile_data.get('files_modified', 0)
+        tests_written = agent_profile_data.get('tests_written', 0)
+        messages_sent = agent_profile_data.get('messages_sent', 0)
+        reviews_completed = agent_profile_data.get('reviews_completed', 0)
+
+        strengths = agent_profile_data.get('strengths', [])
+        weaknesses = agent_profile_data.get('weaknesses', [])
+        last_active = agent_profile_data.get('last_active', None)
+
+        # Get recent events from in-memory store
+        recent_events = list(_agent_recent_events.get(agent_name, []))
+
+        profile = {
+            'name': agent_name,
+            'model': model,
+            'status': current_status,
+            'last_active': last_active,
+            'lifetime_stats': {
+                'tasks_completed': successful_inv,
+                'tasks_failed': failed_inv,
+                'total_invocations': total_inv,
+                'success_rate': success_rate,
+                'total_tokens': total_tokens,
+                'total_cost': total_cost,
+                'avg_duration': avg_duration,
+                'total_duration': total_duration,
+            },
+            'gamification': {
+                'xp': xp,
+                'level': level,
+                'streak': streak,
+                'best_streak': best_streak,
+                'achievements': achievements,
+            },
+            'contribution_counters': {
+                'commits': commits,
+                'prs_created': prs_created,
+                'prs_merged': prs_merged,
+                'linear_issues_closed': issues_closed,
+                'files_created': files_created,
+                'files_modified': files_modified,
+                'tests_written': tests_written,
+                'messages_sent': messages_sent,
+                'reviews_completed': reviews_completed,
+            },
+            'strengths': strengths,
+            'weaknesses': weaknesses,
+            'recent_events': recent_events,
+        }
+
+        return web.json_response({
+            'profile': profile,
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+        })
+
+    async def post_agent_recent_event(self, request: Request) -> Response:
+        """POST /api/agents/{agent_name}/events - Add an event to agent's recent history.
+
+        Maintains a rolling window of the last 20 events per agent.
+
+        Request body:
+            {
+                "type": "task_started|task_completed|error_occurred|...",
+                "title": "Event title",
+                "status": "success|error|in_progress|...",
+                "ticket_key": "AI-123",  (optional)
+                "duration": 12.5         (optional, seconds)
+            }
+
+        Returns:
+            201 Created with event data
+            404 Not Found if agent not in panel list
+            400 Bad Request if body is invalid
+        """
+        agent_name = request.match_info['agent_name']
+
+        if agent_name not in _PANEL_AGENT_NAMES:
+            return web.json_response({
+                'error': 'Agent not found',
+                'agent_name': agent_name,
+                'available_agents': _PANEL_AGENT_NAMES,
+            }, status=404)
+
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        event_type = body.get('type', 'task_completed')
+        title = body.get('title', '')
+        status = body.get('status', 'success')
+        ticket_key = body.get('ticket_key', '')
+        duration = body.get('duration', None)
+
+        if not title:
+            return web.json_response({'error': 'title is required'}, status=400)
+
+        # Build the event record
+        from uuid import uuid4
+        event = {
+            'id': str(uuid4()),
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'type': event_type,
+            'title': title,
+            'status': status,
+            'ticket_key': ticket_key,
+            'duration': duration,
+        }
+
+        # Initialize list if needed, then append and keep last 20
+        if agent_name not in _agent_recent_events:
+            _agent_recent_events[agent_name] = []
+        _agent_recent_events[agent_name].append(event)
+        _agent_recent_events[agent_name] = _agent_recent_events[agent_name][-20:]
+
+        return web.json_response({
+            'event': event,
+            'agent_name': agent_name,
+            'total_events': len(_agent_recent_events[agent_name]),
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+        }, status=201)
 
     async def get_agent(self, request: Request) -> Response:
         """Get specific agent profile by name.

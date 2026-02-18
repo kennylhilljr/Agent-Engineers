@@ -56,6 +56,27 @@ _agent_status_details: Dict[str, Dict[str, Any]] = {}
 # Valid agent statuses for the status panel
 VALID_AGENT_STATUSES = ("idle", "running", "paused", "error")
 
+# AI-81: Agent Detail View (REQ-MONITOR-003) - per-agent recent events store
+# {agent_name: [list of last 20 event dicts]}
+_rest_agent_recent_events: Dict[str, list] = {}
+
+# AI-81: Fallback DEFAULT_MODELS mapping (avoids importing claude_agent_sdk)
+_REST_DEFAULT_MODELS: Dict[str, str] = {
+    "linear": "haiku",
+    "coding": "sonnet",
+    "github": "haiku",
+    "slack": "haiku",
+    "pr_reviewer": "sonnet",
+    "ops": "haiku",
+    "coding_fast": "haiku",
+    "pr_reviewer_fast": "haiku",
+    "chatgpt": "haiku",
+    "gemini": "haiku",
+    "groq": "haiku",
+    "kimi": "haiku",
+    "windsurf": "haiku",
+}
+
 # The 13 canonical agents for the status panel (excludes orchestrator)
 PANEL_AGENT_NAMES = [
     "linear", "coding", "github", "slack", "pr_reviewer",
@@ -275,6 +296,9 @@ class RESTAPIServer:
         self.app.router.add_get('/api/agent-controls', self.get_all_agent_controls)
         # Agent Status Panel endpoints (AI-79 / REQ-MONITOR-001)
         self.app.router.add_get('/api/agents/status', self.get_all_agents_status)
+        # AI-81: Agent Detail View (REQ-MONITOR-003) - register BEFORE /{name}
+        self.app.router.add_get('/api/agents/{name}/profile', self.get_agent_profile)
+        self.app.router.add_post('/api/agents/{name}/events', self.post_agent_recent_event)
         self.app.router.add_get('/api/agents/{name}', self.get_agent)
         self.app.router.add_get('/api/agents/{name}/events', self.get_agent_events)
         self.app.router.add_post('/api/agents/{name}/pause', self.pause_agent)
@@ -1107,6 +1131,186 @@ class RESTAPIServer:
             _ws_clients.discard(ws)
 
         return ws
+
+    # -------------------------------------------------------------------------
+    # AI-81: Agent Detail View - REQ-MONITOR-003
+    # -------------------------------------------------------------------------
+
+    async def get_agent_profile(self, request: Request) -> Response:
+        """GET /api/agents/{name}/profile - Full agent profile for detail view.
+
+        Returns agent profile with lifetime stats, gamification data,
+        contribution counters, strengths/weaknesses, and recent events (last 20).
+
+        Returns:
+            200 OK with profile data
+            404 Not Found if agent not in panel list
+        """
+        import uuid as _uuid
+        agent_name = request.match_info['name']
+
+        if agent_name not in PANEL_AGENT_NAMES:
+            return web.json_response({
+                'error': 'Agent not found',
+                'agent_name': agent_name,
+                'available_agents': PANEL_AGENT_NAMES,
+            }, status=404)
+
+        # Get current status from status details
+        status_info = _agent_status_details.get(agent_name, {})
+        current_status = status_info.get('status', 'idle')
+        model = _REST_DEFAULT_MODELS.get(agent_name, 'haiku')
+
+        # Try to load from metrics store
+        agent_profile_data: Dict[str, Any] = {}
+        try:
+            state = self.store.load()
+            agent_profile_data = state.get('agents', {}).get(agent_name, {})
+        except Exception:
+            pass
+
+        # Lifetime stats
+        total_inv = agent_profile_data.get('total_invocations', 0)
+        successful_inv = agent_profile_data.get('successful_invocations', 0)
+        failed_inv = agent_profile_data.get('failed_invocations', 0)
+        total_tokens = agent_profile_data.get('total_tokens', 0)
+        total_cost = agent_profile_data.get('total_cost_usd', 0.0)
+        total_duration = agent_profile_data.get('total_duration_seconds', 0.0)
+        success_rate = agent_profile_data.get('success_rate', 0.0)
+        avg_duration = agent_profile_data.get('avg_duration_seconds', 0.0)
+
+        # Gamification
+        xp = agent_profile_data.get('xp', 0)
+        level = agent_profile_data.get('level', 1)
+        streak = agent_profile_data.get('current_streak', 0)
+        best_streak = agent_profile_data.get('best_streak', 0)
+        achievements = agent_profile_data.get('achievements', [])
+
+        # Contribution counters
+        commits = agent_profile_data.get('commits_made', 0)
+        prs_created = agent_profile_data.get('prs_created', 0)
+        prs_merged = agent_profile_data.get('prs_merged', 0)
+        issues_closed = agent_profile_data.get('issues_completed', 0)
+        files_created = agent_profile_data.get('files_created', 0)
+        files_modified = agent_profile_data.get('files_modified', 0)
+        tests_written = agent_profile_data.get('tests_written', 0)
+        messages_sent = agent_profile_data.get('messages_sent', 0)
+        reviews_completed = agent_profile_data.get('reviews_completed', 0)
+
+        strengths = agent_profile_data.get('strengths', [])
+        weaknesses = agent_profile_data.get('weaknesses', [])
+        last_active = agent_profile_data.get('last_active', None)
+
+        # Recent events from in-memory store
+        recent_events = list(_rest_agent_recent_events.get(agent_name, []))
+
+        profile = {
+            'name': agent_name,
+            'model': model,
+            'status': current_status,
+            'last_active': last_active,
+            'lifetime_stats': {
+                'tasks_completed': successful_inv,
+                'tasks_failed': failed_inv,
+                'total_invocations': total_inv,
+                'success_rate': success_rate,
+                'total_tokens': total_tokens,
+                'total_cost': total_cost,
+                'avg_duration': avg_duration,
+                'total_duration': total_duration,
+            },
+            'gamification': {
+                'xp': xp,
+                'level': level,
+                'streak': streak,
+                'best_streak': best_streak,
+                'achievements': achievements,
+            },
+            'contribution_counters': {
+                'commits': commits,
+                'prs_created': prs_created,
+                'prs_merged': prs_merged,
+                'linear_issues_closed': issues_closed,
+                'files_created': files_created,
+                'files_modified': files_modified,
+                'tests_written': tests_written,
+                'messages_sent': messages_sent,
+                'reviews_completed': reviews_completed,
+            },
+            'strengths': strengths,
+            'weaknesses': weaknesses,
+            'recent_events': recent_events,
+        }
+
+        return web.json_response({
+            'profile': profile,
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+        })
+
+    async def post_agent_recent_event(self, request: Request) -> Response:
+        """POST /api/agents/{name}/events - Add an event to agent's recent history.
+
+        Maintains a rolling window of the last 20 events per agent.
+
+        Request body:
+            {
+                "type": "task_started|task_completed|error_occurred|...",
+                "title": "Event title",
+                "status": "success|error|in_progress|...",
+                "ticket_key": "AI-123",
+                "duration": 12.5
+            }
+
+        Returns:
+            201 Created with event data
+            404 Not Found if agent not in panel list
+            400 Bad Request if body is invalid
+        """
+        import uuid as _uuid
+        agent_name = request.match_info['name']
+
+        if agent_name not in PANEL_AGENT_NAMES:
+            return web.json_response({
+                'error': 'Agent not found',
+                'agent_name': agent_name,
+                'available_agents': PANEL_AGENT_NAMES,
+            }, status=404)
+
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        event_type = body.get('type', 'task_completed')
+        title = body.get('title', '')
+        status = body.get('status', 'success')
+        ticket_key = body.get('ticket_key', '')
+        duration = body.get('duration', None)
+
+        if not title:
+            return web.json_response({'error': 'title is required'}, status=400)
+
+        event = {
+            'id': str(_uuid.uuid4()),
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'type': event_type,
+            'title': title,
+            'status': status,
+            'ticket_key': ticket_key,
+            'duration': duration,
+        }
+
+        if agent_name not in _rest_agent_recent_events:
+            _rest_agent_recent_events[agent_name] = []
+        _rest_agent_recent_events[agent_name].append(event)
+        _rest_agent_recent_events[agent_name] = _rest_agent_recent_events[agent_name][-20:]
+
+        return web.json_response({
+            'event': event,
+            'agent_name': agent_name,
+            'total_events': len(_rest_agent_recent_events[agent_name]),
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+        }, status=201)
 
     # -------------------------------------------------------------------------
     # AI-79: Agent Status Panel - REQ-MONITOR-001

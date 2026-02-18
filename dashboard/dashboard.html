@@ -493,6 +493,447 @@
             white-space: pre-wrap;
         }
 
+        /* AI-81: Agent Detail View (REQ-MONITOR-003) */
+        /* Overlay backdrop */
+        .agent-detail-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.55);
+            z-index: 1000;
+            transition: opacity 0.25s ease;
+            opacity: 0;
+        }
+        .agent-detail-overlay.open {
+            display: block;
+            opacity: 1;
+        }
+
+        /* Slide-in panel from right */
+        .agent-detail-panel {
+            position: fixed;
+            top: 0; right: 0; bottom: 0;
+            width: 420px;
+            max-width: 95vw;
+            background: var(--panel-bg, #161b22);
+            border-left: 1px solid var(--border-color, #30363d);
+            z-index: 1001;
+            overflow-y: auto;
+            transform: translateX(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: -4px 0 24px rgba(0,0,0,0.4);
+            padding: 0;
+        }
+        .agent-detail-panel.open {
+            transform: translateX(0);
+        }
+
+        .agent-detail-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px 12px;
+            border-bottom: 1px solid var(--border-color, #30363d);
+            position: sticky;
+            top: 0;
+            background: var(--panel-bg, #161b22);
+            z-index: 10;
+        }
+
+        .agent-detail-header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .agent-detail-name {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text-primary, #e6edf3);
+            text-transform: capitalize;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .agent-detail-model-badge {
+            font-size: 0.65rem;
+            padding: 2px 7px;
+            border-radius: 10px;
+            background: rgba(56, 139, 253, 0.15);
+            color: #58a6ff;
+            border: 1px solid rgba(56, 139, 253, 0.3);
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .agent-detail-status-badge {
+            font-size: 0.65rem;
+            padding: 2px 7px;
+            border-radius: 10px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .agent-detail-status-badge.status-idle { background: rgba(71,85,105,0.2); color: #64748b; }
+        .agent-detail-status-badge.status-running { background: rgba(34,197,94,0.15); color: #22c55e; }
+        .agent-detail-status-badge.status-paused { background: rgba(234,179,8,0.15); color: #eab308; }
+        .agent-detail-status-badge.status-error { background: rgba(239,68,68,0.15); color: #ef4444; }
+
+        .agent-detail-close-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary, #8b949e);
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 4px;
+            line-height: 1;
+            flex-shrink: 0;
+            transition: color 0.15s, background 0.15s;
+        }
+        .agent-detail-close-btn:hover {
+            color: var(--text-primary, #e6edf3);
+            background: rgba(255,255,255,0.06);
+        }
+
+        .agent-detail-body {
+            padding: 16px 20px;
+        }
+
+        .agent-detail-section-label {
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-secondary, #8b949e);
+            margin-bottom: 8px;
+            margin-top: 20px;
+        }
+        .agent-detail-section-label:first-child {
+            margin-top: 0;
+        }
+
+        /* Stats grid */
+        .agent-detail-stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .agent-detail-stat-card {
+            background: var(--card-bg, #0d1117);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: 6px;
+            padding: 10px 12px;
+        }
+
+        .agent-detail-stat-label {
+            font-size: 0.65rem;
+            color: var(--text-secondary, #8b949e);
+            margin-bottom: 3px;
+        }
+
+        .agent-detail-stat-value {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-primary, #e6edf3);
+        }
+
+        .agent-detail-stat-value.success { color: #22c55e; }
+        .agent-detail-stat-value.error { color: #ef4444; }
+        .agent-detail-stat-value.token { color: #60a5fa; }
+        .agent-detail-stat-value.cost { color: #fbbf24; }
+
+        /* Gamification row */
+        .agent-detail-gamification-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .agent-detail-xp-section {
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .agent-detail-xp-label {
+            font-size: 0.65rem;
+            color: var(--text-secondary, #8b949e);
+            margin-bottom: 4px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .agent-detail-xp-bar {
+            height: 6px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .agent-detail-xp-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #6366f1, #818cf8);
+            border-radius: 3px;
+            transition: width 0.4s ease;
+        }
+
+        .agent-detail-level-badge {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 4px 9px;
+            border-radius: 10px;
+            background: rgba(99,102,241,0.15);
+            color: #818cf8;
+            border: 1px solid rgba(99,102,241,0.3);
+            white-space: nowrap;
+        }
+
+        .agent-detail-streak-badge {
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 4px 9px;
+            border-radius: 10px;
+            background: rgba(251,146,60,0.15);
+            color: #fb923c;
+            border: 1px solid rgba(251,146,60,0.3);
+            white-space: nowrap;
+        }
+
+        /* Achievements */
+        .agent-detail-achievements {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .agent-detail-achievement-badge {
+            font-size: 0.65rem;
+            padding: 3px 8px;
+            border-radius: 10px;
+            background: rgba(34,197,94,0.12);
+            color: #4ade80;
+            border: 1px solid rgba(34,197,94,0.25);
+        }
+
+        .agent-detail-no-achievements {
+            font-size: 0.72rem;
+            color: var(--text-secondary, #8b949e);
+            opacity: 0.6;
+            font-style: italic;
+        }
+
+        /* Contribution counters */
+        .agent-detail-contributions {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 6px;
+        }
+
+        .agent-detail-contrib-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: var(--card-bg, #0d1117);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: 6px;
+            padding: 8px 6px;
+            text-align: center;
+        }
+
+        .agent-detail-contrib-value {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text-primary, #e6edf3);
+        }
+
+        .agent-detail-contrib-label {
+            font-size: 0.6rem;
+            color: var(--text-secondary, #8b949e);
+            margin-top: 2px;
+        }
+
+        /* Strengths/Weaknesses */
+        .agent-detail-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .agent-detail-strength-tag {
+            font-size: 0.65rem;
+            padding: 3px 8px;
+            border-radius: 10px;
+            background: rgba(34,197,94,0.1);
+            color: #4ade80;
+            border: 1px solid rgba(34,197,94,0.2);
+        }
+
+        .agent-detail-weakness-tag {
+            font-size: 0.65rem;
+            padding: 3px 8px;
+            border-radius: 10px;
+            background: rgba(239,68,68,0.1);
+            color: #f87171;
+            border: 1px solid rgba(239,68,68,0.2);
+        }
+
+        .agent-detail-tag-none {
+            font-size: 0.72rem;
+            color: var(--text-secondary, #8b949e);
+            opacity: 0.6;
+            font-style: italic;
+        }
+
+        /* Activity item pattern for recent events */
+        .agent-detail-events-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+
+        .agent-activity-item {
+            display: flex;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-color, #30363d);
+            cursor: default;
+            transition: background 0.1s;
+        }
+
+        .agent-activity-item:last-child {
+            border-bottom: none;
+        }
+
+        .agent-activity-item:hover {
+            background: rgba(255,255,255,0.02);
+            border-radius: 6px;
+        }
+
+        /* Timeline column */
+        .agent-activity-timeline {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 16px;
+            flex-shrink: 0;
+            padding-top: 2px;
+        }
+
+        .agent-activity-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            border: 2px solid var(--panel-bg, #161b22);
+        }
+
+        /* dot colors by event type */
+        .agent-activity-dot.type-task_completed { background: #22c55e; }
+        .agent-activity-dot.type-task_started { background: #3b82f6; }
+        .agent-activity-dot.type-error_occurred { background: #ef4444; }
+        .agent-activity-dot.type-file_modified { background: #a855f7; }
+        .agent-activity-dot.type-test_run { background: #6366f1; }
+        .agent-activity-dot.type-decision_made { background: #eab308; }
+        .agent-activity-dot.type-command_executed { background: #f97316; }
+        .agent-activity-dot.type-milestone_reached { background: #10b981; }
+        .agent-activity-dot.type-default { background: #64748b; }
+
+        .agent-activity-line {
+            width: 2px;
+            flex: 1;
+            min-height: 16px;
+            background: var(--border-color, #30363d);
+            margin-top: 4px;
+        }
+
+        /* Activity content */
+        .agent-activity-content {
+            flex: 1;
+            min-width: 0;
+            padding-bottom: 4px;
+        }
+
+        .agent-activity-top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 3px;
+        }
+
+        .agent-activity-title {
+            font-size: 0.78rem;
+            color: var(--text-primary, #e6edf3);
+            font-weight: 500;
+            line-height: 1.3;
+            flex: 1;
+            min-width: 0;
+            word-break: break-word;
+        }
+
+        .agent-activity-type-badge {
+            font-size: 0.6rem;
+            padding: 1px 6px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.06);
+            color: var(--text-secondary, #8b949e);
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .agent-activity-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .agent-activity-status {
+            font-size: 0.65rem;
+            font-weight: 600;
+        }
+        .agent-activity-status.s-success { color: #22c55e; }
+        .agent-activity-status.s-error { color: #ef4444; }
+        .agent-activity-status.s-in_progress { color: #3b82f6; }
+        .agent-activity-status.s-timeout { color: #f97316; }
+        .agent-activity-status.s-blocked { color: #a855f7; }
+        .agent-activity-status.s-default { color: #64748b; }
+
+        .agent-activity-time {
+            font-size: 0.62rem;
+            color: var(--text-secondary, #8b949e);
+            opacity: 0.7;
+        }
+
+        .agent-activity-ticket {
+            font-size: 0.62rem;
+            color: #60a5fa;
+            font-family: monospace;
+        }
+
+        .agent-detail-loading {
+            font-size: 0.78rem;
+            color: var(--text-secondary, #8b949e);
+            padding: 20px 0;
+            text-align: center;
+        }
+
+        .agent-detail-empty-events {
+            font-size: 0.78rem;
+            color: var(--text-secondary, #8b949e);
+            opacity: 0.6;
+            font-style: italic;
+            padding: 12px 0;
+        }
+
+        /* Make agent-status-item cursor pointer */
+        .agent-status-item {
+            cursor: pointer;
+        }
+
         /* Header */
         .header {
             text-align: center;
@@ -5343,7 +5784,7 @@
                 const expandedClass = descExpanded ? ' expanded' : '';
 
                 return `
-                    <div class="agent-status-item status-running" id="agent-status-item-${name}" data-agent="${name}" data-status="${status}">
+                    <div class="agent-status-item status-running" id="agent-status-item-${name}" data-agent="${name}" data-status="${status}" onclick="openAgentDetail('${name}')" title="View ${displayName} profile">
                         <div class="agent-running-header">
                             <div class="agent-status-dot status-running" id="agent-status-dot-${name}"></div>
                             <span class="agent-running-ticket">${ticket}</span>
@@ -5374,7 +5815,7 @@
             } else {
                 // Compact view for non-running agents
                 return `
-                    <div class="agent-status-item" id="agent-status-item-${name}" data-agent="${name}" data-status="${status}">
+                    <div class="agent-status-item" id="agent-status-item-${name}" data-agent="${name}" data-status="${status}" onclick="openAgentDetail('${name}')" title="View ${displayName} profile">
                         <div class="agent-status-dot status-${status}" id="agent-status-dot-${name}"></div>
                         <span class="agent-status-name" title="${displayName}">${displayName}</span>
                         <span class="agent-status-label label-${status}" id="agent-status-label-${name}">${label}</span>
@@ -6220,6 +6661,312 @@
                 }
             }
         })();
+    </script>
+
+    <!-- AI-81: Agent Detail View (REQ-MONITOR-003) -->
+    <!-- Overlay backdrop -->
+    <div class="agent-detail-overlay" id="agent-detail-overlay" onclick="closeAgentDetail()"></div>
+    <!-- Slide-in detail panel -->
+    <div class="agent-detail-panel" id="agent-detail-panel" role="dialog" aria-modal="true" aria-label="Agent Detail">
+        <div class="agent-detail-header">
+            <div class="agent-detail-header-left">
+                <span class="agent-detail-name" id="agent-detail-name">Agent</span>
+                <span class="agent-detail-model-badge" id="agent-detail-model">haiku</span>
+                <span class="agent-detail-status-badge status-idle" id="agent-detail-status">Idle</span>
+            </div>
+            <button class="agent-detail-close-btn" onclick="closeAgentDetail()" aria-label="Close agent detail">&times;</button>
+        </div>
+        <div class="agent-detail-body" id="agent-detail-body">
+            <div class="agent-detail-loading">Loading...</div>
+        </div>
+    </div>
+
+    <script>
+        // =====================================================================
+        // AI-81: Agent Detail View (REQ-MONITOR-003)
+        // =====================================================================
+
+        // XP level thresholds
+        const _XP_THRESHOLDS = [0, 50, 150, 400, 800, 1500, 3000, 5000];
+        const _LEVEL_TITLES = ['', 'Intern', 'Junior', 'Mid-Level', 'Senior', 'Staff', 'Principal', 'Distinguished', 'Fellow'];
+
+        // Achievement display names
+        const _ACHIEVEMENT_NAMES = {
+            first_blood: 'First Blood', century_club: 'Century Club', perfect_day: 'Perfect Day',
+            speed_demon: 'Speed Demon', comeback_kid: 'Comeback Kid', big_spender: 'Big Spender',
+            penny_pincher: 'Penny Pincher', marathon: 'Marathon Runner', polyglot: 'Polyglot',
+            night_owl: 'Night Owl', streak_10: 'On Fire', streak_25: 'Unstoppable',
+        };
+
+        // Event type display labels
+        const _EVENT_TYPE_LABELS = {
+            task_started: 'Task Started', task_completed: 'Task Completed',
+            file_modified: 'File Modified', command_executed: 'Cmd Executed',
+            test_run: 'Test Run', decision_made: 'Decision', error_occurred: 'Error',
+            milestone_reached: 'Milestone',
+        };
+
+        // Status display config
+        const _STATUS_CONFIG = {
+            success: { label: 'Success', cls: 's-success' },
+            error: { label: 'Error', cls: 's-error' },
+            in_progress: { label: 'In Progress', cls: 's-in_progress' },
+            timeout: { label: 'Timeout', cls: 's-timeout' },
+            blocked: { label: 'Blocked', cls: 's-blocked' },
+        };
+
+        function _getXpProgress(xp) {
+            const level = _XP_THRESHOLDS.reduce((l, t, i) => (xp >= t ? i + 1 : l), 1);
+            const lvl = Math.min(level, 8);
+            const start = _XP_THRESHOLDS[lvl - 1] || 0;
+            const end = _XP_THRESHOLDS[lvl] || _XP_THRESHOLDS[7];
+            const inLevel = xp - start;
+            const needed = end - start;
+            const pct = needed > 0 ? Math.round((inLevel / needed) * 100) : 100;
+            return { level: lvl, title: _LEVEL_TITLES[lvl] || 'Fellow', pct: Math.min(pct, 100), inLevel, needed };
+        }
+
+        function _formatRelativeTime(isoStr) {
+            const diff = Date.now() - new Date(isoStr).getTime();
+            const s = Math.floor(diff / 1000);
+            if (s < 60) return 'just now';
+            const m = Math.floor(s / 60);
+            if (m < 60) return m + 'm ago';
+            const h = Math.floor(m / 60);
+            if (h < 24) return h + 'h ago';
+            const d = Math.floor(h / 24);
+            if (d < 7) return d + 'd ago';
+            return new Date(isoStr).toLocaleDateString();
+        }
+
+        function _escHtml(str) {
+            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        function _formatCostDetail(cost) {
+            if (cost >= 1) return '$' + cost.toFixed(2);
+            if (cost >= 0.01) return '$' + cost.toFixed(4);
+            if (cost > 0) return '$' + cost.toFixed(6);
+            return '$0.00';
+        }
+
+        function _buildDetailHTML(profile) {
+            const s = profile.lifetime_stats || {};
+            const g = profile.gamification || {};
+            const c = profile.contribution_counters || {};
+
+            const xpInfo = _getXpProgress(g.xp || 0);
+            const successRate = s.success_rate ? (s.success_rate * 100).toFixed(1) + '%' : '0%';
+            const totalTokens = (s.total_tokens || 0).toLocaleString();
+            const totalCost = _formatCostDetail(s.total_cost || 0);
+
+            // Stats grid
+            const statsHTML = `
+                <div class="agent-detail-section-label">Lifetime Statistics</div>
+                <div class="agent-detail-stats-grid">
+                    <div class="agent-detail-stat-card">
+                        <div class="agent-detail-stat-label">Tasks Done</div>
+                        <div class="agent-detail-stat-value success">${(s.tasks_completed || 0).toLocaleString()}</div>
+                    </div>
+                    <div class="agent-detail-stat-card">
+                        <div class="agent-detail-stat-label">Success Rate</div>
+                        <div class="agent-detail-stat-value ${(s.success_rate || 0) >= 0.8 ? 'success' : 'error'}">${successRate}</div>
+                    </div>
+                    <div class="agent-detail-stat-card">
+                        <div class="agent-detail-stat-label">Total Tokens</div>
+                        <div class="agent-detail-stat-value token">${totalTokens}</div>
+                    </div>
+                    <div class="agent-detail-stat-card">
+                        <div class="agent-detail-stat-label">Total Cost</div>
+                        <div class="agent-detail-stat-value cost">${totalCost}</div>
+                    </div>
+                </div>
+            `;
+
+            // Gamification
+            const achievementsHTML = (g.achievements && g.achievements.length > 0)
+                ? g.achievements.map(a => `<span class="agent-detail-achievement-badge" title="${_escHtml(a)}">${_escHtml(_ACHIEVEMENT_NAMES[a] || a)}</span>`).join('')
+                : `<span class="agent-detail-no-achievements">No achievements yet</span>`;
+
+            const gamHTML = `
+                <div class="agent-detail-section-label">Gamification</div>
+                <div class="agent-detail-gamification-row">
+                    <div class="agent-detail-xp-section">
+                        <div class="agent-detail-xp-label">
+                            <span>XP: ${(g.xp || 0).toLocaleString()}</span>
+                            <span>${xpInfo.inLevel}/${xpInfo.needed}</span>
+                        </div>
+                        <div class="agent-detail-xp-bar">
+                            <div class="agent-detail-xp-fill" style="width:${xpInfo.pct}%"></div>
+                        </div>
+                    </div>
+                    <span class="agent-detail-level-badge" title="${_escHtml(xpInfo.title)}">Lv${xpInfo.level} ${_escHtml(xpInfo.title)}</span>
+                    <span class="agent-detail-streak-badge" title="Current streak: ${g.streak || 0} | Best: ${g.best_streak || 0}">&#128293; ${g.streak || 0}</span>
+                </div>
+                <div style="margin-top:8px;">
+                    <div class="agent-detail-achievements">${achievementsHTML}</div>
+                </div>
+            `;
+
+            // Contributions
+            const contribItems = [
+                { label: 'Commits', value: c.commits || 0 },
+                { label: 'PRs Created', value: c.prs_created || 0 },
+                { label: 'PRs Merged', value: c.prs_merged || 0 },
+                { label: 'Issues Closed', value: c.linear_issues_closed || 0 },
+                { label: 'Files Created', value: c.files_created || 0 },
+                { label: 'Tests Written', value: c.tests_written || 0 },
+            ];
+            const contribHTML = `
+                <div class="agent-detail-section-label">Contribution Counters</div>
+                <div class="agent-detail-contributions">
+                    ${contribItems.map(item => `
+                        <div class="agent-detail-contrib-item">
+                            <span class="agent-detail-contrib-value">${item.value.toLocaleString()}</span>
+                            <span class="agent-detail-contrib-label">${_escHtml(item.label)}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+
+            // Strengths / Weaknesses
+            const strengthsHTML = (profile.strengths && profile.strengths.length > 0)
+                ? profile.strengths.map(s => `<span class="agent-detail-strength-tag">${_escHtml(s)}</span>`).join('')
+                : `<span class="agent-detail-tag-none">None detected</span>`;
+            const weaknessesHTML = (profile.weaknesses && profile.weaknesses.length > 0)
+                ? profile.weaknesses.map(w => `<span class="agent-detail-weakness-tag">${_escHtml(w)}</span>`).join('')
+                : `<span class="agent-detail-tag-none">None detected</span>`;
+
+            const swHTML = `
+                <div class="agent-detail-section-label">Strengths</div>
+                <div class="agent-detail-tags">${strengthsHTML}</div>
+                <div class="agent-detail-section-label">Weaknesses</div>
+                <div class="agent-detail-tags">${weaknessesHTML}</div>
+            `;
+
+            // Recent events
+            const events = profile.recent_events || [];
+            let eventsHTML = '';
+            if (events.length === 0) {
+                eventsHTML = `<div class="agent-detail-empty-events">No recent events recorded.</div>`;
+            } else {
+                eventsHTML = `<div class="agent-detail-events-list">` +
+                    events.slice().reverse().map((ev, idx, arr) => {
+                        const typeKey = ev.type || 'default';
+                        const dotClass = 'agent-activity-dot type-' + (typeKey in _EVENT_TYPE_LABELS ? typeKey : 'default');
+                        const typeLabel = _EVENT_TYPE_LABELS[typeKey] || typeKey;
+                        const relTime = ev.timestamp ? _formatRelativeTime(ev.timestamp) : '';
+                        const stCfg = _STATUS_CONFIG[ev.status] || { label: ev.status || '', cls: 's-default' };
+                        const ticketHtml = ev.ticket_key ? `<span class="agent-activity-ticket">${_escHtml(ev.ticket_key)}</span>` : '';
+                        const isLast = idx === arr.length - 1;
+                        return `
+                            <div class="agent-activity-item">
+                                <div class="agent-activity-timeline">
+                                    <div class="${dotClass}"></div>
+                                    ${!isLast ? '<div class="agent-activity-line"></div>' : ''}
+                                </div>
+                                <div class="agent-activity-content">
+                                    <div class="agent-activity-top">
+                                        <span class="agent-activity-title">${_escHtml(ev.title || '')}</span>
+                                        <span class="agent-activity-type-badge">${_escHtml(typeLabel)}</span>
+                                    </div>
+                                    <div class="agent-activity-meta">
+                                        <span class="agent-activity-status ${stCfg.cls}">${_escHtml(stCfg.label)}</span>
+                                        <span class="agent-activity-time">${_escHtml(relTime)}</span>
+                                        ${ticketHtml}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('') +
+                    `</div>`;
+            }
+
+            const recentEventsSection = `
+                <div class="agent-detail-section-label">Recent Events (last ${events.length})</div>
+                ${eventsHTML}
+            `;
+
+            return statsHTML + gamHTML + contribHTML + swHTML + recentEventsSection;
+        }
+
+        // Open agent detail panel
+        async function openAgentDetail(agentName) {
+            // Stop event propagation for toggle buttons inside the running items
+            event && event.stopPropagation && event.stopPropagation();
+
+            const overlay = document.getElementById('agent-detail-overlay');
+            const panel = document.getElementById('agent-detail-panel');
+            const nameEl = document.getElementById('agent-detail-name');
+            const modelEl = document.getElementById('agent-detail-model');
+            const statusEl = document.getElementById('agent-detail-status');
+            const bodyEl = document.getElementById('agent-detail-body');
+
+            if (!panel || !overlay) return;
+
+            // Display name mapping
+            const displayNames = {
+                linear: 'Linear', coding: 'Coding', github: 'GitHub', slack: 'Slack',
+                pr_reviewer: 'PR Reviewer', ops: 'Ops', coding_fast: 'Coding Fast',
+                pr_reviewer_fast: 'PR Rev Fast', chatgpt: 'ChatGPT', gemini: 'Gemini',
+                groq: 'Groq', kimi: 'KIMI', windsurf: 'Windsurf'
+            };
+
+            // Show panel immediately with loading state
+            if (nameEl) nameEl.textContent = displayNames[agentName] || agentName;
+            if (modelEl) modelEl.textContent = '...';
+            if (statusEl) { statusEl.textContent = 'Loading'; statusEl.className = 'agent-detail-status-badge status-idle'; }
+            if (bodyEl) bodyEl.innerHTML = '<div class="agent-detail-loading">Loading profile...</div>';
+
+            overlay.classList.add('open');
+            panel.classList.add('open');
+            document.body.style.overflow = 'hidden';
+
+            // Fetch profile from API
+            try {
+                const baseUrl = (typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '').replace(/\/$/, '');
+                const resp = await fetch(`${baseUrl}/api/agents/${agentName}/profile`);
+                if (!resp.ok) {
+                    throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+                }
+                const data = await resp.json();
+                const profile = data.profile || {};
+
+                // Update header
+                const model = profile.model || 'haiku';
+                const status = profile.status || 'idle';
+                if (nameEl) nameEl.textContent = displayNames[agentName] || agentName;
+                if (modelEl) modelEl.textContent = model;
+                if (statusEl) {
+                    const statusLabels = { idle: 'Idle', running: 'Running', paused: 'Paused', error: 'Error' };
+                    statusEl.textContent = statusLabels[status] || status;
+                    statusEl.className = `agent-detail-status-badge status-${status}`;
+                }
+
+                // Render body
+                if (bodyEl) {
+                    bodyEl.innerHTML = _buildDetailHTML(profile);
+                }
+            } catch (err) {
+                if (bodyEl) {
+                    bodyEl.innerHTML = `<div class="agent-detail-loading">Failed to load profile: ${_escHtml(String(err))}</div>`;
+                }
+            }
+        }
+
+        // Close agent detail panel
+        function closeAgentDetail() {
+            const overlay = document.getElementById('agent-detail-overlay');
+            const panel = document.getElementById('agent-detail-panel');
+            if (panel) panel.classList.remove('open');
+            if (overlay) overlay.classList.remove('open');
+            document.body.style.overflow = '';
+        }
+
+        // Close on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeAgentDetail();
+        });
     </script>
 </body>
 </html>
