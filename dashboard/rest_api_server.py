@@ -859,13 +859,16 @@ class RESTAPIServer:
         return response
 
     async def pause_agent(self, request: Request) -> Response:
-        """POST /api/agents/{name}/pause - Pause an agent.
+        """POST /api/agents/{name}/pause - Pause an agent (AI-87).
+
+        Marks the agent as paused so it will not accept new delegations.
+        Does NOT abort any in-progress task.
 
         Args:
             name: Agent name (path parameter)
 
         Returns:
-            200 OK with confirmation
+            200 OK with {name, previous_status, new_status, message}
             404 Not Found if agent doesn't exist
         """
         agent_name = request.match_info['name']
@@ -876,37 +879,94 @@ class RESTAPIServer:
                 'agent_name': agent_name
             }, status=404)
 
+        # Track previous status (idempotent: already paused is fine)
+        previous_status = _agent_states.get(agent_name, 'idle')
+
         # Update agent state
         _agent_states[agent_name] = 'paused'
+
+        # Also sync the status panel details
+        if agent_name in _agent_status_details:
+            _agent_status_details[agent_name]['status'] = 'paused'
+
+        # Capture current ticket for feed event
+        current_ticket = None
+        if agent_name in _agent_status_details:
+            current_ticket = _agent_status_details[agent_name].get('current_ticket')
 
         # Log decision
         _decisions_log.append({
             'timestamp': datetime.utcnow().isoformat() + 'Z',
             'decision_type': 'agent_pause',
             'agent_name': agent_name,
-            'previous_state': 'running',
+            'previous_state': previous_status,
             'new_state': 'paused'
         })
+
+        # Add feed event (AI-87)
+        import json as _json
+        from uuid import uuid4 as _uuid4
+        feed_event = {
+            'id': str(_uuid4()),
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'agent': agent_name,
+            'status': 'in_progress',
+            'ticket_key': current_ticket,
+            'duration_s': None,
+            'description': f'Agent {agent_name} paused by user',
+        }
+        _rest_feed_events.append(feed_event)
+        while len(_rest_feed_events) > _REST_FEED_MAX:
+            del _rest_feed_events[0]
 
         # Broadcast status change via WebSocket
         await self._broadcast_agent_status(agent_name, 'paused')
 
+        # Broadcast feed_update via WebSocket
+        feed_payload = _json.dumps({
+            'type': 'feed_update',
+            'event': feed_event,
+            'timestamp': feed_event['timestamp'],
+        })
+        dead_clients: set = set()
+        for ws in list(_ws_clients):
+            try:
+                await ws.send_str(feed_payload)
+            except Exception:
+                dead_clients.add(ws)
+        for ws in dead_clients:
+            _ws_clients.discard(ws)
+
+        # Broadcast system chat message via WebSocket
+        chat_payload = _json.dumps({
+            'type': 'system_message',
+            'text': f'Agent {agent_name} paused by user',
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+        })
+        for ws in list(_ws_clients):
+            try:
+                await ws.send_str(chat_payload)
+            except Exception:
+                pass
+
         return web.json_response({
-            'status': 'success',
-            'agent_name': agent_name,
-            'state': 'paused',
-            'message': f'Agent {agent_name} has been paused',
+            'name': agent_name,
+            'previous_status': previous_status,
+            'new_status': 'paused',
+            'message': f'Agent {agent_name} paused',
             'timestamp': datetime.utcnow().isoformat() + 'Z'
         })
 
     async def resume_agent(self, request: Request) -> Response:
-        """POST /api/agents/{name}/resume - Resume an agent.
+        """POST /api/agents/{name}/resume - Resume a paused agent (AI-88).
+
+        Restores the agent to idle so it can accept new delegations.
 
         Args:
             name: Agent name (path parameter)
 
         Returns:
-            200 OK with confirmation
+            200 OK with {name, previous_status, new_status, message}
             404 Not Found if agent doesn't exist
         """
         agent_name = request.match_info['name']
@@ -917,27 +977,76 @@ class RESTAPIServer:
                 'agent_name': agent_name
             }, status=404)
 
+        # Track previous status (idempotent: already idle is fine)
+        previous_status = _agent_states.get(agent_name, 'paused')
+
         # Update agent state
-        previous_state = _agent_states.get(agent_name, 'paused')
         _agent_states[agent_name] = 'idle'
+
+        # Also sync the status panel details
+        if agent_name in _agent_status_details:
+            _agent_status_details[agent_name]['status'] = 'idle'
 
         # Log decision
         _decisions_log.append({
             'timestamp': datetime.utcnow().isoformat() + 'Z',
             'decision_type': 'agent_resume',
             'agent_name': agent_name,
-            'previous_state': previous_state,
+            'previous_state': previous_status,
             'new_state': 'idle'
         })
+
+        # Add feed event (AI-88)
+        import json as _json
+        from uuid import uuid4 as _uuid4
+        feed_event = {
+            'id': str(_uuid4()),
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'agent': agent_name,
+            'status': 'success',
+            'ticket_key': None,
+            'duration_s': None,
+            'description': f'Agent {agent_name} resumed by user',
+        }
+        _rest_feed_events.append(feed_event)
+        while len(_rest_feed_events) > _REST_FEED_MAX:
+            del _rest_feed_events[0]
 
         # Broadcast status change via WebSocket
         await self._broadcast_agent_status(agent_name, 'idle')
 
+        # Broadcast feed_update via WebSocket
+        feed_payload = _json.dumps({
+            'type': 'feed_update',
+            'event': feed_event,
+            'timestamp': feed_event['timestamp'],
+        })
+        dead_clients: set = set()
+        for ws in list(_ws_clients):
+            try:
+                await ws.send_str(feed_payload)
+            except Exception:
+                dead_clients.add(ws)
+        for ws in dead_clients:
+            _ws_clients.discard(ws)
+
+        # Broadcast system chat message via WebSocket
+        chat_payload = _json.dumps({
+            'type': 'system_message',
+            'text': f'Agent {agent_name} resumed by user',
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+        })
+        for ws in list(_ws_clients):
+            try:
+                await ws.send_str(chat_payload)
+            except Exception:
+                pass
+
         return web.json_response({
-            'status': 'success',
-            'agent_name': agent_name,
-            'state': 'idle',
-            'message': f'Agent {agent_name} has been resumed',
+            'name': agent_name,
+            'previous_status': previous_status,
+            'new_status': 'idle',
+            'message': f'Agent {agent_name} resumed',
             'timestamp': datetime.utcnow().isoformat() + 'Z'
         })
 
