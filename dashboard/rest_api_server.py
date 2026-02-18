@@ -147,6 +147,17 @@ _system_paused: bool = False
 # WebSocket clients connected to /api/ws for agent_status broadcasts
 _ws_clients: set = set()
 
+# AI-85: Cost and Token Charts (REQ-METRICS-003) - in-memory chart data stores
+_rest_chart_token_usage: Dict[str, int] = {
+    name: 0 for name in [
+        "linear", "coding", "github", "slack", "pr_reviewer",
+        "ops", "coding_fast", "pr_reviewer_fast", "chatgpt",
+        "gemini", "groq", "kimi", "windsurf",
+    ]
+}
+_rest_chart_cost_trend: list = []  # list of {"session": int, "cost": float}
+_REST_CHART_COST_TREND_MAX = 10
+
 
 def get_auth_token() -> Optional[str]:
     """Get authentication token from environment variable."""
@@ -422,10 +433,18 @@ class RESTAPIServer:
         self.app.router.add_post('/api/feed', self.post_feed)
         self.app.router.add_route('OPTIONS', '/api/feed', self.handle_options)
 
+        # AI-85: Cost and Token Charts (REQ-METRICS-003)
+        self.app.router.add_get('/api/charts/token-usage', self.get_chart_token_usage)
+        self.app.router.add_post('/api/charts/token-usage', self.post_chart_token_usage)
+        self.app.router.add_get('/api/charts/cost-trend', self.get_chart_cost_trend)
+        self.app.router.add_get('/api/charts/success-rate', self.get_chart_success_rate)
+
         # OPTIONS for CORS preflight
         for route in ['/api/metrics', '/api/agents', '/api/sessions', '/api/providers',
                       '/api/chat', '/api/decisions', '/api/agents/status',
-                      '/api/orchestrator/pipeline', '/api/metrics/global']:
+                      '/api/orchestrator/pipeline', '/api/metrics/global',
+                      '/api/charts/token-usage', '/api/charts/cost-trend',
+                      '/api/charts/success-rate']:
             self.app.router.add_route('OPTIONS', route, self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
@@ -2811,6 +2830,108 @@ class RESTAPIServer:
         )
 
         return web.json_response({'event': event, 'total': len(_rest_feed_events)}, status=201)
+
+    # =========================================================================
+    # AI-85: Cost and Token Charts (REQ-METRICS-003)
+    # =========================================================================
+
+    async def get_chart_token_usage(self, request: Request) -> Response:
+        """GET /api/charts/token-usage — token usage by agent (AI-85 / REQ-METRICS-003).
+
+        Response shape:
+            {"agents": [{"name": "coding", "tokens": 50000}, ...], "max": 50000}
+
+        Returns:
+            200 JSON with token usage per agent sorted descending by tokens.
+        """
+        agents = [
+            {"name": name, "tokens": _rest_chart_token_usage.get(name, 0)}
+            for name in PANEL_AGENT_NAMES
+        ]
+        agents.sort(key=lambda a: a["tokens"], reverse=True)
+        max_tokens = max((a["tokens"] for a in agents), default=0)
+        return web.json_response({"agents": agents, "max": max_tokens})
+
+    async def post_chart_token_usage(self, request: Request) -> Response:
+        """POST /api/charts/token-usage — update token count for an agent (AI-85 / REQ-METRICS-003).
+
+        Request body:
+            {"agent": "coding", "tokens": 5000}              - add tokens
+            {"agent": "coding", "tokens": 5000, "set": true} - set absolute value
+
+        Returns:
+            200 JSON with updated chart data.
+            400 if body is invalid or agent unknown.
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON body"}, status=400)
+
+        agent = body.get("agent", "").strip()
+        if not agent:
+            return web.json_response({"error": "agent is required"}, status=400)
+        if agent not in PANEL_AGENT_NAMES:
+            return web.json_response(
+                {"error": "Unknown agent", "agent": agent, "available": PANEL_AGENT_NAMES},
+                status=400,
+            )
+
+        tokens = body.get("tokens")
+        if tokens is None or not isinstance(tokens, (int, float)):
+            return web.json_response(
+                {"error": 'Missing or invalid "tokens" field (must be a number)'}, status=400
+            )
+
+        if body.get("set"):
+            _rest_chart_token_usage[agent] = int(tokens)
+        else:
+            _rest_chart_token_usage[agent] = _rest_chart_token_usage.get(agent, 0) + int(tokens)
+
+        agents = [
+            {"name": name, "tokens": _rest_chart_token_usage.get(name, 0)}
+            for name in PANEL_AGENT_NAMES
+        ]
+        agents.sort(key=lambda a: a["tokens"], reverse=True)
+        max_tokens = max((a["tokens"] for a in agents), default=0)
+        return web.json_response({"agents": agents, "max": max_tokens})
+
+    async def get_chart_cost_trend(self, request: Request) -> Response:
+        """GET /api/charts/cost-trend — cost per session (last 10) (AI-85 / REQ-METRICS-003).
+
+        Response shape:
+            {"sessions": [{"session": 1, "cost": 2.50}, ...]}
+
+        Returns:
+            200 JSON with cost trend data.
+        """
+        sessions = list(_rest_chart_cost_trend[-_REST_CHART_COST_TREND_MAX:])
+        return web.json_response({"sessions": sessions})
+
+    async def get_chart_success_rate(self, request: Request) -> Response:
+        """GET /api/charts/success-rate — success rate by agent (AI-85 / REQ-METRICS-003).
+
+        Response shape:
+            {"agents": [{"name": "coding", "rate": 0.95, "total": 20}, ...]}
+
+        Returns:
+            200 JSON with success rate per agent.
+        """
+        agents = []
+        try:
+            state = self.store.load()
+            stored_agents = state.get("agents", {})
+        except Exception:
+            stored_agents = {}
+
+        for name in PANEL_AGENT_NAMES:
+            persisted = stored_agents.get(name, {})
+            xp_override = _rest_agent_xp_store.get(name, {})
+            rate = xp_override.get("success_rate", persisted.get("success_rate", 0.0))
+            total = persisted.get("total_invocations", 0)
+            agents.append({"name": name, "rate": round(float(rate), 4), "total": int(total)})
+
+        return web.json_response({"agents": agents})
 
     async def serve_dashboard(self, request: Request) -> Response:
         """GET / - Serve dashboard HTML.

@@ -4714,6 +4714,152 @@
         [data-theme="light"] .lb-xp-bar-bg {
             background: rgba(0,0,0,0.08);
         }
+
+        /* AI-85: Visual Analytics Charts (REQ-METRICS-003) */
+        .charts-section {
+            margin-top: 16px;
+        }
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            padding: 16px 0 4px 0;
+        }
+        @media (max-width: 1100px) {
+            .charts-grid { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 720px) {
+            .charts-grid { grid-template-columns: 1fr; }
+        }
+        .chart-card {
+            background: var(--bg-secondary, #161b22);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: 10px;
+            padding: 14px 16px 12px 16px;
+            min-height: 180px;
+        }
+        .chart-card-title {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-secondary, #8b949e);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin: 0 0 12px 0;
+        }
+        /* Horizontal bar chart */
+        .hbar-chart {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .hbar-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.72rem;
+        }
+        .hbar-label {
+            width: 88px;
+            min-width: 88px;
+            color: var(--text-secondary, #8b949e);
+            text-align: right;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .hbar-bg {
+            flex: 1;
+            height: 10px;
+            background: var(--border-color, #30363d);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .hbar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #238636, #2ea043);
+            border-radius: 5px;
+            transition: width 0.4s ease;
+        }
+        .hbar-value {
+            width: 52px;
+            min-width: 52px;
+            color: var(--text-primary, #c9d1d9);
+            text-align: left;
+            font-variant-numeric: tabular-nums;
+        }
+        /* Line chart */
+        .line-chart-wrap {
+            width: 100%;
+        }
+        .line-chart-svg {
+            width: 100%;
+            height: 160px;
+        }
+        .line-axis {
+            stroke: var(--border-color, #30363d);
+            stroke-width: 1;
+        }
+        .line-grid {
+            stroke: var(--border-color, #30363d);
+            stroke-width: 0.5;
+            stroke-dasharray: 3,3;
+        }
+        .line-path {
+            fill: none;
+            stroke: #58a6ff;
+            stroke-width: 2;
+            stroke-linejoin: round;
+        }
+        .line-area {
+            fill: rgba(88, 166, 255, 0.12);
+        }
+        .line-dot {
+            fill: #58a6ff;
+        }
+        .line-label {
+            font-size: 9px;
+            fill: var(--text-secondary, #8b949e);
+        }
+        .chart-empty-text {
+            font-size: 12px;
+            fill: var(--text-secondary, #8b949e);
+        }
+        /* Vertical bar chart */
+        .vbar-chart-wrap {
+            width: 100%;
+        }
+        .vbar-chart-svg {
+            width: 100%;
+            height: 160px;
+        }
+        .vbar-bar {
+            fill: #2ea043;
+            rx: 2;
+        }
+        .vbar-label {
+            font-size: 7px;
+            fill: var(--text-secondary, #8b949e);
+            text-anchor: middle;
+        }
+        .vbar-pct {
+            font-size: 8px;
+            fill: var(--text-primary, #c9d1d9);
+            text-anchor: middle;
+            font-weight: 600;
+        }
+        .chart-loading {
+            color: var(--text-secondary, #8b949e);
+            font-size: 0.8rem;
+            text-align: center;
+            padding: 20px;
+        }
+        [data-theme="light"] .chart-card {
+            background: #f6f8fa;
+            border-color: #d0d7de;
+        }
+        [data-theme="light"] .hbar-bg {
+            background: #e1e4e8;
+        }
     </style>
 </head>
 <body>
@@ -5031,6 +5177,46 @@
                         <tr><td colspan="8" class="lb-loading">Loading leaderboard...</td></tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- AI-85: Visual Analytics Charts (REQ-METRICS-003) -->
+        <div class="card charts-section" id="charts-section" data-testid="charts-section">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <svg class="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                    Visual Analytics
+                </h2>
+                <button class="leaderboard-refresh-btn" id="charts-refresh-btn" onclick="fetchCharts()" aria-label="Refresh charts">&#8635; Refresh</button>
+            </div>
+            <div class="charts-grid" id="charts-grid">
+                <!-- Token Usage Horizontal Bar Chart -->
+                <div class="chart-card" id="chart-token-usage" data-testid="chart-token-usage">
+                    <h3 class="chart-card-title">Token Usage by Agent</h3>
+                    <div class="hbar-chart" id="hbar-token-usage" aria-label="Token usage horizontal bar chart">
+                        <div class="chart-loading">Loading...</div>
+                    </div>
+                </div>
+                <!-- Cost Trend Line Chart -->
+                <div class="chart-card" id="chart-cost-trend" data-testid="chart-cost-trend">
+                    <h3 class="chart-card-title">Cost Trend (Recent Sessions)</h3>
+                    <div class="line-chart-wrap" id="line-cost-trend" aria-label="Cost trend line chart">
+                        <svg id="svg-cost-trend" class="line-chart-svg" viewBox="0 0 400 200" preserveAspectRatio="xMidYMid meet">
+                            <text x="200" y="100" text-anchor="middle" class="chart-empty-text">Loading...</text>
+                        </svg>
+                    </div>
+                </div>
+                <!-- Success Rate Vertical Bar Chart -->
+                <div class="chart-card" id="chart-success-rate" data-testid="chart-success-rate">
+                    <h3 class="chart-card-title">Success Rate by Agent</h3>
+                    <div class="vbar-chart-wrap" id="vbar-success-rate" aria-label="Success rate vertical bar chart">
+                        <svg id="svg-success-rate" class="vbar-chart-svg" viewBox="0 0 520 200" preserveAspectRatio="xMidYMid meet">
+                            <text x="260" y="100" text-anchor="middle" class="chart-empty-text">Loading...</text>
+                        </svg>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -8549,6 +8735,177 @@
             }
         }
 
+        // =====================================================================
+        // AI-85: Visual Analytics Charts (REQ-METRICS-003)
+        // Pure CSS + SVG charts, no external libraries. Poll every 30 seconds.
+        // =====================================================================
+
+        var _chartsPollingTimer = null;
+
+        function _fmtTokens(n) {
+            if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+            if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+            return String(n);
+        }
+
+        function _fmtCost(n) {
+            return '$' + Number(n).toFixed(2);
+        }
+
+        function renderTokenUsageChart(data) {
+            var container = document.getElementById('hbar-token-usage');
+            if (!container) return;
+            var agents = (data && data.agents) ? data.agents : [];
+            var maxVal = (data && data.max) ? data.max : 1;
+            if (maxVal === 0) maxVal = 1;
+            if (agents.length === 0) {
+                container.innerHTML = '<div class="chart-loading">No data yet</div>';
+                return;
+            }
+            var html = '';
+            agents.forEach(function(a) {
+                var pct = Math.round((a.tokens / maxVal) * 100);
+                html += '<div class="hbar-row">'
+                    + '<span class="hbar-label" title="' + a.name + '">' + a.name + '</span>'
+                    + '<div class="hbar-bg"><div class="hbar-fill" style="width:' + pct + '%"></div></div>'
+                    + '<span class="hbar-value">' + _fmtTokens(a.tokens) + '</span>'
+                    + '</div>';
+            });
+            container.innerHTML = html;
+        }
+
+        function renderCostTrendChart(data) {
+            var svg = document.getElementById('svg-cost-trend');
+            if (!svg) return;
+            var sessions = (data && data.sessions) ? data.sessions : [];
+            if (sessions.length === 0) {
+                svg.innerHTML = '<text x="200" y="100" text-anchor="middle" class="chart-empty-text">No sessions yet</text>';
+                return;
+            }
+
+            var W = 400, H = 200;
+            var padL = 42, padR = 12, padT = 14, padB = 28;
+            var plotW = W - padL - padR;
+            var plotH = H - padT - padB;
+
+            var costs = sessions.map(function(s) { return s.cost; });
+            var maxCost = Math.max.apply(null, costs);
+            if (maxCost === 0) maxCost = 1;
+
+            var n = sessions.length;
+            // Compute points
+            var pts = sessions.map(function(s, i) {
+                var x = padL + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW);
+                var y = padT + plotH - (s.cost / maxCost) * plotH;
+                return [x, y];
+            });
+
+            // Build SVG
+            var buf = '';
+
+            // Axes
+            buf += '<line x1="' + padL + '" y1="' + padT + '" x2="' + padL + '" y2="' + (padT + plotH) + '" class="line-axis"/>';
+            buf += '<line x1="' + padL + '" y1="' + (padT + plotH) + '" x2="' + (padL + plotW) + '" y2="' + (padT + plotH) + '" class="line-axis"/>';
+
+            // Grid lines (3 horizontal)
+            [0.25, 0.5, 0.75, 1.0].forEach(function(frac) {
+                var gy = padT + plotH - frac * plotH;
+                buf += '<line x1="' + padL + '" y1="' + gy + '" x2="' + (padL + plotW) + '" y2="' + gy + '" class="line-grid"/>';
+                buf += '<text x="' + (padL - 4) + '" y="' + (gy + 3) + '" text-anchor="end" class="line-label">' + _fmtCost(maxCost * frac) + '</text>';
+            });
+
+            // Area path
+            if (pts.length > 1) {
+                var areaD = 'M ' + pts[0][0] + ' ' + (padT + plotH);
+                pts.forEach(function(p) { areaD += ' L ' + p[0] + ' ' + p[1]; });
+                areaD += ' L ' + pts[pts.length - 1][0] + ' ' + (padT + plotH) + ' Z';
+                buf += '<path d="' + areaD + '" class="line-area"/>';
+            }
+
+            // Line path
+            if (pts.length > 1) {
+                var lineD = 'M ' + pts[0][0] + ' ' + pts[0][1];
+                pts.slice(1).forEach(function(p) { lineD += ' L ' + p[0] + ' ' + p[1]; });
+                buf += '<path d="' + lineD + '" class="line-path"/>';
+            }
+
+            // Dots and x-axis labels
+            pts.forEach(function(p, i) {
+                buf += '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="3" class="line-dot"/>';
+                buf += '<text x="' + p[0] + '" y="' + (padT + plotH + 12) + '" text-anchor="middle" class="line-label">S' + sessions[i].session + '</text>';
+            });
+
+            svg.innerHTML = buf;
+        }
+
+        function renderSuccessRateChart(data) {
+            var svg = document.getElementById('svg-success-rate');
+            if (!svg) return;
+            var agents = (data && data.agents) ? data.agents : [];
+            if (agents.length === 0) {
+                svg.innerHTML = '<text x="260" y="100" text-anchor="middle" class="chart-empty-text">No data yet</text>';
+                return;
+            }
+
+            var W = 520, H = 200;
+            var padL = 8, padR = 8, padT = 18, padB = 24;
+            var plotW = W - padL - padR;
+            var plotH = H - padT - padB;
+
+            var n = agents.length;
+            var barW = Math.max(8, Math.floor(plotW / n) - 4);
+            var gap = (plotW - barW * n) / (n + 1);
+
+            var buf = '';
+            // X-axis
+            buf += '<line x1="' + padL + '" y1="' + (padT + plotH) + '" x2="' + (padL + plotW) + '" y2="' + (padT + plotH) + '" class="line-axis"/>';
+
+            agents.forEach(function(a, i) {
+                var x = padL + gap + i * (barW + gap);
+                var rate = Math.max(0, Math.min(1, a.rate));
+                var barH = Math.round(rate * plotH);
+                var y = padT + plotH - barH;
+
+                // Color by rate: green >= 0.8, yellow >= 0.5, red < 0.5
+                var fill = rate >= 0.8 ? '#2ea043' : (rate >= 0.5 ? '#e3b341' : '#f85149');
+
+                buf += '<rect x="' + x + '" y="' + y + '" width="' + barW + '" height="' + barH + '" fill="' + fill + '" rx="2"/>';
+
+                // Percentage label on top
+                if (barH > 10) {
+                    buf += '<text x="' + (x + barW / 2) + '" y="' + (y - 3) + '" class="vbar-pct">' + Math.round(rate * 100) + '%</text>';
+                }
+
+                // Agent name label (truncated to 4 chars)
+                var shortName = a.name.length > 5 ? a.name.slice(0, 5) : a.name;
+                buf += '<text x="' + (x + barW / 2) + '" y="' + (padT + plotH + 12) + '" class="vbar-label">' + shortName + '</text>';
+            });
+
+            svg.innerHTML = buf;
+        }
+
+        async function fetchCharts() {
+            var baseUrl = (typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '').replace(/\/$/, '');
+            try {
+                var resp = await fetch(baseUrl + '/api/charts/token-usage');
+                if (resp.ok) renderTokenUsageChart(await resp.json());
+            } catch (e) { /* silent */ }
+            try {
+                var resp2 = await fetch(baseUrl + '/api/charts/cost-trend');
+                if (resp2.ok) renderCostTrendChart(await resp2.json());
+            } catch (e) { /* silent */ }
+            try {
+                var resp3 = await fetch(baseUrl + '/api/charts/success-rate');
+                if (resp3.ok) renderSuccessRateChart(await resp3.json());
+            } catch (e) { /* silent */ }
+        }
+
+        function startChartsPolling() {
+            fetchCharts();
+            if (_chartsPollingTimer) clearInterval(_chartsPollingTimer);
+            _chartsPollingTimer = setInterval(fetchCharts, 30000);
+        }
+
         // Start when DOM is ready
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
@@ -8557,6 +8914,7 @@
                 loadDecisionHistory();
                 fetchLeaderboard();
                 fetchLiveFeed(); // AI-86: Live Activity Feed (REQ-FEED-001)
+                startChartsPolling(); // AI-85: Visual Analytics Charts (REQ-METRICS-003)
             });
         } else {
             init();
@@ -8564,12 +8922,14 @@
             loadDecisionHistory();
             fetchLeaderboard();
             fetchLiveFeed(); // AI-86: Live Activity Feed (REQ-FEED-001)
+            startChartsPolling(); // AI-85: Visual Analytics Charts (REQ-METRICS-003)
         }
 
         // Cleanup on page unload
         window.addEventListener('beforeunload', () => {
             closeWebSocket();
             if (refreshTimer) clearInterval(refreshTimer);
+            if (_chartsPollingTimer) clearInterval(_chartsPollingTimer);
             Object.values(charts).forEach(chart => chart && chart.destroy());
         });
 
