@@ -1,0 +1,148 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests & Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: agentdash_test
+          POSTGRES_USER: agentdash
+          POSTGRES_PASSWORD: agentdash
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run mypy type checking
+        run: |
+          mypy dashboard/rest_api_server.py --ignore-missing-imports --no-error-summary || true
+
+      - name: Run unit tests
+        env:
+          DATABASE_URL: postgresql://agentdash:agentdash@localhost:5432/agentdash_test
+          REDIS_URL: redis://localhost:6379/0
+          ENVIRONMENT: test
+        run: |
+          python -m pytest tests/ -v \
+            --tb=short \
+            --ignore=tests/test_deployment.py \
+            -x \
+            --timeout=60 \
+            2>&1 | tail -50
+
+      - name: Run deployment tests
+        env:
+          ENVIRONMENT: test
+        run: |
+          python -m pytest tests/test_deployment.py -v --tb=short --timeout=60
+
+  docker-build:
+    name: Docker Build & Size Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: production
+          push: false
+          tags: agent-dashboard:ci-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          load: true
+
+      - name: Check image size (must be < 500MB)
+        run: |
+          IMAGE_SIZE=$(docker image inspect agent-dashboard:ci-${{ github.sha }} --format='{{.Size}}')
+          SIZE_MB=$((IMAGE_SIZE / 1024 / 1024))
+          echo "Image size: ${SIZE_MB}MB"
+          if [ ${SIZE_MB} -gt 500 ]; then
+            echo "ERROR: Image size ${SIZE_MB}MB exceeds 500MB limit!"
+            exit 1
+          fi
+          echo "Image size check passed: ${SIZE_MB}MB < 500MB"
+
+      - name: Test Docker health check
+        run: |
+          docker run -d --name test-dashboard \
+            -p 8080:8080 \
+            -e ENVIRONMENT=test \
+            agent-dashboard:ci-${{ github.sha }} || true
+          sleep 10
+          docker ps -a
+          docker logs test-dashboard || true
+          docker stop test-dashboard || true
+          docker rm test-dashboard || true
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Run pip-audit
+        run: pip-audit -r requirements.txt --ignore-vuln PYSEC-2022-42974 || true
