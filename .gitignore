@@ -26,6 +26,9 @@ screenshots/
 # Agent metrics
 .agent_metrics.json
 
+# AI-225: Multi-project config (local file, not committed)
+.agent_projects.json
+
 # Worktrees
 .worktrees/
 
