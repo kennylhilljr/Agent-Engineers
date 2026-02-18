@@ -862,6 +862,7 @@ class DashboardServer:
 
         logger.info(
             f"POST /api/chat: '{message[:50]}' -> "
+            f"provider={result.get('provider', provider)}, "
             f"intent={result['routing'].get('intent_type')}, "
             f"handler={result['routing'].get('handler')}"
         )
