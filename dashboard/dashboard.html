@@ -2657,6 +2657,279 @@
             display: block;
         }
 
+        /* AI-90/AI-91: Requirement Modal Styles */
+        .req-modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 9000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .req-modal-overlay.open {
+            display: flex;
+        }
+
+        .req-modal {
+            background: var(--bg-secondary, #161b22);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: 12px;
+            width: 640px;
+            max-width: 96vw;
+            max-height: 88vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .req-modal-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            padding: 20px 24px 14px;
+            border-bottom: 1px solid var(--border-color, #30363d);
+            flex-shrink: 0;
+        }
+
+        .req-modal-title-block {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .req-modal-ticket-key {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--accent, #58a6ff);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        .req-modal-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-primary, #e6edf3);
+            line-height: 1.3;
+        }
+
+        .req-modal-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary, #8b949e);
+            cursor: pointer;
+            font-size: 1.3rem;
+            line-height: 1;
+            padding: 4px 6px;
+            border-radius: 6px;
+            flex-shrink: 0;
+            margin-left: 16px;
+            transition: background 0.15s ease, color 0.15s ease;
+        }
+
+        .req-modal-close:hover {
+            background: var(--border-color, #30363d);
+            color: var(--text-primary, #e6edf3);
+        }
+
+        .req-modal-body {
+            padding: 20px 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            flex: 1;
+        }
+
+        .req-modal-section-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: var(--text-secondary, #8b949e);
+            margin-bottom: 6px;
+        }
+
+        .req-modal-description-view {
+            background: var(--bg-primary, #0d1117);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: 8px;
+            padding: 12px 14px;
+            font-size: 0.875rem;
+            color: var(--text-primary, #e6edf3);
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+            min-height: 80px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .req-modal-edit-textarea {
+            width: 100%;
+            min-height: 160px;
+            background: var(--bg-primary, #0d1117);
+            border: 1px solid var(--accent, #58a6ff);
+            border-radius: 8px;
+            padding: 12px 14px;
+            font-size: 0.875rem;
+            font-family: 'Courier New', Courier, monospace;
+            color: var(--text-primary, #e6edf3);
+            resize: vertical;
+            line-height: 1.6;
+            box-sizing: border-box;
+        }
+
+        .req-modal-edit-textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
+        .req-modal-hint {
+            font-size: 0.72rem;
+            color: var(--text-secondary, #8b949e);
+            margin-top: -8px;
+        }
+
+        .req-modal-spec {
+            background: rgba(88, 166, 255, 0.05);
+            border: 1px solid rgba(88, 166, 255, 0.15);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 0.8rem;
+            color: var(--text-secondary, #8b949e);
+            white-space: pre-wrap;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+
+        .req-modal-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 24px 20px;
+            border-top: 1px solid var(--border-color, #30363d);
+            gap: 12px;
+            flex-shrink: 0;
+            flex-wrap: wrap;
+        }
+
+        .req-modal-sync-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.82rem;
+            color: var(--text-secondary, #8b949e);
+            cursor: pointer;
+        }
+
+        .req-modal-sync-label input[type=checkbox] {
+            accent-color: var(--accent, #58a6ff);
+            width: 15px;
+            height: 15px;
+        }
+
+        .req-modal-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .req-modal-edit-btn {
+            background: rgba(88, 166, 255, 0.1);
+            border: 1px solid rgba(88, 166, 255, 0.3);
+            color: var(--accent, #58a6ff);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        .req-modal-edit-btn:hover {
+            background: rgba(88, 166, 255, 0.2);
+        }
+
+        .req-modal-save-btn {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            border: none;
+            color: #fff;
+            padding: 8px 18px;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.15s ease;
+        }
+
+        .req-modal-save-btn:hover { opacity: 0.9; }
+        .req-modal-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .req-modal-cancel-btn {
+            background: none;
+            border: 1px solid var(--border-color, #30363d);
+            color: var(--text-secondary, #8b949e);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        .req-modal-cancel-btn:hover {
+            background: var(--border-color, #30363d);
+            color: var(--text-primary, #e6edf3);
+        }
+
+        .req-modal-toast {
+            position: fixed;
+            bottom: 28px;
+            right: 28px;
+            background: #10b981;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            z-index: 9999;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            pointer-events: none;
+        }
+
+        .req-modal-toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .req-modal-toast.error {
+            background: #ef4444;
+        }
+
+        /* VIEW REQUIREMENT button on agent status items */
+        .agent-view-req-btn {
+            background: none;
+            border: 1px solid rgba(88, 166, 255, 0.3);
+            color: var(--accent, #58a6ff);
+            font-size: 0.68rem;
+            font-weight: 600;
+            padding: 2px 7px;
+            border-radius: 5px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.15s ease;
+            margin-left: auto;
+        }
+
+        .agent-view-req-btn:hover {
+            background: rgba(88, 166, 255, 0.12);
+        }
+
         /* Reasoning Block Styles (AI-158) */
         .reasoning-block {
             font-family: 'Courier New', Courier, monospace;
@@ -6619,6 +6892,9 @@
                 const descPreview = desc.length > 100 ? desc.substring(0, 100) + '...' : desc;
                 const expandedClass = descExpanded ? ' expanded' : '';
 
+                const viewReqBtnRunning = ticket
+                    ? `<button class="agent-view-req-btn" title="View requirement for ${ticket}" onclick="event.stopPropagation();openReqModal('${ticket}','${name}','${status}')">VIEW REQ</button>`
+                    : '';
                 return `
                     <div class="agent-status-item status-running" id="agent-status-item-${name}" data-agent="${name}" data-status="${status}" onclick="openAgentDetail('${name}')" title="View ${displayName} profile">
                         <div class="agent-running-header">
@@ -6626,6 +6902,7 @@
                             <span class="agent-running-ticket">${ticket}</span>
                             <span class="agent-running-title" title="${title}">${title || displayName}</span>
                             <span class="agent-status-label label-running" id="agent-status-label-${name}">Running</span>
+                            ${viewReqBtnRunning}
                             <button class="agent-pause-btn" title="Pause ${displayName}" onclick="event.stopPropagation();pauseAgent('${name}')">&#9646;&#9646;</button>
                         </div>
                         <div class="agent-running-metrics">
@@ -6661,12 +6938,18 @@
                 const pausedBadge = status === 'paused'
                     ? `<span class="agent-paused-badge">PAUSED</span>`
                     : '';
+                // AI-90/AI-91: VIEW REQUIREMENT button for paused agents with a ticket
+                const currentTicket = (info && info.current_ticket) ? info.current_ticket : '';
+                const viewReqBtn = (status === 'paused' && currentTicket)
+                    ? `<button class="agent-view-req-btn" title="View/edit requirement for ${currentTicket}" onclick="event.stopPropagation();openReqModal('${currentTicket}','${name}','${status}')">VIEW REQ</button>`
+                    : '';
                 return `
                     <div class="agent-status-item" id="agent-status-item-${name}" data-agent="${name}" data-status="${status}" onclick="openAgentDetail('${name}')" title="View ${displayName} profile">
                         <div class="agent-status-dot status-${status}" id="agent-status-dot-${name}"></div>
                         <span class="agent-status-name" title="${displayName}">${displayName}</span>
                         ${pausedBadge}
                         <span class="agent-status-label label-${status}" id="agent-status-label-${name}">${label}</span>
+                        ${viewReqBtn}
                         ${pauseBtn}${resumeBtn}
                     </div>
                 `;
@@ -8260,8 +8543,254 @@
 
         // Close on Escape key
         document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') closeAgentDetail();
+            if (e.key === 'Escape') {
+                closeAgentDetail();
+                closeReqModal();
+            }
         });
+    </script>
+
+    <!-- AI-90/AI-91: Requirement View/Edit Modal -->
+    <div class="req-modal-overlay" id="req-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="req-modal-title" onclick="if(event.target===this)closeReqModal()">
+        <div class="req-modal" id="req-modal">
+            <div class="req-modal-header">
+                <div class="req-modal-title-block">
+                    <span class="req-modal-ticket-key" id="req-modal-ticket-key">---</span>
+                    <span class="req-modal-title" id="req-modal-title">Requirement</span>
+                </div>
+                <button class="req-modal-close" onclick="closeReqModal()" aria-label="Close requirement modal" title="Close">&times;</button>
+            </div>
+            <div class="req-modal-body" id="req-modal-body">
+                <!-- Description (read-only view) -->
+                <div id="req-modal-view-section">
+                    <div class="req-modal-section-label">Description</div>
+                    <div class="req-modal-description-view" id="req-modal-description-view">Loading...</div>
+                </div>
+                <!-- Description (edit mode) - hidden by default -->
+                <div id="req-modal-edit-section" style="display:none;">
+                    <div class="req-modal-section-label">Edit Description <span style="font-weight:400;color:#64748b;">(Markdown supported)</span></div>
+                    <textarea class="req-modal-edit-textarea" id="req-modal-edit-textarea" placeholder="Enter requirement text..."></textarea>
+                    <div class="req-modal-hint">Markdown is supported. Changes are saved locally and optionally synced to Linear.</div>
+                </div>
+                <!-- Spec text section (shown when available) -->
+                <div id="req-modal-spec-section" style="display:none;">
+                    <div class="req-modal-section-label">Spec Context</div>
+                    <div class="req-modal-spec" id="req-modal-spec-text"></div>
+                </div>
+            </div>
+            <div class="req-modal-footer">
+                <label class="req-modal-sync-label" id="req-modal-sync-label">
+                    <input type="checkbox" id="req-modal-sync-toggle" aria-label="Sync to Linear" />
+                    Sync to Linear
+                </label>
+                <div class="req-modal-actions" id="req-modal-actions">
+                    <!-- Actions set by JS based on agent status / edit mode -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI-90/AI-91: Toast notification -->
+    <div class="req-modal-toast" id="req-modal-toast"></div>
+
+    <script>
+    // ==========================================
+    // AI-90/AI-91: Requirement View/Edit Modal
+    // ==========================================
+
+    (function() {
+        // Current modal state
+        let _reqModalState = {
+            ticketKey: null,
+            agentName: null,
+            agentStatus: null,
+            editMode: false,
+            loading: false,
+        };
+
+        // Expose open function globally
+        window.openReqModal = async function(ticketKey, agentName, agentStatus) {
+            if (!ticketKey) return;
+            _reqModalState = {
+                ticketKey,
+                agentName: agentName || null,
+                agentStatus: agentStatus || 'idle',
+                editMode: false,
+                loading: true,
+            };
+
+            // Show modal immediately with loading state
+            const overlay = document.getElementById('req-modal-overlay');
+            const keyEl = document.getElementById('req-modal-ticket-key');
+            const titleEl = document.getElementById('req-modal-title');
+            const descView = document.getElementById('req-modal-description-view');
+
+            if (overlay) overlay.classList.add('open');
+            if (keyEl) keyEl.textContent = ticketKey;
+            if (titleEl) titleEl.textContent = 'Loading...';
+            if (descView) descView.textContent = 'Loading requirement...';
+
+            _setModalViewMode();
+            _updateModalActions();
+
+            // Fetch the requirement
+            try {
+                const url = `${typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : ''}/api/requirements/${encodeURIComponent(ticketKey)}`;
+                const resp = await fetch(url);
+                if (resp.status === 404) {
+                    // Not found - show empty editable form if paused
+                    _reqModalState.loading = false;
+                    if (titleEl) titleEl.textContent = ticketKey;
+                    if (descView) descView.textContent = '(No requirement saved yet)';
+                    const editTA = document.getElementById('req-modal-edit-textarea');
+                    if (editTA) editTA.value = '';
+                    const syncToggle = document.getElementById('req-modal-sync-toggle');
+                    if (syncToggle) syncToggle.checked = false;
+                    _updateModalActions();
+                    return;
+                }
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                _reqModalState.loading = false;
+
+                // Populate modal
+                if (titleEl) titleEl.textContent = data.title || ticketKey;
+                if (descView) descView.textContent = data.edited_description || data.description || '(empty)';
+
+                const editTA = document.getElementById('req-modal-edit-textarea');
+                if (editTA) editTA.value = data.edited_description || data.description || '';
+
+                const syncToggle = document.getElementById('req-modal-sync-toggle');
+                if (syncToggle) syncToggle.checked = !!data.sync_to_linear;
+
+                // Spec text section
+                const specSection = document.getElementById('req-modal-spec-section');
+                const specText = document.getElementById('req-modal-spec-text');
+                if (data.spec_text && specSection && specText) {
+                    specText.textContent = data.spec_text;
+                    specSection.style.display = '';
+                } else if (specSection) {
+                    specSection.style.display = 'none';
+                }
+
+                _updateModalActions();
+            } catch (err) {
+                _reqModalState.loading = false;
+                if (descView) descView.textContent = 'Failed to load requirement: ' + err.message;
+                _updateModalActions();
+            }
+        };
+
+        window.closeReqModal = function() {
+            const overlay = document.getElementById('req-modal-overlay');
+            if (overlay) overlay.classList.remove('open');
+            _reqModalState = { ticketKey: null, agentName: null, agentStatus: null, editMode: false, loading: false };
+        };
+
+        window._reqEnterEditMode = function() {
+            _reqModalState.editMode = true;
+            _setModalEditMode();
+            _updateModalActions();
+            const ta = document.getElementById('req-modal-edit-textarea');
+            if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+        };
+
+        window._reqCancelEdit = function() {
+            _reqModalState.editMode = false;
+            _setModalViewMode();
+            _updateModalActions();
+        };
+
+        window._reqSave = async function() {
+            const { ticketKey } = _reqModalState;
+            if (!ticketKey) return;
+
+            const ta = document.getElementById('req-modal-edit-textarea');
+            const syncToggle = document.getElementById('req-modal-sync-toggle');
+            const editedDesc = ta ? ta.value : '';
+            const syncToLinear = syncToggle ? syncToggle.checked : false;
+
+            const saveBtn = document.getElementById('req-modal-save-btn');
+            if (saveBtn) saveBtn.disabled = true;
+
+            try {
+                const url = `${typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : ''}/api/requirements/${encodeURIComponent(ticketKey)}`;
+                const resp = await fetch(url, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ edited_description: editedDesc, sync_to_linear: syncToLinear }),
+                });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    throw new Error(err.error || `HTTP ${resp.status}`);
+                }
+
+                // Update view
+                const descView = document.getElementById('req-modal-description-view');
+                if (descView) descView.textContent = editedDesc || '(empty)';
+
+                _reqModalState.editMode = false;
+                _setModalViewMode();
+                _updateModalActions();
+                _showReqToast('Requirement saved');
+            } catch (err) {
+                _showReqToast('Save failed: ' + err.message, true);
+            } finally {
+                if (saveBtn) saveBtn.disabled = false;
+            }
+        };
+
+        function _setModalViewMode() {
+            const viewSec = document.getElementById('req-modal-view-section');
+            const editSec = document.getElementById('req-modal-edit-section');
+            if (viewSec) viewSec.style.display = '';
+            if (editSec) editSec.style.display = 'none';
+        }
+
+        function _setModalEditMode() {
+            const viewSec = document.getElementById('req-modal-view-section');
+            const editSec = document.getElementById('req-modal-edit-section');
+            if (viewSec) viewSec.style.display = 'none';
+            if (editSec) editSec.style.display = '';
+        }
+
+        function _updateModalActions() {
+            const actionsEl = document.getElementById('req-modal-actions');
+            if (!actionsEl) return;
+
+            const isPaused = _reqModalState.agentStatus === 'paused';
+            const isEdit = _reqModalState.editMode;
+
+            if (isEdit) {
+                // Edit mode: SAVE + CANCEL
+                actionsEl.innerHTML = `
+                    <button class="req-modal-cancel-btn" onclick="_reqCancelEdit()">Cancel</button>
+                    <button class="req-modal-save-btn" id="req-modal-save-btn" onclick="_reqSave()">Save</button>
+                `;
+            } else if (isPaused) {
+                // View mode + paused: show EDIT button
+                actionsEl.innerHTML = `
+                    <button class="req-modal-edit-btn" onclick="_reqEnterEditMode()">&#9998; Edit</button>
+                `;
+            } else {
+                // View mode + not paused: read-only
+                actionsEl.innerHTML = `<span style="font-size:0.78rem;color:#64748b;">Agent must be paused to edit</span>`;
+            }
+        }
+
+        // Toast helper
+        let _toastTimer = null;
+        function _showReqToast(msg, isError) {
+            const toast = document.getElementById('req-modal-toast');
+            if (!toast) return;
+            toast.textContent = msg;
+            toast.className = 'req-modal-toast' + (isError ? ' error' : '') + ' show';
+            clearTimeout(_toastTimer);
+            _toastTimer = setTimeout(() => {
+                toast.className = 'req-modal-toast' + (isError ? ' error' : '');
+            }, 3000);
+        }
+    })();
     </script>
 </body>
 </html>

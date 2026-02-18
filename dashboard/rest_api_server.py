@@ -45,7 +45,10 @@ from exceptions import SecurityError
 
 # Agent state tracking (in-memory for pause/resume)
 _agent_states: Dict[str, str] = {}  # agent_name -> "running" | "paused" | "idle"
-_requirements_cache: Dict[str, str] = {}  # ticket_key -> requirement text
+_requirements_cache: Dict[str, str] = {}  # ticket_key -> requirement text (legacy simple cache)
+# AI-90/AI-91: Rich requirements store - ticket_key -> requirement dict
+# Each entry: {ticket_key, title, description, spec_text, edited_description, last_edited, sync_to_linear}
+_requirements_store: Dict[str, Dict[str, Any]] = {}
 _decisions_log: list[Dict[str, Any]] = []  # Decision history
 
 # Agent Status Panel (AI-79 / REQ-MONITOR-001): extended per-agent status details
@@ -375,9 +378,10 @@ class RESTAPIServer:
         # Chat
         self.app.router.add_post('/api/chat', self.chat)
 
-        # Requirements
+        # Requirements (AI-90/AI-91: view + edit)
         self.app.router.add_put('/api/requirements/{ticket_key}', self.update_requirement)
         self.app.router.add_get('/api/requirements/{ticket_key}', self.get_requirement)
+        self.app.router.add_post('/api/requirements/{ticket_key}/sync', self.sync_requirement_to_linear)
 
         # Decisions
         self.app.router.add_get('/api/decisions', self.get_decisions)
@@ -1301,12 +1305,20 @@ class RESTAPIServer:
     async def update_requirement(self, request: Request) -> Response:
         """PUT /api/requirements/{ticket_key} - Update requirement instructions.
 
+        AI-90/AI-91: Enhanced to store full requirement data model including
+        title, description, edited_description, spec_text, sync_to_linear, last_edited.
+
         Args:
             ticket_key: Linear ticket key (path parameter)
 
-        Request body:
+        Request body (flexible - accepts either legacy or new format):
             {
-                "requirements": "Updated requirement text"
+                "requirements": "Updated requirement text",        # legacy field
+                "edited_description": "Edited description text",  # new field (AI-91)
+                "title": "Ticket title",                          # optional
+                "description": "Original description",            # optional
+                "spec_text": "App spec text",                     # optional
+                "sync_to_linear": false                           # optional toggle
             }
 
         Returns:
@@ -1322,60 +1334,147 @@ class RESTAPIServer:
                 'error': 'Invalid JSON in request body'
             }, status=400)
 
-        requirements = data.get('requirements')
-        if not requirements:
+        # Support both legacy 'requirements' field and new 'edited_description' field
+        edited_description = data.get('edited_description') or data.get('requirements')
+        if edited_description is None:
             return web.json_response({
-                'error': 'Missing required field: requirements'
+                'error': 'Missing required field: requirements or edited_description'
             }, status=400)
 
-        if len(requirements) > 50_000:
+        if len(edited_description) > 50_000:
             return web.json_response({
                 'error': 'Requirements text exceeds maximum length of 50000 characters'
             }, status=400)
 
-        # Store requirement in cache
-        _requirements_cache[ticket_key] = requirements
+        now = datetime.utcnow().isoformat() + 'Z'
+
+        # Build or update the rich requirements entry
+        existing = _requirements_store.get(ticket_key, {})
+        entry = {
+            'ticket_key': ticket_key,
+            'title': data.get('title') or existing.get('title') or '',
+            'description': data.get('description') or existing.get('description') or '',
+            'spec_text': data.get('spec_text') or existing.get('spec_text') or '',
+            'edited_description': edited_description,
+            'last_edited': now,
+            'sync_to_linear': data.get('sync_to_linear', existing.get('sync_to_linear', False)),
+            'linear_synced': False,
+        }
+        _requirements_store[ticket_key] = entry
+
+        # Also keep legacy cache in sync
+        _requirements_cache[ticket_key] = edited_description
 
         # Log decision
         _decisions_log.append({
-            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'timestamp': now,
             'decision_type': 'requirement_update',
             'ticket_key': ticket_key,
-            'requirements_length': len(requirements)
+            'requirements_length': len(edited_description)
         })
 
         return web.json_response({
             'status': 'success',
             'ticket_key': ticket_key,
             'message': f'Requirements for {ticket_key} updated',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
+            'requirement': entry,
+            'timestamp': now
         })
 
     async def get_requirement(self, request: Request) -> Response:
         """GET /api/requirements/{ticket_key} - Get current requirement instructions.
 
+        AI-90/AI-91: Returns full requirement data model including title, description,
+        edited_description, spec_text, last_edited, sync_to_linear.
+
         Args:
             ticket_key: Linear ticket key (path parameter)
 
         Returns:
-            200 OK with requirement text
+            200 OK with full requirement object
             404 Not Found if requirement doesn't exist
         """
         ticket_key = request.match_info['ticket_key']
 
-        requirements = _requirements_cache.get(ticket_key)
+        entry = _requirements_store.get(ticket_key)
 
-        if requirements is None:
-            return web.json_response({
-                'error': 'Requirement not found',
+        if entry is None:
+            # Also check legacy cache for backwards compatibility
+            legacy_text = _requirements_cache.get(ticket_key)
+            if legacy_text is None:
+                return web.json_response({
+                    'error': 'Requirement not found',
+                    'ticket_key': ticket_key,
+                    'message': f'No requirements found for {ticket_key}'
+                }, status=404)
+            # Promote legacy entry to rich format
+            entry = {
                 'ticket_key': ticket_key,
-                'message': f'No requirements cached for {ticket_key}'
-            }, status=404)
+                'title': '',
+                'description': legacy_text,
+                'spec_text': '',
+                'edited_description': legacy_text,
+                'last_edited': None,
+                'sync_to_linear': False,
+                'linear_synced': False,
+            }
 
         return web.json_response({
             'ticket_key': ticket_key,
-            'requirements': requirements,
+            'title': entry.get('title', ''),
+            'description': entry.get('description', ''),
+            'spec_text': entry.get('spec_text', ''),
+            'edited_description': entry.get('edited_description', ''),
+            'last_edited': entry.get('last_edited'),
+            'sync_to_linear': entry.get('sync_to_linear', False),
+            'linear_synced': entry.get('linear_synced', False),
+            # Legacy compat field
+            'requirements': entry.get('edited_description', ''),
             'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+
+    async def sync_requirement_to_linear(self, request: Request) -> Response:
+        """POST /api/requirements/{ticket_key}/sync - Sync requirement changes to Linear.
+
+        AI-91: Marks the stored requirement as synced. In practice stores the sync
+        state in-memory and marks linear_synced=True. A real integration would call
+        the Linear API here.
+
+        Args:
+            ticket_key: Linear ticket key (path parameter)
+
+        Returns:
+            200 OK with sync confirmation
+            404 Not Found if requirement doesn't exist
+        """
+        ticket_key = request.match_info['ticket_key']
+
+        entry = _requirements_store.get(ticket_key)
+        if entry is None:
+            return web.json_response({
+                'error': 'Requirement not found',
+                'ticket_key': ticket_key,
+                'message': f'No requirements found for {ticket_key}. Save requirement first.'
+            }, status=404)
+
+        # Mark as synced
+        entry['linear_synced'] = True
+        entry['sync_to_linear'] = True
+        _requirements_store[ticket_key] = entry
+
+        now = datetime.utcnow().isoformat() + 'Z'
+        _decisions_log.append({
+            'timestamp': now,
+            'decision_type': 'requirement_sync',
+            'ticket_key': ticket_key,
+        })
+
+        return web.json_response({
+            'status': 'success',
+            'ticket_key': ticket_key,
+            'message': f'Requirement for {ticket_key} marked as synced to Linear',
+            'linear_synced': True,
+            'timestamp': now
         })
 
     async def get_decisions(self, request: Request) -> Response:
