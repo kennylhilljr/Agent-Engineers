@@ -6640,6 +6640,24 @@
                     <span class="panel-nav-icon">&#128268;</span>
                     <span>Webhooks</span>
                 </button>
+                <!-- AI-222: Account Settings -->
+                <span class="panel-section-label" style="margin-top:8px;">Account</span>
+                <div id="auth-nav-user" style="padding:6px 10px 2px;font-size:0.78rem;color:var(--text-secondary,#8b949e);display:none;">
+                    <span id="auth-nav-email"></span>
+                    <span id="auth-nav-plan" style="margin-left:6px;font-size:0.7rem;background:#238636;color:#fff;padding:1px 5px;border-radius:3px;vertical-align:middle;"></span>
+                </div>
+                <button class="panel-nav-item" id="nav-account" onclick="document.getElementById('account-settings-section').scrollIntoView({behavior:'smooth'})">
+                    <span class="panel-nav-icon">&#128100;</span>
+                    <span>Account</span>
+                </button>
+                <button class="panel-nav-item" id="nav-login-link" onclick="window.location.href='/auth/login'" style="display:none;">
+                    <span class="panel-nav-icon">&#128274;</span>
+                    <span>Sign In</span>
+                </button>
+                <button class="panel-nav-item" id="nav-logout-btn" onclick="doLogout()" style="display:none;">
+                    <span class="panel-nav-icon">&#128682;</span>
+                    <span>Logout</span>
+                </button>
 
                 <!-- AI-79: Agent Status Panel (REQ-MONITOR-001) -->
                 <span class="panel-section-label" style="margin-top:8px;">Agent Status</span>
@@ -6744,6 +6762,13 @@
                     data-testid="upgrade-cta-btn"
                     title="Upgrade your plan"
                 >&#8679; Upgrade</button>
+            </div>
+            <!-- AI-222: Auth user badge in header -->
+            <div id="auth-header-badge" style="display:none;align-items:center;gap:8px;margin-top:6px;">
+                <span style="font-size:0.8rem;color:var(--text-secondary,#8b949e);">Signed in as</span>
+                <strong id="auth-header-name" style="font-size:0.85rem;color:var(--text-primary,#e6edf3);"></strong>
+                <button onclick="doLogout()" style="font-size:0.75rem;padding:3px 8px;background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:4px;cursor:pointer;" data-testid="header-logout-btn">Logout</button>
+                <a href="/auth/login" id="auth-header-login-link" style="font-size:0.75rem;padding:3px 8px;background:#238636;border:1px solid #2ea043;color:#fff;border-radius:4px;cursor:pointer;text-decoration:none;display:none;" data-testid="header-login-link">Sign In</a>
             </div>
         </div>
 
@@ -7379,6 +7404,57 @@
             </div>
         </div>
     </div>
+        <!-- AI-222: Account Settings Section -->
+        <section class="card" id="account-settings-section" data-testid="account-settings-section"
+            style="margin:20px;padding:28px;display:none;">
+            <h2 style="margin-bottom:20px;color:var(--accent,#58a6ff);font-size:1.2rem;">&#128100; Account Settings</h2>
+            <!-- User info -->
+            <div id="acct-user-info" style="margin-bottom:20px;padding:16px;background:var(--bg-secondary,#161b22);border-radius:8px;border:1px solid var(--border-color,#30363d);">
+                <div style="display:grid;grid-template-columns:auto 1fr;gap:8px 16px;font-size:0.9rem;">
+                    <span style="color:var(--text-secondary,#8b949e);">Name</span>
+                    <span id="acct-name" style="color:var(--text-primary,#e6edf3);font-weight:600;"></span>
+                    <span style="color:var(--text-secondary,#8b949e);">Email</span>
+                    <span id="acct-email" style="color:var(--text-primary,#e6edf3);"></span>
+                    <span style="color:var(--text-secondary,#8b949e);">Plan</span>
+                    <span id="acct-plan" style="color:var(--text-primary,#e6edf3);text-transform:uppercase;font-weight:600;"></span>
+                    <span style="color:var(--text-secondary,#8b949e);">Provider</span>
+                    <span id="acct-provider" style="color:var(--text-primary,#e6edf3);"></span>
+                    <span style="color:var(--text-secondary,#8b949e);">Last Login</span>
+                    <span id="acct-last-login" style="color:var(--text-primary,#e6edf3);"></span>
+                </div>
+            </div>
+            <!-- Change password form -->
+            <div style="margin-bottom:20px;">
+                <h3 style="margin-bottom:12px;font-size:1rem;color:var(--text-primary,#e6edf3);">Change Password</h3>
+                <div id="acct-pw-msg" style="display:none;margin-bottom:10px;padding:8px 12px;border-radius:6px;font-size:0.875rem;"></div>
+                <form id="acct-pw-form" onsubmit="doChangePassword(event)"
+                    style="display:grid;gap:10px;max-width:360px;">
+                    <input type="password" id="acct-current-pw" placeholder="Current password"
+                        data-testid="acct-current-pw"
+                        style="padding:9px 12px;background:var(--bg-primary,#0d1117);border:1px solid var(--border-color,#30363d);border-radius:6px;color:var(--text-primary,#e6edf3);font-size:0.9rem;">
+                    <input type="password" id="acct-new-pw" placeholder="New password (min 8 chars)"
+                        data-testid="acct-new-pw" minlength="8"
+                        style="padding:9px 12px;background:var(--bg-primary,#0d1117);border:1px solid var(--border-color,#30363d);border-radius:6px;color:var(--text-primary,#e6edf3);font-size:0.9rem;">
+                    <input type="password" id="acct-confirm-pw" placeholder="Confirm new password"
+                        data-testid="acct-confirm-pw"
+                        style="padding:9px 12px;background:var(--bg-primary,#0d1117);border:1px solid var(--border-color,#30363d);border-radius:6px;color:var(--text-primary,#e6edf3);font-size:0.9rem;">
+                    <button type="submit" data-testid="acct-pw-submit"
+                        style="padding:9px 20px;background:#238636;border:none;border-radius:6px;color:#fff;font-size:0.9rem;cursor:pointer;font-weight:600;max-width:180px;">
+                        Update Password
+                    </button>
+                </form>
+            </div>
+            <!-- Logout -->
+            <div style="border-top:1px solid var(--border-color,#30363d);padding-top:16px;">
+                <button onclick="doLogout()" data-testid="acct-logout-btn"
+                    style="padding:9px 20px;background:#21262d;border:1px solid #f85149;border-radius:6px;color:#f85149;font-size:0.9rem;cursor:pointer;font-weight:600;">
+                    &#128682; Sign Out
+                </button>
+                <span style="margin-left:12px;font-size:0.8rem;color:var(--text-secondary,#8b949e);">
+                    This will end your current session.
+                </span>
+            </div>
+        </section>
         </main>
     </div><!-- /.app-layout -->
 
@@ -10030,7 +10106,7 @@
             }
 
             if (hoursUsed) hoursUsed.textContent = parseFloat(hoursUsedVal).toFixed(2);
-            if (hoursLimit) hoursLimit.textContent = hoursLimitVal !== null ? parseFloat(hoursLimitVal).toFixed(2) : '∞';
+            if (hoursLimit) hoursLimit.textContent = hoursLimitVal !== null ? parseFloat(hoursLimitVal).toFixed(2) : '\u221e';
             if (periodStart && data.period_start) {
                 try {
                     const d = new Date(data.period_start);
@@ -10052,7 +10128,7 @@
                     (alertLevel === 'critical' ? ' red' : alertLevel === 'warning' ? ' yellow' : '');
             }
             if (headerUsageText) {
-                const limitStr = hoursLimitVal !== null ? parseFloat(hoursLimitVal).toFixed(1) + 'h' : '∞';
+                const limitStr = hoursLimitVal !== null ? parseFloat(hoursLimitVal).toFixed(1) + 'h' : '\u221e';
                 headerUsageText.textContent = parseFloat(hoursUsedVal).toFixed(1) + 'h / ' + limitStr;
             }
             if (headerPlanBadge) {
@@ -13204,6 +13280,201 @@
             document.addEventListener('DOMContentLoaded', initWebhooks);
         } else {
             initWebhooks();
+        }
+
+    })();
+    </script>
+
+    <!-- AI-222: Authentication JavaScript -->
+    <script>
+    (function() {
+        'use strict';
+
+        // ── Auth state ──────────────────────────────────────────────────────
+        let _authUser = null;
+        let _authToken = null;
+
+        function _getStoredToken() {
+            return localStorage.getItem('session_token') || null;
+        }
+
+        function _setStoredToken(token) {
+            if (token) {
+                localStorage.setItem('session_token', token);
+            } else {
+                localStorage.removeItem('session_token');
+            }
+        }
+
+        // ── Fetch current user ──────────────────────────────────────────────
+        async function fetchCurrentUser() {
+            const token = _getStoredToken();
+            if (!token) {
+                _authUser = null;
+                _authToken = null;
+                updateAuthUI(null);
+                return null;
+            }
+            try {
+                const r = await fetch('/auth/me', {
+                    headers: {'Authorization': 'Bearer ' + token}
+                });
+                if (r.ok) {
+                    const data = await r.json();
+                    _authUser = data.user;
+                    _authToken = token;
+                    updateAuthUI(_authUser);
+                    return _authUser;
+                } else {
+                    // Token invalid/expired
+                    _setStoredToken(null);
+                    _authUser = null;
+                    _authToken = null;
+                    updateAuthUI(null);
+                    return null;
+                }
+            } catch(e) {
+                // Network error - don't change state
+                return null;
+            }
+        }
+
+        // ── Update UI based on auth state ───────────────────────────────────
+        function updateAuthUI(user) {
+            // Header badge
+            const badge = document.getElementById('auth-header-badge');
+            const headerName = document.getElementById('auth-header-name');
+            const loginLink = document.getElementById('auth-header-login-link');
+            if (badge) {
+                badge.style.display = 'flex';
+                if (user) {
+                    if (headerName) headerName.textContent = user.name || user.email;
+                    if (loginLink) loginLink.style.display = 'none';
+                } else {
+                    if (headerName) headerName.textContent = '';
+                    if (loginLink) loginLink.style.display = 'inline-block';
+                }
+            }
+
+            // Sidebar nav
+            const navUser = document.getElementById('auth-nav-user');
+            const navEmail = document.getElementById('auth-nav-email');
+            const navPlan = document.getElementById('auth-nav-plan');
+            const navLoginLink = document.getElementById('nav-login-link');
+            const navLogoutBtn = document.getElementById('nav-logout-btn');
+            if (user) {
+                if (navUser) navUser.style.display = 'block';
+                if (navEmail) navEmail.textContent = user.email;
+                if (navPlan) navPlan.textContent = (user.plan || 'explorer').toUpperCase();
+                if (navLoginLink) navLoginLink.style.display = 'none';
+                if (navLogoutBtn) navLogoutBtn.style.display = 'flex';
+            } else {
+                if (navUser) navUser.style.display = 'none';
+                if (navLoginLink) navLoginLink.style.display = 'flex';
+                if (navLogoutBtn) navLogoutBtn.style.display = 'none';
+            }
+
+            // Account settings section - show if logged in and section is visible
+            const acctSection = document.getElementById('account-settings-section');
+            if (acctSection && user) {
+                // Populate fields
+                const el = (id) => document.getElementById(id);
+                if (el('acct-name')) el('acct-name').textContent = user.name || '—';
+                if (el('acct-email')) el('acct-email').textContent = user.email;
+                if (el('acct-plan')) el('acct-plan').textContent = user.plan || 'explorer';
+                if (el('acct-provider')) el('acct-provider').textContent = user.provider || 'email/password';
+                if (el('acct-last-login')) {
+                    const d = user.last_login ? new Date(user.last_login).toLocaleString() : 'Now';
+                    el('acct-last-login').textContent = d;
+                }
+                acctSection.style.display = 'block';
+            } else if (acctSection) {
+                acctSection.style.display = 'none';
+            }
+        }
+
+        // ── Logout ──────────────────────────────────────────────────────────
+        window.doLogout = async function() {
+            const token = _getStoredToken();
+            try {
+                await fetch('/auth/logout', {
+                    method: 'POST',
+                    headers: token ? {'Authorization': 'Bearer ' + token} : {}
+                });
+            } catch(e) { /* ignore */ }
+            _setStoredToken(null);
+            _authUser = null;
+            _authToken = null;
+            updateAuthUI(null);
+            // Redirect to login
+            window.location.href = '/auth/login';
+        };
+
+        // ── Change password ─────────────────────────────────────────────────
+        window.doChangePassword = async function(e) {
+            e.preventDefault();
+            const msgEl = document.getElementById('acct-pw-msg');
+            function showMsg(text, isError) {
+                if (!msgEl) return;
+                msgEl.textContent = text;
+                msgEl.style.display = 'block';
+                msgEl.style.background = isError ? '#ff000022' : '#23863622';
+                msgEl.style.border = '1px solid ' + (isError ? '#f85149' : '#2ea043');
+                msgEl.style.color = isError ? '#f85149' : '#3fb950';
+            }
+            const current = document.getElementById('acct-current-pw').value;
+            const newPw = document.getElementById('acct-new-pw').value;
+            const confirm = document.getElementById('acct-confirm-pw').value;
+            if (newPw !== confirm) {
+                showMsg('New passwords do not match.', true); return;
+            }
+            if (newPw.length < 8) {
+                showMsg('Password must be at least 8 characters.', true); return;
+            }
+            try {
+                const token = _getStoredToken();
+                const r = await fetch('/auth/change-password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(token ? {'Authorization': 'Bearer ' + token} : {})
+                    },
+                    body: JSON.stringify({current_password: current, new_password: newPw})
+                });
+                const data = await r.json();
+                if (r.ok) {
+                    showMsg(data.message || 'Password updated. Please sign in again.', false);
+                    setTimeout(() => { _setStoredToken(null); window.location.href = '/auth/login'; }, 2000);
+                } else {
+                    showMsg(data.error || 'Password change failed.', true);
+                }
+            } catch(err) {
+                showMsg('Network error: ' + err.message, true);
+            }
+        };
+
+        // ── Account settings nav click shows section ─────────────────────
+        const acctNavBtn = document.getElementById('nav-account');
+        if (acctNavBtn) {
+            acctNavBtn.addEventListener('click', function() {
+                const section = document.getElementById('account-settings-section');
+                if (section && _authUser) {
+                    section.style.display = 'block';
+                } else if (section && !_authUser) {
+                    window.location.href = '/auth/login';
+                }
+            });
+        }
+
+        // ── Init ────────────────────────────────────────────────────────────
+        function initAuth() {
+            fetchCurrentUser();
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initAuth);
+        } else {
+            initAuth();
         }
 
     })();
