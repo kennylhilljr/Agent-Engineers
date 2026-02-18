@@ -143,6 +143,14 @@ if _worktree_usage_meter_path.exists() and "dashboard.usage_meter" not in sys.mo
     except Exception:
         pass
 
+# 4l. Load dashboard.webhooks from the worktree (AI-229 / Webhook Support) — before server
+_worktree_webhooks_path = _WORKTREE_ROOT / "dashboard" / "webhooks.py"
+if _worktree_webhooks_path.exists() and "dashboard.webhooks" not in sys.modules:
+    try:
+        _load_module_from_file("dashboard.webhooks", _worktree_webhooks_path)
+    except Exception:
+        pass
+
 # 4b. Override dashboard.server with the worktree's AI-161 version
 _worktree_server_path = _WORKTREE_ROOT / "dashboard" / "server.py"
 if _worktree_server_path.exists():

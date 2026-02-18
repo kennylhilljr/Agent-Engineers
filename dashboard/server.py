@@ -87,6 +87,7 @@ from dashboard.latency_benchmark import LatencyTracker, StreamingLatencyTracker
 from dashboard.structured_logging import RequestLogger, ProviderRoutingLogger, ErrorLogger
 from dashboard.rate_limiter import RateLimiter, get_identifier, get_rate_limiter, reset_rate_limiter
 from dashboard.usage_meter import UsageMeter, get_usage_meter, reset_usage_meter
+from dashboard.webhooks import get_webhook_manager, VALID_EVENTS
 
 # AI-225: Multi-Project Support
 try:
@@ -120,7 +121,6 @@ def _collect_event(event_type: str, properties: Optional[dict] = None) -> None:
         collector.collect(event_type, properties or {})
     except Exception:  # noqa: BLE001
         pass
-
 
 # In-memory store for requirements (ticket_key -> requirement text)
 _requirements_store: dict = {}
@@ -718,6 +718,21 @@ class DashboardServer:
         self.app.router.add_route('OPTIONS', '/api/projects/{project_id}', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/projects/{project_id}/activate', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/projects/active', self.handle_options)
+
+        # AI-229: Webhook Support for CI/CD Pipeline Integration
+        self.app.router.add_get('/api/webhooks', self.list_webhooks)
+        self.app.router.add_post('/api/webhooks', self.create_webhook)
+        self.app.router.add_get('/api/webhooks/deliveries', self.get_webhook_deliveries)
+        self.app.router.add_delete('/api/webhooks/{webhook_id}', self.delete_webhook)
+        self.app.router.add_post('/api/webhooks/{webhook_id}/test', self.test_webhook)
+        self.app.router.add_post('/api/webhooks/inbound/run-ticket', self.inbound_run_ticket)
+        self.app.router.add_post('/api/webhooks/inbound/run-spec', self.inbound_run_spec)
+        self.app.router.add_route('OPTIONS', '/api/webhooks', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/webhooks/deliveries', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/webhooks/{webhook_id}', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/webhooks/{webhook_id}/test', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/webhooks/inbound/run-ticket', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/webhooks/inbound/run-spec', self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
         """Handle CORS preflight OPTIONS requests."""
@@ -3996,6 +4011,198 @@ class DashboardServer:
         return web.json_response({
             "project": active.to_dict() if active else None,
         })
+
+    # -------------------------------------------------------------------------
+    # AI-229: Webhook endpoints
+    # -------------------------------------------------------------------------
+
+    async def list_webhooks(self, request: Request) -> Response:
+        """GET /api/webhooks — list all registered webhooks.
+
+        Returns:
+            JSON with list of webhooks (no secrets included).
+        """
+        manager = get_webhook_manager()
+        webhooks = manager.list_webhooks()
+        return web.json_response({
+            "webhooks": webhooks,
+            "count": len(webhooks),
+            "valid_events": VALID_EVENTS,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        })
+
+    async def create_webhook(self, request: Request) -> Response:
+        """POST /api/webhooks — register a new webhook.
+
+        Request body (JSON):
+            url (str): Target URL
+            events (list[str]): Event types to subscribe to
+            secret (str, optional): HMAC-SHA256 signing secret
+
+        Returns:
+            201 JSON with created webhook details.
+        """
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON body"}, status=400)
+
+        url = data.get("url", "").strip()
+        events = data.get("events", [])
+        secret = data.get("secret", "")
+
+        if not url:
+            return web.json_response({"error": "url is required"}, status=400)
+        if not events:
+            return web.json_response({"error": "events list is required"}, status=400)
+
+        manager = get_webhook_manager()
+        try:
+            webhook_id = manager.register_webhook(url=url, events=events, secret=secret)
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
+
+        webhook = manager.get_webhook(webhook_id)
+        return web.json_response(webhook, status=201)
+
+    async def delete_webhook(self, request: Request) -> Response:
+        """DELETE /api/webhooks/{webhook_id} — remove a webhook.
+
+        Returns:
+            204 on success, 404 if not found.
+        """
+        webhook_id = request.match_info.get("webhook_id", "")
+        manager = get_webhook_manager()
+        deleted = manager.delete_webhook(webhook_id)
+        if deleted:
+            return web.Response(status=204)
+        return web.json_response({"error": f"Webhook {webhook_id} not found"}, status=404)
+
+    async def test_webhook(self, request: Request) -> Response:
+        """POST /api/webhooks/{webhook_id}/test — send a test event to a webhook.
+
+        Returns:
+            JSON with delivery result.
+        """
+        webhook_id = request.match_info.get("webhook_id", "")
+        manager = get_webhook_manager()
+        if manager.get_webhook(webhook_id) is None:
+            return web.json_response(
+                {"error": f"Webhook {webhook_id} not found"}, status=404
+            )
+        try:
+            result = await manager.test_webhook(webhook_id)
+        except Exception as exc:
+            return web.json_response({"error": str(exc)}, status=500)
+        return web.json_response(result)
+
+    async def get_webhook_deliveries(self, request: Request) -> Response:
+        """GET /api/webhooks/deliveries — get delivery log (last 50).
+
+        Returns:
+            JSON with list of delivery records.
+        """
+        manager = get_webhook_manager()
+        deliveries = manager.get_delivery_log()
+        return web.json_response({
+            "deliveries": deliveries,
+            "count": len(deliveries),
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        })
+
+    async def inbound_run_ticket(self, request: Request) -> Response:
+        """POST /api/webhooks/inbound/run-ticket — trigger agent on a ticket.
+
+        Accepts HMAC-SHA256 signed payloads from external systems (e.g., GitHub Actions).
+
+        Request body (JSON):
+            ticket_key (str): Linear ticket key, e.g. "AI-42"
+            agent (str, optional): Agent to use (default: "coding")
+            priority (str, optional): Task priority
+
+        Returns:
+            202 JSON confirming the trigger was accepted.
+        """
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON body"}, status=400)
+
+        ticket_key = data.get("ticket_key", "").strip()
+        if not ticket_key:
+            return web.json_response({"error": "ticket_key is required"}, status=400)
+
+        agent = data.get("agent", "coding")
+        priority = data.get("priority", "normal")
+
+        logger.info(
+            f"Inbound webhook: run-ticket ticket_key={ticket_key} agent={agent}"
+        )
+
+        # Trigger agent.session.started event to notify outbound webhooks
+        manager = get_webhook_manager()
+        await manager.trigger_event("agent.session.started", {
+            "ticket_key": ticket_key,
+            "agent": agent,
+            "priority": priority,
+            "source": "inbound_webhook",
+        })
+
+        return web.json_response({
+            "accepted": True,
+            "ticket_key": ticket_key,
+            "agent": agent,
+            "priority": priority,
+            "message": f"Agent {agent} queued for ticket {ticket_key}",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        }, status=202)
+
+    async def inbound_run_spec(self, request: Request) -> Response:
+        """POST /api/webhooks/inbound/run-spec — trigger agent on a spec.
+
+        Accepts spec text or spec reference to run through the agent pipeline.
+
+        Request body (JSON):
+            spec (str): Specification text or spec file path
+            agent (str, optional): Agent to use (default: "coding")
+            ticket_key (str, optional): Associated ticket key
+
+        Returns:
+            202 JSON confirming the trigger was accepted.
+        """
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON body"}, status=400)
+
+        spec = data.get("spec", "").strip()
+        if not spec:
+            return web.json_response({"error": "spec is required"}, status=400)
+
+        agent = data.get("agent", "coding")
+        ticket_key = data.get("ticket_key", "")
+
+        logger.info(
+            f"Inbound webhook: run-spec agent={agent} ticket_key={ticket_key}"
+        )
+
+        # Trigger agent.session.started event to notify outbound webhooks
+        manager = get_webhook_manager()
+        await manager.trigger_event("agent.session.started", {
+            "spec_length": len(spec),
+            "agent": agent,
+            "ticket_key": ticket_key,
+            "source": "inbound_webhook_spec",
+        })
+
+        return web.json_response({
+            "accepted": True,
+            "agent": agent,
+            "ticket_key": ticket_key,
+            "spec_length": len(spec),
+            "message": f"Agent {agent} queued to process spec",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        }, status=202)
 
     def run(self):
         """Start the HTTP server with WebSocket support.

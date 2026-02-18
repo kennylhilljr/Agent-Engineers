@@ -6000,6 +6000,267 @@
             margin-top: 6px;
             min-height: 18px;
         }
+
+        /* AI-229: Webhook Support Styles */
+        .webhooks-section {
+            margin-top: 16px;
+        }
+        .webhook-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .webhook-item {
+            background: var(--bg-secondary, #161b22);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: 8px;
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .webhook-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .webhook-url {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--accent, #58a6ff);
+            word-break: break-all;
+            flex: 1;
+        }
+        .webhook-item-actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        .webhook-events {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        .webhook-event-badge {
+            font-size: 0.7rem;
+            padding: 2px 7px;
+            border-radius: 10px;
+            background: rgba(88, 166, 255, 0.15);
+            color: var(--accent, #58a6ff);
+            border: 1px solid rgba(88, 166, 255, 0.3);
+        }
+        .webhook-status-badge {
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+        .webhook-status-active {
+            background: rgba(63, 185, 80, 0.15);
+            color: #3fb950;
+            border: 1px solid rgba(63, 185, 80, 0.3);
+        }
+        .webhook-btn {
+            font-size: 0.75rem;
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: opacity 0.15s;
+        }
+        .webhook-btn:hover { opacity: 0.85; }
+        .webhook-btn-test {
+            background: rgba(88, 166, 255, 0.2);
+            color: var(--accent, #58a6ff);
+            border: 1px solid rgba(88, 166, 255, 0.4);
+        }
+        .webhook-btn-delete {
+            background: rgba(248, 81, 73, 0.15);
+            color: #f85149;
+            border: 1px solid rgba(248, 81, 73, 0.3);
+        }
+        .webhook-add-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.82rem;
+            padding: 8px 14px;
+            border-radius: 7px;
+            background: var(--accent, #58a6ff);
+            color: #0d1117;
+            border: none;
+            cursor: pointer;
+            font-weight: 700;
+            transition: opacity 0.15s;
+        }
+        .webhook-add-btn:hover { opacity: 0.88; }
+        .webhook-empty {
+            font-size: 0.82rem;
+            color: var(--text-secondary, #8b949e);
+            padding: 16px 0;
+            text-align: center;
+        }
+        /* Delivery Log */
+        .webhook-delivery-log {
+            margin-top: 20px;
+        }
+        .webhook-delivery-log h3 {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-secondary, #8b949e);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 10px;
+        }
+        .delivery-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.78rem;
+        }
+        .delivery-table th {
+            text-align: left;
+            color: var(--text-secondary, #8b949e);
+            font-weight: 600;
+            padding: 6px 8px;
+            border-bottom: 1px solid var(--border-color, #30363d);
+        }
+        .delivery-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid rgba(48, 54, 61, 0.5);
+            color: var(--text-primary, #e6edf3);
+            vertical-align: middle;
+        }
+        .delivery-table tr:last-child td { border-bottom: none; }
+        .delivery-success { color: #3fb950; font-weight: 600; }
+        .delivery-failed { color: #f85149; font-weight: 600; }
+        .delivery-url-cell { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        /* Add Webhook Modal */
+        .webhook-modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+        .webhook-modal-overlay.open {
+            display: flex;
+        }
+        .webhook-modal {
+            background: var(--bg-primary, #0d1117);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: 12px;
+            padding: 24px;
+            width: 480px;
+            max-width: 95vw;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        .webhook-modal h3 {
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: var(--text-primary, #e6edf3);
+        }
+        .webhook-modal-field {
+            margin-bottom: 14px;
+        }
+        .webhook-modal-label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-secondary, #8b949e);
+            margin-bottom: 5px;
+        }
+        .webhook-modal-input {
+            width: 100%;
+            padding: 8px 10px;
+            border-radius: 7px;
+            border: 1px solid var(--border-color, #30363d);
+            background: var(--bg-secondary, #161b22);
+            color: var(--text-primary, #e6edf3);
+            font-size: 0.85rem;
+        }
+        .webhook-modal-input:focus {
+            outline: none;
+            border-color: var(--accent, #58a6ff);
+        }
+        .webhook-event-checkboxes {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-top: 4px;
+        }
+        .webhook-event-checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.78rem;
+            color: var(--text-primary, #e6edf3);
+            cursor: pointer;
+        }
+        .webhook-modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .webhook-modal-cancel {
+            padding: 7px 16px;
+            border-radius: 7px;
+            background: transparent;
+            color: var(--text-secondary, #8b949e);
+            border: 1px solid var(--border-color, #30363d);
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .webhook-modal-save {
+            padding: 7px 16px;
+            border-radius: 7px;
+            background: var(--accent, #58a6ff);
+            color: #0d1117;
+            border: none;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 700;
+        }
+        .webhook-toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            background: #3fb950;
+            color: #0d1117;
+            z-index: 9999;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .webhook-toast.show { opacity: 1; }
+        .webhook-toast.error { background: #f85149; color: #fff; }
+        [data-theme="light"] .webhook-item {
+            background: #f6f8fa;
+            border-color: #d0d7de;
+        }
+        [data-theme="light"] .webhook-modal {
+            background: #ffffff;
+            border-color: #d0d7de;
+        }
+        [data-theme="light"] .webhook-modal-input {
+            background: #f6f8fa;
+            border-color: #d0d7de;
+            color: #24292f;
+        }
+        [data-theme="light"] .delivery-table td {
+            color: #24292f;
+        }
     </style>
 </head>
 <body>
@@ -6100,6 +6361,11 @@
                 <button class="panel-nav-item" onclick="document.getElementById('github-section').scrollIntoView({behavior:'smooth'})">
                     <span class="panel-nav-icon">&#128279;</span>
                     <span>GitHub</span>
+                </button>
+                <!-- AI-229: Webhook Support (REQ-CICD-001) -->
+                <button class="panel-nav-item" id="nav-webhooks" onclick="document.getElementById('webhooks-section').scrollIntoView({behavior:'smooth'})">
+                    <span class="panel-nav-icon">&#128268;</span>
+                    <span>Webhooks</span>
                 </button>
 
                 <!-- AI-79: Agent Status Panel (REQ-MONITOR-001) -->
@@ -6520,6 +6786,86 @@
             <!-- Response area -->
             <div class="github-response-box" id="github-response-box" data-testid="github-response-box" aria-live="polite"></div>
         </div>
+
+        <!-- AI-229: Webhook Support for CI/CD Pipeline Integration -->
+        <div class="card webhooks-section" id="webhooks-section" data-testid="webhooks-section">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <svg class="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    Webhooks
+                </h2>
+                <button class="webhook-add-btn" id="webhook-add-btn" data-testid="webhook-add-btn" onclick="openWebhookModal()">
+                    <span>+</span> Add Webhook
+                </button>
+            </div>
+
+            <!-- Webhook list -->
+            <div class="webhook-list" id="webhook-list" data-testid="webhook-list">
+                <div class="webhook-empty" id="webhook-empty">No webhooks registered. Click "Add Webhook" to create one.</div>
+            </div>
+
+            <!-- Delivery Log -->
+            <div class="webhook-delivery-log" id="webhook-delivery-log">
+                <h3>Delivery Log
+                    <button class="leaderboard-refresh-btn" id="webhook-refresh-log-btn" onclick="loadWebhookDeliveries()" aria-label="Refresh delivery log" style="float:right;">&#8635;</button>
+                </h3>
+                <div id="webhook-delivery-table-wrap">
+                    <table class="delivery-table" id="webhook-delivery-table" data-testid="webhook-delivery-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Webhook URL</th>
+                                <th>Event</th>
+                                <th>Status</th>
+                                <th>HTTP</th>
+                            </tr>
+                        </thead>
+                        <tbody id="webhook-delivery-tbody">
+                            <tr><td colspan="5" style="text-align:center;color:var(--text-secondary,#8b949e);padding:16px;">No deliveries yet.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Webhook Add Modal -->
+        <div class="webhook-modal-overlay" id="webhook-modal-overlay" data-testid="webhook-modal-overlay" onclick="if(event.target===this)closeWebhookModal()">
+            <div class="webhook-modal" data-testid="webhook-modal">
+                <h3>Add Webhook</h3>
+                <div class="webhook-modal-field">
+                    <label class="webhook-modal-label" for="webhook-url-input">Endpoint URL *</label>
+                    <input type="url" id="webhook-url-input" class="webhook-modal-input"
+                        data-testid="webhook-url-input"
+                        placeholder="https://your-server.com/webhook"
+                        autocomplete="off" />
+                </div>
+                <div class="webhook-modal-field">
+                    <label class="webhook-modal-label">Events *</label>
+                    <div class="webhook-event-checkboxes" id="webhook-event-checkboxes">
+                        <!-- Populated dynamically by renderWebhookEventCheckboxes() -->
+                    </div>
+                </div>
+                <div class="webhook-modal-field">
+                    <label class="webhook-modal-label" for="webhook-secret-input">Secret (HMAC-SHA256)</label>
+                    <input type="password" id="webhook-secret-input" class="webhook-modal-input"
+                        data-testid="webhook-secret-input"
+                        placeholder="Optional signing secret"
+                        autocomplete="new-password" />
+                    <small style="font-size:0.72rem;color:var(--text-secondary,#8b949e);margin-top:4px;display:block;">
+                        Payload will be signed with X-Hub-Signature-256 header.
+                    </small>
+                </div>
+                <div class="webhook-modal-actions">
+                    <button class="webhook-modal-cancel" onclick="closeWebhookModal()">Cancel</button>
+                    <button class="webhook-modal-save" id="webhook-modal-save" data-testid="webhook-modal-save" onclick="saveWebhook()">Save Webhook</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Webhook toast -->
+        <div class="webhook-toast" id="webhook-toast"></div>
 
         <!-- Requirement Editor -->
         <div class="card req-editor-section" id="requirement-editor" data-testid="requirement-editor">
@@ -12110,6 +12456,251 @@
         });
     }());
     // ---- END AI-225 Project Switcher ----
+    </script>
+
+    <script>
+    // ==========================================
+    // AI-229: Webhook Management UI
+    // ==========================================
+    (function() {
+        const VALID_EVENTS = [
+            'agent.session.started',
+            'agent.session.completed',
+            'agent.session.failed',
+            'pr.created',
+            'pr.merged',
+            'ticket.transitioned',
+        ];
+
+        // State
+        let _webhooks = [];
+        let _deliveries = [];
+        let _deliveryRefreshTimer = null;
+        let _webhookToastTimer = null;
+
+        function _apiBase() {
+            return (typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '').replace(/\/$/, '');
+        }
+
+        // ---------- Toast ----------
+        function _showWebhookToast(msg, isError) {
+            const el = document.getElementById('webhook-toast');
+            if (!el) return;
+            el.textContent = msg;
+            el.className = 'webhook-toast' + (isError ? ' error' : '') + ' show';
+            clearTimeout(_webhookToastTimer);
+            _webhookToastTimer = setTimeout(() => {
+                el.className = 'webhook-toast' + (isError ? ' error' : '');
+            }, 3000);
+        }
+
+        // ---------- Load webhooks ----------
+        async function loadWebhooks() {
+            try {
+                const resp = await fetch(_apiBase() + '/api/webhooks');
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                const data = await resp.json();
+                _webhooks = data.webhooks || [];
+                renderWebhookList();
+            } catch (e) {
+                console.error('Failed to load webhooks:', e);
+            }
+        }
+
+        // ---------- Render webhook list ----------
+        function renderWebhookList() {
+            const list = document.getElementById('webhook-list');
+            const emptyEl = document.getElementById('webhook-empty');
+            if (!list) return;
+
+            if (!_webhooks.length) {
+                if (emptyEl) emptyEl.style.display = '';
+                // Remove any old items
+                Array.from(list.querySelectorAll('.webhook-item')).forEach(el => el.remove());
+                return;
+            }
+            if (emptyEl) emptyEl.style.display = 'none';
+
+            // Remove old items
+            Array.from(list.querySelectorAll('.webhook-item')).forEach(el => el.remove());
+
+            _webhooks.forEach(wh => {
+                const div = document.createElement('div');
+                div.className = 'webhook-item';
+                div.setAttribute('data-webhook-id', wh.id);
+                div.setAttribute('data-testid', 'webhook-item');
+                div.innerHTML = `
+                    <div class="webhook-item-header">
+                        <span class="webhook-url" title="${wh.url}">${wh.url}</span>
+                        <span class="webhook-status-badge webhook-status-active">Active</span>
+                        <div class="webhook-item-actions">
+                            <button class="webhook-btn webhook-btn-test" onclick="_testWebhook('${wh.id}')" data-testid="webhook-test-btn">Test</button>
+                            <button class="webhook-btn webhook-btn-delete" onclick="_deleteWebhook('${wh.id}')" data-testid="webhook-delete-btn">Delete</button>
+                        </div>
+                    </div>
+                    <div class="webhook-events">
+                        ${(wh.events || []).map(e => `<span class="webhook-event-badge">${e}</span>`).join('')}
+                    </div>
+                `;
+                list.insertBefore(div, emptyEl ? emptyEl.nextSibling : null);
+                list.appendChild(div);
+            });
+        }
+
+        // ---------- Load delivery log ----------
+        async function loadWebhookDeliveries() {
+            try {
+                const resp = await fetch(_apiBase() + '/api/webhooks/deliveries');
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                const data = await resp.json();
+                _deliveries = (data.deliveries || []).slice().reverse(); // newest first
+                renderDeliveryLog();
+            } catch (e) {
+                console.error('Failed to load webhook deliveries:', e);
+            }
+        }
+        window.loadWebhookDeliveries = loadWebhookDeliveries;
+
+        // ---------- Render delivery log ----------
+        function renderDeliveryLog() {
+            const tbody = document.getElementById('webhook-delivery-tbody');
+            if (!tbody) return;
+            if (!_deliveries.length) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-secondary,#8b949e);padding:16px;">No deliveries yet.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = _deliveries.map(d => {
+                const ts = d.timestamp ? new Date(d.timestamp).toLocaleTimeString() : '—';
+                const shortUrl = d.url ? (d.url.length > 40 ? d.url.slice(0, 38) + '...' : d.url) : '—';
+                const statusClass = d.status === 'success' ? 'delivery-success' : 'delivery-failed';
+                const code = d.response_code != null ? d.response_code : '—';
+                return `<tr>
+                    <td>${ts}</td>
+                    <td class="delivery-url-cell" title="${d.url || ''}">${shortUrl}</td>
+                    <td>${d.event || '—'}</td>
+                    <td class="${statusClass}">${d.status || '—'}</td>
+                    <td>${code}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        // ---------- Modal ----------
+        function renderWebhookEventCheckboxes() {
+            const container = document.getElementById('webhook-event-checkboxes');
+            if (!container) return;
+            container.innerHTML = VALID_EVENTS.map(e => `
+                <label class="webhook-event-checkbox-label">
+                    <input type="checkbox" name="webhook-event" value="${e}" checked />
+                    ${e}
+                </label>
+            `).join('');
+        }
+
+        window.openWebhookModal = function() {
+            renderWebhookEventCheckboxes();
+            const overlay = document.getElementById('webhook-modal-overlay');
+            if (overlay) overlay.classList.add('open');
+            const urlInput = document.getElementById('webhook-url-input');
+            if (urlInput) { urlInput.value = ''; urlInput.focus(); }
+            const secretInput = document.getElementById('webhook-secret-input');
+            if (secretInput) secretInput.value = '';
+        };
+
+        window.closeWebhookModal = function() {
+            const overlay = document.getElementById('webhook-modal-overlay');
+            if (overlay) overlay.classList.remove('open');
+        };
+
+        window.saveWebhook = async function() {
+            const url = (document.getElementById('webhook-url-input') || {}).value || '';
+            const secret = (document.getElementById('webhook-secret-input') || {}).value || '';
+            const checkboxes = document.querySelectorAll('input[name="webhook-event"]:checked');
+            const events = Array.from(checkboxes).map(c => c.value);
+
+            if (!url.trim()) {
+                _showWebhookToast('Endpoint URL is required', true);
+                return;
+            }
+            if (!events.length) {
+                _showWebhookToast('Select at least one event', true);
+                return;
+            }
+
+            const saveBtn = document.getElementById('webhook-modal-save');
+            if (saveBtn) saveBtn.disabled = true;
+
+            try {
+                const resp = await fetch(_apiBase() + '/api/webhooks', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url.trim(), events, secret }),
+                });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    throw new Error(err.error || 'HTTP ' + resp.status);
+                }
+                await resp.json();
+                closeWebhookModal();
+                await loadWebhooks();
+                _showWebhookToast('Webhook registered successfully');
+            } catch (e) {
+                _showWebhookToast('Failed to save webhook: ' + e.message, true);
+            } finally {
+                if (saveBtn) saveBtn.disabled = false;
+            }
+        };
+
+        // ---------- Test webhook ----------
+        window._testWebhook = async function(webhookId) {
+            try {
+                const resp = await fetch(_apiBase() + '/api/webhooks/' + webhookId + '/test', {
+                    method: 'POST',
+                });
+                const data = await resp.json();
+                if (data.status === 'success') {
+                    _showWebhookToast('Test delivery successful (HTTP ' + (data.response_code || '—') + ')');
+                } else {
+                    _showWebhookToast('Test delivery failed: ' + (data.error || data.status), true);
+                }
+                await loadWebhookDeliveries();
+            } catch (e) {
+                _showWebhookToast('Test failed: ' + e.message, true);
+            }
+        };
+
+        // ---------- Delete webhook ----------
+        window._deleteWebhook = async function(webhookId) {
+            if (!confirm('Delete this webhook?')) return;
+            try {
+                const resp = await fetch(_apiBase() + '/api/webhooks/' + webhookId, {
+                    method: 'DELETE',
+                });
+                if (!resp.ok && resp.status !== 204) {
+                    throw new Error('HTTP ' + resp.status);
+                }
+                await loadWebhooks();
+                _showWebhookToast('Webhook deleted');
+            } catch (e) {
+                _showWebhookToast('Delete failed: ' + e.message, true);
+            }
+        };
+
+        // ---------- Init ----------
+        async function initWebhooks() {
+            await loadWebhooks();
+            await loadWebhookDeliveries();
+            // Auto-refresh delivery log every 30 seconds
+            _deliveryRefreshTimer = setInterval(loadWebhookDeliveries, 30000);
+        }
+
+        // Run after DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initWebhooks);
+        } else {
+            initWebhooks();
+        }
+
+    })();
     </script>
 </body>
 </html>

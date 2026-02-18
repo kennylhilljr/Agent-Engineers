@@ -34,6 +34,11 @@ import aiohttp
 import aiohttp_cors
 from aiohttp import web
 
+# Add project root to path for webhook imports
+_PROJ_ROOT = Path(__file__).parent.parent
+if str(_PROJ_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJ_ROOT))
+
 # Add project root to path so we can import dashboard modules
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -146,6 +151,15 @@ class DashboardServer:
         self.app.router.add_get('/api/providers', self.handle_providers)
         self.app.router.add_get('/api/providers/status', self.handle_providers_status)
         self.app.router.add_post('/api/chat', self.handle_chat)
+
+        # AI-229: Webhook Support for CI/CD Pipeline Integration
+        self.app.router.add_get('/api/webhooks', self.handle_list_webhooks)
+        self.app.router.add_post('/api/webhooks', self.handle_create_webhook)
+        self.app.router.add_get('/api/webhooks/deliveries', self.handle_webhook_deliveries)
+        self.app.router.add_delete('/api/webhooks/{webhook_id}', self.handle_delete_webhook)
+        self.app.router.add_post('/api/webhooks/{webhook_id}/test', self.handle_test_webhook)
+        self.app.router.add_post('/api/webhooks/inbound/run-ticket', self.handle_inbound_run_ticket)
+        self.app.router.add_post('/api/webhooks/inbound/run-spec', self.handle_inbound_run_spec)
 
     def _setup_cors(self) -> None:
         """Set up CORS to allow browser access from any origin."""
@@ -1052,6 +1066,163 @@ class DashboardServer:
 </body>
 </html>
 """
+
+    # -------------------------------------------------------------------------
+    # AI-229: Webhook handlers
+    # -------------------------------------------------------------------------
+
+    def _get_webhook_manager(self):
+        """Lazy-import and return the WebhookManager singleton."""
+        try:
+            from dashboard.webhooks import get_webhook_manager, VALID_EVENTS
+            return get_webhook_manager(), VALID_EVENTS
+        except ImportError:
+            return None, []
+
+    async def handle_list_webhooks(self, request: web.Request) -> web.Response:
+        """GET /api/webhooks — list all registered webhooks."""
+        manager, valid_events = self._get_webhook_manager()
+        if manager is None:
+            return web.json_response({"error": "Webhook module not available"}, status=503)
+        webhooks = manager.list_webhooks()
+        return web.json_response({
+            "webhooks": webhooks,
+            "count": len(webhooks),
+            "valid_events": valid_events,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        })
+
+    async def handle_create_webhook(self, request: web.Request) -> web.Response:
+        """POST /api/webhooks — register a new webhook."""
+        manager, _ = self._get_webhook_manager()
+        if manager is None:
+            return web.json_response({"error": "Webhook module not available"}, status=503)
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON body"}, status=400)
+
+        url = data.get("url", "").strip()
+        events = data.get("events", [])
+        secret = data.get("secret", "")
+
+        if not url:
+            return web.json_response({"error": "url is required"}, status=400)
+        if not events:
+            return web.json_response({"error": "events list is required"}, status=400)
+
+        try:
+            webhook_id = manager.register_webhook(url=url, events=events, secret=secret)
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
+
+        webhook = manager.get_webhook(webhook_id)
+        return web.json_response(webhook, status=201)
+
+    async def handle_delete_webhook(self, request: web.Request) -> web.Response:
+        """DELETE /api/webhooks/{webhook_id} — remove a webhook."""
+        manager, _ = self._get_webhook_manager()
+        if manager is None:
+            return web.json_response({"error": "Webhook module not available"}, status=503)
+        webhook_id = request.match_info.get("webhook_id", "")
+        deleted = manager.delete_webhook(webhook_id)
+        if deleted:
+            return web.Response(status=204)
+        return web.json_response({"error": f"Webhook {webhook_id} not found"}, status=404)
+
+    async def handle_test_webhook(self, request: web.Request) -> web.Response:
+        """POST /api/webhooks/{webhook_id}/test — send a test event to a webhook."""
+        manager, _ = self._get_webhook_manager()
+        if manager is None:
+            return web.json_response({"error": "Webhook module not available"}, status=503)
+        webhook_id = request.match_info.get("webhook_id", "")
+        if manager.get_webhook(webhook_id) is None:
+            return web.json_response({"error": f"Webhook {webhook_id} not found"}, status=404)
+        try:
+            result = await manager.test_webhook(webhook_id)
+        except Exception as exc:
+            return web.json_response({"error": str(exc)}, status=500)
+        return web.json_response(result)
+
+    async def handle_webhook_deliveries(self, request: web.Request) -> web.Response:
+        """GET /api/webhooks/deliveries — get delivery log (last 50)."""
+        manager, _ = self._get_webhook_manager()
+        if manager is None:
+            return web.json_response({"error": "Webhook module not available"}, status=503)
+        deliveries = manager.get_delivery_log()
+        return web.json_response({
+            "deliveries": deliveries,
+            "count": len(deliveries),
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        })
+
+    async def handle_inbound_run_ticket(self, request: web.Request) -> web.Response:
+        """POST /api/webhooks/inbound/run-ticket — trigger agent on a ticket."""
+        manager, _ = self._get_webhook_manager()
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON body"}, status=400)
+
+        ticket_key = data.get("ticket_key", "").strip()
+        if not ticket_key:
+            return web.json_response({"error": "ticket_key is required"}, status=400)
+
+        agent = data.get("agent", "coding")
+        priority = data.get("priority", "normal")
+
+        logger.info(f"Inbound webhook: run-ticket ticket_key={ticket_key} agent={agent}")
+
+        if manager:
+            await manager.trigger_event("agent.session.started", {
+                "ticket_key": ticket_key,
+                "agent": agent,
+                "priority": priority,
+                "source": "inbound_webhook",
+            })
+
+        return web.json_response({
+            "accepted": True,
+            "ticket_key": ticket_key,
+            "agent": agent,
+            "priority": priority,
+            "message": f"Agent {agent} queued for ticket {ticket_key}",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        }, status=202)
+
+    async def handle_inbound_run_spec(self, request: web.Request) -> web.Response:
+        """POST /api/webhooks/inbound/run-spec — trigger agent on a spec."""
+        manager, _ = self._get_webhook_manager()
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON body"}, status=400)
+
+        spec = data.get("spec", "").strip()
+        if not spec:
+            return web.json_response({"error": "spec is required"}, status=400)
+
+        agent = data.get("agent", "coding")
+        ticket_key = data.get("ticket_key", "")
+
+        logger.info(f"Inbound webhook: run-spec agent={agent} ticket_key={ticket_key}")
+
+        if manager:
+            await manager.trigger_event("agent.session.started", {
+                "spec_length": len(spec),
+                "agent": agent,
+                "ticket_key": ticket_key,
+                "source": "inbound_webhook_spec",
+            })
+
+        return web.json_response({
+            "accepted": True,
+            "agent": agent,
+            "ticket_key": ticket_key,
+            "spec_length": len(spec),
+            "message": f"Agent {agent} queued to process spec",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        }, status=202)
 
     async def start(self, open_browser: bool = True) -> None:
         """Start the dashboard server.
