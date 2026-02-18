@@ -60,6 +60,18 @@ VALID_AGENT_STATUSES = ("idle", "running", "paused", "error")
 # {agent_name: [list of last 20 event dicts]}
 _rest_agent_recent_events: Dict[str, list] = {}
 
+# AI-83: Global Metrics Bar (REQ-METRICS-001) - in-memory global metrics store
+_rest_global_metrics: Dict[str, Any] = {
+    "total_sessions": 0,
+    "total_tokens": 0,
+    "total_cost_usd": 0.0,
+    "uptime_seconds": 0,
+    "current_session": 0,
+    "agents_active": 0,
+    "tasks_completed_today": 0,
+    "_server_start_time": None,  # set at server startup
+}
+
 # AI-82: Orchestrator Pipeline Visualization (REQ-MONITOR-004)
 # Pipeline state: {"active": bool, "ticket_key": str, "ticket_title": str, "steps": [...]}
 _PIPELINE_STEP_IDS = [
@@ -278,6 +290,10 @@ class RESTAPIServer:
                     "estimated_cost": 0.0,
                 }
 
+        # AI-83: Record server start time for uptime calculation (REQ-METRICS-001)
+        if _rest_global_metrics.get("_server_start_time") is None:
+            _rest_global_metrics["_server_start_time"] = datetime.utcnow()
+
     @middleware
     async def _cors_middleware(self, request: Request, handler):
         """Add CORS headers to all responses."""
@@ -362,10 +378,14 @@ class RESTAPIServer:
         self.app.router.add_post('/api/orchestrator/pipeline', self.set_pipeline)
         self.app.router.add_post('/api/orchestrator/pipeline/step', self.update_pipeline_step)
 
+        # AI-83: Global Metrics Bar (REQ-METRICS-001)
+        self.app.router.add_get('/api/metrics/global', self.get_global_metrics)
+        self.app.router.add_post('/api/metrics/global', self.post_global_metrics)
+
         # OPTIONS for CORS preflight
         for route in ['/api/metrics', '/api/agents', '/api/sessions', '/api/providers',
                       '/api/chat', '/api/decisions', '/api/agents/status',
-                      '/api/orchestrator/pipeline']:
+                      '/api/orchestrator/pipeline', '/api/metrics/global']:
             self.app.router.add_route('OPTIONS', route, self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
@@ -1834,6 +1854,140 @@ class RESTAPIServer:
 
         for ws in dead_clients:
             _ws_clients.discard(ws)
+
+    # =========================================================================
+    # AI-83: Global Metrics Bar (REQ-METRICS-001)
+    # =========================================================================
+
+    def _get_rest_uptime_seconds(self) -> int:
+        """Return seconds since REST server started (or 0 if not tracked)."""
+        start = _rest_global_metrics.get("_server_start_time")
+        if start is None:
+            return 0
+        try:
+            delta = (datetime.utcnow() - start).total_seconds()
+            return max(0, int(delta))
+        except Exception:
+            return 0
+
+    def _build_rest_global_metrics_response(self) -> dict:
+        """Build the global metrics response dict from current state.
+
+        Merges the in-memory _rest_global_metrics overrides with the persisted
+        DashboardState (total_sessions, total_tokens, total_cost_usd) and
+        live agent counts from _agent_status_details.
+
+        Returns:
+            dict with all required fields for REQ-METRICS-001
+        """
+        try:
+            state = self.store.load()
+            persisted_sessions = state.get("total_sessions", 0)
+            persisted_tokens = state.get("total_tokens", 0)
+            persisted_cost = state.get("total_cost_usd", 0.0)
+            current_session = len(state.get("sessions", []))
+        except Exception:
+            persisted_sessions = 0
+            persisted_tokens = 0
+            persisted_cost = 0.0
+            current_session = 0
+
+        total_sessions = _rest_global_metrics.get("total_sessions") or persisted_sessions
+        total_tokens = _rest_global_metrics.get("total_tokens") or persisted_tokens
+        total_cost_usd = _rest_global_metrics.get("total_cost_usd") or persisted_cost
+
+        agents_active = sum(
+            1 for info in _agent_status_details.values()
+            if info.get("status") == "running"
+        )
+
+        return {
+            "total_sessions": total_sessions,
+            "total_tokens": total_tokens,
+            "total_cost_usd": round(total_cost_usd, 6),
+            "uptime_seconds": self._get_rest_uptime_seconds(),
+            "current_session": _rest_global_metrics.get("current_session") or current_session,
+            "agents_active": agents_active,
+            "tasks_completed_today": _rest_global_metrics.get("tasks_completed_today", 0),
+        }
+
+    async def get_global_metrics(self, request: Request) -> Response:
+        """GET /api/metrics/global — return global metrics summary (AI-83 / REQ-METRICS-001).
+
+        Response shape:
+            {
+                "total_sessions": 42,
+                "total_tokens": 250000,
+                "total_cost_usd": 12.50,
+                "uptime_seconds": 86400,
+                "current_session": 8,
+                "agents_active": 3,
+                "tasks_completed_today": 15
+            }
+
+        Returns:
+            200 JSON with global metrics.
+        """
+        return web.json_response(self._build_rest_global_metrics_response())
+
+    async def post_global_metrics(self, request: Request) -> Response:
+        """POST /api/metrics/global — increment global metrics (AI-83 / REQ-METRICS-001).
+
+        Request body (all fields optional, each increments the corresponding counter):
+            {
+                "total_sessions": 1,
+                "total_tokens": 500,
+                "total_cost_usd": 0.05,
+                "tasks_completed_today": 1,
+                "current_session": 9,
+                "agents_active": 2
+            }
+
+        Set ``"set"`` key to true to overwrite rather than increment.
+
+        Returns:
+            200 JSON with updated global metrics.
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        mode = "set" if body.get("set") else "increment"
+        incrementable = ("total_sessions", "total_tokens", "total_cost_usd",
+                         "tasks_completed_today", "current_session", "agents_active")
+
+        for field in incrementable:
+            if field in body:
+                val = body[field]
+                if mode == "set":
+                    _rest_global_metrics[field] = val
+                else:
+                    current = _rest_global_metrics.get(field, 0)
+                    if isinstance(current, float) or isinstance(val, float):
+                        _rest_global_metrics[field] = round(float(current) + float(val), 6)
+                    else:
+                        _rest_global_metrics[field] = int(current) + int(val)
+
+        metrics = self._build_rest_global_metrics_response()
+
+        # Broadcast via WebSocket to all connected REST API clients
+        import json as _json
+        payload = _json.dumps({
+            "type": "global_metrics_update",
+            "data": metrics,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        })
+        dead_clients: set = set()
+        for ws in list(_ws_clients):
+            try:
+                await ws.send_str(payload)
+            except Exception:
+                dead_clients.add(ws)
+        for ws in dead_clients:
+            _ws_clients.discard(ws)
+
+        return web.json_response(metrics)
 
     async def serve_dashboard(self, request: Request) -> Response:
         """GET / - Serve dashboard HTML.
