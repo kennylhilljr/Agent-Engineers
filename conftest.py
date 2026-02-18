@@ -106,6 +106,14 @@ if _worktree_load_time_benchmark_path.exists() and "dashboard.load_time_benchmar
     except Exception:
         pass
 
+# 4h. Load dashboard.structured_logging from the worktree (AI-186 / REQ-OBS-001) — before server
+_worktree_structured_logging_path = _WORKTREE_ROOT / "dashboard" / "structured_logging.py"
+if _worktree_structured_logging_path.exists() and "dashboard.structured_logging" not in sys.modules:
+    try:
+        _load_module_from_file("dashboard.structured_logging", _worktree_structured_logging_path)
+    except Exception:
+        pass
+
 # 4b. Override dashboard.server with the worktree's AI-161 version
 _worktree_server_path = _WORKTREE_ROOT / "dashboard" / "server.py"
 if _worktree_server_path.exists():
