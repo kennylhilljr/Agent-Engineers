@@ -392,6 +392,107 @@
             background: rgba(239, 68, 68, 0.1);
         }
 
+        /* AI-80: Active Requirement Display (REQ-MONITOR-002) */
+        .agent-status-item.status-running {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+            background: rgba(34, 197, 94, 0.06);
+            border: 1px solid rgba(34, 197, 94, 0.15);
+            border-radius: 6px;
+            padding: 6px 10px;
+        }
+
+        .agent-running-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .agent-running-ticket {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: #22c55e;
+            letter-spacing: 0.02em;
+        }
+
+        .agent-running-title {
+            font-size: 0.72rem;
+            color: var(--text-primary, #e2e8f0);
+            font-weight: 600;
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .agent-running-metrics {
+            display: flex;
+            gap: 10px;
+            font-size: 0.68rem;
+            color: var(--text-secondary, #8b949e);
+            width: 100%;
+        }
+
+        .agent-running-metric {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .agent-running-metric-label {
+            opacity: 0.7;
+        }
+
+        .agent-running-metric-value {
+            color: var(--text-primary, #e2e8f0);
+            font-weight: 500;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .agent-running-cost {
+            color: #fbbf24;
+        }
+
+        .agent-desc-toggle {
+            font-size: 0.65rem;
+            color: #60a5fa;
+            cursor: pointer;
+            border: none;
+            background: none;
+            padding: 0;
+            margin-left: auto;
+            flex-shrink: 0;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+
+        .agent-desc-toggle:hover {
+            color: #93c5fd;
+        }
+
+        .agent-desc-container {
+            width: 100%;
+            overflow: hidden;
+            max-height: 0;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .agent-desc-container.expanded {
+            max-height: 200px;
+            transition: max-height 0.3s ease-in;
+        }
+
+        .agent-desc-text {
+            font-size: 0.68rem;
+            color: var(--text-secondary, #8b949e);
+            line-height: 1.4;
+            padding: 4px 0 2px 0;
+            word-break: break-word;
+            white-space: pre-wrap;
+        }
+
         /* Header */
         .header {
             text-align: center;
@@ -4656,6 +4757,25 @@
                             // AI-79: Real-time agent status update from WebSocket (REQ-MONITOR-001)
                             console.log('Received agent_status event via WebSocket', message);
                             updateAgentStatusItem(message.agent, message.status, message.ticket || null);
+                        } else if (message.type === 'agent_metrics_update') {
+                            // AI-80: Real-time metrics update (REQ-MONITOR-002)
+                            console.log('Received agent_metrics_update via WebSocket', message);
+                            const agentName = message.agent;
+                            if (agentName && PANEL_AGENTS.includes(agentName)) {
+                                if (_agentPanelStatus[agentName]) {
+                                    if (message.token_count !== undefined) {
+                                        _agentPanelStatus[agentName].token_count = message.token_count;
+                                    }
+                                    if (message.estimated_cost !== undefined) {
+                                        _agentPanelStatus[agentName].estimated_cost = message.estimated_cost;
+                                    }
+                                    // Update in-place (no re-render needed)
+                                    const tokensEl = document.getElementById(`agent-tokens-${agentName}`);
+                                    const costEl = document.getElementById(`agent-cost-${agentName}`);
+                                    if (tokensEl) tokensEl.textContent = (_agentPanelStatus[agentName].token_count || 0).toLocaleString();
+                                    if (costEl) costEl.textContent = formatCost(_agentPanelStatus[agentName].estimated_cost);
+                                }
+                            }
                         }
                     } catch (error) {
                         console.error('Error processing WebSocket message:', error);
@@ -5125,8 +5245,71 @@
         // In-memory cache of agent statuses for the panel
         const _agentPanelStatus = {};
         PANEL_AGENTS.forEach(name => {
-            _agentPanelStatus[name] = { status: 'idle', current_ticket: null, elapsed_time: null };
+            _agentPanelStatus[name] = {
+                status: 'idle',
+                current_ticket: null,
+                elapsed_time: null,
+                // AI-80 / REQ-MONITOR-002: active requirement display fields
+                ticket_title: null,
+                description: null,
+                token_count: 0,
+                estimated_cost: 0.0,
+                started_at: null,
+                _desc_expanded: false,
+            };
         });
+
+        // AI-80: elapsed time counter - runs every second for running agents
+        let _elapsedTimer = null;
+
+        function startElapsedTimer() {
+            if (_elapsedTimer) return;
+            _elapsedTimer = setInterval(() => {
+                PANEL_AGENTS.forEach(name => {
+                    const info = _agentPanelStatus[name];
+                    if (info.status === 'running' && info.started_at) {
+                        const started = new Date(info.started_at);
+                        const elapsed = Math.round((Date.now() - started.getTime()) / 1000);
+                        info.elapsed_time = elapsed;
+                        // Update just the elapsed time display
+                        const elEl = document.getElementById(`agent-elapsed-${name}`);
+                        if (elEl) elEl.textContent = formatElapsed(elapsed);
+                    }
+                });
+            }, 1000);
+        }
+
+        function formatElapsed(seconds) {
+            if (seconds === null || seconds === undefined) return '--';
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = seconds % 60;
+            if (h > 0) return `${h}h ${m}m ${s}s`;
+            if (m > 0) return `${m}m ${s}s`;
+            return `${s}s`;
+        }
+
+        function formatCost(cost) {
+            if (cost === null || cost === undefined || cost === 0) return '$0.0000';
+            return '$' + cost.toFixed(4);
+        }
+
+        function toggleAgentDesc(agentName) {
+            const info = _agentPanelStatus[agentName];
+            if (!info) return;
+            info._desc_expanded = !info._desc_expanded;
+            const container = document.getElementById(`agent-desc-container-${agentName}`);
+            const toggle = document.getElementById(`agent-desc-toggle-${agentName}`);
+            if (container) {
+                if (info._desc_expanded) {
+                    container.classList.add('expanded');
+                    if (toggle) toggle.textContent = 'collapse';
+                } else {
+                    container.classList.remove('expanded');
+                    if (toggle) toggle.textContent = 'expand';
+                }
+            }
+        }
 
         // Display name formatter
         function agentDisplayName(name) {
@@ -5140,17 +5323,56 @@
             return names[name] || name;
         }
 
-        function renderAgentStatusPanel() {
-            const list = document.getElementById('agent-status-list');
-            if (!list) return;
+        function renderAgentStatusItem(name) {
+            const info = _agentPanelStatus[name] || { status: 'idle', current_ticket: null };
+            const status = info.status || 'idle';
+            const displayName = agentDisplayName(name);
+            const labelMap = { idle: 'Idle', running: 'Running', paused: 'Paused', error: 'Error' };
+            const label = labelMap[status] || status;
 
-            list.innerHTML = PANEL_AGENTS.map(name => {
-                const info = _agentPanelStatus[name] || { status: 'idle', current_ticket: null };
-                const status = info.status || 'idle';
-                const displayName = agentDisplayName(name);
-                const labelMap = { idle: 'Idle', running: 'Running', paused: 'Paused', error: 'Error' };
-                const label = labelMap[status] || status;
+            if (status === 'running') {
+                // AI-80 / REQ-MONITOR-002: Expanded running agent view
+                const ticket = info.current_ticket || '';
+                const title = info.ticket_title || '';
+                const desc = info.description || '';
+                const elapsed = info.elapsed_time !== null ? formatElapsed(info.elapsed_time) : '0s';
+                const tokens = info.token_count || 0;
+                const cost = formatCost(info.estimated_cost);
+                const descExpanded = info._desc_expanded || false;
+                const descPreview = desc.length > 100 ? desc.substring(0, 100) + '...' : desc;
+                const expandedClass = descExpanded ? ' expanded' : '';
 
+                return `
+                    <div class="agent-status-item status-running" id="agent-status-item-${name}" data-agent="${name}" data-status="${status}">
+                        <div class="agent-running-header">
+                            <div class="agent-status-dot status-running" id="agent-status-dot-${name}"></div>
+                            <span class="agent-running-ticket">${ticket}</span>
+                            <span class="agent-running-title" title="${title}">${title || displayName}</span>
+                            <span class="agent-status-label label-running" id="agent-status-label-${name}">Running</span>
+                        </div>
+                        <div class="agent-running-metrics">
+                            <div class="agent-running-metric">
+                                <span class="agent-running-metric-label">Time:</span>
+                                <span class="agent-running-metric-value" id="agent-elapsed-${name}">${elapsed}</span>
+                            </div>
+                            <div class="agent-running-metric">
+                                <span class="agent-running-metric-label">Tokens:</span>
+                                <span class="agent-running-metric-value" id="agent-tokens-${name}">${tokens.toLocaleString()}</span>
+                            </div>
+                            <div class="agent-running-metric">
+                                <span class="agent-running-metric-label">Cost:</span>
+                                <span class="agent-running-metric-value agent-running-cost" id="agent-cost-${name}">${cost}</span>
+                            </div>
+                            ${desc ? `<button class="agent-desc-toggle" id="agent-desc-toggle-${name}" onclick="toggleAgentDesc('${name}')">${descExpanded ? 'collapse' : 'expand'}</button>` : ''}
+                        </div>
+                        ${desc ? `
+                        <div class="agent-desc-container${expandedClass}" id="agent-desc-container-${name}">
+                            <div class="agent-desc-text">${desc.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+                        </div>` : ''}
+                    </div>
+                `;
+            } else {
+                // Compact view for non-running agents
                 return `
                     <div class="agent-status-item" id="agent-status-item-${name}" data-agent="${name}" data-status="${status}">
                         <div class="agent-status-dot status-${status}" id="agent-status-dot-${name}"></div>
@@ -5158,15 +5380,61 @@
                         <span class="agent-status-label label-${status}" id="agent-status-label-${name}">${label}</span>
                     </div>
                 `;
-            }).join('');
+            }
         }
 
-        function updateAgentStatusItem(agentName, status, currentTicket) {
+        function renderAgentStatusPanel() {
+            const list = document.getElementById('agent-status-list');
+            if (!list) return;
+
+            list.innerHTML = PANEL_AGENTS.map(name => renderAgentStatusItem(name)).join('');
+        }
+
+        function updateAgentStatusItem(agentName, status, currentTicket, extraFields) {
             if (!PANEL_AGENTS.includes(agentName)) return;
 
-            _agentPanelStatus[agentName] = { status, current_ticket: currentTicket };
+            const prevStatus = (_agentPanelStatus[agentName] || {}).status;
+            const prevExpanded = (_agentPanelStatus[agentName] || {})._desc_expanded || false;
 
-            // Update the DOM element if it exists
+            // Update cached info
+            _agentPanelStatus[agentName] = Object.assign(
+                _agentPanelStatus[agentName] || {},
+                {
+                    status,
+                    current_ticket: currentTicket,
+                    _desc_expanded: prevExpanded,
+                },
+                extraFields || {}
+            );
+
+            // If status changed, re-render the entire item (layout changed)
+            if (prevStatus !== status) {
+                const list = document.getElementById('agent-status-list');
+                const item = document.getElementById(`agent-status-item-${agentName}`);
+                if (list && item) {
+                    const newHtml = renderAgentStatusItem(agentName);
+                    item.outerHTML = newHtml;
+                } else if (list) {
+                    // Not yet in DOM, re-render all
+                    renderAgentStatusPanel();
+                }
+                return;
+            }
+
+            // Same status, just update metrics in-place for running agents
+            if (status === 'running') {
+                const tokensEl = document.getElementById(`agent-tokens-${agentName}`);
+                const costEl = document.getElementById(`agent-cost-${agentName}`);
+                const elapsedEl = document.getElementById(`agent-elapsed-${agentName}`);
+                if (tokensEl) tokensEl.textContent = (_agentPanelStatus[agentName].token_count || 0).toLocaleString();
+                if (costEl) costEl.textContent = formatCost(_agentPanelStatus[agentName].estimated_cost);
+                if (elapsedEl && _agentPanelStatus[agentName].elapsed_time !== null) {
+                    elapsedEl.textContent = formatElapsed(_agentPanelStatus[agentName].elapsed_time);
+                }
+                return;
+            }
+
+            // Compact view - update just dot and label
             const item = document.getElementById(`agent-status-item-${agentName}`);
             const dot = document.getElementById(`agent-status-dot-${agentName}`);
             const label = document.getElementById(`agent-status-label-${agentName}`);
@@ -5179,11 +5447,7 @@
                 dot.className = `agent-status-dot status-${status}`;
                 label.className = `agent-status-label label-${status}`;
                 label.textContent = displayLabel;
-                if (currentTicket && status === 'running') {
-                    item.title = `Running: ${currentTicket}`;
-                } else {
-                    item.title = '';
-                }
+                item.title = '';
             }
         }
 
@@ -5195,14 +5459,23 @@
                 const agents = data.agents || [];
                 agents.forEach(agent => {
                     if (agent.name && PANEL_AGENTS.includes(agent.name)) {
+                        const prevExpanded = (_agentPanelStatus[agent.name] || {})._desc_expanded || false;
                         _agentPanelStatus[agent.name] = {
                             status: agent.status || 'idle',
                             current_ticket: agent.current_ticket || null,
-                            elapsed_time: agent.elapsed_time || null,
+                            elapsed_time: agent.elapsed_time !== undefined ? agent.elapsed_time : null,
+                            // AI-80 / REQ-MONITOR-002: active requirement fields
+                            ticket_title: agent.ticket_title || null,
+                            description: agent.description || null,
+                            token_count: agent.token_count || 0,
+                            estimated_cost: agent.estimated_cost || 0.0,
+                            started_at: agent.started_at || null,
+                            _desc_expanded: prevExpanded,
                         };
                     }
                 });
                 renderAgentStatusPanel();
+                startElapsedTimer();
             } catch (err) {
                 console.warn('Agent status panel fetch failed:', err);
             }
@@ -5228,6 +5501,8 @@
             // AI-79: Initialize Agent Status Panel
             await fetchAgentStatusPanel();
             startAgentStatusPolling();
+            // AI-80: Start elapsed time counter
+            startElapsedTimer();
 
             console.log('Dashboard initialized');
             console.log('WebSocket live updates enabled with auto-reconnect');
