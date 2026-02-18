@@ -41,6 +41,23 @@ from aiohttp.web import Request, Response, middleware
 from dashboard.metrics_store import MetricsStore, ALL_AGENT_NAMES
 from exceptions import SecurityError
 
+# AI-222: User Authentication
+try:
+    from dashboard.auth.user_store import UserStore
+    from dashboard.auth.session_manager import SessionManager
+    from dashboard.auth.oauth_handler import OAuthHandler, OAuthNotConfiguredError
+    _AUTH_AVAILABLE = True
+except ImportError:
+    _AUTH_AVAILABLE = False
+
+# Shared singleton auth instances (initialized in RESTAPIServer.__init__)
+_user_store: Optional[Any] = None
+_session_manager: Optional[Any] = None
+_oauth_handler: Optional[Any] = None
+
+# In-memory OAuth state store {state_nonce -> provider}
+_oauth_states: Dict[str, str] = {}
+
 # Import only if needed - avoid importing agents.definitions which has Python 3.10+ dependencies
 # from agents.definitions import DEFAULT_MODELS, AGENT_DEFINITIONS
 
@@ -225,6 +242,10 @@ def create_auth_middleware():
         if request.path == "/api/health":
             return await handler(request)
 
+        # AI-222: Auth endpoints are always open (they handle their own auth)
+        if request.path.startswith("/auth/"):
+            return await handler(request)
+
         # Check Authorization header
         auth_header = request.headers.get("Authorization", "")
 
@@ -301,6 +322,13 @@ class RESTAPIServer:
             project_name=project_name,
             metrics_dir=self.metrics_dir
         )
+
+        # AI-222: Initialize auth singletons
+        global _user_store, _session_manager, _oauth_handler
+        if _AUTH_AVAILABLE:
+            _user_store = UserStore()
+            _session_manager = SessionManager()
+            _oauth_handler = OAuthHandler()
 
         # Create app with middlewares
         self.app = web.Application(
@@ -435,6 +463,23 @@ class RESTAPIServer:
 
         # Dashboard HTML
         self.app.router.add_get('/', self.serve_dashboard)
+
+        # AI-222: Authentication routes (register before WebSocket)
+        self.app.router.add_get('/auth/login', self.auth_login_page)
+        self.app.router.add_post('/auth/login', self.auth_login)
+        self.app.router.add_post('/auth/logout', self.auth_logout)
+        self.app.router.add_post('/auth/register', self.auth_register)
+        self.app.router.add_post('/auth/password-reset', self.auth_password_reset)
+        self.app.router.add_post('/auth/change-password', self.auth_change_password)
+        self.app.router.add_get('/auth/me', self.auth_me)
+        self.app.router.add_get('/auth/github', self.auth_github_start)
+        self.app.router.add_get('/auth/github/callback', self.auth_github_callback)
+        self.app.router.add_get('/auth/google', self.auth_google_start)
+        self.app.router.add_get('/auth/google/callback', self.auth_google_callback)
+        # OPTIONS preflight for auth endpoints
+        for _auth_route in ['/auth/login', '/auth/logout', '/auth/register',
+                             '/auth/password-reset', '/auth/change-password', '/auth/me']:
+            self.app.router.add_route('OPTIONS', _auth_route, self.handle_options)
 
         # WebSocket for agent_status broadcasts
         self.app.router.add_get('/api/ws', self.ws_handler)
@@ -3223,6 +3268,553 @@ class RESTAPIServer:
             }
         )
 
+    # ── AI-222: Authentication endpoints ────────────────────────────────
+
+    def _get_session_token(self, request: Request) -> Optional[str]:
+        """Extract the session token from cookie or Authorization header."""
+        # Cookie takes priority
+        token = request.cookies.get("session_token")
+        if token:
+            return token
+        # Fall back to Authorization: Bearer (for API clients)
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            t = auth[7:].strip()
+            if t:
+                return t
+        return None
+
+    def _get_current_user(self, request: Request):
+        """Return the User for the current session, or None."""
+        if not _AUTH_AVAILABLE or not _session_manager or not _user_store:
+            return None
+        token = self._get_session_token(request)
+        if not token:
+            return None
+        user_id = _session_manager.validate_session(token)
+        if not user_id:
+            return None
+        return _user_store.get_user_by_id(user_id)
+
+    def _make_session_cookie(self, token: str, expires_at: str, clear: bool = False) -> str:
+        """Build a Set-Cookie header value."""
+        if clear:
+            return "session_token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"
+        # 30-day max-age
+        max_age = 30 * 24 * 3600
+        return (
+            f"session_token={token}; Path=/; HttpOnly; SameSite=Lax; Max-Age={max_age}"
+        )
+
+    async def auth_login_page(self, request: Request) -> Response:
+        """GET /auth/login - Serve the login page."""
+        html_path = Path(__file__).parent / "auth_login.html"
+        if html_path.exists():
+            return web.Response(text=html_path.read_text(), content_type="text/html")
+        # Inline minimal fallback login page (auth section is also in dashboard.html)
+        github_configured = _oauth_handler.is_github_configured() if _oauth_handler else False
+        google_configured = _oauth_handler.is_google_configured() if _oauth_handler else False
+        github_btn = (
+            '<a href="/auth/github" class="oauth-btn github-btn">Login with GitHub</a>'
+            if github_configured
+            else '<div class="oauth-disabled">GitHub OAuth not configured</div>'
+        )
+        google_btn = (
+            '<a href="/auth/google" class="oauth-btn google-btn">Login with Google</a>'
+            if google_configured
+            else '<div class="oauth-disabled">Google OAuth not configured</div>'
+        )
+        html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login - Agent Dashboard</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+        background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);
+        min-height:100vh;display:flex;align-items:center;justify-content:center;
+        color:#e6edf3}}
+  .card{{background:rgba(22,27,34,0.95);border:1px solid #30363d;border-radius:12px;
+         padding:40px;width:100%;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,0.4)}}
+  h1{{color:#58a6ff;margin-bottom:8px;font-size:1.5rem}}
+  .subtitle{{color:#8b949e;font-size:0.875rem;margin-bottom:28px}}
+  label{{display:block;margin-bottom:6px;font-size:0.875rem;color:#8b949e}}
+  input{{width:100%;padding:10px 14px;background:#0d1117;border:1px solid #30363d;
+         border-radius:6px;color:#e6edf3;font-size:1rem;margin-bottom:16px;outline:none}}
+  input:focus{{border-color:#58a6ff}}
+  .btn{{width:100%;padding:11px;background:#238636;border:none;border-radius:6px;
+        color:#fff;font-size:1rem;cursor:pointer;font-weight:600;margin-bottom:12px}}
+  .btn:hover{{background:#2ea043}}
+  .oauth-btn{{display:block;width:100%;padding:10px;border-radius:6px;text-align:center;
+              text-decoration:none;font-weight:600;font-size:0.9rem;margin-bottom:10px}}
+  .github-btn{{background:#24292f;color:#fff;border:1px solid #444}}
+  .github-btn:hover{{background:#32383f}}
+  .google-btn{{background:#4285f4;color:#fff;border:1px solid #4285f4}}
+  .google-btn:hover{{background:#3370e0}}
+  .oauth-disabled{{color:#8b949e;font-size:0.8rem;text-align:center;
+                   margin-bottom:10px;padding:8px;border:1px dashed #30363d;border-radius:6px}}
+  .divider{{display:flex;align-items:center;gap:12px;margin:16px 0}}
+  .divider hr{{flex:1;border:none;border-top:1px solid #30363d}}
+  .divider span{{color:#8b949e;font-size:0.8rem}}
+  .error-msg{{background:#ff000022;border:1px solid #f85149;color:#f85149;
+              padding:10px;border-radius:6px;margin-bottom:16px;font-size:0.875rem}}
+  .links{{display:flex;justify-content:space-between;margin-top:16px;font-size:0.8rem}}
+  .links a{{color:#58a6ff;text-decoration:none}}
+  .links a:hover{{text-decoration:underline}}
+  #tab-bar{{display:flex;gap:0;margin-bottom:24px;border-bottom:1px solid #30363d}}
+  .tab{{flex:1;padding:10px;text-align:center;cursor:pointer;font-size:0.875rem;
+        color:#8b949e;border-bottom:2px solid transparent}}
+  .tab.active{{color:#58a6ff;border-bottom:2px solid #58a6ff}}
+  .tab-panel{{display:none}}.tab-panel.active{{display:block}}
+</style>
+</head>
+<body>
+<div class="card" data-testid="auth-card">
+  <h1>Agent Dashboard</h1>
+  <p class="subtitle">Sign in to your account</p>
+  <div id="error-msg" class="error-msg" style="display:none"></div>
+  <div id="tab-bar">
+    <div class="tab active" data-tab="login" onclick="showTab('login')" data-testid="tab-login">Sign In</div>
+    <div class="tab" data-tab="register" onclick="showTab('register')" data-testid="tab-register">Register</div>
+  </div>
+  <!-- Login Tab -->
+  <div id="tab-login" class="tab-panel active">
+    {github_btn}
+    {google_btn}
+    <div class="divider"><hr><span>or</span><hr></div>
+    <form id="login-form" onsubmit="doLogin(event)">
+      <label>Email</label>
+      <input type="email" id="login-email" name="email" placeholder="you@example.com"
+             data-testid="login-email" required>
+      <label>Password</label>
+      <input type="password" id="login-password" name="password" placeholder="Your password"
+             data-testid="login-password" required>
+      <button type="submit" class="btn" data-testid="login-submit">Sign In</button>
+    </form>
+    <div class="links">
+      <a href="#" onclick="showForgotPassword()">Forgot password?</a>
+      <a href="/">Back to Dashboard</a>
+    </div>
+  </div>
+  <!-- Register Tab -->
+  <div id="tab-register" class="tab-panel">
+    <form id="register-form" onsubmit="doRegister(event)">
+      <label>Name</label>
+      <input type="text" id="reg-name" name="name" placeholder="Your name"
+             data-testid="register-name" required>
+      <label>Email</label>
+      <input type="email" id="reg-email" name="email" placeholder="you@example.com"
+             data-testid="register-email" required>
+      <label>Password</label>
+      <input type="password" id="reg-password" name="password" placeholder="Choose a password"
+             data-testid="register-password" required minlength="8">
+      <button type="submit" class="btn" data-testid="register-submit">Create Account</button>
+    </form>
+  </div>
+</div>
+<script>
+function showTab(name) {{
+  document.querySelectorAll('.tab,.tab-panel').forEach(function(el) {{ el.classList.remove('active'); }});
+  var panel = document.getElementById('tab-' + name);
+  if (panel) panel.classList.add('active');
+  var tabs = document.querySelectorAll('.tab');
+  for (var i = 0; i < tabs.length; i++) {{
+    if (tabs[i].getAttribute('data-tab') === name) {{ tabs[i].classList.add('active'); }}
+  }}
+  hideError();
+}}
+function showError(msg) {{
+  const el = document.getElementById('error-msg');
+  el.textContent = msg; el.style.display = 'block';
+}}
+function hideError() {{
+  document.getElementById('error-msg').style.display = 'none';
+}}
+async function doLogin(e) {{
+  e.preventDefault(); hideError();
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  try {{
+    const r = await fetch('/auth/login', {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{email, password}})
+    }});
+    const data = await r.json();
+    if (r.ok) {{
+      localStorage.setItem('session_token', data.token);
+      window.location.href = '/';
+    }} else {{
+      showError(data.message || data.error || 'Login failed');
+    }}
+  }} catch(err) {{
+    showError('Network error: ' + err.message);
+  }}
+}}
+async function doRegister(e) {{
+  e.preventDefault(); hideError();
+  const name = document.getElementById('reg-name').value;
+  const email = document.getElementById('reg-email').value;
+  const password = document.getElementById('reg-password').value;
+  try {{
+    const r = await fetch('/auth/register', {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{name, email, password}})
+    }});
+    const data = await r.json();
+    if (r.ok) {{
+      localStorage.setItem('session_token', data.token);
+      window.location.href = '/';
+    }} else {{
+      showError(data.message || data.error || 'Registration failed');
+    }}
+  }} catch(err) {{
+    showError('Network error: ' + err.message);
+  }}
+}}
+async function showForgotPassword() {{
+  const email = document.getElementById('login-email').value || prompt('Enter your email:');
+  if (!email) return;
+  try {{
+    const r = await fetch('/auth/password-reset', {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{email}})
+    }});
+    const data = await r.json();
+    alert(data.message || 'If that email exists, a reset link has been logged to console.');
+  }} catch(err) {{
+    alert('Error: ' + err.message);
+  }}
+}}
+</script>
+</body>
+</html>"""
+        return web.Response(text=html, content_type="text/html")
+
+    async def auth_login(self, request: Request) -> Response:
+        """POST /auth/login - Email/password login."""
+        if not _AUTH_AVAILABLE or not _user_store or not _session_manager:
+            return web.json_response({"error": "Auth not available"}, status=503)
+
+        ip = request.remote or "unknown"
+
+        # Rate limiting check
+        if _session_manager.is_rate_limited(ip):
+            return web.json_response(
+                {"error": "Too many failed attempts. Please try again in 15 minutes."},
+                status=429,
+            )
+
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON"}, status=400)
+
+        email = (body.get("email") or "").strip()
+        password = body.get("password") or ""
+
+        if not email or not password:
+            return web.json_response({"error": "Email and password are required."}, status=400)
+
+        user = _user_store.get_user_by_email(email)
+        if not user or not _user_store.verify_password(user, password):
+            _session_manager.record_failed_attempt(ip)
+            remaining = _session_manager.remaining_attempts(ip)
+            return web.json_response(
+                {
+                    "error": "Invalid email or password.",
+                    "message": f"Invalid credentials. {remaining} attempts remaining.",
+                },
+                status=401,
+            )
+
+        # Successful login
+        _session_manager.clear_rate_limit(ip)
+        _user_store.update_last_login(user.id)
+        session = _session_manager.create_session(user.id, ip)
+
+        response = web.json_response({
+            "ok": True,
+            "token": session["token"],
+            "expires_at": session["expires_at"],
+            "csrf_token": session["csrf_token"],
+            "user": user.public_dict(),
+        })
+        response.set_cookie(
+            "session_token",
+            session["token"],
+            max_age=30 * 24 * 3600,
+            httponly=True,
+            samesite="Lax",
+            path="/",
+        )
+        return response
+
+    async def auth_logout(self, request: Request) -> Response:
+        """POST /auth/logout - Invalidate the current session."""
+        if not _AUTH_AVAILABLE or not _session_manager:
+            return web.json_response({"ok": True})
+
+        token = self._get_session_token(request)
+        if token:
+            _session_manager.invalidate_session(token)
+
+        response = web.json_response({"ok": True, "message": "Logged out successfully."})
+        response.del_cookie("session_token", path="/")
+        return response
+
+    async def auth_register(self, request: Request) -> Response:
+        """POST /auth/register - Create a new email/password account."""
+        if not _AUTH_AVAILABLE or not _user_store or not _session_manager:
+            return web.json_response({"error": "Auth not available"}, status=503)
+
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON"}, status=400)
+
+        email = (body.get("email") or "").strip()
+        password = body.get("password") or ""
+        name = (body.get("name") or "").strip()
+
+        if not email or not password:
+            return web.json_response({"error": "Email and password are required."}, status=400)
+        if len(password) < 8:
+            return web.json_response(
+                {"error": "Password must be at least 8 characters."}, status=400
+            )
+
+        try:
+            user = _user_store.create_user(email=email, name=name, password=password)
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=409)
+
+        ip = request.remote or "unknown"
+        _user_store.update_last_login(user.id)
+        session = _session_manager.create_session(user.id, ip)
+
+        response = web.json_response({
+            "ok": True,
+            "token": session["token"],
+            "expires_at": session["expires_at"],
+            "csrf_token": session["csrf_token"],
+            "user": user.public_dict(),
+        }, status=201)
+        response.set_cookie(
+            "session_token",
+            session["token"],
+            max_age=30 * 24 * 3600,
+            httponly=True,
+            samesite="Lax",
+            path="/",
+        )
+        return response
+
+    async def auth_password_reset(self, request: Request) -> Response:
+        """POST /auth/password-reset - Initiate password reset (logs to console)."""
+        if not _AUTH_AVAILABLE or not _user_store:
+            return web.json_response({"error": "Auth not available"}, status=503)
+
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON"}, status=400)
+
+        email = (body.get("email") or "").strip()
+        if not email:
+            return web.json_response({"error": "Email is required."}, status=400)
+
+        user = _user_store.get_user_by_email(email)
+        if user:
+            import secrets as _secrets
+            reset_token = _secrets.token_urlsafe(32)
+            # In production this would send an email; for now, log to console
+            import logging as _logging
+            _logging.getLogger(__name__).info(
+                "[AI-222] PASSWORD RESET TOKEN for %s: %s "
+                "(use POST /auth/change-password with this token)",
+                email,
+                reset_token,
+            )
+            print(
+                f"\n[AI-222] PASSWORD RESET for {email}\n"
+                f"  Reset token: {reset_token}\n"
+                f"  (In production this would be emailed)\n"
+            )
+
+        # Always return the same message to prevent user enumeration
+        return web.json_response({
+            "ok": True,
+            "message": "If that email address is registered, a reset link has been logged to the server console.",
+        })
+
+    async def auth_change_password(self, request: Request) -> Response:
+        """POST /auth/change-password - Change password for the authenticated user."""
+        if not _AUTH_AVAILABLE or not _user_store or not _session_manager:
+            return web.json_response({"error": "Auth not available"}, status=503)
+
+        user = self._get_current_user(request)
+        if not user:
+            return web.json_response({"error": "Authentication required."}, status=401)
+
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON"}, status=400)
+
+        current_password = body.get("current_password") or ""
+        new_password = body.get("new_password") or ""
+
+        if not new_password or len(new_password) < 8:
+            return web.json_response(
+                {"error": "New password must be at least 8 characters."}, status=400
+            )
+
+        # Verify current password (unless account was created via OAuth with no password)
+        if user.password_hash and not _user_store.verify_password(user, current_password):
+            return web.json_response(
+                {"error": "Current password is incorrect."}, status=401
+            )
+
+        _user_store.update_password(user.id, new_password)
+        # Invalidate all existing sessions so the user must re-login
+        _session_manager.invalidate_all_user_sessions(user.id)
+
+        return web.json_response({"ok": True, "message": "Password updated. Please sign in again."})
+
+    async def auth_me(self, request: Request) -> Response:
+        """GET /auth/me - Return current user info."""
+        if not _AUTH_AVAILABLE:
+            return web.json_response({"error": "Auth not available"}, status=503)
+
+        user = self._get_current_user(request)
+        if not user:
+            return web.json_response({"error": "Not authenticated."}, status=401)
+
+        return web.json_response({"ok": True, "user": user.public_dict()})
+
+    async def auth_github_start(self, request: Request) -> Response:
+        """GET /auth/github - Start GitHub OAuth flow."""
+        if not _AUTH_AVAILABLE or not _oauth_handler:
+            return web.Response(
+                text="<h2>GitHub OAuth not available</h2>",
+                content_type="text/html",
+                status=503,
+            )
+        try:
+            state = _oauth_handler.generate_state()
+            _oauth_states[state] = "github"
+            url = _oauth_handler.get_github_auth_url(state)
+            raise web.HTTPFound(location=url)
+        except OAuthNotConfiguredError as exc:
+            return web.json_response({"error": str(exc)}, status=503)
+
+    async def auth_github_callback(self, request: Request) -> Response:
+        """GET /auth/github/callback - Handle GitHub OAuth callback."""
+        if not _AUTH_AVAILABLE or not _oauth_handler or not _user_store or not _session_manager:
+            return web.json_response({"error": "Auth not available"}, status=503)
+
+        code = request.rel_url.query.get("code")
+        state = request.rel_url.query.get("state")
+
+        if not code or not state:
+            return web.json_response({"error": "Missing code or state."}, status=400)
+
+        if _oauth_states.pop(state, None) != "github":
+            return web.json_response({"error": "Invalid or expired state parameter."}, status=400)
+
+        try:
+            result = await _oauth_handler.exchange_github_code(code, state)
+        except OAuthNotConfiguredError as exc:
+            return web.json_response({"error": str(exc)}, status=503)
+        except Exception as exc:
+            return web.json_response({"error": f"OAuth exchange failed: {exc}"}, status=502)
+
+        user_info = result["user_info"]
+        user = _user_store.get_or_create_oauth_user(
+            provider="github",
+            provider_id=user_info["id"],
+            email=user_info["email"],
+            name=user_info["name"],
+        )
+        _user_store.update_last_login(user.id)
+        ip = request.remote or "unknown"
+        session = _session_manager.create_session(user.id, ip)
+
+        response = web.HTTPFound(location="/")
+        response.set_cookie(
+            "session_token",
+            session["token"],
+            max_age=30 * 24 * 3600,
+            httponly=True,
+            samesite="Lax",
+            path="/",
+        )
+        return response
+
+    async def auth_google_start(self, request: Request) -> Response:
+        """GET /auth/google - Start Google OAuth flow."""
+        if not _AUTH_AVAILABLE or not _oauth_handler:
+            return web.Response(
+                text="<h2>Google OAuth not available</h2>",
+                content_type="text/html",
+                status=503,
+            )
+        try:
+            state = _oauth_handler.generate_state()
+            _oauth_states[state] = "google"
+            url = _oauth_handler.get_google_auth_url(state)
+            raise web.HTTPFound(location=url)
+        except OAuthNotConfiguredError as exc:
+            return web.json_response({"error": str(exc)}, status=503)
+
+    async def auth_google_callback(self, request: Request) -> Response:
+        """GET /auth/google/callback - Handle Google OAuth callback."""
+        if not _AUTH_AVAILABLE or not _oauth_handler or not _user_store or not _session_manager:
+            return web.json_response({"error": "Auth not available"}, status=503)
+
+        code = request.rel_url.query.get("code")
+        state = request.rel_url.query.get("state")
+
+        if not code or not state:
+            return web.json_response({"error": "Missing code or state."}, status=400)
+
+        if _oauth_states.pop(state, None) != "google":
+            return web.json_response({"error": "Invalid or expired state parameter."}, status=400)
+
+        try:
+            result = await _oauth_handler.exchange_google_code(code, state)
+        except OAuthNotConfiguredError as exc:
+            return web.json_response({"error": str(exc)}, status=503)
+        except Exception as exc:
+            return web.json_response({"error": f"OAuth exchange failed: {exc}"}, status=502)
+
+        user_info = result["user_info"]
+        user = _user_store.get_or_create_oauth_user(
+            provider="google",
+            provider_id=user_info["id"],
+            email=user_info["email"],
+            name=user_info["name"],
+        )
+        _user_store.update_last_login(user.id)
+        ip = request.remote or "unknown"
+        session = _session_manager.create_session(user.id, ip)
+
+        response = web.HTTPFound(location="/")
+        response.set_cookie(
+            "session_token",
+            session["token"],
+            max_age=30 * 24 * 3600,
+            httponly=True,
+            samesite="Lax",
+            path="/",
+        )
+        return response
+
     async def serve_dashboard(self, request: Request) -> Response:
         """GET / - Serve dashboard HTML.
 
@@ -3230,6 +3822,14 @@ class RESTAPIServer:
             200 OK with HTML content
             404 Not Found if HTML file doesn't exist
         """
+        html_path = Path(__file__).parent / 'index.html'
+        if html_path.exists():
+            return web.Response(
+                text=html_path.read_text(),
+                content_type='text/html'
+            )
+
+        # Fallback to dashboard.html
         html_path = Path(__file__).parent / 'dashboard.html'
         if html_path.exists():
             return web.Response(
@@ -3239,7 +3839,7 @@ class RESTAPIServer:
 
         return web.json_response({
             'error': 'Dashboard HTML not found',
-            'message': 'dashboard.html not found in dashboard directory'
+            'message': 'index.html or dashboard.html not found in dashboard directory'
         }, status=404)
 
     # ── PM Task Launcher endpoints ──────────────────────────────────────
