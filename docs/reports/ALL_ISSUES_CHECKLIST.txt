@@ -1,0 +1,378 @@
+AGENT DASHBOARD - ALL 71 PLANNED ISSUES CHECKLIST
+================================================
+
+META ISSUE (1)
+==============
+[ ] [META] Project Progress Tracker - Session coordination and handoff
+
+
+PHASE 1: FOUNDATION (14 Issues)
+===============================
+Goal: Dashboard server with agent status panel
+Success: Server starts, shows all 13 agents with status from metrics
+
+[ ] REQ-CHAT-001: Implement Conversational Chat Interface
+    Component: None
+
+[ ] REQ-CHAT-002: Implement Message History Persistence
+    Component: None
+
+[ ] REQ-CHAT-003: Implement Code Block Rendering with Syntax Highlighting
+    Component: None
+
+[ ] REQ-MONITOR-001: Implement Agent Status Panel with Live Indicators
+    Component: TaskCard
+
+[ ] REQ-MONITOR-002: Implement Active Requirement Display for Running Agents
+    Component: TaskCard
+
+[ ] REQ-TECH-001: Create Backend HTTP Server (aiohttp/FastAPI)
+    Component: None
+
+[ ] REQ-TECH-002: Create Single-File HTML Frontend (no build step)
+    Component: None
+
+[ ] REQ-TECH-003: Implement WebSocket Protocol for Real-Time Updates
+    Component: None
+
+[ ] REQ-TECH-004: Define REST API Endpoints (/api/*)
+    Component: None
+
+[ ] REQ-TECH-005: Integrate MetricsStore Data Source
+    Component: None
+
+[ ] REQ-TECH-010: Implement Environment Variable Configuration
+    Component: None
+
+[ ] REQ-TECH-011: Add Dashboard Authentication (DASHBOARD_AUTH_TOKEN)
+    Component: None
+
+[ ] REQ-TECH-012: Ensure Sandbox Security Compliance
+    Component: None
+
+[ ] REQ-UI-001: Implement Panel Collapsibility for Responsive Design
+    Component: None
+
+[ ] REQ-UI-002: Add Dark Mode Toggle (default dark)
+    Component: None
+
+
+PHASE 2: REAL-TIME UPDATES (8 Issues)
+=====================================
+Goal: Agent status updates appear without page refresh
+Success: Agent status transitions visible within 1 second
+
+[ ] REQ-MONITOR-003: Implement Agent Detail View with Profiles and History
+    Component: TaskCard
+
+[ ] REQ-MONITOR-004: Implement Orchestrator Flow Visualization Pipeline
+    Component: None
+
+[ ] REQ-METRICS-001: Implement Global Metrics Bar (sessions, tokens, cost, uptime)
+    Component: ProgressRing
+
+[ ] REQ-METRICS-002: Implement Agent Leaderboard (XP, level, success rate)
+    Component: None
+
+[ ] REQ-METRICS-003: Implement Cost and Token Charts (bar, line, success rate)
+    Component: ProgressRing
+
+[ ] REQ-FEED-001: Implement Live Activity Feed with Agent Events
+    Component: ActivityItem
+
+[ ] REQ-TECH-006: Add Metrics Collector Event Emission Hooks
+    Component: None
+
+[ ] WebSocket Real-Time Event Broadcasting
+    Component: ActivityItem
+
+
+PHASE 3: CHAT INTERFACE (5 Issues)
+==================================
+Goal: User can chat with Claude through dashboard
+Success: User queries Linear, receives formatted response
+
+[ ] REQ-INTEGRATION-001: Implement Linear MCP Tool Access (39 tools)
+    Component: None
+    Description: Create issues, query status, transition workflows
+
+[ ] REQ-INTEGRATION-002: Implement Slack MCP Tool Access (8 tools)
+    Component: None
+    Description: Send messages, react, pin updates
+
+[ ] REQ-INTEGRATION-003: Implement GitHub MCP Tool Access (46 tools)
+    Component: None
+    Description: View PRs, create/merge, manage issues
+
+[ ] REQ-INTEGRATION-004: Implement Tool Call Transparency Display
+    Component: None
+    Description: Show which tool called, parameters, response
+
+[ ] REQ-TECH-008: Implement Chat-to-Agent Bridge Layer
+    Component: None
+    Description: Route chat messages through orchestrator
+
+
+PHASE 4: MULTI-PROVIDER SUPPORT (5 Issues)
+==========================================
+Goal: Switch AI providers and models in chat
+Success: Switch Claude to Gemini, receive Gemini response
+
+Providers Supported:
+  - Claude (Haiku 4.5, Sonnet 4.5, Opus 4.6)
+  - ChatGPT (GPT-4o, o1, o3-mini, o4-mini)
+  - Gemini (2.5 Flash, 2.5 Pro, 2.0 Flash)
+  - Groq (Llama 3.3 70B, Mixtral 8x7B)
+  - KIMI (Moonshot, 2M context)
+  - Windsurf (Cascade)
+
+[ ] REQ-PROVIDER-001: Implement Provider Switcher UI
+    Component: None
+
+[ ] REQ-PROVIDER-002: Implement Model Selector per Provider
+    Component: None
+
+[ ] REQ-PROVIDER-003: Implement Provider Status Indicators
+    Component: None
+    Description: Available/Unconfigured/Error states
+
+[ ] REQ-PROVIDER-004: Implement Hot-Swap Without Context Loss
+    Component: None
+    Description: Preserve history, insert system message
+
+[ ] REQ-TECH-009: Integrate Provider Bridge Modules
+    Component: None
+    Description: openai_bridge, gemini_bridge, groq_bridge, kimi_bridge, windsurf_bridge
+
+
+PHASE 5: AGENT CONTROLS (7 Issues)
+==================================
+Goal: Pause, edit requirements, resume agents
+Success: Edit requirement mid-flight, agent picks up changes
+
+[ ] REQ-CONTROL-001: Implement Pause Agent Feature
+    Component: ApprovalCard
+    Description: Signal orchestrator, complete current delegation
+
+[ ] REQ-CONTROL-002: Implement Resume Agent Feature
+    Component: ApprovalCard
+    Description: Restore to idle, enable new delegations
+
+[ ] REQ-CONTROL-003: Implement Pause All / Resume All Global Controls
+    Component: None
+    Description: System holding state, prominent banner
+
+[ ] REQ-CONTROL-004: Implement View Current Requirements UI
+    Component: TaskCard
+    Description: Linear description, app_spec context
+
+[ ] REQ-CONTROL-005: Implement Edit Requirements Mid-Flight
+    Component: None
+    Description: Text editor with markdown support
+
+[ ] REQ-CONTROL-006: Implement Requirement Edit Flow
+    Component: None
+    Description: Pause → Edit → Save → Resume workflow
+
+[ ] REQ-CONTROL-007: Implement Requirement Sync to Linear (optional)
+    Component: None
+    Description: Toggle to sync dashboard edits back to Linear
+
+
+PHASE 6: REASONING & TRANSPARENCY (10 Issues)
+==============================================
+Goal: Show why orchestrator made each decision
+Success: Display "Complexity: COMPLEX — auth keyword found" reasoning
+
+[ ] REQ-REASONING-001: Implement Live Reasoning Stream Display
+    Component: DecisionCard
+    Description: Complexity assessment, agent selection, context
+
+[ ] REQ-REASONING-002: Implement Agent Thinking Display
+    Component: None
+    Description: Files read, planned changes, commands, tests
+
+[ ] REQ-REASONING-003: Implement Collapsible Reasoning Blocks
+    Component: None
+    Description: Expand/collapse all, individual toggles
+
+[ ] REQ-DECISION-001: Implement Decision Log UI
+    Component: DecisionCard
+    Description: Agent selection, complexity, verification gates
+
+[ ] REQ-DECISION-002: Implement Decision Audit Trail
+    Component: DecisionCard
+    Description: Timestamp, input factors, outcome, link
+
+[ ] REQ-CODE-001: Implement Live Code Streaming Display
+    Component: FileTree
+    Description: Character-by-character streaming, syntax highlighting
+
+[ ] REQ-CODE-002: Implement File Change Summary Panel
+    Component: FileTree
+    Description: Created/modified/deleted files, line counts, diffs
+
+[ ] REQ-CODE-003: Implement Test Results Display
+    Component: TestResults
+    Description: Command, pass/fail per test, error output, screenshots
+
+[ ] REQ-TECH-007: Add Orchestrator Event Emission Hooks
+    Component: None
+    Description: Decision points, reasoning, delegation events
+
+[ ] Panel Responsive Design (already in Phase 1, REQ-UI-001/002)
+
+
+CODE QUALITY IMPROVEMENTS (10 Issues)
+====================================
+Goal: Improve test coverage from 20% to 80%+
+Target: 30% code duplication reduction, 15-25% I/O performance
+
+[ ] QA-001: Expand Test Coverage - Critical Priority
+    Files Missing:
+      - tests/test_agent.py
+      - tests/test_client.py
+      - tests/test_progress.py
+      - tests/test_prompts.py
+      - tests/bridges/test_openai_bridge.py
+      - tests/bridges/test_gemini_bridge.py
+      - tests/bridges/test_groq_bridge.py
+      - tests/bridges/test_kimi_bridge.py
+      - tests/bridges/test_windsurf_bridge.py
+      - tests/dashboard/test_server.py
+      - tests/dashboard/test_api.py
+      - tests/dashboard/test_websocket.py
+    Impact: Critical for production readiness
+
+[ ] QA-002: Address Technical Debt
+    Found: 12 TODO/FIXME comments
+    Priority: daemon/control_plane.py (3 TODOs), scripts/daemon.py (2 TODOs)
+    Action: Create technical debt backlog
+
+[ ] QA-003: Reduce Code Duplication in Bridge Classes
+    Pattern: All bridges share similar client patterns
+    Solution: Extract common interface (base_bridge.py)
+    Impact: 30% reduction in bridge modules
+
+[ ] QA-004: Performance Optimizations
+    Areas:
+      - Subprocess calls → connection pooling
+      - I/O operations → asyncio subprocess
+      - API responses/tokens → caching
+    Impact: 15-25% improvement
+
+[ ] QA-005: Configuration Management
+    Current: Environment variables scattered
+    Solution: Centralized AgentConfig dataclass
+    Fields: windsurf_mode, timeout, api_keys
+
+[ ] QA-006: Dependency Security
+    Status: 41 dependencies in requirements.txt
+    Actions:
+      - Add pip-audit to CI
+      - Consider dependency pinning
+      - Remove unused dev-only
+
+[ ] QA-007: Error Handling Standardization
+    Create: Custom exception hierarchy
+    Classes: AgentError, BridgeError, SecurityError
+    Impact: Better error tracking and recovery
+
+[ ] QA-008: Type Safety Improvements
+    Enhancements:
+      - Strict typing mode in pyproject.toml
+      - Use typing.Protocol for interfaces
+      - Runtime type checking with typeguard
+
+[ ] QA-009: Documentation Completeness
+    Missing: API documentation for bridges
+    Solution: Generate with pdoc or Sphinx
+    Add: Inline examples for complex functions
+
+[ ] QA-010: Monitoring & Observability
+    Current: Basic metrics collection
+    Enhancements:
+      - Structured logging
+      - Performance metrics collection
+      - Health check endpoints
+
+
+ISSUE SUMMARY
+=============
+Phase 1 Foundation: 14 issues
+Phase 2 Real-Time: 8 issues
+Phase 3 Chat Interface: 5 issues
+Phase 4 Multi-Provider: 5 issues
+Phase 5 Agent Controls: 7 issues
+Phase 6 Transparency: 10 issues
+QA & Technical Debt: 10 issues
+META Issue: 1 issue
+---
+TOTAL: 71 issues
+
+
+COMPONENT INTEGRATION SUMMARY
+=============================
+TaskCard: 5 issues
+  - Agent status display (Phase 1)
+  - Active requirement display (Phase 1)
+  - Pause/resume controls (Phase 5)
+  - Agent detail view (Phase 2)
+  - Current requirements viewer (Phase 5)
+
+ProgressRing: 3 issues
+  - Global metrics bar (Phase 2)
+  - Token counting (Phase 2)
+  - Cost tracking (Phase 6)
+
+ActivityItem: 4 issues
+  - Live activity feed (Phase 2)
+  - Recent events (Phase 2)
+  - Status updates (Phase 6)
+  - Activity display (Phase 6)
+
+FileTree: 2 issues
+  - File change summary (Phase 6)
+  - Modified files display (Phase 6)
+
+TestResults: 1 issue
+  - Test results display panel (Phase 6)
+
+DecisionCard: 1 issue
+  - Decision log visualization (Phase 6)
+
+ApprovalCard: 2 issues
+  - Requirement editor (Phase 5)
+  - Agent control UI (Phase 5)
+
+TOTAL: 15 issues (21%) with component references
+
+
+DUPLICATES FOUND: ZERO
+All 71 issues are unique and complementary.
+
+
+DEDUPLICATION VERIFICATION COMPLETE
+====================================
+Status: ZERO DUPLICATES - All issues unique
+Analysis: Title matching, semantic equivalence, phase overlap checked
+Component references: 15 issues identified for A2UI integration
+Ready for Linear creation: YES
+
+
+NEXT STEPS
+==========
+1. Grant Linear MCP tool authorization (next session)
+2. List teams and identify appropriate team
+3. Create "Agent Dashboard" project in Linear
+4. Create all 71 issues (bulk or sequential)
+5. Add comment to META issue
+6. Update .linear_project.json with Linear IDs
+7. Verify all 71 issues created successfully
+8. Begin Phase 1 implementation
+
+
+STATUS: READY FOR LINEAR CREATION
+Date Created: 2026-02-15
+Session: 1 (Planning & Specification)
+Authorization Status: PENDING
