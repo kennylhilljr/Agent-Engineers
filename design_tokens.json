@@ -1,0 +1,181 @@
+{
+  "metadata": {
+    "source": "dashboard/dashboard.html",
+    "total_variables": 11,
+    "root_variables": 11,
+    "total_usages": 175,
+    "themes": [
+      "light"
+    ],
+    "hardcoded_color_count": 59
+  },
+  "root": {
+    "--bg-primary": "#0d1117",
+    "--bg-secondary": "#161b22",
+    "--text-primary": "#e6edf3",
+    "--text-secondary": "#8b949e",
+    "--border-color": "#30363d",
+    "--accent": "#58a6ff",
+    "--body-bg-start": "#0f172a",
+    "--body-bg-end": "#1e293b",
+    "--card-bg": "rgba(15, 23, 42, 0.8)",
+    "--header-bg": "rgba(15, 23, 42, 0.5)",
+    "--transition-theme": "background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease"
+  },
+  "themes": {
+    "light": {
+      "--bg-primary": "#ffffff",
+      "--bg-secondary": "#f6f8fa",
+      "--text-primary": "#24292f",
+      "--text-secondary": "#656d76",
+      "--border-color": "#d0d7de",
+      "--accent": "#0969da",
+      "--body-bg-start": "#f0f4f8",
+      "--body-bg-end": "#dde8f0",
+      "--card-bg": "rgba(255, 255, 255, 0.9)",
+      "--header-bg": "rgba(246, 248, 250, 0.9)"
+    }
+  },
+  "categories": {
+    "colors.background": {
+      "--bg-primary": {
+        "value": "#0d1117",
+        "is_root": true,
+        "usage_count": 5
+      },
+      "--bg-secondary": {
+        "value": "#161b22",
+        "is_root": true,
+        "usage_count": 6
+      },
+      "--body-bg-start": {
+        "value": "#0f172a",
+        "is_root": true,
+        "usage_count": 2
+      },
+      "--body-bg-end": {
+        "value": "#1e293b",
+        "is_root": true,
+        "usage_count": 2
+      },
+      "--card-bg": {
+        "value": "rgba(15, 23, 42, 0.8)",
+        "is_root": true,
+        "usage_count": 3
+      },
+      "--header-bg": {
+        "value": "rgba(15, 23, 42, 0.5)",
+        "is_root": true,
+        "usage_count": 1
+      }
+    },
+    "colors.text": {
+      "--text-primary": {
+        "value": "#e6edf3",
+        "is_root": true,
+        "usage_count": 35
+      },
+      "--text-secondary": {
+        "value": "#8b949e",
+        "is_root": true,
+        "usage_count": 57
+      }
+    },
+    "colors.accent": {
+      "--accent": {
+        "value": "#58a6ff",
+        "is_root": true,
+        "usage_count": 19
+      }
+    },
+    "colors.border": {
+      "--border-color": {
+        "value": "#30363d",
+        "is_root": true,
+        "usage_count": 41
+      }
+    },
+    "animations": {
+      "--transition-theme": {
+        "value": "background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease",
+        "is_root": true,
+        "usage_count": 1
+      }
+    }
+  },
+  "hardcoded_colors": [
+    "#161b22",
+    "#94a3b8",
+    "#c0c0c0",
+    "#f6f8fa",
+    "#f1f5f9",
+    "#c9d1d9",
+    "#c084fc",
+    "#f97316",
+    "#2ea043",
+    "#4ade80",
+    "#fcd34d",
+    "#93c5fd",
+    "#34d399",
+    "#2563eb",
+    "#c4b5fd",
+    "#ef4444",
+    "#3fb950",
+    "#1e293b",
+    "#fbbf24",
+    "#30363d",
+    "#818cf8",
+    "#a855f7",
+    "#6366f1",
+    "#24292f",
+    "#cd7f32",
+    "#a78bfa",
+    "#fb923c",
+    "#656d76",
+    "#eab308",
+    "#f59e0b",
+    "#fff",
+    "#60a5fa",
+    "#fca5a5",
+    "#8b949e",
+    "#22c55e",
+    "#0d1117",
+    "#0550ae",
+    "#3b82f6",
+    "#10b981",
+    "#1d4ed8",
+    "#86efac",
+    "#6ee7b7",
+    "#ffd700",
+    "#dde8f0",
+    "#f87171",
+    "#cbd5e1",
+    "#e2e8f0",
+    "#ffffff",
+    "#0969da",
+    "#0f172a",
+    "#f0f4f8",
+    "#475569",
+    "#e6edf3",
+    "#58a6ff",
+    "#64748b",
+    "#f85149",
+    "#e1e4e8",
+    "#d0d7de",
+    "#238636"
+  ],
+  "usage_stats": {
+    "--body-bg-start": 2,
+    "--body-bg-end": 2,
+    "--text-primary": 35,
+    "--transition-theme": 1,
+    "--bg-secondary": 6,
+    "--border-color": 41,
+    "--accent": 19,
+    "--text-secondary": 57,
+    "--header-bg": 1,
+    "--card-bg": 3,
+    "--panel-bg": 3,
+    "--bg-primary": 5
+  }
+}
