@@ -50,6 +50,7 @@ _decisions_log: list[Dict[str, Any]] = []  # Decision history
 
 # Agent Status Panel (AI-79 / REQ-MONITOR-001): extended per-agent status details
 # Tracks: status (idle|running|paused|error), current_ticket, elapsed_time start
+# AI-80 / REQ-MONITOR-002: also tracks ticket_title, description, token_count, estimated_cost
 _agent_status_details: Dict[str, Dict[str, Any]] = {}
 
 # Valid agent statuses for the status panel
@@ -209,6 +210,11 @@ class RESTAPIServer:
                     "status": "idle",
                     "current_ticket": None,
                     "started_at": None,
+                    # AI-80 / REQ-MONITOR-002: active requirement display fields
+                    "ticket_title": None,
+                    "description": None,
+                    "token_count": 0,
+                    "estimated_cost": 0.0,
                 }
         # Also ensure ALL_AGENT_NAMES have entries (covers orchestrator etc.)
         for agent_name in ALL_AGENT_NAMES:
@@ -218,6 +224,11 @@ class RESTAPIServer:
                     "status": "idle",
                     "current_ticket": None,
                     "started_at": None,
+                    # AI-80 / REQ-MONITOR-002: active requirement display fields
+                    "ticket_title": None,
+                    "description": None,
+                    "token_count": 0,
+                    "estimated_cost": 0.0,
                 }
 
     @middleware
@@ -271,6 +282,9 @@ class RESTAPIServer:
         self.app.router.add_post('/api/agents/{name}/status', self.update_agent_status)
         self.app.router.add_get('/api/agents/{name}/requirements', self.get_agent_requirements_by_name)
         self.app.router.add_put('/api/agents/{name}/requirements', self.update_agent_requirements_by_name)
+        # AI-80 / REQ-MONITOR-002: Active Requirement Display endpoints
+        self.app.router.add_get('/api/agents/{name}/requirement', self.get_agent_requirement)
+        self.app.router.add_post('/api/agents/{name}/metrics', self.update_agent_metrics)
 
         # Sessions and providers
         self.app.router.add_get('/api/sessions', self.get_sessions)
@@ -1130,6 +1144,11 @@ class RESTAPIServer:
                 "status": detail.get("status", "idle"),
                 "current_ticket": detail.get("current_ticket"),
                 "elapsed_time": elapsed_time,
+                # AI-80 / REQ-MONITOR-002: active requirement display fields
+                "ticket_title": detail.get("ticket_title"),
+                "description": detail.get("description"),
+                "token_count": detail.get("token_count", 0),
+                "estimated_cost": detail.get("estimated_cost", 0.0),
             })
 
         return web.json_response({
@@ -1150,7 +1169,11 @@ class RESTAPIServer:
         Request body:
             {
                 "status": "idle|running|paused|error",
-                "current_ticket": "AI-XX"  (optional, used when running)
+                "current_ticket": "AI-XX"  (optional, used when running),
+                "ticket_title": "Title of the ticket"  (optional, AI-80),
+                "description": "Full requirement description"  (optional, AI-80),
+                "token_count": 0  (optional, AI-80),
+                "estimated_cost": 0.0  (optional, AI-80)
             }
 
         Returns:
@@ -1183,6 +1206,12 @@ class RESTAPIServer:
         current_ticket = body.get('current_ticket', None)
         timestamp = datetime.utcnow().isoformat() + 'Z'
 
+        # AI-80 / REQ-MONITOR-002: new optional fields for active requirement display
+        ticket_title = body.get('ticket_title', None)
+        description = body.get('description', None)
+        token_count = body.get('token_count', 0)
+        estimated_cost = body.get('estimated_cost', 0.0)
+
         # Update in-memory details
         if agent_name not in _agent_status_details:
             _agent_status_details[agent_name] = {
@@ -1190,6 +1219,10 @@ class RESTAPIServer:
                 "status": "idle",
                 "current_ticket": None,
                 "started_at": None,
+                "ticket_title": None,
+                "description": None,
+                "token_count": 0,
+                "estimated_cost": 0.0,
             }
 
         previous_status = _agent_status_details[agent_name].get("status", "idle")
@@ -1199,8 +1232,18 @@ class RESTAPIServer:
         # Track start time for elapsed_time calculation
         if new_status == "running":
             _agent_status_details[agent_name]["started_at"] = timestamp
+            # Store active requirement display fields
+            _agent_status_details[agent_name]["ticket_title"] = ticket_title
+            _agent_status_details[agent_name]["description"] = description
+            _agent_status_details[agent_name]["token_count"] = token_count
+            _agent_status_details[agent_name]["estimated_cost"] = estimated_cost
         elif new_status in ("idle", "error"):
             _agent_status_details[agent_name]["started_at"] = None
+            # Clear active requirement display fields when not running
+            _agent_status_details[agent_name]["ticket_title"] = None
+            _agent_status_details[agent_name]["description"] = None
+            _agent_status_details[agent_name]["token_count"] = 0
+            _agent_status_details[agent_name]["estimated_cost"] = 0.0
 
         # Also keep _agent_states in sync (for backward compat with pause/resume endpoints)
         _agent_states[agent_name] = new_status
@@ -1214,8 +1257,169 @@ class RESTAPIServer:
             'previous_status': previous_status,
             'new_status': new_status,
             'current_ticket': current_ticket if new_status == "running" else None,
+            'ticket_title': ticket_title if new_status == "running" else None,
+            'description': description if new_status == "running" else None,
+            'token_count': token_count if new_status == "running" else 0,
+            'estimated_cost': estimated_cost if new_status == "running" else 0.0,
             'timestamp': timestamp,
         })
+
+    async def get_agent_requirement(self, request: Request) -> Response:
+        """GET /api/agents/{name}/requirement - Get full requirement details for a running agent.
+
+        AI-80 / REQ-MONITOR-002: Returns ticket key, title, description, token_count,
+        estimated_cost, and elapsed_time for a running agent.
+
+        Args:
+            name: Agent name (path parameter)
+
+        Returns:
+            200 OK with requirement details
+            404 Not Found if agent not in panel agents
+        """
+        agent_name = request.match_info['name']
+
+        if agent_name not in PANEL_AGENT_NAMES:
+            return web.json_response({
+                'error': 'Agent not found',
+                'agent_name': agent_name,
+                'available_agents': PANEL_AGENT_NAMES,
+            }, status=404)
+
+        detail = _agent_status_details.get(agent_name, {
+            "name": agent_name,
+            "status": "idle",
+            "current_ticket": None,
+            "started_at": None,
+            "ticket_title": None,
+            "description": None,
+            "token_count": 0,
+            "estimated_cost": 0.0,
+        })
+
+        # Calculate elapsed time
+        elapsed_time = None
+        if detail.get("status") == "running" and detail.get("started_at"):
+            try:
+                started = datetime.fromisoformat(detail["started_at"].rstrip('Z'))
+                elapsed_time = round((datetime.utcnow() - started).total_seconds())
+            except (ValueError, AttributeError):
+                elapsed_time = None
+
+        return web.json_response({
+            "agent_name": agent_name,
+            "status": detail.get("status", "idle"),
+            "current_ticket": detail.get("current_ticket"),
+            "ticket_title": detail.get("ticket_title"),
+            "description": detail.get("description"),
+            "token_count": detail.get("token_count", 0),
+            "estimated_cost": detail.get("estimated_cost", 0.0),
+            "elapsed_time": elapsed_time,
+            "started_at": detail.get("started_at"),
+            "timestamp": datetime.utcnow().isoformat() + 'Z',
+        })
+
+    async def update_agent_metrics(self, request: Request) -> Response:
+        """POST /api/agents/{name}/metrics - Update token_count and estimated_cost for a running agent.
+
+        AI-80 / REQ-MONITOR-002: Real-time metrics update endpoint. Broadcasts
+        agent_metrics_update WebSocket message with updated values.
+
+        Request body:
+            {
+                "token_count": 1234,
+                "estimated_cost": 0.0042
+            }
+
+        Returns:
+            200 OK with updated metrics
+            400 Bad Request for invalid input
+            404 Not Found if agent not in panel agents
+        """
+        agent_name = request.match_info['name']
+
+        if agent_name not in PANEL_AGENT_NAMES:
+            return web.json_response({
+                'error': 'Agent not found',
+                'agent_name': agent_name,
+                'available_agents': PANEL_AGENT_NAMES,
+            }, status=404)
+
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        token_count = body.get('token_count')
+        estimated_cost = body.get('estimated_cost')
+
+        if token_count is None and estimated_cost is None:
+            return web.json_response({
+                'error': 'At least one of token_count or estimated_cost must be provided'
+            }, status=400)
+
+        # Initialize if needed
+        if agent_name not in _agent_status_details:
+            _agent_status_details[agent_name] = {
+                "name": agent_name,
+                "status": "idle",
+                "current_ticket": None,
+                "started_at": None,
+                "ticket_title": None,
+                "description": None,
+                "token_count": 0,
+                "estimated_cost": 0.0,
+            }
+
+        # Update metrics
+        if token_count is not None:
+            _agent_status_details[agent_name]["token_count"] = token_count
+        if estimated_cost is not None:
+            _agent_status_details[agent_name]["estimated_cost"] = estimated_cost
+
+        timestamp = datetime.utcnow().isoformat() + 'Z'
+        detail = _agent_status_details[agent_name]
+
+        # Broadcast agent_metrics_update via WebSocket
+        await self._broadcast_metrics_update(agent_name, detail)
+
+        return web.json_response({
+            'status': 'success',
+            'agent_name': agent_name,
+            'token_count': detail.get("token_count", 0),
+            'estimated_cost': detail.get("estimated_cost", 0.0),
+            'timestamp': timestamp,
+        })
+
+    async def _broadcast_metrics_update(self, agent_name: str, detail: Dict[str, Any]) -> None:
+        """Broadcast an agent_metrics_update event to all connected WebSocket clients.
+
+        AI-80 / REQ-MONITOR-002: Emits real-time token/cost updates.
+
+        Args:
+            agent_name: Name of the agent whose metrics changed
+            detail: Current agent status detail dict
+        """
+        if not _ws_clients:
+            return
+
+        payload = json.dumps({
+            "type": "agent_metrics_update",
+            "agent": agent_name,
+            "token_count": detail.get("token_count", 0),
+            "estimated_cost": detail.get("estimated_cost", 0.0),
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        })
+
+        dead_clients = set()
+        for ws in list(_ws_clients):
+            try:
+                await ws.send_str(payload)
+            except Exception:
+                dead_clients.add(ws)
+
+        for ws in dead_clients:
+            _ws_clients.discard(ws)
 
     async def _broadcast_agent_status(self, agent_name: str, status: str) -> None:
         """Broadcast an agent_status event to all connected WebSocket clients.
