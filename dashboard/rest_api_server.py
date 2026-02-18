@@ -64,6 +64,10 @@ _rest_agent_recent_events: Dict[str, list] = {}
 # {agent_name: {"xp": int, "level": int, "success_rate": float, "avg_duration_s": float, "total_cost_usd": float, "status": str}}
 _rest_agent_xp_store: Dict[str, Dict[str, Any]] = {}
 
+# AI-86: Live Activity Feed (REQ-FEED-001) - in-memory event feed store (newest last, capped at 50)
+_rest_feed_events: list = []
+_REST_FEED_MAX = 50
+
 # AI-83: Global Metrics Bar (REQ-METRICS-001) - in-memory global metrics store
 _rest_global_metrics: Dict[str, Any] = {
     "total_sessions": 0,
@@ -388,6 +392,11 @@ class RESTAPIServer:
         # AI-83: Global Metrics Bar (REQ-METRICS-001)
         self.app.router.add_get('/api/metrics/global', self.get_global_metrics)
         self.app.router.add_post('/api/metrics/global', self.post_global_metrics)
+
+        # AI-86: Live Activity Feed (REQ-FEED-001)
+        self.app.router.add_get('/api/feed', self.get_feed)
+        self.app.router.add_post('/api/feed', self.post_feed)
+        self.app.router.add_route('OPTIONS', '/api/feed', self.handle_options)
 
         # OPTIONS for CORS preflight
         for route in ['/api/metrics', '/api/agents', '/api/sessions', '/api/providers',
@@ -2143,6 +2152,109 @@ class RESTAPIServer:
             'level': _rest_agent_xp_store[agent_name]['level'],
             'leaderboard': leaderboard,
         })
+
+    # =========================================================================
+    # AI-86: Live Activity Feed (REQ-FEED-001)
+    # =========================================================================
+
+    async def get_feed(self, request: Request) -> Response:
+        """GET /api/feed — Return last 50 events across all agents.
+
+        Returns:
+            200 JSON list of feed events, newest first.
+        """
+        return web.json_response(list(reversed(_rest_feed_events)))
+
+    async def post_feed(self, request: Request) -> Response:
+        """POST /api/feed — Add a new event to the activity feed.
+
+        Request body:
+            {
+                "agent": "coding",          # required
+                "description": "...",       # required
+                "status": "success",        # optional, default "success"
+                "ticket_key": "AI-86",      # optional
+                "duration_s": 12.3          # optional
+            }
+
+        Returns:
+            201 Created with the new event.
+            400 Bad Request for invalid input.
+        """
+        import logging as _logging
+        import json as _json
+        _logger = _logging.getLogger(__name__)
+
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        agent = (body.get('agent') or '').strip()
+        description = (body.get('description') or '').strip()
+
+        if not agent:
+            return web.json_response({'error': 'agent is required'}, status=400)
+        if not description:
+            return web.json_response({'error': 'description is required'}, status=400)
+
+        # Warn but don't block unknown agents
+        if agent not in PANEL_AGENT_NAMES:
+            _logger.warning(f"POST /api/feed: unknown agent {agent!r}")
+
+        status = body.get('status', 'success')
+        valid_statuses = ('success', 'error', 'in_progress')
+        if status not in valid_statuses:
+            return web.json_response({
+                'error': f'Invalid status. Must be one of: {list(valid_statuses)}',
+                'provided': status,
+            }, status=400)
+
+        ticket_key = body.get('ticket_key', None) or None
+        duration_s = body.get('duration_s', None)
+        if duration_s is not None:
+            try:
+                duration_s = float(duration_s)
+            except (TypeError, ValueError):
+                duration_s = None
+
+        from uuid import uuid4 as _uuid4
+        event = {
+            'id': str(_uuid4()),
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'agent': agent,
+            'status': status,
+            'ticket_key': ticket_key,
+            'duration_s': duration_s,
+            'description': description[:120],
+        }
+
+        _rest_feed_events.append(event)
+        # Cap at _REST_FEED_MAX (drop oldest)
+        while len(_rest_feed_events) > _REST_FEED_MAX:
+            del _rest_feed_events[0]
+
+        # Broadcast feed_update via WebSocket
+        payload = _json.dumps({
+            'type': 'feed_update',
+            'event': event,
+            'timestamp': event['timestamp'],
+        })
+        dead_clients: set = set()
+        for ws in list(_ws_clients):
+            try:
+                await ws.send_str(payload)
+            except Exception:
+                dead_clients.add(ws)
+        for ws in dead_clients:
+            _ws_clients.discard(ws)
+
+        _logger.info(
+            f"Feed event added: agent={agent!r}, status={status!r}, "
+            f"ticket={ticket_key!r}, total={len(_rest_feed_events)}"
+        )
+
+        return web.json_response({'event': event, 'total': len(_rest_feed_events)}, status=201)
 
     async def serve_dashboard(self, request: Request) -> Response:
         """GET / - Serve dashboard HTML.
