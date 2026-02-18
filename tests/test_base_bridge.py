@@ -13,7 +13,6 @@ Tests cover:
 - bridges package exports BaseBridge and BridgeResponse
 """
 
-import asyncio
 import sys
 from dataclasses import fields
 from pathlib import Path
@@ -247,42 +246,37 @@ class TestProviderNameProperty:
 class TestSendTask:
     """Tests for the send_task abstract async method."""
 
-    def test_send_task_returns_bridge_response(self):
+    @pytest.mark.asyncio
+    async def test_send_task_returns_bridge_response(self):
         bridge = SimpleBridge()
-        result = asyncio.get_event_loop().run_until_complete(
-            bridge.send_task("test task")
-        )
+        result = await bridge.send_task("test task")
         assert isinstance(result, BridgeResponse)
 
-    def test_send_task_content_reflects_input(self):
+    @pytest.mark.asyncio
+    async def test_send_task_content_reflects_input(self):
         bridge = SimpleBridge()
-        result = asyncio.get_event_loop().run_until_complete(
-            bridge.send_task("hello world")
-        )
+        result = await bridge.send_task("hello world")
         assert "hello world" in result.content
 
-    def test_send_task_tokens_used_set(self):
+    @pytest.mark.asyncio
+    async def test_send_task_tokens_used_set(self):
         bridge = SimpleBridge()
         task = "hi"
-        result = asyncio.get_event_loop().run_until_complete(
-            bridge.send_task(task)
-        )
+        result = await bridge.send_task(task)
         assert result.tokens_used == len(task)
 
-    def test_send_task_failure_response(self):
+    @pytest.mark.asyncio
+    async def test_send_task_failure_response(self):
         bridge = FailingBridge()
-        result = asyncio.get_event_loop().run_until_complete(
-            bridge.send_task("anything")
-        )
+        result = await bridge.send_task("anything")
         assert result.success is False
         assert result.error == "simulated failure"
         assert result.content == ""
 
-    def test_send_task_provider_matches(self):
+    @pytest.mark.asyncio
+    async def test_send_task_provider_matches(self):
         bridge = SimpleBridge()
-        result = asyncio.get_event_loop().run_until_complete(
-            bridge.send_task("task")
-        )
+        result = await bridge.send_task("task")
         assert result.provider == "simple"
 
 

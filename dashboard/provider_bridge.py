@@ -375,7 +375,7 @@ class WindsurfBridge(ProviderBridge):
             )
             if context:
                 session.add_message("system", context)
-            resp = self._bridge.send_task(session, message)
+            resp = self._bridge.dispatch_task(session, message)
             return resp.content
         except Exception as exc:
             logger.error("WindsurfBridge error: %s", exc)
