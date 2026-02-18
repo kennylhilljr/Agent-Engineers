@@ -4,8 +4,19 @@ ChatGPT, Gemini, Groq, KIMI, and Windsurf for multi-AI orchestration.
 """
 
 import os
+import sys
 from pathlib import Path
-from typing import Final, Literal, NamedTuple, TypeGuard
+from typing import Final, Literal, NamedTuple
+
+# TypeGuard is only available in Python 3.10+
+if sys.version_info >= (3, 10):
+    from typing import TypeGuard
+else:
+    try:
+        from typing_extensions import TypeGuard
+    except ImportError:
+        # Fallback for Python 3.9 without typing_extensions
+        TypeGuard = type  # type: ignore
 
 from arcade_config import (
     get_coding_tools,

@@ -1,0 +1,65 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - heading "Test Results Display Component" [level=1] [ref=e4]
+    - paragraph [ref=e5]: "AI-101: REQ-CODE-003 - Test Results Display with Pass/Fail Status and Error Output"
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - generic [ref=e8]: "Scenario 1: All Tests Passed"
+      - generic [ref=e9]: Demonstrates test results when all tests pass successfully. Shows 100% pass rate with green progress bar.
+      - generic [ref=e10]:
+        - button "Load Test Data" [ref=e11] [cursor=pointer]
+        - button "Screenshot" [ref=e12] [cursor=pointer]
+      - generic [ref=e13]: All tests completed successfully
+    - generic [ref=e15]:
+      - generic [ref=e16]: "Scenario 2: Mixed Results with Failures"
+      - generic [ref=e17]: Shows test suite with mixed pass/fail results. Demonstrates error details expansion and individual test status display.
+      - generic [ref=e18]:
+        - button "Load Test Data" [ref=e19] [cursor=pointer]
+        - button "Screenshot" [ref=e20] [cursor=pointer]
+      - generic [ref=e21]: $ npm test -- --coverage --verbose
+    - generic [ref=e23]:
+      - generic [ref=e24]: "Scenario 3: Failed Tests with Error Output"
+      - generic [ref=e25]: Displays failed tests with detailed error messages. Shows expandable error details and stack traces.
+      - generic [ref=e26]:
+        - button "Load Test Data" [ref=e27] [cursor=pointer]
+        - button "Screenshot" [ref=e28] [cursor=pointer]
+      - generic [ref=e29]: ❌ 3 test failures detected
+    - generic [ref=e31]:
+      - generic [ref=e32]: "Scenario 4: Multiple Test Suites"
+      - generic [ref=e33]: Demonstrates multiple test suites with nested test cases. Shows suite-level statistics and expandable test listings.
+      - generic [ref=e34]:
+        - button "Load Test Data" [ref=e35] [cursor=pointer]
+        - button "Screenshot" [ref=e36] [cursor=pointer]
+      - generic [ref=e37]: $ playwright test --headed --reporter=html
+    - generic [ref=e39]:
+      - generic [ref=e40]: "Scenario 5: Playwright Test Results"
+      - generic [ref=e41]: Shows Playwright browser test results with screenshot evidence. Includes test execution durations and browser context.
+      - generic [ref=e42]:
+        - button "Load Test Data" [ref=e43] [cursor=pointer]
+        - button "Screenshot" [ref=e44] [cursor=pointer]
+      - generic [ref=e45]: $ playwright test --headed --screenshot=only-on-failure
+    - generic [ref=e47]:
+      - generic [ref=e48]: "Scenario 6: Tests with Skipped Status"
+      - generic [ref=e49]: Demonstrates handling of skipped tests in addition to passed and failed tests.
+      - generic [ref=e50]:
+        - button "Load Test Data" [ref=e51] [cursor=pointer]
+        - button "Screenshot" [ref=e52] [cursor=pointer]
+    - generic [ref=e54]:
+      - generic [ref=e55]: "Scenario 7: Long Running Tests"
+      - generic [ref=e56]: Shows test results with varied durations, demonstrating duration formatting (milliseconds to seconds).
+      - generic [ref=e57]:
+        - button "Load Test Data" [ref=e58] [cursor=pointer]
+        - button "Screenshot" [ref=e59] [cursor=pointer]
+    - generic [ref=e61]:
+      - generic [ref=e62]: "Scenario 8: Multiple Sequential Runs"
+      - generic [ref=e63]: Demonstrates multiple test runs in sequence, showing how results update and previous tests are replaced.
+      - generic [ref=e64]:
+        - button "Start Sequential Runs" [ref=e65] [cursor=pointer]
+        - button "Screenshot" [ref=e66] [cursor=pointer]
+  - generic [ref=e68]:
+    - paragraph [ref=e69]: Test Results Display Component - AI-101 Implementation
+    - paragraph [ref=e70]: Use the screenshot buttons to capture evidence. Screenshots are saved to /test-results/screenshots/
+```

@@ -330,6 +330,33 @@ class AgentMetricsCollector:
         # Active session tracking
         self._active_sessions: dict[str, dict] = {}
 
+        # Event callbacks: list of callables that receive each new AgentEvent
+        # Callbacks are invoked synchronously from _record_event()
+        self._event_callbacks: list = []
+
+    def register_event_callback(self, callback) -> None:
+        """Register a callback to be called when a new event is recorded.
+
+        The callback will be called with the AgentEvent dict as the sole argument
+        each time _record_event() is invoked.
+
+        Args:
+            callback: A callable that accepts a single AgentEvent dict argument.
+        """
+        if callback not in self._event_callbacks:
+            self._event_callbacks.append(callback)
+
+    def unregister_event_callback(self, callback) -> None:
+        """Remove a previously registered event callback.
+
+        Args:
+            callback: The callable to remove. No-op if not registered.
+        """
+        try:
+            self._event_callbacks.remove(callback)
+        except ValueError:
+            pass  # Not registered; silently ignore
+
     def start_session(
         self,
         session_type: Literal["initializer", "continuation"] = "initializer"
@@ -515,6 +542,17 @@ class AgentMetricsCollector:
 
         # Save state
         self.store.save(state)
+
+        # Notify all registered callbacks with the new event
+        for callback in list(self._event_callbacks):
+            try:
+                callback(event)
+            except Exception:
+                # Log but do not propagate callback errors; event recording must succeed
+                import logging
+                logging.getLogger(__name__).exception(
+                    "Error in event callback %r; skipping", callback
+                )
 
     def get_state(self) -> DashboardState:
         """Get the current dashboard state.

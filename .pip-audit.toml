@@ -1,0 +1,5 @@
+[tool.pip-audit]
+require-hashes = false
+vulnerability-service = "osv"
+format = "json"
+output = "pip-audit-results.json"

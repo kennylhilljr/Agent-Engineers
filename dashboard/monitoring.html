@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Dashboard - Monitoring & Observability</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e94560;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            color: #fff;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            color: #a0a0a0;
+            font-size: 1.1em;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 48px rgba(233, 69, 96, 0.2);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .card-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .card-icon {
+            font-size: 1.5em;
+        }
+
+        .metric {
+            margin-bottom: 15px;
+        }
+
+        .metric-label {
+            font-size: 0.9em;
+            color: #a0a0a0;
+            margin-bottom: 5px;
+        }
+
+        .metric-value {
+            font-size: 1.8em;
+            font-weight: 700;
+            color: #4ade80;
+        }
+
+        .metric-value.warning {
+            color: #fbbf24;
+        }
+
+        .metric-value.danger {
+            color: #ef4444;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4ade80 0%, #22c55e 100%);
+            transition: width 0.5s ease;
+        }
+
+        .progress-fill.warning {
+            background: linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%);
+        }
+
+        .progress-fill.danger {
+            background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-healthy {
+            background: rgba(74, 222, 128, 0.2);
+            color: #4ade80;
+        }
+
+        .status-degraded {
+            background: rgba(251, 191, 36, 0.2);
+            color: #fbbf24;
+        }
+
+        .status-unhealthy {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .alerts-section {
+            margin-top: 30px;
+        }
+
+        .alert {
+            background: rgba(255, 255, 255, 0.05);
+            border-left: 4px solid #fbbf24;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+        }
+
+        .alert.critical {
+            border-left-color: #ef4444;
+        }
+
+        .alert.warning {
+            border-left-color: #fbbf24;
+        }
+
+        .alert.info {
+            border-left-color: #3b82f6;
+        }
+
+        .alert-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .alert-severity {
+            font-weight: 600;
+            margin-right: 10px;
+            text-transform: uppercase;
+            font-size: 0.85em;
+        }
+
+        .alert-time {
+            color: #a0a0a0;
+            font-size: 0.85em;
+        }
+
+        .metrics-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        .metrics-table th,
+        .metrics-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .metrics-table th {
+            color: #a0a0a0;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        .metrics-table td {
+            color: #e0e0e0;
+        }
+
+        .refresh-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(74, 222, 128, 0.2);
+            color: #4ade80;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            display: none;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .chart-container {
+            margin-top: 20px;
+            height: 200px;
+            position: relative;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #a0a0a0;
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid #ef4444;
+            padding: 15px;
+            border-radius: 8px;
+            color: #fca5a5;
+            margin: 20px 0;
+        }
+
+        .timestamp {
+            text-align: center;
+            color: #a0a0a0;
+            font-size: 0.9em;
+            margin-top: 30px;
+        }
+
+        .section-title {
+            font-size: 1.5em;
+            color: #fff;
+            margin: 30px 0 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .metric-item {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 Monitoring & Observability Dashboard</h1>
+            <p class="subtitle">Real-time system metrics, health status, and performance monitoring</p>
+        </header>
+
+        <div class="refresh-indicator" id="refreshIndicator">
+            Refreshing...
+        </div>
+
+        <div id="content">
+            <div class="loading">Loading monitoring data...</div>
+        </div>
+
+        <div class="timestamp" id="lastUpdate">
+            Last updated: Never
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = window.location.origin;
+        const REFRESH_INTERVAL = 5000; // 5 seconds
+
+        // State
+        let refreshTimer = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadMonitoringData();
+            startAutoRefresh();
+        });
+
+        // Load all monitoring data
+        async function loadMonitoringData() {
+            showRefreshIndicator();
+
+            try {
+                // Fetch all data in parallel
+                const [healthData, systemData, metricsData] = await Promise.all([
+                    fetch(`${API_BASE}/health`).then(r => r.json()),
+                    fetch(`${API_BASE}/api/system/status`).then(r => r.json()),
+                    fetch(`${API_BASE}/api/metrics`).then(r => r.json())
+                ]);
+
+                renderDashboard(healthData, systemData, metricsData);
+                updateTimestamp();
+
+            } catch (error) {
+                console.error('Error loading monitoring data:', error);
+                showError(error.message);
+            } finally {
+                hideRefreshIndicator();
+            }
+        }
+
+        // Render complete dashboard
+        function renderDashboard(health, system, metrics) {
+            const content = document.getElementById('content');
+
+            const html = `
+                <!-- Health Overview -->
+                <div class="dashboard-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Service Health</span>
+                            <span class="card-icon">❤️</span>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Status</div>
+                            <div class="status-badge status-${health.status}">
+                                ${health.status || 'unknown'}
+                            </div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Uptime</div>
+                            <div class="metric-value">
+                                ${formatDuration(health.service?.uptime_seconds || 0)}
+                            </div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">WebSocket Connections</div>
+                            <div class="metric-value">${health.service?.websocket_connections || 0}</div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">CPU Usage</span>
+                            <span class="card-icon">⚙️</span>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Current</div>
+                            <div class="metric-value ${getStatusClass(health.system?.cpu_percent, 70, 85)}">
+                                ${health.system?.cpu_percent || 0}%
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill ${getStatusClass(health.system?.cpu_percent, 70, 85)}"
+                                     style="width: ${health.system?.cpu_percent || 0}%"></div>
+                            </div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Process CPU</div>
+                            <div class="metric-value">${system.process?.cpu_percent || 0}%</div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Memory Usage</span>
+                            <span class="card-icon">💾</span>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">System Memory</div>
+                            <div class="metric-value ${getStatusClass(health.system?.memory_percent, 75, 85)}">
+                                ${health.system?.memory_percent || 0}%
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill ${getStatusClass(health.system?.memory_percent, 75, 85)}"
+                                     style="width: ${health.system?.memory_percent || 0}%"></div>
+                            </div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Used / Total</div>
+                            <div class="metric-value" style="font-size: 1.2em;">
+                                ${health.system?.memory_used_mb || 0} / ${health.system?.memory_total_mb || 0} MB
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Disk Usage</span>
+                            <span class="card-icon">💿</span>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Disk Space</div>
+                            <div class="metric-value ${getStatusClass(health.system?.disk_percent, 80, 90)}">
+                                ${health.system?.disk_percent || 0}%
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill ${getStatusClass(health.system?.disk_percent, 80, 90)}"
+                                     style="width: ${health.system?.disk_percent || 0}%"></div>
+                            </div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Used / Total</div>
+                            <div class="metric-value" style="font-size: 1.2em;">
+                                ${health.system?.disk_used_gb || 0} / ${health.system?.disk_total_gb || 0} GB
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Metrics Store -->
+                <h2 class="section-title">📊 Metrics Store</h2>
+                <div class="dashboard-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Storage</span>
+                            <span class="card-icon">📁</span>
+                        </div>
+                        <div class="metric-grid">
+                            <div class="metric-item">
+                                <div class="metric-label">Events</div>
+                                <div class="metric-value">${health.metrics_store?.event_count || 0}</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-label">Sessions</div>
+                                <div class="metric-value">${health.metrics_store?.session_count || 0}</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-label">Agents</div>
+                                <div class="metric-value">${health.metrics_store?.agent_count || 0}</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-label">File Size</div>
+                                <div class="metric-value" style="font-size: 1.2em;">
+                                    ${formatBytes(health.metrics_store?.metrics_file_size_bytes || 0)}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Performance</span>
+                            <span class="card-icon">⚡</span>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Total Requests</div>
+                            <div class="metric-value">${health.performance?.total_requests || 0}</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Avg Response Time</div>
+                            <div class="metric-value">${health.performance?.avg_response_time_ms || 0} ms</div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Cost & Usage</span>
+                            <span class="card-icon">💰</span>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Total Cost</div>
+                            <div class="metric-value">$${metrics.total_cost_usd?.toFixed(4) || 0}</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Total Tokens</div>
+                            <div class="metric-value">${(metrics.total_tokens || 0).toLocaleString()}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Alerts -->
+                ${renderAlerts(system.alerts || [])}
+
+                <!-- Network Stats -->
+                <h2 class="section-title">🌐 Network Statistics</h2>
+                <div class="card">
+                    <table class="metrics-table">
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Bytes Sent</td>
+                                <td>${formatBytes(system.system?.network?.bytes_sent || 0)}</td>
+                            </tr>
+                            <tr>
+                                <td>Bytes Received</td>
+                                <td>${formatBytes(system.system?.network?.bytes_recv || 0)}</td>
+                            </tr>
+                            <tr>
+                                <td>Packets Sent</td>
+                                <td>${(system.system?.network?.packets_sent || 0).toLocaleString()}</td>
+                            </tr>
+                            <tr>
+                                <td>Packets Received</td>
+                                <td>${(system.system?.network?.packets_recv || 0).toLocaleString()}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Process Info -->
+                <h2 class="section-title">🔧 Process Information</h2>
+                <div class="card">
+                    <div class="metric-grid">
+                        <div class="metric-item">
+                            <div class="metric-label">PID</div>
+                            <div class="metric-value" style="font-size: 1.4em;">${system.process?.pid || 'N/A'}</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-label">Memory</div>
+                            <div class="metric-value" style="font-size: 1.4em;">${system.process?.memory_mb || 0} MB</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-label">Threads</div>
+                            <div class="metric-value" style="font-size: 1.4em;">${system.process?.num_threads || 0}</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-label">Python</div>
+                            <div class="metric-value" style="font-size: 1.4em;">${health.system?.python_version || 'N/A'}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            content.innerHTML = html;
+        }
+
+        // Render alerts section
+        function renderAlerts(alerts) {
+            if (!alerts || alerts.length === 0) {
+                return `
+                    <div class="alerts-section">
+                        <h2 class="section-title">🔔 Alerts</h2>
+                        <div class="card">
+                            <p style="color: #4ade80; text-align: center; padding: 20px;">
+                                ✓ No active alerts - All systems operational
+                            </p>
+                        </div>
+                    </div>
+                `;
+            }
+
+            const alertsHtml = alerts.map(alert => `
+                <div class="alert ${alert.severity}">
+                    <div class="alert-header">
+                        <span class="alert-severity" style="color: ${alert.severity === 'critical' ? '#ef4444' : '#fbbf24'}">
+                            ${alert.severity}
+                        </span>
+                        <span class="alert-time">${formatTimestamp(alert.timestamp)}</span>
+                    </div>
+                    <div>${alert.message}</div>
+                </div>
+            `).join('');
+
+            return `
+                <div class="alerts-section">
+                    <h2 class="section-title">🔔 Active Alerts (${alerts.length})</h2>
+                    ${alertsHtml}
+                </div>
+            `;
+        }
+
+        // Utility functions
+        function getStatusClass(value, warningThreshold, dangerThreshold) {
+            if (value >= dangerThreshold) return 'danger';
+            if (value >= warningThreshold) return 'warning';
+            return '';
+        }
+
+        function formatDuration(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+
+            if (hours > 0) {
+                return `${hours}h ${minutes}m`;
+            } else if (minutes > 0) {
+                return `${minutes}m ${secs}s`;
+            } else {
+                return `${secs}s`;
+            }
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        function formatTimestamp(timestamp) {
+            const date = new Date(timestamp);
+            return date.toLocaleTimeString();
+        }
+
+        function updateTimestamp() {
+            const now = new Date();
+            document.getElementById('lastUpdate').textContent =
+                `Last updated: ${now.toLocaleTimeString()}`;
+        }
+
+        function showRefreshIndicator() {
+            document.getElementById('refreshIndicator').style.display = 'block';
+        }
+
+        function hideRefreshIndicator() {
+            setTimeout(() => {
+                document.getElementById('refreshIndicator').style.display = 'none';
+            }, 500);
+        }
+
+        function showError(message) {
+            document.getElementById('content').innerHTML = `
+                <div class="error">
+                    <strong>Error loading monitoring data:</strong><br>
+                    ${message}
+                </div>
+            `;
+        }
+
+        function startAutoRefresh() {
+            refreshTimer = setInterval(loadMonitoringData, REFRESH_INTERVAL);
+        }
+
+        function stopAutoRefresh() {
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+                refreshTimer = null;
+            }
+        }
+
+        // Stop refresh when page is hidden
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                stopAutoRefresh();
+            } else {
+                startAutoRefresh();
+                loadMonitoringData();
+            }
+        });
+    </script>
+</body>
+</html>

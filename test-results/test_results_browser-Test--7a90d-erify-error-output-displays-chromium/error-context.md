@@ -1,0 +1,115 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - heading "Test Results Display Component" [level=1] [ref=e4]
+    - paragraph [ref=e5]: "AI-101: REQ-CODE-003 - Test Results Display with Pass/Fail Status and Error Output"
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - generic [ref=e8]: "Scenario 1: All Tests Passed"
+      - generic [ref=e9]: Demonstrates test results when all tests pass successfully. Shows 100% pass rate with green progress bar.
+      - generic [ref=e10]:
+        - button "Load Test Data" [ref=e11] [cursor=pointer]
+        - button "Screenshot" [ref=e12] [cursor=pointer]
+      - generic [ref=e13]: All tests completed successfully
+    - generic [ref=e15]:
+      - generic [ref=e16]: "Scenario 2: Mixed Results with Failures"
+      - generic [ref=e17]: Shows test suite with mixed pass/fail results. Demonstrates error details expansion and individual test status display.
+      - generic [ref=e18]:
+        - button "Load Test Data" [ref=e19] [cursor=pointer]
+        - button "Screenshot" [ref=e20] [cursor=pointer]
+      - generic [ref=e21]: $ npm test -- --coverage --verbose
+    - generic [ref=e23]:
+      - generic [ref=e24]: "Scenario 3: Failed Tests with Error Output"
+      - generic [ref=e25]: Displays failed tests with detailed error messages. Shows expandable error details and stack traces.
+      - generic [ref=e26]:
+        - button "Load Test Data" [ref=e27] [cursor=pointer]
+        - button "Screenshot" [ref=e28] [cursor=pointer]
+      - generic [ref=e29]: ❌ 3 test failures detected
+      - generic [ref=e31]:
+        - heading "Test Results" [level=3] [ref=e33]
+        - generic [ref=e34]:
+          - generic [ref=e35]:
+            - generic [ref=e36]: "5"
+            - generic [ref=e37]: Total Tests
+          - generic [ref=e38]:
+            - generic [ref=e39]: "2"
+            - generic [ref=e40]: Passed (40%)
+          - generic [ref=e41]:
+            - generic [ref=e42]: "3"
+            - generic [ref=e43]: Failed (60%)
+        - generic [ref=e45]:
+          - generic [ref=e46]: Pass Rate
+          - generic [ref=e47]: 40%
+        - generic [ref=e50]: "Total Duration: 1.92s"
+        - generic [ref=e51]:
+          - heading "Test Cases" [level=4] [ref=e52]
+          - generic [ref=e55]:
+            - generic [ref=e56]: ✓ Passed
+            - generic [ref=e57]: 450ms
+            - generic [ref=e58]: Database connection test
+          - generic [ref=e59]:
+            - generic [ref=e60] [cursor=pointer]:
+              - generic [ref=e61]:
+                - generic [ref=e62]: ✕ Failed
+                - generic [ref=e63]: 670ms
+                - generic [ref=e64]: User authentication test
+              - button "▶" [ref=e65]
+            - generic [ref=e66]: "Error: Failed to authenticate user at UserService.authenticate (src/services/user-service.js:45)..."
+          - generic [ref=e69]:
+            - generic [ref=e70]: ✓ Passed
+            - generic [ref=e71]: 380ms
+            - generic [ref=e72]: Email validation test
+          - generic [ref=e73]:
+            - generic [ref=e74] [cursor=pointer]:
+              - generic [ref=e75]:
+                - generic [ref=e76]: ✕ Failed
+                - generic [ref=e77]: 230ms
+                - generic [ref=e78]: Payment processing test
+              - button "▶" [ref=e79]
+            - generic [ref=e80]: "Timeout: Payment API did not respond within 5 seconds"
+          - generic [ref=e81]:
+            - generic [ref=e82] [cursor=pointer]:
+              - generic [ref=e83]:
+                - generic [ref=e84]: ✕ Failed
+                - generic [ref=e85]: 190ms
+                - generic [ref=e86]: Data export test
+              - button "▶" [ref=e87]
+            - generic [ref=e88]: "FileWriteError: Unable to write export file to /tmp/export.csv. Permission denied."
+    - generic [ref=e89]:
+      - generic [ref=e90]: "Scenario 4: Multiple Test Suites"
+      - generic [ref=e91]: Demonstrates multiple test suites with nested test cases. Shows suite-level statistics and expandable test listings.
+      - generic [ref=e92]:
+        - button "Load Test Data" [ref=e93] [cursor=pointer]
+        - button "Screenshot" [ref=e94] [cursor=pointer]
+      - generic [ref=e95]: $ playwright test --headed --reporter=html
+    - generic [ref=e97]:
+      - generic [ref=e98]: "Scenario 5: Playwright Test Results"
+      - generic [ref=e99]: Shows Playwright browser test results with screenshot evidence. Includes test execution durations and browser context.
+      - generic [ref=e100]:
+        - button "Load Test Data" [ref=e101] [cursor=pointer]
+        - button "Screenshot" [ref=e102] [cursor=pointer]
+      - generic [ref=e103]: $ playwright test --headed --screenshot=only-on-failure
+    - generic [ref=e105]:
+      - generic [ref=e106]: "Scenario 6: Tests with Skipped Status"
+      - generic [ref=e107]: Demonstrates handling of skipped tests in addition to passed and failed tests.
+      - generic [ref=e108]:
+        - button "Load Test Data" [ref=e109] [cursor=pointer]
+        - button "Screenshot" [ref=e110] [cursor=pointer]
+    - generic [ref=e112]:
+      - generic [ref=e113]: "Scenario 7: Long Running Tests"
+      - generic [ref=e114]: Shows test results with varied durations, demonstrating duration formatting (milliseconds to seconds).
+      - generic [ref=e115]:
+        - button "Load Test Data" [ref=e116] [cursor=pointer]
+        - button "Screenshot" [ref=e117] [cursor=pointer]
+    - generic [ref=e119]:
+      - generic [ref=e120]: "Scenario 8: Multiple Sequential Runs"
+      - generic [ref=e121]: Demonstrates multiple test runs in sequence, showing how results update and previous tests are replaced.
+      - generic [ref=e122]:
+        - button "Start Sequential Runs" [ref=e123] [cursor=pointer]
+        - button "Screenshot" [ref=e124] [cursor=pointer]
+  - generic [ref=e126]:
+    - paragraph [ref=e127]: Test Results Display Component - AI-101 Implementation
+    - paragraph [ref=e128]: Use the screenshot buttons to capture evidence. Screenshots are saved to /test-results/screenshots/
+```

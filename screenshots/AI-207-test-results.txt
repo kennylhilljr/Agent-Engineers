@@ -1,0 +1,217 @@
+AI-207: Standardize Error Handling - Test Results
+==================================================
+Date: 2026-02-17
+
+WHAT WAS FOUND IN EXISTING exceptions.py
+-----------------------------------------
+The file already contained:
+  - AgentError (base class)
+      * message and error_code attributes
+      * __str__ with [CODE] message format
+      * to_dict() for JSON serialization
+  - BridgeError(AgentError)
+      * provider attribute
+      * overridden to_dict()
+  - SecurityError(AgentError)
+      * auth_type and details attributes
+      * overridden to_dict()
+
+Missing from existing file:
+  - ConfigurationError
+  - TimeoutError
+  - RateLimitError
+  - AuthenticationError
+  - __cause__ chain support in to_dict()
+  - to_json() method
+  - is_retryable() helper function
+  - get_error_code() helper function
+  - error_handler() context manager
+
+WHAT WAS ADDED / CHANGED
+--------------------------
+File: /Users/bkh223/Documents/GitHub/agent-engineers/exceptions.py
+
+1. AgentError.to_dict() - Enhanced to include __cause__ chain:
+     - When __cause__ is set, a "cause" key is added to the dict.
+     - If cause is an AgentError subclass, its own to_dict() is used recursively.
+     - Otherwise, error_type and message are extracted from the plain exception.
+
+2. AgentError.to_json() - New method:
+     - Returns json.dumps(self.to_dict()) for direct JSON string output.
+
+3. ConfigurationError(AgentError) - New class:
+     - Default error_code: "CONFIG_ERROR"
+     - Optional config_key attribute (included in to_dict when set)
+
+4. TimeoutError(AgentError) - New class:
+     - Default error_code: "TIMEOUT_ERROR"
+     - Optional timeout_seconds attribute (float, included in to_dict when set)
+
+5. RateLimitError(AgentError) - New class:
+     - Default error_code: "RATE_LIMIT_ERROR"
+     - Optional retry_after (float) and provider (str) attributes
+
+6. AuthenticationError(AgentError) - New class:
+     - Default error_code: "AUTH_ERROR"
+     - Optional username attribute (included in to_dict when set)
+
+7. is_retryable(exc) -> bool - New module-level helper:
+     - Returns True for RateLimitError and TimeoutError instances (by type)
+     - Returns True for AgentError instances whose error_code is in the
+       known retryable set: BRIDGE_CONNECTION, BRIDGE_RATE_LIMIT, BRIDGE_TIMEOUT,
+       TIMEOUT_ERROR, TIMEOUT_REQUEST, TIMEOUT_OPERATION, TIMEOUT_CONNECTION,
+       RATE_LIMIT_ERROR, RATE_LIMIT_EXCEEDED, RATE_LIMIT_PROVIDER, RATE_LIMIT_INTERNAL
+     - Returns False for all other exceptions
+
+8. get_error_code(exc) -> Optional[str] - New module-level helper:
+     - Returns exc.error_code if exc is an AgentError, else None.
+
+9. error_handler() context manager - New @contextlib.contextmanager function:
+     - Intercepts AgentError exceptions.
+     - reraise=True (default): calls log_fn if provided, then re-raises.
+     - reraise=False: suppresses the exception after calling log_fn.
+     - Non-AgentError exceptions propagate unaffected in either mode.
+     - Yields an _ErrorHandlerContext whose .exception attribute is set to the
+       caught AgentError (or None if no exception occurred).
+
+FILES MODIFIED
+--------------
+  Modified: /Users/bkh223/Documents/GitHub/agent-engineers/exceptions.py
+  Created:  /Users/bkh223/Documents/GitHub/agent-engineers/tests/test_error_handling.py
+
+TEST RESULTS
+------------
+Command: python -m pytest tests/test_error_handling.py tests/test_exceptions.py -v --tb=short
+
+Platform: darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Library/Developer/CommandLineTools/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/bkh223/Documents/GitHub/agent-engineers
+configfile: pyproject.toml
+plugins: asyncio-1.2.0, cov-7.0.0, asyncio-mode=strict
+collected 112 items
+
+tests/test_error_handling.py::TestAgentError::test_basic_creation PASSED
+tests/test_error_handling.py::TestAgentError::test_custom_error_code PASSED
+tests/test_error_handling.py::TestAgentError::test_str_includes_code_and_message PASSED
+tests/test_error_handling.py::TestAgentError::test_none_error_code_defaults PASSED
+tests/test_error_handling.py::TestAgentError::test_is_exception PASSED
+tests/test_error_handling.py::TestAgentError::test_to_dict_keys PASSED
+tests/test_error_handling.py::TestAgentError::test_to_json_roundtrip PASSED
+tests/test_error_handling.py::TestAgentError::test_cause_included_in_to_dict_when_chained PASSED
+tests/test_error_handling.py::TestAgentError::test_agent_error_cause_chained PASSED
+tests/test_error_handling.py::TestBridgeError::test_default_error_code PASSED
+tests/test_error_handling.py::TestBridgeError::test_provider_attribute PASSED
+tests/test_error_handling.py::TestBridgeError::test_no_provider_by_default PASSED
+tests/test_error_handling.py::TestBridgeError::test_inherits_from_agent_error PASSED
+tests/test_error_handling.py::TestBridgeError::test_to_dict_includes_provider PASSED
+tests/test_error_handling.py::TestBridgeError::test_to_dict_no_provider_key_when_absent PASSED
+tests/test_error_handling.py::TestBridgeError::test_catchable_as_agent_error PASSED
+tests/test_error_handling.py::TestBridgeError::test_bridge_specific_error_codes PASSED
+tests/test_error_handling.py::TestSecurityError::test_default_error_code PASSED
+tests/test_error_handling.py::TestSecurityError::test_auth_type_and_details PASSED
+tests/test_error_handling.py::TestSecurityError::test_details_defaults_to_empty_dict PASSED
+tests/test_error_handling.py::TestSecurityError::test_inherits_from_agent_error PASSED
+tests/test_error_handling.py::TestSecurityError::test_to_dict_full PASSED
+tests/test_error_handling.py::TestSecurityError::test_to_dict_partial_fields_absent PASSED
+tests/test_error_handling.py::TestConfigurationError::test_default_error_code PASSED
+tests/test_error_handling.py::TestConfigurationError::test_config_key_attribute PASSED
+tests/test_error_handling.py::TestConfigurationError::test_inherits_from_agent_error PASSED
+tests/test_error_handling.py::TestConfigurationError::test_to_dict_includes_config_key PASSED
+tests/test_error_handling.py::TestConfigurationError::test_to_dict_no_config_key_when_absent PASSED
+tests/test_error_handling.py::TestConfigurationError::test_catchable_as_agent_error PASSED
+tests/test_error_handling.py::TestTimeoutError::test_default_error_code PASSED
+tests/test_error_handling.py::TestTimeoutError::test_timeout_seconds_attribute PASSED
+tests/test_error_handling.py::TestTimeoutError::test_inherits_from_agent_error PASSED
+tests/test_error_handling.py::TestTimeoutError::test_to_dict_includes_timeout_seconds PASSED
+tests/test_error_handling.py::TestTimeoutError::test_to_dict_no_timeout_seconds_when_absent PASSED
+tests/test_error_handling.py::TestTimeoutError::test_catchable_as_agent_error PASSED
+tests/test_error_handling.py::TestRateLimitError::test_default_error_code PASSED
+tests/test_error_handling.py::TestRateLimitError::test_retry_after_attribute PASSED
+tests/test_error_handling.py::TestRateLimitError::test_provider_attribute PASSED
+tests/test_error_handling.py::TestRateLimitError::test_inherits_from_agent_error PASSED
+tests/test_error_handling.py::TestRateLimitError::test_to_dict_includes_retry_after_and_provider PASSED
+tests/test_error_handling.py::TestRateLimitError::test_to_dict_absent_optional_fields PASSED
+tests/test_error_handling.py::TestRateLimitError::test_catchable_as_agent_error PASSED
+tests/test_error_handling.py::TestAuthenticationError::test_default_error_code PASSED
+tests/test_error_handling.py::TestAuthenticationError::test_username_attribute PASSED
+tests/test_error_handling.py::TestAuthenticationError::test_inherits_from_agent_error PASSED
+tests/test_error_handling.py::TestAuthenticationError::test_to_dict_includes_username PASSED
+tests/test_error_handling.py::TestAuthenticationError::test_to_dict_no_username_when_absent PASSED
+tests/test_error_handling.py::TestAuthenticationError::test_catchable_as_agent_error PASSED
+tests/test_error_handling.py::TestInheritanceHierarchy::test_all_subclass_agent_error PASSED
+tests/test_error_handling.py::TestInheritanceHierarchy::test_agent_error_subclasses_exception PASSED
+tests/test_error_handling.py::TestInheritanceHierarchy::test_siblings_do_not_catch_each_other PASSED
+tests/test_error_handling.py::TestInheritanceHierarchy::test_catch_all_via_agent_error PASSED
+tests/test_error_handling.py::TestIsRetryable::test_rate_limit_error_is_retryable PASSED
+tests/test_error_handling.py::TestIsRetryable::test_timeout_error_is_retryable PASSED
+tests/test_error_handling.py::TestIsRetryable::test_bridge_connection_is_retryable PASSED
+tests/test_error_handling.py::TestIsRetryable::test_bridge_rate_limit_is_retryable PASSED
+tests/test_error_handling.py::TestIsRetryable::test_bridge_timeout_is_retryable PASSED
+tests/test_error_handling.py::TestIsRetryable::test_security_error_not_retryable PASSED
+tests/test_error_handling.py::TestIsRetryable::test_agent_error_not_retryable_by_default PASSED
+tests/test_error_handling.py::TestIsRetryable::test_non_agent_error_not_retryable PASSED
+tests/test_error_handling.py::TestIsRetryable::test_config_error_not_retryable PASSED
+tests/test_error_handling.py::TestIsRetryable::test_auth_error_not_retryable PASSED
+tests/test_error_handling.py::TestGetErrorCode::test_returns_code_for_agent_error PASSED
+tests/test_error_handling.py::TestGetErrorCode::test_returns_code_for_subclass PASSED
+tests/test_error_handling.py::TestGetErrorCode::test_returns_none_for_plain_exception PASSED
+tests/test_error_handling.py::TestGetErrorCode::test_returns_none_for_none_input PASSED
+tests/test_error_handling.py::TestErrorHandlerContextManager::test_suppresses_when_reraise_false PASSED
+tests/test_error_handling.py::TestErrorHandlerContextManager::test_reraises_by_default PASSED
+tests/test_error_handling.py::TestErrorHandlerContextManager::test_reraises_when_reraise_true PASSED
+tests/test_error_handling.py::TestErrorHandlerContextManager::test_log_fn_called_on_exception PASSED
+tests/test_error_handling.py::TestErrorHandlerContextManager::test_no_exception_leaves_ctx_exception_as_none PASSED
+tests/test_error_handling.py::TestErrorHandlerContextManager::test_non_agent_errors_propagate_unaffected PASSED
+tests/test_error_handling.py::TestErrorHandlerContextManager::test_log_fn_not_called_when_no_exception PASSED
+tests/test_error_handling.py::TestExceptionChaining::test_cause_chain_appears_in_to_dict PASSED
+tests/test_error_handling.py::TestExceptionChaining::test_nested_agent_error_chain PASSED
+tests/test_error_handling.py::TestExceptionChaining::test_no_cause_key_when_no_chain PASSED
+tests/test_error_handling.py::TestJSONSerialization::test_all_types_json_serializable PASSED
+tests/test_error_handling.py::TestJSONSerialization::test_to_json_method PASSED
+tests/test_exceptions.py::TestAgentError::test_agent_error_basic_creation PASSED
+tests/test_exceptions.py::TestAgentError::test_agent_error_with_error_code PASSED
+tests/test_exceptions.py::TestAgentError::test_agent_error_to_dict PASSED
+tests/test_exceptions.py::TestAgentError::test_agent_error_inheritance PASSED
+tests/test_exceptions.py::TestAgentError::test_agent_error_string_without_error_code PASSED
+tests/test_exceptions.py::TestAgentError::test_agent_error_exception_handling PASSED
+tests/test_exceptions.py::TestBridgeError::test_bridge_error_basic_creation PASSED
+tests/test_exceptions.py::TestBridgeError::test_bridge_error_with_provider PASSED
+tests/test_exceptions.py::TestBridgeError::test_bridge_error_to_dict PASSED
+tests/test_exceptions.py::TestBridgeError::test_bridge_error_to_dict_without_provider PASSED
+tests/test_exceptions.py::TestBridgeError::test_bridge_error_inheritance PASSED
+tests/test_exceptions.py::TestBridgeError::test_bridge_error_exception_handling PASSED
+tests/test_exceptions.py::TestBridgeError::test_bridge_error_codes PASSED
+tests/test_exceptions.py::TestSecurityError::test_security_error_basic_creation PASSED
+tests/test_exceptions.py::TestSecurityError::test_security_error_with_auth_type PASSED
+tests/test_exceptions.py::TestSecurityError::test_security_error_with_details PASSED
+tests/test_exceptions.py::TestSecurityError::test_security_error_to_dict PASSED
+tests/test_exceptions.py::TestSecurityError::test_security_error_to_dict_partial PASSED
+tests/test_exceptions.py::TestSecurityError::test_security_error_inheritance PASSED
+tests/test_exceptions.py::TestSecurityError::test_security_error_exception_handling PASSED
+tests/test_exceptions.py::TestSecurityError::test_security_error_codes PASSED
+tests/test_exceptions.py::TestExceptionHierarchy::test_exception_hierarchy_structure PASSED
+tests/test_exceptions.py::TestExceptionHierarchy::test_catch_all_with_agent_error PASSED
+tests/test_exceptions.py::TestExceptionHierarchy::test_specific_exception_handling PASSED
+tests/test_exceptions.py::TestExceptionHierarchy::test_exception_message_preservation PASSED
+tests/test_exceptions.py::TestErrorCodeUsage::test_error_code_default_values PASSED
+tests/test_exceptions.py::TestErrorCodeUsage::test_error_code_custom_values PASSED
+tests/test_exceptions.py::TestErrorCodeUsage::test_error_code_in_string_representation PASSED
+tests/test_exceptions.py::TestJSONSerialization::test_agent_error_json_serializable PASSED
+tests/test_exceptions.py::TestJSONSerialization::test_bridge_error_json_serializable PASSED
+tests/test_exceptions.py::TestJSONSerialization::test_security_error_json_serializable PASSED
+tests/test_exceptions.py::TestIntegration::test_provider_bridge_error_pattern PASSED
+tests/test_exceptions.py::TestIntegration::test_authentication_error_pattern PASSED
+tests/test_exceptions.py::TestIntegration::test_error_propagation_through_handlers PASSED
+
+============================== 112 passed in 0.20s ==============================
+
+SUMMARY
+-------
+Total tests collected: 112
+  test_error_handling.py: 79 tests (new)
+  test_exceptions.py:     33 tests (existing, all still pass)
+
+All 112 passed. 0 failed. 0 errors.

@@ -41,6 +41,15 @@ try:
 except ImportError:
     METRICS_AVAILABLE = False
 
+# Import WebSocket server for real-time status updates (Phase 2)
+_websocket_server = None
+try:
+    from dashboard.websocket_server import WebSocketServer
+    WEBSOCKET_AVAILABLE = True
+except ImportError:
+    WEBSOCKET_AVAILABLE = False
+    print("WebSocket server not available - real-time updates disabled")
+
 # Configuration
 AUTO_CONTINUE_DELAY_SECONDS: int = 0
 
@@ -72,10 +81,36 @@ class SessionResult(NamedTuple):
     response: str
 
 
+async def broadcast_agent_status(agent_name: str, status: str, metadata: dict = None):
+    """Broadcast agent status change via WebSocket if available.
+
+    Args:
+        agent_name: Name of the agent (e.g., 'coding', 'orchestrator')
+        status: New status ('idle', 'running', 'paused', 'error')
+        metadata: Additional context (ticket_key, error details, etc.)
+    """
+    global _websocket_server
+
+    if not WEBSOCKET_AVAILABLE or _websocket_server is None:
+        return
+
+    try:
+        await _websocket_server.broadcast_agent_status(
+            agent_name=agent_name,
+            status=status,
+            metadata=metadata or {}
+        )
+    except Exception as e:
+        # Don't crash if WebSocket broadcast fails
+        print(f"Warning: Failed to broadcast agent status: {e}")
+
+
 async def run_agent_session(
     client: ClaudeSDKClient,
     message: str,
     project_dir: Path,
+    agent_name: str = "agent",
+    ticket_key: str = None,
 ) -> SessionResult:
     """
     Run a single agent session using Claude Agent SDK.
@@ -84,6 +119,8 @@ async def run_agent_session(
         client: Claude SDK client
         message: The prompt to send
         project_dir: Project directory path
+        agent_name: Name of the agent for status tracking
+        ticket_key: Linear ticket key being worked on
 
     Returns:
         SessionResult with status and response text:
@@ -92,6 +129,13 @@ async def run_agent_session(
         - status=COMPLETE: All features done, PROJECT_COMPLETE signal detected
     """
     print("Sending prompt to Claude Agent SDK...\n")
+
+    # Broadcast that agent is starting work
+    await broadcast_agent_status(
+        agent_name=agent_name,
+        status="running",
+        metadata={"ticket_key": ticket_key} if ticket_key else {}
+    )
 
     try:
         # Send the query
@@ -136,23 +180,53 @@ async def run_agent_session(
 
         # Check for project completion signal from orchestrator
         if COMPLETION_SIGNAL in response_text:
+            # Broadcast completion
+            await broadcast_agent_status(
+                agent_name=agent_name,
+                status="idle",
+                metadata={"completion": True, "ticket_key": ticket_key} if ticket_key else {"completion": True}
+            )
             return SessionResult(status=SESSION_COMPLETE, response=response_text)
 
+        # Broadcast that agent finished normally
+        await broadcast_agent_status(
+            agent_name=agent_name,
+            status="idle",
+            metadata={"ticket_key": ticket_key} if ticket_key else {}
+        )
         return SessionResult(status=SESSION_CONTINUE, response=response_text)
 
     except ConnectionError as e:
+        # Broadcast error status
+        await broadcast_agent_status(
+            agent_name=agent_name,
+            status="error",
+            metadata={"error": str(e), "ticket_key": ticket_key} if ticket_key else {"error": str(e)}
+        )
         print(f"\nNetwork error during agent session: {e}")
         print("Check your internet connection and try again.")
         traceback.print_exc()
         return SessionResult(status=SESSION_ERROR, response=str(e))
 
     except TimeoutError as e:
+        # Broadcast error status
+        await broadcast_agent_status(
+            agent_name=agent_name,
+            status="error",
+            metadata={"error": str(e), "ticket_key": ticket_key} if ticket_key else {"error": str(e)}
+        )
         print(f"\nTimeout during agent session: {e}")
         print("The API request timed out. Will retry with fresh session.")
         traceback.print_exc()
         return SessionResult(status=SESSION_ERROR, response=str(e))
 
     except Exception as e:
+        # Broadcast error status
+        await broadcast_agent_status(
+            agent_name=agent_name,
+            status="error",
+            metadata={"error": str(e), "ticket_key": ticket_key} if ticket_key else {"error": str(e)}
+        )
         error_type: str = type(e).__name__
         error_msg: str = str(e)
 
@@ -187,6 +261,7 @@ async def run_autonomous_agent(
     project_dir: Path,
     model: str,
     max_iterations: int | None = None,
+    websocket_server = None,
 ) -> None:
     """
     Run the autonomous agent loop.
@@ -195,10 +270,14 @@ async def run_autonomous_agent(
         project_dir: Directory for the project
         model: Claude model to use
         max_iterations: Maximum number of iterations (None for unlimited)
+        websocket_server: Optional WebSocketServer instance for real-time updates
 
     Raises:
         ValueError: If max_iterations is not positive
     """
+    global _websocket_server
+    _websocket_server = websocket_server
+
     if max_iterations is not None and max_iterations < 1:
         raise ValueError(f"max_iterations must be positive, got {max_iterations}")
 
@@ -290,7 +369,13 @@ async def run_autonomous_agent(
         result: SessionResult = SessionResult(status=SESSION_ERROR, response="uninitialized")
         try:
             async with client:
-                result = await run_agent_session(client, prompt, project_dir)
+                result = await run_agent_session(
+                    client,
+                    prompt,
+                    project_dir,
+                    agent_name="orchestrator" if is_first_run else "coding",
+                    ticket_key=None  # TODO: extract from Linear context
+                )
         except ConnectionError as e:
             print(f"\nFailed to connect to Claude SDK: {e}")
             print("Check your authentication and network connection.")
