@@ -127,6 +127,22 @@ if _worktree_compat_path.exists() and "dashboard.compat" not in sys.modules:
     except Exception:
         pass
 
+# 4j. Load dashboard.rate_limiter from the worktree (AI-224) — before server
+_worktree_rate_limiter_path = _WORKTREE_ROOT / "dashboard" / "rate_limiter.py"
+if _worktree_rate_limiter_path.exists() and "dashboard.rate_limiter" not in sys.modules:
+    try:
+        _load_module_from_file("dashboard.rate_limiter", _worktree_rate_limiter_path)
+    except Exception:
+        pass
+
+# 4k. Load dashboard.usage_meter from the worktree (AI-224) — before server
+_worktree_usage_meter_path = _WORKTREE_ROOT / "dashboard" / "usage_meter.py"
+if _worktree_usage_meter_path.exists() and "dashboard.usage_meter" not in sys.modules:
+    try:
+        _load_module_from_file("dashboard.usage_meter", _worktree_usage_meter_path)
+    except Exception:
+        pass
+
 # 4b. Override dashboard.server with the worktree's AI-161 version
 _worktree_server_path = _WORKTREE_ROOT / "dashboard" / "server.py"
 if _worktree_server_path.exists():

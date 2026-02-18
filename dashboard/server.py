@@ -85,6 +85,8 @@ from dashboard.config import get_config
 from dashboard.compat import check_python_version
 from dashboard.latency_benchmark import LatencyTracker, StreamingLatencyTracker
 from dashboard.structured_logging import RequestLogger, ProviderRoutingLogger, ErrorLogger
+from dashboard.rate_limiter import RateLimiter, get_identifier, get_rate_limiter, reset_rate_limiter
+from dashboard.usage_meter import UsageMeter, get_usage_meter, reset_usage_meter
 
 # In-memory store for requirements (ticket_key -> requirement text)
 _requirements_store: dict = {}
@@ -466,8 +468,12 @@ class DashboardServer:
         if collector is not None:
             collector.register_event_callback(self._on_new_event)
 
-        # Create app with middlewares (auth before cors so rejections get CORS headers)
-        self.app = web.Application(middlewares=[auth_middleware, error_middleware, cors_middleware])
+        # AI-224: Rate limiter and usage meter singletons
+        self._rate_limiter = get_rate_limiter()
+        self._usage_meter = get_usage_meter()
+
+        # Create app with middlewares (auth before rate-limit before cors so rejections get CORS headers)
+        self.app = web.Application(middlewares=[auth_middleware, self._rate_limiter.middleware, error_middleware, cors_middleware])
 
         # Register routes
         self._setup_routes()
@@ -636,6 +642,14 @@ class DashboardServer:
         self.app.router.add_route('OPTIONS', '/api/charts/token-usage', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/charts/cost-trend', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/charts/success-rate', self.handle_options)
+
+        # AI-224: Usage metering endpoints
+        self.app.router.add_get('/api/usage', self.get_usage)
+        self.app.router.add_post('/api/usage/record', self.post_usage_record)
+        self.app.router.add_post('/api/usage/reset', self.post_usage_reset)
+        self.app.router.add_route('OPTIONS', '/api/usage', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/usage/record', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/usage/reset', self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
         """Handle CORS preflight OPTIONS requests."""
@@ -3502,6 +3516,86 @@ class DashboardServer:
             agents.append({"name": name, "rate": round(float(rate), 4), "total": int(total)})
 
         return web.json_response({"agents": agents})
+
+    # -------------------------------------------------------------------------
+    # AI-224: Usage metering endpoints
+    # -------------------------------------------------------------------------
+
+    async def get_usage(self, request: Request) -> Response:
+        """GET /api/usage — return current period usage stats for the caller (AI-224).
+
+        Uses the rate-limit identifier to look up the user. The caller is
+        identified by Bearer token / X-API-Key (authenticated) or by IP
+        (unauthenticated).
+
+        Response:
+            {
+                "user_id": "token:abc123",
+                "tier": "explorer",
+                "period_start": "2024-01-01T00:00:00+00:00",
+                "agent_hours_used": 5.2,
+                "agent_hours_limit": 10.0,
+                "percentage": 52.0,
+                "alert_level": null
+            }
+
+        Returns:
+            200 JSON with usage stats.
+        """
+        identifier, _is_auth = get_identifier(request)
+        usage = self._usage_meter.get_usage(identifier)
+        return web.json_response(usage.to_dict())
+
+    async def post_usage_record(self, request: Request) -> Response:
+        """POST /api/usage/record — record agent-time consumption (AI-224).
+
+        Request body:
+            {"user_id": "...", "seconds": 300}
+
+        Returns:
+            200 JSON with updated usage stats.
+            400 if body is invalid.
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON body"}, status=400)
+
+        user_id = body.get("user_id")
+        seconds = body.get("seconds")
+
+        if not user_id:
+            return web.json_response({"error": "Missing 'user_id' field"}, status=400)
+        if seconds is None or not isinstance(seconds, (int, float)) or seconds < 0:
+            return web.json_response(
+                {"error": "Missing or invalid 'seconds' field (must be non-negative number)"},
+                status=400,
+            )
+
+        usage = self._usage_meter.record_usage(str(user_id), float(seconds))
+        return web.json_response(usage.to_dict())
+
+    async def post_usage_reset(self, request: Request) -> Response:
+        """POST /api/usage/reset — reset billing period for a user (AI-224).
+
+        Request body:
+            {"user_id": "..."}
+
+        Returns:
+            200 JSON with fresh usage stats.
+            400 if body is invalid.
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON body"}, status=400)
+
+        user_id = body.get("user_id")
+        if not user_id:
+            return web.json_response({"error": "Missing 'user_id' field"}, status=400)
+
+        usage = self._usage_meter.reset_period(str(user_id))
+        return web.json_response(usage.to_dict())
 
     def run(self):
         """Start the HTTP server with WebSocket support.
