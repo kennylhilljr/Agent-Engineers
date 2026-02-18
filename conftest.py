@@ -151,6 +151,14 @@ if _worktree_webhooks_path.exists() and "dashboard.webhooks" not in sys.modules:
     except Exception:
         pass
 
+# 4m. Load dashboard.free_tier from the worktree (AI-220 / Free Tier Metering) — before server
+_worktree_free_tier_path = _WORKTREE_ROOT / "dashboard" / "free_tier.py"
+if _worktree_free_tier_path.exists() and "dashboard.free_tier" not in sys.modules:
+    try:
+        _load_module_from_file("dashboard.free_tier", _worktree_free_tier_path)
+    except Exception:
+        pass
+
 # 4b. Override dashboard.server with the worktree's AI-161 version
 _worktree_server_path = _WORKTREE_ROOT / "dashboard" / "server.py"
 if _worktree_server_path.exists():

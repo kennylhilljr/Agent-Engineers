@@ -2145,6 +2145,279 @@
             border-color: rgba(9, 105, 218, 0.2);
         }
 
+        /* AI-220: Compact header usage meter */
+        .header-usage-meter {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 12px;
+            padding: 8px 16px;
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid rgba(148, 163, 184, 0.15);
+            border-radius: 10px;
+            max-width: 480px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .header-usage-icon {
+            font-size: 1rem;
+            opacity: 0.8;
+        }
+        .header-usage-bar-wrap {
+            flex: 1;
+            min-width: 80px;
+        }
+        .header-usage-bar-track {
+            height: 6px;
+            background: rgba(148, 163, 184, 0.2);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .header-usage-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            background: linear-gradient(90deg, #3b82f6, #60a5fa);
+            transition: width 0.4s ease, background 0.4s ease;
+        }
+        .header-usage-bar-fill.yellow {
+            background: linear-gradient(90deg, #d97706, #f59e0b);
+        }
+        .header-usage-bar-fill.red {
+            background: linear-gradient(90deg, #dc2626, #ef4444);
+        }
+        .header-usage-text {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-secondary, #8b949e);
+            white-space: nowrap;
+        }
+        .header-plan-badge {
+            background: rgba(88, 166, 255, 0.15);
+            color: #58a6ff;
+            border: 1px solid rgba(88, 166, 255, 0.3);
+            border-radius: 5px;
+            padding: 2px 7px;
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .header-upgrade-btn {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 4px 12px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            cursor: pointer;
+            animation: pulse-upgrade 2s ease-in-out infinite;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .header-upgrade-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 12px rgba(245, 158, 11, 0.5);
+        }
+        @keyframes pulse-upgrade {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+            50%       { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); }
+        }
+        [data-theme="light"] .header-usage-meter {
+            background: rgba(246, 248, 250, 0.8);
+            border-color: rgba(148, 163, 184, 0.3);
+        }
+        [data-theme="light"] .header-plan-badge {
+            background: rgba(9, 105, 218, 0.1);
+            color: #0969da;
+            border-color: rgba(9, 105, 218, 0.2);
+        }
+
+        /* AI-220: Upgrade Modal */
+        .upgrade-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 9000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .upgrade-modal {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 16px;
+            max-width: 860px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+            animation: slideUp 0.25s ease;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .upgrade-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 24px 16px;
+            border-bottom: 1px solid #30363d;
+        }
+        .upgrade-modal-header h2 {
+            font-size: 1.4rem;
+            color: #f1f5f9;
+            font-weight: 700;
+        }
+        .upgrade-modal-close {
+            background: none;
+            border: 1px solid #30363d;
+            color: #8b949e;
+            cursor: pointer;
+            font-size: 1.3rem;
+            border-radius: 6px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.15s ease, border-color 0.15s ease;
+        }
+        .upgrade-modal-close:hover {
+            color: #e6edf3;
+            border-color: #58a6ff;
+        }
+        .upgrade-modal-body {
+            padding: 20px 24px 24px;
+        }
+        .upgrade-modal-subtitle {
+            color: #8b949e;
+            font-size: 0.95rem;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .upgrade-plan-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+        }
+        .upgrade-plan-card {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 20px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: border-color 0.2s ease, transform 0.15s ease;
+            position: relative;
+        }
+        .upgrade-plan-card:hover {
+            border-color: #58a6ff;
+            transform: translateY(-2px);
+        }
+        .upgrade-plan-card.current-plan {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+        .upgrade-plan-card-name {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #e6edf3;
+        }
+        .upgrade-plan-card-price {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #60a5fa;
+        }
+        .upgrade-plan-card-price span {
+            font-size: 0.85rem;
+            font-weight: 400;
+            color: #8b949e;
+        }
+        .upgrade-plan-card-features {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            flex: 1;
+        }
+        .upgrade-plan-card-features li {
+            font-size: 0.8rem;
+            color: #8b949e;
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+        }
+        .upgrade-plan-card-features li::before {
+            content: '✓';
+            color: #10b981;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .upgrade-plan-card-badge {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #3b82f6;
+            color: #fff;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+        .upgrade-plan-card-btn {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            transition: opacity 0.15s ease;
+            width: 100%;
+        }
+        .upgrade-plan-card-btn:hover {
+            opacity: 0.9;
+        }
+        .upgrade-plan-card-btn.current-btn {
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            cursor: default;
+        }
+        /* model restriction tooltip */
+        .model-option-restricted {
+            color: #6b7280 !important;
+            font-style: italic;
+        }
+        [data-theme="light"] .upgrade-modal {
+            background: #ffffff;
+            border-color: #d0d7de;
+        }
+        [data-theme="light"] .upgrade-modal-header {
+            border-bottom-color: #d0d7de;
+        }
+        [data-theme="light"] .upgrade-plan-card {
+            background: rgba(246, 248, 250, 0.9);
+            border-color: #d0d7de;
+        }
+        [data-theme="light"] .upgrade-plan-card-name,
+        [data-theme="light"] .upgrade-modal-header h2 {
+            color: #24292f;
+        }
+
         /* Loading State */
         .loading {
             display: flex;
@@ -6452,6 +6725,42 @@
                     title="Resume all agents"
                 >&#9654; Resume All</button>
             </div>
+
+            <!-- AI-220: Compact usage meter in header -->
+            <div class="header-usage-meter" id="header-usage-meter" data-testid="header-usage-meter">
+                <span class="header-usage-icon">&#128336;</span>
+                <div class="header-usage-bar-wrap">
+                    <div class="header-usage-bar-track">
+                        <div class="header-usage-bar-fill" id="header-usage-bar-fill" style="width:0%"></div>
+                    </div>
+                </div>
+                <span class="header-usage-text" id="header-usage-text">0h / 10h</span>
+                <span class="header-plan-badge" id="header-plan-badge" data-testid="plan-badge">EXPLORER</span>
+                <button
+                    class="header-upgrade-btn"
+                    id="header-upgrade-btn"
+                    onclick="openUpgradeModal()"
+                    style="display:none"
+                    data-testid="upgrade-cta-btn"
+                    title="Upgrade your plan"
+                >&#8679; Upgrade</button>
+            </div>
+        </div>
+
+        <!-- AI-220: Upgrade Modal -->
+        <div class="upgrade-modal-overlay" id="upgrade-modal-overlay" style="display:none" data-testid="upgrade-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="upgrade-modal-title">
+            <div class="upgrade-modal" id="upgrade-modal">
+                <div class="upgrade-modal-header">
+                    <h2 id="upgrade-modal-title">&#128640; Upgrade Your Plan</h2>
+                    <button class="upgrade-modal-close" onclick="closeUpgradeModal()" aria-label="Close upgrade modal" data-testid="upgrade-modal-close">&times;</button>
+                </div>
+                <div class="upgrade-modal-body">
+                    <p class="upgrade-modal-subtitle">Choose the plan that fits your team</p>
+                    <div class="upgrade-plan-cards" id="upgrade-plan-cards" data-testid="upgrade-plan-cards">
+                        <!-- Plan cards inserted by JS -->
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- AI-89: System-paused global banner -->
@@ -9666,15 +9975,20 @@
         }
 
         // =========================================================
-        // AI-224: Usage Meter Widget
+        // AI-224 / AI-220: Usage Meter Widget + Free Tier UI
         // =========================================================
 
         let _usageMeterPollInterval = null;
-        const USAGE_METER_POLL_MS = 30000; // 30 seconds per spec
+        const USAGE_METER_POLL_MS = 60000; // 60 seconds (AI-220 spec)
+
+        // Global usage state for model restriction checks
+        let _currentUsageData = null;
 
         function renderUsageMeter(data) {
             if (!data) return;
+            _currentUsageData = data;
 
+            // ---- Existing full usage-meter card (AI-224) ----
             const tierBadge = document.getElementById('usage-tier-badge');
             const alertBadge = document.getElementById('usage-alert-badge');
             const barFill = document.getElementById('usage-bar-fill');
@@ -9683,35 +9997,40 @@
             const hoursLimit = document.getElementById('usage-hours-limit');
             const periodStart = document.getElementById('usage-period-start');
 
-            if (!tierBadge || !barFill) return;
+            // Support both old (/api/usage -> usage_meter) and new (/api/billing/usage -> free_tier) field names
+            const pctRaw = data.percent_used !== undefined ? data.percent_used : (data.percentage || 0);
+            const pct = Math.min(parseFloat(pctRaw), 100);
+            const alertLevel = data.alert_level || (pct >= 100 ? 'critical' : pct >= 80 ? 'warning' : null);
+            const planName = data.plan || data.tier || 'explorer';
+            const planDisplay = data.plan_display || planName.toUpperCase();
+            const hoursUsedVal = data.hours_used !== undefined ? data.hours_used : (data.agent_hours_used || 0);
+            const hoursLimitVal = data.hours_limit !== undefined ? data.hours_limit : (data.agent_hours_limit || 10);
 
-            const pct = Math.min(parseFloat(data.percentage || 0), 100);
-            const alertLevel = data.alert_level || null;
+            if (tierBadge) tierBadge.textContent = planName;
 
-            // Tier badge
-            tierBadge.textContent = data.tier || 'explorer';
-
-            // Alert badge
-            if (alertLevel) {
-                alertBadge.textContent = alertLevel === 'critical' ? 'OVER LIMIT' : '80% WARNING';
-                alertBadge.className = 'usage-meter-alert ' + alertLevel;
-                alertBadge.style.display = '';
-            } else {
-                alertBadge.style.display = 'none';
+            if (alertBadge) {
+                if (alertLevel) {
+                    alertBadge.textContent = alertLevel === 'critical' ? 'OVER LIMIT' : '80% WARNING';
+                    alertBadge.className = 'usage-meter-alert ' + alertLevel;
+                    alertBadge.style.display = '';
+                } else {
+                    alertBadge.style.display = 'none';
+                }
             }
 
-            // Progress bar
-            barFill.style.width = pct + '%';
-            barFill.className = 'usage-meter-bar-fill' + (alertLevel ? ' ' + alertLevel : '');
+            if (barFill) {
+                barFill.style.width = pct + '%';
+                barFill.className = 'usage-meter-bar-fill' + (alertLevel ? ' ' + alertLevel : '');
+            }
 
-            // Percent label
-            percentLabel.textContent = pct.toFixed(1) + '%';
-            percentLabel.style.color = alertLevel === 'critical' ? '#ef4444' :
-                                       alertLevel === 'warning'  ? '#f59e0b' : '';
+            if (percentLabel) {
+                percentLabel.textContent = pct.toFixed(1) + '%';
+                percentLabel.style.color = alertLevel === 'critical' ? '#ef4444' :
+                                           alertLevel === 'warning'  ? '#f59e0b' : '';
+            }
 
-            // Stats
-            if (hoursUsed) hoursUsed.textContent = (parseFloat(data.agent_hours_used || 0)).toFixed(2);
-            if (hoursLimit) hoursLimit.textContent = (parseFloat(data.agent_hours_limit || 0)).toFixed(2);
+            if (hoursUsed) hoursUsed.textContent = parseFloat(hoursUsedVal).toFixed(2);
+            if (hoursLimit) hoursLimit.textContent = hoursLimitVal !== null ? parseFloat(hoursLimitVal).toFixed(2) : '∞';
             if (periodStart && data.period_start) {
                 try {
                     const d = new Date(data.period_start);
@@ -9720,19 +10039,77 @@
                     periodStart.textContent = data.period_start;
                 }
             }
+
+            // ---- AI-220: Compact header usage meter ----
+            const headerBarFill = document.getElementById('header-usage-bar-fill');
+            const headerUsageText = document.getElementById('header-usage-text');
+            const headerPlanBadge = document.getElementById('header-plan-badge');
+            const headerUpgradeBtn = document.getElementById('header-upgrade-btn');
+
+            if (headerBarFill) {
+                headerBarFill.style.width = pct + '%';
+                headerBarFill.className = 'header-usage-bar-fill' +
+                    (alertLevel === 'critical' ? ' red' : alertLevel === 'warning' ? ' yellow' : '');
+            }
+            if (headerUsageText) {
+                const limitStr = hoursLimitVal !== null ? parseFloat(hoursLimitVal).toFixed(1) + 'h' : '∞';
+                headerUsageText.textContent = parseFloat(hoursUsedVal).toFixed(1) + 'h / ' + limitStr;
+            }
+            if (headerPlanBadge) {
+                headerPlanBadge.textContent = planDisplay;
+            }
+
+            // Show upgrade CTA when at or above 80%
+            if (headerUpgradeBtn) {
+                headerUpgradeBtn.style.display = (pct >= 80) ? '' : 'none';
+            }
+
+            // ---- AI-220: Apply model restrictions for Explorer plan ----
+            applyModelRestrictions(planName, data.allowed_models || null);
+        }
+
+        function applyModelRestrictions(planName, allowedModels) {
+            // Restrict model options in the onboarding wizard's model selector
+            const obModelSelect = document.getElementById('ob-model');
+            if (obModelSelect) {
+                const isExplorer = planName === 'explorer';
+                Array.from(obModelSelect.options).forEach(opt => {
+                    const val = opt.value;
+                    const isHaiku = val.includes('haiku');
+                    if (isExplorer && !isHaiku) {
+                        opt.disabled = true;
+                        if (!opt.dataset.originalText) opt.dataset.originalText = opt.text;
+                        opt.text = (opt.dataset.originalText || opt.text) + ' (Upgrade Required)';
+                        opt.className = 'model-option-restricted';
+                        opt.title = 'Upgrade to Builder to use Claude Sonnet/Opus';
+                    } else {
+                        opt.disabled = false;
+                        if (opt.dataset.originalText) {
+                            opt.text = opt.dataset.originalText;
+                            delete opt.dataset.originalText;
+                        }
+                        opt.className = '';
+                        opt.title = '';
+                    }
+                });
+            }
         }
 
         async function fetchUsageMeter() {
             try {
-                const resp = await fetch(`${API_BASE_URL}/api/usage`);
+                // Try new billing endpoint first (AI-220), fall back to legacy (AI-224)
+                let resp = await fetch(`${API_BASE_URL}/api/billing/usage`);
                 if (!resp.ok) {
-                    console.warn('[AI-224] Usage meter fetch failed:', resp.status);
+                    resp = await fetch(`${API_BASE_URL}/api/usage`);
+                }
+                if (!resp.ok) {
+                    console.warn('[AI-220] Usage meter fetch failed:', resp.status);
                     return;
                 }
                 const data = await resp.json();
                 renderUsageMeter(data);
             } catch (err) {
-                console.warn('[AI-224] Usage meter error:', err);
+                console.warn('[AI-220] Usage meter error:', err);
             }
         }
 
@@ -9740,6 +10117,135 @@
             if (_usageMeterPollInterval) clearInterval(_usageMeterPollInterval);
             _usageMeterPollInterval = setInterval(fetchUsageMeter, USAGE_METER_POLL_MS);
         }
+
+        // ---- AI-220: Upgrade Modal ----
+
+        const UPGRADE_PLAN_DATA = [
+            {
+                plan: 'explorer',
+                name: 'Explorer',
+                price: 'Free',
+                priceNote: '',
+                features: [
+                    '10 agent-hours/month',
+                    'Claude Haiku only',
+                    '1 concurrent agent',
+                    'GitHub integration',
+                    'Community support'
+                ]
+            },
+            {
+                plan: 'builder',
+                name: 'Builder',
+                price: '$49',
+                priceNote: '/month',
+                features: [
+                    '50 agent-hours/month',
+                    'Claude Haiku, Sonnet & Opus',
+                    '5 concurrent agents',
+                    'GitHub, Slack, Jira & Linear',
+                    'Email support'
+                ]
+            },
+            {
+                plan: 'team',
+                name: 'Team',
+                price: '$199',
+                priceNote: '/month',
+                features: [
+                    '200 agent-hours/month',
+                    'All Claude models',
+                    '20 concurrent agents',
+                    'All integrations',
+                    'Priority support'
+                ]
+            },
+            {
+                plan: 'organization',
+                name: 'Organization',
+                price: '$799',
+                priceNote: '/month',
+                features: [
+                    'Unlimited agent-hours',
+                    'All Claude models',
+                    'Unlimited agents',
+                    'All integrations + custom',
+                    'Dedicated support',
+                    'SSO & Audit logs'
+                ]
+            }
+        ];
+
+        function openUpgradeModal() {
+            const overlay = document.getElementById('upgrade-modal-overlay');
+            if (!overlay) return;
+
+            const currentPlan = (_currentUsageData && (_currentUsageData.plan || _currentUsageData.tier)) || 'explorer';
+
+            // Render plan cards
+            const container = document.getElementById('upgrade-plan-cards');
+            if (container) {
+                container.innerHTML = UPGRADE_PLAN_DATA.map(p => {
+                    const isCurrent = p.plan === currentPlan;
+                    return `
+                        <div class="upgrade-plan-card ${isCurrent ? 'current-plan' : ''}" data-plan="${p.plan}" data-testid="plan-card-${p.plan}">
+                            ${isCurrent ? '<div class="upgrade-plan-card-badge">Current Plan</div>' : ''}
+                            <div class="upgrade-plan-card-name">${p.name}</div>
+                            <div class="upgrade-plan-card-price">${p.price}<span>${p.priceNote}</span></div>
+                            <ul class="upgrade-plan-card-features">
+                                ${p.features.map(f => `<li>${f}</li>`).join('')}
+                            </ul>
+                            <button class="upgrade-plan-card-btn ${isCurrent ? 'current-btn' : ''}"
+                                    onclick="${isCurrent ? '' : `requestUpgrade('${p.plan}')`}"
+                                    data-testid="plan-btn-${p.plan}"
+                                    ${isCurrent ? 'disabled' : ''}>
+                                ${isCurrent ? 'Current Plan' : 'Upgrade'}
+                            </button>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            overlay.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeUpgradeModal() {
+            const overlay = document.getElementById('upgrade-modal-overlay');
+            if (overlay) overlay.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+
+        async function requestUpgrade(targetPlan) {
+            try {
+                const resp = await fetch(`${API_BASE_URL}/api/billing/upgrade`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ plan: targetPlan })
+                });
+                const data = await resp.json();
+                // In production this would redirect to a payment page
+                const url = data.upgrade_url || 'https://agentdashboard.ai/upgrade';
+                alert(`Upgrade to ${targetPlan}!\n\nIn production this would redirect to:\n${url}\n\n(Billing integration coming in AI-221)`);
+            } catch (err) {
+                console.error('[AI-220] Upgrade request error:', err);
+                alert('Upgrade request failed. Please try again.');
+            }
+        }
+
+        // Close upgrade modal on overlay click
+        document.addEventListener('DOMContentLoaded', function () {
+            const overlay = document.getElementById('upgrade-modal-overlay');
+            if (overlay) {
+                overlay.addEventListener('click', function (e) {
+                    if (e.target === overlay) closeUpgradeModal();
+                });
+            }
+            // Close on Escape
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') closeUpgradeModal();
+            });
+        });
 
         // ==========================================
         // Requirement Editor Implementation
