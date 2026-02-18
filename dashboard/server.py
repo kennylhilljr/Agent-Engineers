@@ -406,6 +406,7 @@ class DashboardServer:
         self.app.router.add_post('/api/chat/route', self.post_chat_route)
         self.app.router.add_get('/api/chat/history', self.get_chat_history)
 
+
         # Reasoning broadcast endpoint (AI-158)
         self.app.router.add_post('/api/reasoning', self.broadcast_reasoning)
 
@@ -862,6 +863,7 @@ class DashboardServer:
 
         logger.info(
             f"POST /api/chat: '{message[:50]}' -> "
+            f"provider={result.get('provider', provider)}, "
             f"intent={result['routing'].get('intent_type')}, "
             f"handler={result['routing'].get('handler')}"
         )

@@ -149,4 +149,3 @@ if _worktree_crash_isolation_path.exists() and "dashboard.crash_isolation" not i
         _load_module_from_file("dashboard.crash_isolation", _worktree_crash_isolation_path)
     except Exception:
         pass
-
