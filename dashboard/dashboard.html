@@ -4860,6 +4860,134 @@
         [data-theme="light"] .hbar-bg {
             background: #e1e4e8;
         }
+
+        /* AI-77: GitHub Access Panel (REQ-INTEGRATION-003) */
+        .github-section {
+            margin-top: 16px;
+        }
+        .github-repo-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+        }
+        .github-repo-label {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-secondary, #8b949e);
+        }
+        .github-repo-name {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: var(--accent, #58a6ff);
+        }
+        .github-stats-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+        .github-stat-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--bg-secondary, #161b22);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: 20px;
+            padding: 5px 14px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-primary, #e6edf3);
+        }
+        .github-stat-icon {
+            font-size: 1rem;
+        }
+        .github-query-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .github-query-input {
+            flex: 1;
+            background: var(--bg-primary, #0d1117);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: 8px;
+            padding: 9px 14px;
+            font-size: 0.875rem;
+            color: var(--text-primary, #e6edf3);
+            transition: border-color 0.15s ease;
+        }
+        .github-query-input:focus {
+            outline: none;
+            border-color: var(--accent, #58a6ff);
+        }
+        .github-query-input::placeholder {
+            color: var(--text-secondary, #8b949e);
+        }
+        .github-query-btn {
+            background: var(--accent, #58a6ff);
+            color: #0d1117;
+            border: none;
+            border-radius: 8px;
+            padding: 9px 16px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity 0.15s ease;
+            white-space: nowrap;
+        }
+        .github-query-btn:hover { opacity: 0.85; }
+        .github-query-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .github-quick-btns {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+        .github-quick-btn {
+            background: none;
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 0.80rem;
+            color: var(--text-secondary, #8b949e);
+            cursor: pointer;
+            transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+        }
+        .github-quick-btn:hover {
+            background: var(--border-color, #30363d);
+            color: var(--text-primary, #e6edf3);
+            border-color: var(--accent, #58a6ff);
+        }
+        .github-response-box {
+            background: var(--bg-primary, #0d1117);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: 8px;
+            padding: 12px 14px;
+            font-size: 0.875rem;
+            color: var(--text-primary, #e6edf3);
+            min-height: 60px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+            display: none;
+        }
+        .github-response-box.visible { display: block; }
+        .github-response-loading {
+            color: var(--text-secondary, #8b949e);
+            font-style: italic;
+        }
+        [data-theme="light"] .github-query-input {
+            background: #f6f8fa;
+            color: #24292f;
+            border-color: #d0d7de;
+        }
+        [data-theme="light"] .github-response-box {
+            background: #f6f8fa;
+            color: #24292f;
+            border-color: #d0d7de;
+        }
     </style>
 </head>
 <body>
@@ -4916,6 +5044,11 @@
                 <button class="panel-nav-item" onclick="document.getElementById('chat-container').scrollIntoView({behavior:'smooth'})">
                     <span class="panel-nav-icon">&#128172;</span>
                     <span>Chat Interface</span>
+                </button>
+                <!-- AI-77: GitHub Access (REQ-INTEGRATION-003) -->
+                <button class="panel-nav-item" onclick="document.getElementById('github-section').scrollIntoView({behavior:'smooth'})">
+                    <span class="panel-nav-icon">&#128279;</span>
+                    <span>GitHub</span>
                 </button>
 
                 <!-- AI-79: Agent Status Panel (REQ-MONITOR-001) -->
@@ -5218,6 +5351,69 @@
                     </div>
                 </div>
             </div>
+        </div>
+
+        <!-- AI-77: GitHub Access Panel (REQ-INTEGRATION-003) -->
+        <div class="card github-section" id="github-section" data-testid="github-section">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <svg class="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22"></path>
+                    </svg>
+                    GitHub Access
+                </h2>
+                <button class="leaderboard-refresh-btn" id="github-refresh-btn" onclick="fetchGithubRepo()" aria-label="Refresh GitHub info">&#8635; Refresh</button>
+            </div>
+
+            <!-- Repo info bar -->
+            <div class="github-repo-bar">
+                <span class="github-repo-label">Repo:</span>
+                <span class="github-repo-name" id="github-repo-name" data-testid="github-repo-name">Loading...</span>
+            </div>
+            <div class="github-stats-row" id="github-stats-row">
+                <span class="github-stat-badge">
+                    <span class="github-stat-icon">&#128275;</span>
+                    <span>Open PRs: <strong id="github-open-prs" data-testid="github-open-prs">—</strong></span>
+                </span>
+                <span class="github-stat-badge">
+                    <span class="github-stat-icon">&#128221;</span>
+                    <span>Open Issues: <strong id="github-open-issues" data-testid="github-open-issues">—</strong></span>
+                </span>
+                <span class="github-stat-badge">
+                    <span class="github-stat-icon">&#11088;</span>
+                    <span>Stars: <strong id="github-stars" data-testid="github-stars">—</strong></span>
+                </span>
+            </div>
+
+            <!-- Quick action buttons -->
+            <div class="github-quick-btns">
+                <button class="github-quick-btn" data-testid="github-btn-open-prs" onclick="githubQuickQuery('What are the open PRs?')">&#128275; View Open PRs</button>
+                <button class="github-quick-btn" data-testid="github-btn-open-issues" onclick="githubQuickQuery('What are the open issues?')">&#128221; View Open Issues</button>
+                <button class="github-quick-btn" data-testid="github-btn-recent-activity" onclick="githubQuickQuery('Show recent activity and merged PRs')">&#9203; Recent Activity</button>
+            </div>
+
+            <!-- Natural-language query bar -->
+            <div class="github-query-bar">
+                <input
+                    type="text"
+                    id="github-query-input"
+                    class="github-query-input"
+                    placeholder="Ask about GitHub... e.g. 'What is the status of PR #125?'"
+                    data-testid="github-query-input"
+                    aria-label="GitHub query"
+                    onkeydown="if(event.key==='Enter')submitGithubQuery()"
+                />
+                <button
+                    id="github-query-btn"
+                    class="github-query-btn"
+                    data-testid="github-query-btn"
+                    onclick="submitGithubQuery()"
+                    aria-label="Submit GitHub query"
+                >Ask</button>
+            </div>
+
+            <!-- Response area -->
+            <div class="github-response-box" id="github-response-box" data-testid="github-response-box" aria-live="polite"></div>
         </div>
 
         <!-- Requirement Editor -->
@@ -8906,6 +9102,65 @@
             _chartsPollingTimer = setInterval(fetchCharts, 30000);
         }
 
+        // =====================================================================
+        // AI-77: GitHub Access Panel (REQ-INTEGRATION-003)
+        // =====================================================================
+        async function fetchGithubRepo() {
+            var baseUrl = (typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '').replace(/\/$/, '');
+            var nameEl = document.getElementById('github-repo-name');
+            var openPrsEl = document.getElementById('github-open-prs');
+            var openIssuesEl = document.getElementById('github-open-issues');
+            var starsEl = document.getElementById('github-stars');
+            try {
+                var resp = await fetch(baseUrl + '/api/github/repo');
+                if (resp.ok) {
+                    var data = await resp.json();
+                    if (nameEl) nameEl.textContent = data.full_name || data.name || 'Not configured';
+                    if (openPrsEl) openPrsEl.textContent = data.open_prs !== undefined ? data.open_prs : '—';
+                    if (openIssuesEl) openIssuesEl.textContent = data.open_issues !== undefined ? data.open_issues : '—';
+                    if (starsEl) starsEl.textContent = data.stars !== undefined ? data.stars : '—';
+                }
+            } catch (e) {
+                if (nameEl) nameEl.textContent = 'Unavailable';
+            }
+        }
+
+        async function submitGithubQuery() {
+            var input = document.getElementById('github-query-input');
+            var btn = document.getElementById('github-query-btn');
+            var responseBox = document.getElementById('github-response-box');
+            if (!input || !responseBox) return;
+            var query = input.value.trim();
+            if (!query) return;
+
+            btn.disabled = true;
+            responseBox.className = 'github-response-box visible';
+            responseBox.innerHTML = '<span class="github-response-loading">Querying GitHub...</span>';
+
+            var baseUrl = (typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '').replace(/\/$/, '');
+            try {
+                var resp = await fetch(baseUrl + '/api/github/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query })
+                });
+                var data = await resp.json();
+                responseBox.textContent = data.response || JSON.stringify(data, null, 2);
+            } catch (e) {
+                responseBox.textContent = 'Error: ' + (e.message || 'Could not reach GitHub API');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function githubQuickQuery(query) {
+            var input = document.getElementById('github-query-input');
+            if (input) {
+                input.value = query;
+                submitGithubQuery();
+            }
+        }
+
         // Start when DOM is ready
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
@@ -8915,6 +9170,7 @@
                 fetchLeaderboard();
                 fetchLiveFeed(); // AI-86: Live Activity Feed (REQ-FEED-001)
                 startChartsPolling(); // AI-85: Visual Analytics Charts (REQ-METRICS-003)
+                fetchGithubRepo(); // AI-77: GitHub Access (REQ-INTEGRATION-003)
             });
         } else {
             init();
@@ -8923,6 +9179,7 @@
             fetchLeaderboard();
             fetchLiveFeed(); // AI-86: Live Activity Feed (REQ-FEED-001)
             startChartsPolling(); // AI-85: Visual Analytics Charts (REQ-METRICS-003)
+            fetchGithubRepo(); // AI-77: GitHub Access (REQ-INTEGRATION-003)
         }
 
         // Cleanup on page unload
