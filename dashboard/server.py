@@ -88,6 +88,13 @@ from dashboard.structured_logging import RequestLogger, ProviderRoutingLogger, E
 from dashboard.rate_limiter import RateLimiter, get_identifier, get_rate_limiter, reset_rate_limiter
 from dashboard.usage_meter import UsageMeter, get_usage_meter, reset_usage_meter
 
+# AI-225: Multi-Project Support
+try:
+    from projects.project_manager import Project, ProjectManager, TierLimitError
+    _PROJECTS_AVAILABLE = True
+except ImportError:
+    _PROJECTS_AVAILABLE = False
+
 # AI-227: Telemetry & Usage Analytics
 try:
     from telemetry.event_collector import (
@@ -499,6 +506,12 @@ class DashboardServer:
         self._rate_limiter = get_rate_limiter()
         self._usage_meter = get_usage_meter()
 
+        # AI-225: Multi-project manager
+        if _PROJECTS_AVAILABLE:
+            self._project_manager = ProjectManager(base_dir=self.metrics_dir)
+        else:
+            self._project_manager = None
+
         # Create app with middlewares (auth before rate-limit before cors so rejections get CORS headers)
         self.app = web.Application(middlewares=[auth_middleware, self._rate_limiter.middleware, error_middleware, cors_middleware])
 
@@ -694,6 +707,17 @@ class DashboardServer:
         self.app.router.add_post('/api/telemetry/optout', self.post_telemetry_optout)
         self.app.router.add_route('OPTIONS', '/api/admin/analytics', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/telemetry/optout', self.handle_options)
+
+        # AI-225: Multi-project endpoints
+        self.app.router.add_get('/api/projects', self.get_projects)
+        self.app.router.add_post('/api/projects', self.post_project)
+        self.app.router.add_delete('/api/projects/{project_id}', self.delete_project)
+        self.app.router.add_post('/api/projects/{project_id}/activate', self.activate_project)
+        self.app.router.add_get('/api/projects/active', self.get_active_project)
+        self.app.router.add_route('OPTIONS', '/api/projects', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/projects/{project_id}', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/projects/{project_id}/activate', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/projects/active', self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
         """Handle CORS preflight OPTIONS requests."""
@@ -3847,6 +3871,130 @@ class DashboardServer:
             "status": "ok",
             "telemetry_disabled": True,
             "message": "Telemetry opt-out recorded. Collection is disabled.",
+        })
+
+    # -------------------------------------------------------------------------
+    # AI-225: Multi-project endpoints
+    # -------------------------------------------------------------------------
+
+    def _project_unavailable_response(self) -> Response:
+        """Return a 503 when the projects module is unavailable."""
+        return web.json_response(
+            {"error": "Projects module not available"},
+            status=503,
+        )
+
+    async def get_projects(self, request: Request) -> Response:
+        """GET /api/projects — list all projects (AI-225).
+
+        Returns:
+            200 JSON: {"projects": [...], "active_project_id": str|null}
+        """
+        if self._project_manager is None:
+            return self._project_unavailable_response()
+
+        projects = self._project_manager.list_projects()
+        active = self._project_manager.get_active_project()
+        return web.json_response({
+            "projects": [p.to_dict() for p in projects],
+            "active_project_id": active.id if active else None,
+            "max_projects": self._project_manager.max_projects,
+            "tier": self._project_manager.tier,
+        })
+
+    async def post_project(self, request: Request) -> Response:
+        """POST /api/projects — create a new project (AI-225).
+
+        Request body:
+            {
+                "name": "My Project",
+                "git_repo_url": "https://github.com/...",   # optional
+                "linear_project_id": "PROJ-1",              # optional
+                "directory": "/path/to/project"             # optional
+            }
+
+        Returns:
+            201 JSON with created project.
+            400 if name is missing or invalid.
+            409 if tier limit would be exceeded.
+        """
+        if self._project_manager is None:
+            return self._project_unavailable_response()
+
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON body"}, status=400)
+
+        name = body.get("name", "").strip()
+        if not name:
+            return web.json_response({"error": "Missing or empty 'name' field"}, status=400)
+
+        try:
+            project = self._project_manager.create_project(
+                name=name,
+                directory=body.get("directory", ""),
+                git_repo_url=body.get("git_repo_url", ""),
+                linear_project_id=body.get("linear_project_id", ""),
+            )
+        except TierLimitError as exc:
+            return web.json_response({"error": str(exc)}, status=409)
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
+
+        return web.json_response({"project": project.to_dict()}, status=201)
+
+    async def delete_project(self, request: Request) -> Response:
+        """DELETE /api/projects/{project_id} — delete a project (AI-225).
+
+        Returns:
+            200 JSON: {"status": "deleted", "project_id": str}
+            404 if project not found.
+        """
+        if self._project_manager is None:
+            return self._project_unavailable_response()
+
+        project_id = request.match_info["project_id"]
+        deleted = self._project_manager.delete_project(project_id)
+        if not deleted:
+            return web.json_response(
+                {"error": f"Project '{project_id}' not found"},
+                status=404,
+            )
+        return web.json_response({"status": "deleted", "project_id": project_id})
+
+    async def activate_project(self, request: Request) -> Response:
+        """POST /api/projects/{project_id}/activate — switch active project (AI-225).
+
+        Returns:
+            200 JSON with the activated project.
+            404 if project not found.
+        """
+        if self._project_manager is None:
+            return self._project_unavailable_response()
+
+        project_id = request.match_info["project_id"]
+        try:
+            project = self._project_manager.switch_project(project_id)
+        except KeyError:
+            return web.json_response(
+                {"error": f"Project '{project_id}' not found"},
+                status=404,
+            )
+        return web.json_response({"project": project.to_dict()})
+
+    async def get_active_project(self, request: Request) -> Response:
+        """GET /api/projects/active — get currently active project (AI-225).
+
+        Returns:
+            200 JSON: {"project": {...}} or {"project": null} if none active.
+        """
+        if self._project_manager is None:
+            return self._project_unavailable_response()
+
+        active = self._project_manager.get_active_project()
+        return web.json_response({
+            "project": active.to_dict() if active else None,
         })
 
     def run(self):
