@@ -3217,14 +3217,6 @@ class RESTAPIServer:
             200 OK with HTML content
             404 Not Found if HTML file doesn't exist
         """
-        html_path = Path(__file__).parent / 'index.html'
-        if html_path.exists():
-            return web.Response(
-                text=html_path.read_text(),
-                content_type='text/html'
-            )
-
-        # Fallback to dashboard.html
         html_path = Path(__file__).parent / 'dashboard.html'
         if html_path.exists():
             return web.Response(
@@ -3234,7 +3226,7 @@ class RESTAPIServer:
 
         return web.json_response({
             'error': 'Dashboard HTML not found',
-            'message': 'index.html or dashboard.html not found in dashboard directory'
+            'message': 'dashboard.html not found in dashboard directory'
         }, status=404)
 
     # ── PM Task Launcher endpoints ──────────────────────────────────────
