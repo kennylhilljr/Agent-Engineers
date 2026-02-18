@@ -50,6 +50,24 @@ try:
 except ImportError:
     _AUTH_AVAILABLE = False
 
+# AI-232: Enterprise SSO - SAML 2.0, OIDC, JIT provisioning, SCIM 2.0
+try:
+    from sso.saml_handler import SAMLHandler, SAMLConfig, SAMLError, SAMLValidationError
+    from sso.oidc_handler import OIDCHandler, OIDCConfig, OIDCError, OIDCValidationError
+    from sso.organization_store import OrganizationStore as SSOOrgStore, PlanGatingError
+    from sso.jit_provisioner import JITProvisioner, JITError, JITDomainError
+    from sso.scim_handler import SCIMHandler, SCIMError, SCIMAuthError, SCIMNotFoundError
+    _SSO_AVAILABLE = True
+except ImportError:
+    _SSO_AVAILABLE = False
+
+# SSO singleton instances (initialized lazily)
+_sso_org_store: Optional[Any] = None
+_sso_jit_provisioner: Optional[Any] = None
+_sso_scim_handler: Optional[Any] = None
+_sso_saml_handlers: Dict[str, Any] = {}  # org_id -> SAMLHandler
+_sso_oidc_handlers: Dict[str, Any] = {}  # org_id -> OIDCHandler
+
 # Shared singleton auth instances (initialized in RESTAPIServer.__init__)
 _user_store: Optional[Any] = None
 _session_manager: Optional[Any] = None
@@ -547,6 +565,35 @@ class RESTAPIServer:
         self.app.router.add_get('/api/billing/invoices', self.get_billing_invoices)
         self.app.router.add_get('/api/billing/subscription', self.get_billing_subscription)
         self.app.router.add_post('/api/billing/stripe-webhook', self.post_stripe_webhook)
+
+        # AI-232: Enterprise SSO endpoints (Organization plan+)
+        # Organization management
+        self.app.router.add_post('/api/sso/organizations', self.sso_create_org)
+        self.app.router.add_get('/api/sso/organizations/{org_id}', self.sso_get_org)
+        self.app.router.add_post('/api/sso/organizations/{org_id}/saml', self.sso_configure_saml)
+        self.app.router.add_post('/api/sso/organizations/{org_id}/oidc', self.sso_configure_oidc)
+        self.app.router.add_post('/api/sso/organizations/{org_id}/enable', self.sso_enable)
+        self.app.router.add_post('/api/sso/organizations/{org_id}/disable', self.sso_disable)
+        self.app.router.add_get('/api/sso/organizations/{org_id}/metadata', self.sso_sp_metadata)
+        # SAML flow
+        self.app.router.add_get('/api/sso/{org_id}/saml/login', self.sso_saml_login)
+        self.app.router.add_post('/api/sso/{org_id}/saml/acs', self.sso_saml_acs)
+        # OIDC flow
+        self.app.router.add_get('/api/sso/{org_id}/oidc/login', self.sso_oidc_login)
+        self.app.router.add_get('/api/sso/{org_id}/oidc/callback', self.sso_oidc_callback)
+        # SCIM 2.0 endpoints
+        self.app.router.add_post('/api/sso/organizations/{org_id}/scim/token', self.sso_scim_token)
+        self.app.router.add_get('/scim/v2/Users', self.scim_list_users)
+        self.app.router.add_post('/scim/v2/Users', self.scim_create_user)
+        self.app.router.add_get('/scim/v2/Users/{user_id}', self.scim_get_user)
+        self.app.router.add_put('/scim/v2/Users/{user_id}', self.scim_replace_user)
+        self.app.router.add_patch('/scim/v2/Users/{user_id}', self.scim_patch_user)
+        self.app.router.add_delete('/scim/v2/Users/{user_id}', self.scim_delete_user)
+        self.app.router.add_get('/scim/v2/Groups', self.scim_list_groups)
+        self.app.router.add_post('/scim/v2/Groups', self.scim_create_group)
+        self.app.router.add_get('/scim/v2/Groups/{group_id}', self.scim_get_group)
+        self.app.router.add_patch('/scim/v2/Groups/{group_id}', self.scim_patch_group)
+        self.app.router.add_delete('/scim/v2/Groups/{group_id}', self.scim_delete_group)
 
         # OPTIONS for CORS preflight
         for route in ['/api/metrics', '/api/agents', '/api/sessions', '/api/providers',
@@ -4594,6 +4641,511 @@ async function showForgotPassword() {{
             )
         except KeyboardInterrupt:
             print("\nServer stopped by user")
+
+
+    # ----------------------------------------------------------------
+    # AI-232: Enterprise SSO Helper Methods
+    # ----------------------------------------------------------------
+
+    def _get_sso_org_store(self) -> Any:
+        """Get or initialize the SSO organization store."""
+        global _sso_org_store, _sso_jit_provisioner, _sso_scim_handler
+        if not _SSO_AVAILABLE:
+            raise web.HTTPServiceUnavailable(reason="SSO module not available")
+        if _sso_org_store is None:
+            _sso_org_store = SSOOrgStore()
+            _sso_jit_provisioner = JITProvisioner()
+            _sso_scim_handler = SCIMHandler(_sso_org_store)
+        return _sso_org_store
+
+    def _extract_scim_token(self, request: Request) -> str:
+        """Extract Bearer token from Authorization header for SCIM."""
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            raise SCIMAuthError("Missing or invalid Authorization header")
+        return auth_header[7:].strip()
+
+    # ----------------------------------------------------------------
+    # AI-232: SSO Organization Management Endpoints
+    # ----------------------------------------------------------------
+
+    async def sso_create_org(self, request: Request) -> Response:
+        """POST /api/sso/organizations - Create a new SSO-capable organization."""
+        try:
+            org_store = self._get_sso_org_store()
+            data = await request.json()
+            org = org_store.create_organization(
+                name=data.get("name", ""),
+                owner_user_id=data.get("owner_user_id", ""),
+                plan=data.get("plan", "free"),
+                slug=data.get("slug"),
+            )
+            return web.json_response(org.to_dict(), status=201)
+        except PlanGatingError as e:
+            return web.json_response({"error": str(e), "code": "plan_gating"}, status=402)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=400)
+
+    async def sso_get_org(self, request: Request) -> Response:
+        """GET /api/sso/organizations/{org_id} - Get organization details."""
+        try:
+            org_store = self._get_sso_org_store()
+            org_id = request.match_info["org_id"]
+            org = org_store.get_organization(org_id)
+            if not org:
+                return web.json_response({"error": "Organization not found"}, status=404)
+            return web.json_response(org.to_dict())
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def sso_configure_saml(self, request: Request) -> Response:
+        """POST /api/sso/organizations/{org_id}/saml - Configure SAML 2.0."""
+        try:
+            org_store = self._get_sso_org_store()
+            org_id = request.match_info["org_id"]
+            data = await request.json()
+            org = org_store.configure_saml(org_id, data)
+            return web.json_response({
+                "message": "SAML configured successfully",
+                "org_id": org.org_id,
+                "sso_type": org.sso_config.sso_type,
+            })
+        except PlanGatingError as e:
+            return web.json_response({"error": str(e), "code": "plan_gating"}, status=402)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=400)
+
+    async def sso_configure_oidc(self, request: Request) -> Response:
+        """POST /api/sso/organizations/{org_id}/oidc - Configure OIDC."""
+        try:
+            org_store = self._get_sso_org_store()
+            org_id = request.match_info["org_id"]
+            data = await request.json()
+            org = org_store.configure_oidc(org_id, data)
+            return web.json_response({
+                "message": "OIDC configured successfully",
+                "org_id": org.org_id,
+                "sso_type": org.sso_config.sso_type,
+            })
+        except PlanGatingError as e:
+            return web.json_response({"error": str(e), "code": "plan_gating"}, status=402)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=400)
+
+    async def sso_enable(self, request: Request) -> Response:
+        """POST /api/sso/organizations/{org_id}/enable - Enable SSO."""
+        try:
+            org_store = self._get_sso_org_store()
+            org_id = request.match_info["org_id"]
+            org = org_store.enable_sso(org_id)
+            return web.json_response({
+                "message": "SSO enabled",
+                "org_id": org.org_id,
+                "sso_enabled": org.sso_config.enabled,
+            })
+        except PlanGatingError as e:
+            return web.json_response({"error": str(e), "code": "plan_gating"}, status=402)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=400)
+
+    async def sso_disable(self, request: Request) -> Response:
+        """POST /api/sso/organizations/{org_id}/disable - Disable SSO."""
+        try:
+            org_store = self._get_sso_org_store()
+            org_id = request.match_info["org_id"]
+            org = org_store.disable_sso(org_id)
+            return web.json_response({
+                "message": "SSO disabled",
+                "org_id": org.org_id,
+                "sso_enabled": org.sso_config.enabled,
+            })
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=400)
+
+    async def sso_sp_metadata(self, request: Request) -> Response:
+        """GET /api/sso/organizations/{org_id}/metadata - Get SP SAML metadata."""
+        try:
+            org_store = self._get_sso_org_store()
+            org_id = request.match_info["org_id"]
+            org = org_store.get_organization(org_id)
+            if not org:
+                return web.json_response({"error": "Organization not found"}, status=404)
+
+            if org.sso_config.sso_type != "saml":
+                return web.json_response({"error": "SAML not configured for this org"}, status=400)
+
+            saml_config = SAMLConfig(
+                idp_entity_id=org.sso_config.saml_idp_entity_id,
+                idp_sso_url=org.sso_config.saml_idp_sso_url,
+                idp_certificate=org.sso_config.saml_idp_certificate,
+                sp_entity_id=org.sso_config.saml_sp_entity_id,
+                sp_acs_url=org.sso_config.saml_acs_url,
+            )
+            handler = SAMLHandler(saml_config)
+            metadata = handler.generate_metadata()
+            return web.Response(
+                content_type="application/xml",
+                body=metadata.encode("utf-8"),
+            )
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    # ----------------------------------------------------------------
+    # AI-232: SAML Flow Endpoints
+    # ----------------------------------------------------------------
+
+    async def sso_saml_login(self, request: Request) -> Response:
+        """GET /api/sso/{org_id}/saml/login - Initiate SAML SSO login."""
+        try:
+            org_store = self._get_sso_org_store()
+            org_id = request.match_info["org_id"]
+            org = org_store.get_organization(org_id)
+
+            if not org:
+                return web.json_response({"error": "Organization not found"}, status=404)
+            if not org.sso_config.enabled:
+                return web.json_response({"error": "SSO not enabled for this organization"}, status=400)
+            if org.sso_config.sso_type != "saml":
+                return web.json_response({"error": "SAML not configured"}, status=400)
+
+            saml_config = SAMLConfig(
+                idp_entity_id=org.sso_config.saml_idp_entity_id,
+                idp_sso_url=org.sso_config.saml_idp_sso_url,
+                idp_certificate=org.sso_config.saml_idp_certificate,
+                sp_entity_id=org.sso_config.saml_sp_entity_id,
+                sp_acs_url=org.sso_config.saml_acs_url,
+                attribute_mapping=org.sso_config.saml_attribute_mapping or {},
+            )
+
+            if org_id not in _sso_saml_handlers:
+                _sso_saml_handlers[org_id] = SAMLHandler(saml_config)
+
+            handler = _sso_saml_handlers[org_id]
+            relay_state = request.rel_url.query.get("relay_state")
+            redirect_url, request_id, relay = handler.generate_authn_request(relay_state=relay_state)
+
+            return web.Response(status=302, headers={"Location": redirect_url})
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def sso_saml_acs(self, request: Request) -> Response:
+        """POST /api/sso/{org_id}/saml/acs - SAML Assertion Consumer Service."""
+        try:
+            org_store = self._get_sso_org_store()
+            org_id = request.match_info["org_id"]
+            org = org_store.get_organization(org_id)
+
+            if not org or not org.sso_config.enabled:
+                return web.json_response({"error": "SSO not available"}, status=400)
+
+            # Parse form data
+            post_data = await request.post()
+            saml_response_b64 = post_data.get("SAMLResponse", "")
+            relay_state = post_data.get("RelayState")
+
+            if not saml_response_b64:
+                return web.json_response({"error": "Missing SAMLResponse"}, status=400)
+
+            handler = _sso_saml_handlers.get(org_id)
+            if not handler:
+                return web.json_response({"error": "No SAML session found. Initiate login first."}, status=400)
+
+            saml_resp = handler.parse_response(saml_response_b64, relay_state=relay_state)
+
+            # JIT Provisioning
+            jit_result = _sso_jit_provisioner.provision_from_saml(org_id, org.sso_config, saml_resp)
+
+            return web.json_response({
+                "message": "SAML authentication successful",
+                "user_id": jit_result.user_id,
+                "email": jit_result.email,
+                "role": jit_result.role,
+                "is_new_user": jit_result.is_new_user,
+                "action": jit_result.action,
+            })
+        except SAMLValidationError as e:
+            return web.json_response({"error": f"SAML validation failed: {e}"}, status=401)
+        except JITDomainError as e:
+            return web.json_response({"error": str(e), "code": "domain_not_allowed"}, status=403)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    # ----------------------------------------------------------------
+    # AI-232: OIDC Flow Endpoints
+    # ----------------------------------------------------------------
+
+    async def sso_oidc_login(self, request: Request) -> Response:
+        """GET /api/sso/{org_id}/oidc/login - Initiate OIDC SSO login."""
+        try:
+            org_store = self._get_sso_org_store()
+            org_id = request.match_info["org_id"]
+            org = org_store.get_organization(org_id)
+
+            if not org:
+                return web.json_response({"error": "Organization not found"}, status=404)
+            if not org.sso_config.enabled:
+                return web.json_response({"error": "SSO not enabled"}, status=400)
+            if org.sso_config.sso_type != "oidc":
+                return web.json_response({"error": "OIDC not configured"}, status=400)
+
+            oidc_config = OIDCConfig(
+                issuer=org.sso_config.oidc_issuer,
+                client_id=org.sso_config.oidc_client_id,
+                client_secret=org.sso_config.oidc_client_secret,
+                discovery_url=org.sso_config.oidc_discovery_url or None,
+                redirect_uri=org.sso_config.oidc_redirect_uri,
+                scopes=org.sso_config.oidc_scopes,
+                attribute_mapping=org.sso_config.oidc_attribute_mapping or {},
+            )
+
+            if org_id not in _sso_oidc_handlers:
+                _sso_oidc_handlers[org_id] = OIDCHandler(oidc_config)
+
+            handler = _sso_oidc_handlers[org_id]
+
+            # Discover endpoints if not already set
+            if not oidc_config.authorization_endpoint and oidc_config.discovery_url:
+                await handler.discover()
+
+            auth_url, state, nonce = handler.generate_auth_url()
+            return web.Response(status=302, headers={"Location": auth_url})
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def sso_oidc_callback(self, request: Request) -> Response:
+        """GET /api/sso/{org_id}/oidc/callback - OIDC authorization callback."""
+        try:
+            org_store = self._get_sso_org_store()
+            org_id = request.match_info["org_id"]
+            org = org_store.get_organization(org_id)
+
+            if not org or not org.sso_config.enabled:
+                return web.json_response({"error": "SSO not available"}, status=400)
+
+            code = request.rel_url.query.get("code")
+            state = request.rel_url.query.get("state")
+            error = request.rel_url.query.get("error")
+
+            if error:
+                return web.json_response({"error": f"OIDC error: {error}"}, status=401)
+
+            if not code or not state:
+                return web.json_response({"error": "Missing code or state"}, status=400)
+
+            handler = _sso_oidc_handlers.get(org_id)
+            if not handler:
+                return web.json_response({"error": "No OIDC session found. Initiate login first."}, status=400)
+
+            token_response = await handler.exchange_code(code, state)
+
+            # JIT Provisioning
+            jit_result = _sso_jit_provisioner.provision_from_oidc(org_id, org.sso_config, token_response)
+
+            return web.json_response({
+                "message": "OIDC authentication successful",
+                "user_id": jit_result.user_id,
+                "email": jit_result.email,
+                "role": jit_result.role,
+                "is_new_user": jit_result.is_new_user,
+                "action": jit_result.action,
+            })
+        except OIDCValidationError as e:
+            return web.json_response({"error": f"OIDC validation failed: {e}"}, status=401)
+        except JITDomainError as e:
+            return web.json_response({"error": str(e), "code": "domain_not_allowed"}, status=403)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    # ----------------------------------------------------------------
+    # AI-232: SCIM Token Management
+    # ----------------------------------------------------------------
+
+    async def sso_scim_token(self, request: Request) -> Response:
+        """POST /api/sso/organizations/{org_id}/scim/token - Generate SCIM token."""
+        try:
+            org_store = self._get_sso_org_store()
+            org_id = request.match_info["org_id"]
+            token = org_store.generate_scim_token(org_id)
+            return web.json_response({
+                "message": "SCIM token generated. Store this securely - it will not be shown again.",
+                "scim_token": token,
+                "scim_base_url": "/scim/v2",
+            })
+        except PlanGatingError as e:
+            return web.json_response({"error": str(e), "code": "plan_gating"}, status=402)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=400)
+
+    # ----------------------------------------------------------------
+    # AI-232: SCIM 2.0 User Endpoints
+    # ----------------------------------------------------------------
+
+    async def scim_list_users(self, request: Request) -> Response:
+        """GET /scim/v2/Users - List SCIM users."""
+        try:
+            self._get_sso_org_store()
+            token = self._extract_scim_token(request)
+            org = _sso_scim_handler.authenticate_token(token)
+            filter_str = request.rel_url.query.get("filter")
+            start_index = int(request.rel_url.query.get("startIndex", 1))
+            count = int(request.rel_url.query.get("count", 100))
+            users, total = _sso_scim_handler.list_users(org.org_id, filter_str, start_index, count)
+            response = _sso_scim_handler.build_list_response(users, total, start_index)
+            return web.json_response(response)
+        except SCIMAuthError as e:
+            return web.json_response(_sso_scim_handler.build_error_response(e), status=e.status)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def scim_create_user(self, request: Request) -> Response:
+        """POST /scim/v2/Users - Create SCIM user."""
+        try:
+            self._get_sso_org_store()
+            token = self._extract_scim_token(request)
+            org = _sso_scim_handler.authenticate_token(token)
+            data = await request.json()
+            user = _sso_scim_handler.create_user(org.org_id, data)
+            return web.json_response(user.to_scim_dict(), status=201)
+        except (SCIMAuthError, SCIMError) as e:
+            return web.json_response(_sso_scim_handler.build_error_response(e), status=e.status)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def scim_get_user(self, request: Request) -> Response:
+        """GET /scim/v2/Users/{user_id} - Get SCIM user."""
+        try:
+            self._get_sso_org_store()
+            token = self._extract_scim_token(request)
+            org = _sso_scim_handler.authenticate_token(token)
+            user_id = request.match_info["user_id"]
+            user = _sso_scim_handler.get_user(org.org_id, user_id)
+            return web.json_response(user.to_scim_dict())
+        except (SCIMAuthError, SCIMNotFoundError, SCIMError) as e:
+            return web.json_response(_sso_scim_handler.build_error_response(e), status=e.status)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def scim_replace_user(self, request: Request) -> Response:
+        """PUT /scim/v2/Users/{user_id} - Replace SCIM user."""
+        try:
+            self._get_sso_org_store()
+            token = self._extract_scim_token(request)
+            org = _sso_scim_handler.authenticate_token(token)
+            user_id = request.match_info["user_id"]
+            data = await request.json()
+            user = _sso_scim_handler.replace_user(org.org_id, user_id, data)
+            return web.json_response(user.to_scim_dict())
+        except (SCIMAuthError, SCIMNotFoundError, SCIMError) as e:
+            return web.json_response(_sso_scim_handler.build_error_response(e), status=e.status)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def scim_patch_user(self, request: Request) -> Response:
+        """PATCH /scim/v2/Users/{user_id} - Patch SCIM user."""
+        try:
+            self._get_sso_org_store()
+            token = self._extract_scim_token(request)
+            org = _sso_scim_handler.authenticate_token(token)
+            user_id = request.match_info["user_id"]
+            data = await request.json()
+            user = _sso_scim_handler.patch_user(org.org_id, user_id, data)
+            return web.json_response(user.to_scim_dict())
+        except (SCIMAuthError, SCIMNotFoundError, SCIMError) as e:
+            return web.json_response(_sso_scim_handler.build_error_response(e), status=e.status)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def scim_delete_user(self, request: Request) -> Response:
+        """DELETE /scim/v2/Users/{user_id} - Delete (deactivate) SCIM user."""
+        try:
+            self._get_sso_org_store()
+            token = self._extract_scim_token(request)
+            org = _sso_scim_handler.authenticate_token(token)
+            user_id = request.match_info["user_id"]
+            _sso_scim_handler.delete_user(org.org_id, user_id)
+            return web.Response(status=204)
+        except (SCIMAuthError, SCIMNotFoundError, SCIMError) as e:
+            return web.json_response(_sso_scim_handler.build_error_response(e), status=e.status)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    # ----------------------------------------------------------------
+    # AI-232: SCIM 2.0 Group Endpoints
+    # ----------------------------------------------------------------
+
+    async def scim_list_groups(self, request: Request) -> Response:
+        """GET /scim/v2/Groups - List SCIM groups."""
+        try:
+            self._get_sso_org_store()
+            token = self._extract_scim_token(request)
+            org = _sso_scim_handler.authenticate_token(token)
+            filter_str = request.rel_url.query.get("filter")
+            start_index = int(request.rel_url.query.get("startIndex", 1))
+            count = int(request.rel_url.query.get("count", 100))
+            groups, total = _sso_scim_handler.list_groups(org.org_id, filter_str, start_index, count)
+            response = _sso_scim_handler.build_list_response(groups, total, start_index)
+            return web.json_response(response)
+        except SCIMAuthError as e:
+            return web.json_response(_sso_scim_handler.build_error_response(e), status=e.status)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def scim_create_group(self, request: Request) -> Response:
+        """POST /scim/v2/Groups - Create SCIM group."""
+        try:
+            self._get_sso_org_store()
+            token = self._extract_scim_token(request)
+            org = _sso_scim_handler.authenticate_token(token)
+            data = await request.json()
+            group = _sso_scim_handler.create_group(org.org_id, data)
+            return web.json_response(group.to_scim_dict(), status=201)
+        except (SCIMAuthError, SCIMError) as e:
+            return web.json_response(_sso_scim_handler.build_error_response(e), status=e.status)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def scim_get_group(self, request: Request) -> Response:
+        """GET /scim/v2/Groups/{group_id} - Get SCIM group."""
+        try:
+            self._get_sso_org_store()
+            token = self._extract_scim_token(request)
+            org = _sso_scim_handler.authenticate_token(token)
+            group_id = request.match_info["group_id"]
+            group = _sso_scim_handler.get_group(org.org_id, group_id)
+            return web.json_response(group.to_scim_dict())
+        except (SCIMAuthError, SCIMNotFoundError, SCIMError) as e:
+            return web.json_response(_sso_scim_handler.build_error_response(e), status=e.status)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def scim_patch_group(self, request: Request) -> Response:
+        """PATCH /scim/v2/Groups/{group_id} - Patch SCIM group."""
+        try:
+            self._get_sso_org_store()
+            token = self._extract_scim_token(request)
+            org = _sso_scim_handler.authenticate_token(token)
+            group_id = request.match_info["group_id"]
+            data = await request.json()
+            group = _sso_scim_handler.patch_group(org.org_id, group_id, data)
+            return web.json_response(group.to_scim_dict())
+        except (SCIMAuthError, SCIMNotFoundError, SCIMError) as e:
+            return web.json_response(_sso_scim_handler.build_error_response(e), status=e.status)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def scim_delete_group(self, request: Request) -> Response:
+        """DELETE /scim/v2/Groups/{group_id} - Delete SCIM group."""
+        try:
+            self._get_sso_org_store()
+            token = self._extract_scim_token(request)
+            org = _sso_scim_handler.authenticate_token(token)
+            group_id = request.match_info["group_id"]
+            _sso_scim_handler.delete_group(org.org_id, group_id)
+            return web.Response(status=204)
+        except (SCIMAuthError, SCIMNotFoundError, SCIMError) as e:
+            return web.json_response(_sso_scim_handler.build_error_response(e), status=e.status)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
 
 
 def main():
