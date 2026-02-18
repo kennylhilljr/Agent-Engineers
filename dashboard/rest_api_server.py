@@ -476,6 +476,15 @@ class RESTAPIServer:
         self.app.router.add_post('/api/pm/stop', self.stop_pm_task)
         self.app.router.add_get('/api/pm/history', self.get_pm_history)
 
+        # AI-229: Webhook Support for CI/CD Pipeline Integration
+        self.app.router.add_get('/api/webhooks', self.rest_list_webhooks)
+        self.app.router.add_post('/api/webhooks', self.rest_create_webhook)
+        self.app.router.add_get('/api/webhooks/deliveries', self.rest_webhook_deliveries)
+        self.app.router.add_delete('/api/webhooks/{webhook_id}', self.rest_delete_webhook)
+        self.app.router.add_post('/api/webhooks/{webhook_id}/test', self.rest_test_webhook)
+        self.app.router.add_post('/api/webhooks/inbound/run-ticket', self.rest_inbound_run_ticket)
+        self.app.router.add_post('/api/webhooks/inbound/run-spec', self.rest_inbound_run_spec)
+
         # OPTIONS for CORS preflight
         for route in ['/api/metrics', '/api/agents', '/api/sessions', '/api/providers',
                       '/api/chat', '/api/decisions', '/api/agents/status',
@@ -483,7 +492,10 @@ class RESTAPIServer:
                       '/api/charts/token-usage', '/api/charts/cost-trend',
                       '/api/charts/success-rate',
                       '/api/pm/tasks', '/api/pm/run', '/api/pm/status',
-                      '/api/pm/stop', '/api/pm/history']:
+                      '/api/pm/stop', '/api/pm/history',
+                      '/api/webhooks', '/api/webhooks/deliveries',
+                      '/api/webhooks/inbound/run-ticket',
+                      '/api/webhooks/inbound/run-spec']:
             self.app.router.add_route('OPTIONS', route, self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
@@ -3303,6 +3315,161 @@ class RESTAPIServer:
     async def get_pm_history(self, request: Request) -> Response:
         """GET /api/pm/history - List past PM task runs."""
         return web.json_response({"history": _pm_task_log})
+
+    # -------------------------------------------------------------------------
+    # AI-229: Webhook endpoints
+    # -------------------------------------------------------------------------
+
+    def _get_webhook_manager(self):
+        """Lazy import and return the WebhookManager singleton."""
+        try:
+            from dashboard.webhooks import get_webhook_manager, VALID_EVENTS
+            return get_webhook_manager(), VALID_EVENTS
+        except ImportError:
+            return None, []
+
+    async def rest_list_webhooks(self, request: Request) -> Response:
+        """GET /api/webhooks — list all registered webhooks."""
+        manager, valid_events = self._get_webhook_manager()
+        if manager is None:
+            return web.json_response({"error": "Webhook module not available"}, status=503)
+        webhooks = manager.list_webhooks()
+        return web.json_response({
+            "webhooks": webhooks,
+            "count": len(webhooks),
+            "valid_events": valid_events,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        })
+
+    async def rest_create_webhook(self, request: Request) -> Response:
+        """POST /api/webhooks — register a new webhook."""
+        manager, _ = self._get_webhook_manager()
+        if manager is None:
+            return web.json_response({"error": "Webhook module not available"}, status=503)
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON body"}, status=400)
+
+        url = data.get("url", "").strip()
+        events = data.get("events", [])
+        secret = data.get("secret", "")
+
+        if not url:
+            return web.json_response({"error": "url is required"}, status=400)
+        if not events:
+            return web.json_response({"error": "events list is required"}, status=400)
+
+        try:
+            webhook_id = manager.register_webhook(url=url, events=events, secret=secret)
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
+
+        webhook = manager.get_webhook(webhook_id)
+        return web.json_response(webhook, status=201)
+
+    async def rest_delete_webhook(self, request: Request) -> Response:
+        """DELETE /api/webhooks/{webhook_id} — remove a webhook."""
+        manager, _ = self._get_webhook_manager()
+        if manager is None:
+            return web.json_response({"error": "Webhook module not available"}, status=503)
+        webhook_id = request.match_info.get("webhook_id", "")
+        deleted = manager.delete_webhook(webhook_id)
+        if deleted:
+            return web.Response(status=204)
+        return web.json_response({"error": f"Webhook {webhook_id} not found"}, status=404)
+
+    async def rest_test_webhook(self, request: Request) -> Response:
+        """POST /api/webhooks/{webhook_id}/test — send a test event to a webhook."""
+        manager, _ = self._get_webhook_manager()
+        if manager is None:
+            return web.json_response({"error": "Webhook module not available"}, status=503)
+        webhook_id = request.match_info.get("webhook_id", "")
+        if manager.get_webhook(webhook_id) is None:
+            return web.json_response({"error": f"Webhook {webhook_id} not found"}, status=404)
+        try:
+            result = await manager.test_webhook(webhook_id)
+        except Exception as exc:
+            return web.json_response({"error": str(exc)}, status=500)
+        return web.json_response(result)
+
+    async def rest_webhook_deliveries(self, request: Request) -> Response:
+        """GET /api/webhooks/deliveries — get delivery log (last 50)."""
+        manager, _ = self._get_webhook_manager()
+        if manager is None:
+            return web.json_response({"error": "Webhook module not available"}, status=503)
+        deliveries = manager.get_delivery_log()
+        return web.json_response({
+            "deliveries": deliveries,
+            "count": len(deliveries),
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        })
+
+    async def rest_inbound_run_ticket(self, request: Request) -> Response:
+        """POST /api/webhooks/inbound/run-ticket — trigger agent on a ticket."""
+        manager, _ = self._get_webhook_manager()
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON body"}, status=400)
+
+        ticket_key = data.get("ticket_key", "").strip()
+        if not ticket_key:
+            return web.json_response({"error": "ticket_key is required"}, status=400)
+
+        agent = data.get("agent", "coding")
+        priority = data.get("priority", "normal")
+
+        if manager:
+            import asyncio
+            asyncio.ensure_future(manager.trigger_event("agent.session.started", {
+                "ticket_key": ticket_key,
+                "agent": agent,
+                "priority": priority,
+                "source": "inbound_webhook",
+            }))
+
+        return web.json_response({
+            "accepted": True,
+            "ticket_key": ticket_key,
+            "agent": agent,
+            "priority": priority,
+            "message": f"Agent {agent} queued for ticket {ticket_key}",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        }, status=202)
+
+    async def rest_inbound_run_spec(self, request: Request) -> Response:
+        """POST /api/webhooks/inbound/run-spec — trigger agent on a spec."""
+        manager, _ = self._get_webhook_manager()
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON body"}, status=400)
+
+        spec = data.get("spec", "").strip()
+        if not spec:
+            return web.json_response({"error": "spec is required"}, status=400)
+
+        agent = data.get("agent", "coding")
+        ticket_key = data.get("ticket_key", "")
+
+        if manager:
+            import asyncio
+            asyncio.ensure_future(manager.trigger_event("agent.session.started", {
+                "spec_length": len(spec),
+                "agent": agent,
+                "ticket_key": ticket_key,
+                "source": "inbound_webhook_spec",
+            }))
+
+        return web.json_response({
+            "accepted": True,
+            "agent": agent,
+            "ticket_key": ticket_key,
+            "spec_length": len(spec),
+            "message": f"Agent {agent} queued to process spec",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        }, status=202)
 
     def run(self):
         """Start the REST API server.
