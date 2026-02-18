@@ -279,6 +279,7 @@ class ChatRouter:
                 f"Please check your API configuration."
             )
 
+
     async def enqueue_message(
         self,
         message: str,

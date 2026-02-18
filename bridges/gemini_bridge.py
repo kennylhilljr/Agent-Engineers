@@ -31,6 +31,8 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from exceptions import BridgeError, SecurityError
+
 
 class GeminiAuthType(StrEnum):
     CLI_OAUTH = "cli-oauth"
@@ -91,9 +93,11 @@ class GeminiCLIClient:
 
     def __init__(self):
         if not self._is_gemini_cli_installed():
-            raise ImportError(
-                "gemini-cli not installed. Run: npm install -g @google/gemini-cli\n"
-                "Then run 'gemini' once to complete OAuth setup."
+            raise BridgeError(
+                message="gemini-cli not installed. Run: npm install -g @google/gemini-cli\n"
+                        "Then run 'gemini' once to complete OAuth setup.",
+                error_code="BRIDGE_UNSUPPORTED_PROVIDER",
+                provider="gemini"
             )
 
     @staticmethod

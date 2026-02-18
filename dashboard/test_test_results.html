@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Results Component - AI-101</title>
+    <link rel="stylesheet" href="test-results.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 30px;
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #94a3b8;
+            font-size: 1.1rem;
+        }
+
+        .test-scenarios {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+        }
+
+        .scenario {
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(71, 85, 105, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .scenario-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #e0e0e0;
+            border-bottom: 2px solid rgba(96, 165, 250, 0.3);
+            padding-bottom: 10px;
+        }
+
+        .scenario-description {
+            font-size: 13px;
+            color: #9ca3af;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+
+        .results-container {
+            background: rgba(20, 20, 30, 0.8);
+            border-radius: 8px;
+            padding: 15px;
+            min-height: 300px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+        }
+
+        .btn-secondary:hover {
+            box-shadow: 0 4px 12px rgba(107, 114, 128, 0.4);
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            border-radius: 6px;
+            font-size: 12px;
+            color: #22c55e;
+            margin-bottom: 15px;
+        }
+
+        .status-indicator.error {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            color: #6b7280;
+            font-size: 13px;
+        }
+
+        .test-command {
+            background: rgba(20, 20, 30, 0.8);
+            border-left: 3px solid #3b82f6;
+            padding: 12px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            color: #60a5fa;
+            word-break: break-all;
+        }
+
+        .screenshot-section {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(20, 20, 30, 0.8);
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .screenshot-section img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 6px;
+            margin-top: 10px;
+            max-height: 400px;
+        }
+
+        .test-summary-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .stat {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #3b82f6;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>Test Results Display Component</h1>
+            <p>AI-101: REQ-CODE-003 - Test Results Display with Pass/Fail Status and Error Output</p>
+        </div>
+
+        <!-- Test Scenarios -->
+        <div class="test-scenarios">
+            <!-- Scenario 1: All Tests Passed -->
+            <div class="scenario">
+                <div class="scenario-title">Scenario 1: All Tests Passed</div>
+                <div class="scenario-description">
+                    Demonstrates test results when all tests pass successfully. Shows 100% pass rate with green progress bar.
+                </div>
+                <div class="controls">
+                    <button onclick="loadScenario1()">Load Test Data</button>
+                    <button class="btn-secondary" onclick="takeScreenshot('scenario1')">Screenshot</button>
+                </div>
+                <div class="status-indicator">All tests completed successfully</div>
+                <div id="scenario1-results" class="results-container"></div>
+            </div>
+
+            <!-- Scenario 2: Mixed Results with Failures -->
+            <div class="scenario">
+                <div class="scenario-title">Scenario 2: Mixed Results with Failures</div>
+                <div class="scenario-description">
+                    Shows test suite with mixed pass/fail results. Demonstrates error details expansion and individual test status display.
+                </div>
+                <div class="controls">
+                    <button onclick="loadScenario2()">Load Test Data</button>
+                    <button class="btn-secondary" onclick="takeScreenshot('scenario2')">Screenshot</button>
+                </div>
+                <div class="test-command">$ npm test -- --coverage --verbose</div>
+                <div id="scenario2-results" class="results-container"></div>
+            </div>
+
+            <!-- Scenario 3: Failed Tests with Error Output -->
+            <div class="scenario">
+                <div class="scenario-title">Scenario 3: Failed Tests with Error Output</div>
+                <div class="scenario-description">
+                    Displays failed tests with detailed error messages. Shows expandable error details and stack traces.
+                </div>
+                <div class="controls">
+                    <button onclick="loadScenario3()">Load Test Data</button>
+                    <button class="btn-secondary" onclick="takeScreenshot('scenario3')">Screenshot</button>
+                </div>
+                <div class="status-indicator error">❌ 3 test failures detected</div>
+                <div id="scenario3-results" class="results-container"></div>
+            </div>
+
+            <!-- Scenario 4: Multiple Test Suites with Nested Tests -->
+            <div class="scenario">
+                <div class="scenario-title">Scenario 4: Multiple Test Suites</div>
+                <div class="scenario-description">
+                    Demonstrates multiple test suites with nested test cases. Shows suite-level statistics and expandable test listings.
+                </div>
+                <div class="controls">
+                    <button onclick="loadScenario4()">Load Test Data</button>
+                    <button class="btn-secondary" onclick="takeScreenshot('scenario4')">Screenshot</button>
+                </div>
+                <div class="test-command">$ playwright test --headed --reporter=html</div>
+                <div id="scenario4-results" class="results-container"></div>
+            </div>
+
+            <!-- Scenario 5: Playwright Tests with Screenshot Evidence -->
+            <div class="scenario">
+                <div class="scenario-title">Scenario 5: Playwright Test Results</div>
+                <div class="scenario-description">
+                    Shows Playwright browser test results with screenshot evidence. Includes test execution durations and browser context.
+                </div>
+                <div class="controls">
+                    <button onclick="loadScenario5()">Load Test Data</button>
+                    <button class="btn-secondary" onclick="takeScreenshot('scenario5')">Screenshot</button>
+                </div>
+                <div class="test-command">$ playwright test --headed --screenshot=only-on-failure</div>
+                <div id="scenario5-results" class="results-container"></div>
+            </div>
+
+            <!-- Scenario 6: Skipped Tests -->
+            <div class="scenario">
+                <div class="scenario-title">Scenario 6: Tests with Skipped Status</div>
+                <div class="scenario-description">
+                    Demonstrates handling of skipped tests in addition to passed and failed tests.
+                </div>
+                <div class="controls">
+                    <button onclick="loadScenario6()">Load Test Data</button>
+                    <button class="btn-secondary" onclick="takeScreenshot('scenario6')">Screenshot</button>
+                </div>
+                <div id="scenario6-results" class="results-container"></div>
+            </div>
+
+            <!-- Scenario 7: Long Running Tests -->
+            <div class="scenario">
+                <div class="scenario-title">Scenario 7: Long Running Tests</div>
+                <div class="scenario-description">
+                    Shows test results with varied durations, demonstrating duration formatting (milliseconds to seconds).
+                </div>
+                <div class="controls">
+                    <button onclick="loadScenario7()">Load Test Data</button>
+                    <button class="btn-secondary" onclick="takeScreenshot('scenario7')">Screenshot</button>
+                </div>
+                <div id="scenario7-results" class="results-container"></div>
+            </div>
+
+            <!-- Scenario 8: Sequential Test Runs -->
+            <div class="scenario">
+                <div class="scenario-title">Scenario 8: Multiple Sequential Runs</div>
+                <div class="scenario-description">
+                    Demonstrates multiple test runs in sequence, showing how results update and previous tests are replaced.
+                </div>
+                <div class="controls">
+                    <button onclick="sequentialTestRun()">Start Sequential Runs</button>
+                    <button class="btn-secondary" onclick="takeScreenshot('scenario8')">Screenshot</button>
+                </div>
+                <div class="test-summary-stats" id="scenario8-stats" style="display: none;">
+                    <div class="stat">
+                        <div class="stat-value" id="run-count">1</div>
+                        <div class="stat-label">Run #</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" id="total-count">0</div>
+                        <div class="stat-label">Total Tests</div>
+                    </div>
+                </div>
+                <div id="scenario8-results" class="results-container"></div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>Test Results Display Component - AI-101 Implementation</p>
+            <p style="margin-top: 10px; color: #4b5563;">
+                Use the screenshot buttons to capture evidence. Screenshots are saved to /test-results/screenshots/
+            </p>
+        </div>
+    </div>
+
+    <!-- Test Results Component Script -->
+    <script src="test-results.js"></script>
+
+    <script>
+        // Test data scenarios
+        const scenarios = {
+            scenario1: {
+                totalTests: 8,
+                passedTests: 8,
+                failedTests: 0,
+                skippedTests: 0,
+                duration: 1.24,
+                testCases: [
+                    { name: 'Should render test results component', status: 'passed', duration: 0.15 },
+                    { name: 'Should handle empty test data', status: 'passed', duration: 0.08 },
+                    { name: 'Should calculate pass rate correctly', status: 'passed', duration: 0.12 },
+                    { name: 'Should escape HTML special characters', status: 'passed', duration: 0.09 },
+                    { name: 'Should format duration correctly', status: 'passed', duration: 0.11 },
+                    { name: 'Should toggle test expansion', status: 'passed', duration: 0.14 },
+                    { name: 'Should render error details', status: 'passed', duration: 0.13 },
+                    { name: 'Should handle multiple test suites', status: 'passed', duration: 0.42 }
+                ]
+            },
+            scenario2: {
+                totalTests: 10,
+                passedTests: 7,
+                failedTests: 3,
+                skippedTests: 0,
+                duration: 2.18,
+                testSuites: [
+                    {
+                        name: 'Unit Tests',
+                        total: 6,
+                        passed: 5,
+                        failed: 1,
+                        skipped: 0,
+                        duration: 0.85,
+                        tests: [
+                            { name: 'Should initialize component', status: 'passed', duration: 0.12 },
+                            { name: 'Should render HTML correctly', status: 'passed', duration: 0.18 },
+                            { name: 'Should handle events', status: 'passed', duration: 0.15 },
+                            { name: 'Should format durations', status: 'failed', duration: 0.25, error: 'Expected 1.50s but got 1.5' },
+                            { name: 'Should escape HTML', status: 'passed', duration: 0.08 },
+                            { name: 'Should truncate errors', status: 'passed', duration: 0.07 }
+                        ]
+                    },
+                    {
+                        name: 'Integration Tests',
+                        total: 4,
+                        passed: 2,
+                        failed: 2,
+                        skipped: 0,
+                        duration: 1.33,
+                        tests: [
+                            { name: 'Should render test suite', status: 'passed', duration: 0.45 },
+                            { name: 'Should expand/collapse suites', status: 'failed', duration: 0.38, error: 'Click handler not attached to suite header' },
+                            { name: 'Should display error preview', status: 'failed', duration: 0.32, error: 'Error preview HTML contains unescaped content' },
+                            { name: 'Should update on data change', status: 'passed', duration: 0.18 }
+                        ]
+                    }
+                ]
+            },
+            scenario3: {
+                totalTests: 5,
+                passedTests: 2,
+                failedTests: 3,
+                skippedTests: 0,
+                duration: 1.92,
+                testCases: [
+                    { name: 'Database connection test', status: 'passed', duration: 0.45 },
+                    {
+                        name: 'User authentication test',
+                        status: 'failed',
+                        duration: 0.67,
+                        error: `Error: Failed to authenticate user
+    at UserService.authenticate (src/services/user-service.js:45)
+    at async describe.<anonymous> (tests/user.test.js:12)
+    Error code: AUTH_FAILED
+    Expected: token to be present
+    Received: undefined`
+                    },
+                    { name: 'Email validation test', status: 'passed', duration: 0.38 },
+                    {
+                        name: 'Payment processing test',
+                        status: 'failed',
+                        duration: 0.23,
+                        error: 'Timeout: Payment API did not respond within 5 seconds'
+                    },
+                    {
+                        name: 'Data export test',
+                        status: 'failed',
+                        duration: 0.19,
+                        error: 'FileWriteError: Unable to write export file to /tmp/export.csv. Permission denied.'
+                    }
+                ]
+            },
+            scenario4: {
+                totalTests: 24,
+                passedTests: 19,
+                failedTests: 5,
+                skippedTests: 0,
+                duration: 5.67,
+                testSuites: [
+                    {
+                        name: 'Component Rendering',
+                        total: 8,
+                        passed: 8,
+                        failed: 0,
+                        skipped: 0,
+                        duration: 1.23,
+                        tests: [
+                            { name: 'Renders header correctly', status: 'passed', duration: 0.15 },
+                            { name: 'Renders test summary', status: 'passed', duration: 0.12 },
+                            { name: 'Renders progress bar', status: 'passed', duration: 0.18 },
+                            { name: 'Renders test suites', status: 'passed', duration: 0.14 },
+                            { name: 'Renders test cases', status: 'passed', duration: 0.16 },
+                            { name: 'Renders error details', status: 'passed', duration: 0.19 },
+                            { name: 'Renders duration information', status: 'passed', duration: 0.13 },
+                            { name: 'Applies correct CSS classes', status: 'passed', duration: 0.16 }
+                        ]
+                    },
+                    {
+                        name: 'Data Handling',
+                        total: 8,
+                        passed: 6,
+                        failed: 2,
+                        skipped: 0,
+                        duration: 1.85,
+                        tests: [
+                            { name: 'Handles empty test data', status: 'passed', duration: 0.21 },
+                            { name: 'Calculates statistics correctly', status: 'passed', duration: 0.18 },
+                            { name: 'Formats durations correctly', status: 'passed', duration: 0.15 },
+                            { name: 'Handles missing fields gracefully', status: 'failed', duration: 0.32, error: 'TypeError: Cannot read property "duration" of undefined' },
+                            { name: 'Escapes HTML content', status: 'passed', duration: 0.14 },
+                            { name: 'Truncates long errors', status: 'failed', duration: 0.28, error: 'Truncation not working for very long strings' },
+                            { name: 'Handles special characters', status: 'passed', duration: 0.19 },
+                            { name: 'Preserves data structure', status: 'passed', duration: 0.12 }
+                        ]
+                    },
+                    {
+                        name: 'User Interactions',
+                        total: 8,
+                        passed: 5,
+                        failed: 3,
+                        skipped: 0,
+                        duration: 2.59,
+                        tests: [
+                            { name: 'Expands/collapses test cases', status: 'passed', duration: 0.35 },
+                            { name: 'Expands/collapses test suites', status: 'passed', duration: 0.38 },
+                            { name: 'Shows error details on click', status: 'passed', duration: 0.41 },
+                            { name: 'Hides error details on collapse', status: 'failed', duration: 0.29, error: 'Error details not removed from DOM on collapse' },
+                            { name: 'Maintains expansion state', status: 'passed', duration: 0.33 },
+                            { name: 'Handles rapid clicks', status: 'failed', duration: 0.31, error: 'State becomes inconsistent with rapid clicking' },
+                            { name: 'Keyboard navigation support', status: 'failed', duration: 0.27, error: 'Enter key does not trigger expansion' },
+                            { name: 'Mobile touch support', status: 'passed', duration: 0.25 }
+                        ]
+                    }
+                ]
+            },
+            scenario5: {
+                totalTests: 12,
+                passedTests: 11,
+                failedTests: 1,
+                skippedTests: 0,
+                duration: 45.32,
+                testSuites: [
+                    {
+                        name: 'Browser Tests - Chat Interface',
+                        total: 6,
+                        passed: 6,
+                        failed: 0,
+                        skipped: 0,
+                        duration: 23.15,
+                        tests: [
+                            { name: 'Should load chat page', status: 'passed', duration: 4.2 },
+                            { name: 'Should send message and receive response', status: 'passed', duration: 5.8 },
+                            { name: 'Should render code blocks', status: 'passed', duration: 3.9 },
+                            { name: 'Should persist messages in storage', status: 'passed', duration: 2.1 },
+                            { name: 'Should clear chat history', status: 'passed', duration: 1.7 },
+                            { name: 'Should handle rapid message sending', status: 'passed', duration: 5.4 }
+                        ]
+                    },
+                    {
+                        name: 'Browser Tests - File Changes',
+                        total: 6,
+                        passed: 5,
+                        failed: 1,
+                        skipped: 0,
+                        duration: 22.17,
+                        tests: [
+                            { name: 'Should display file tree', status: 'passed', duration: 4.1 },
+                            { name: 'Should expand/collapse directories', status: 'passed', duration: 3.8 },
+                            { name: 'Should show file modifications', status: 'passed', duration: 4.3 },
+                            { name: 'Should render diff blocks', status: 'failed', duration: 6.2, error: 'Screenshot mismatch: Expected syntax highlighting not found\nSee: test-results/screenshots/diff-block-chromium.png' },
+                            { name: 'Should copy file paths', status: 'passed', duration: 2.1 },
+                            { name: 'Should navigate file tree with keyboard', status: 'passed', duration: 1.6 }
+                        ]
+                    }
+                ]
+            },
+            scenario6: {
+                totalTests: 10,
+                passedTests: 5,
+                failedTests: 2,
+                skippedTests: 3,
+                duration: 1.45,
+                testCases: [
+                    { name: 'Feature: User login', status: 'passed', duration: 0.25 },
+                    { name: 'Feature: User logout', status: 'passed', duration: 0.18 },
+                    { name: 'Feature: User profile', status: 'skipped' },
+                    { name: 'Feature: Admin panel', status: 'failed', duration: 0.32, error: 'Requires admin role' },
+                    { name: 'Feature: Settings', status: 'passed', duration: 0.22 },
+                    { name: 'Feature: Notifications', status: 'skipped' },
+                    { name: 'Feature: Export data', status: 'passed', duration: 0.15 },
+                    { name: 'Feature: Import data', status: 'skipped' },
+                    { name: 'Feature: Search', status: 'failed', duration: 0.18, error: 'Search index not initialized' },
+                    { name: 'Feature: Analytics', status: 'passed', duration: 0.28 }
+                ]
+            },
+            scenario7: {
+                totalTests: 7,
+                passedTests: 7,
+                failedTests: 0,
+                skippedTests: 0,
+                duration: 12.456,
+                testCases: [
+                    { name: 'Quick smoke test', status: 'passed', duration: 0.045 },
+                    { name: 'API response parsing', status: 'passed', duration: 0.234 },
+                    { name: 'Database query execution', status: 'passed', duration: 2.187 },
+                    { name: 'File I/O operations', status: 'passed', duration: 1.543 },
+                    { name: 'Memory leak detection', status: 'passed', duration: 4.234 },
+                    { name: 'Long running integration test', status: 'passed', duration: 3.876 },
+                    { name: 'End-to-end workflow', status: 'passed', duration: 0.337 }
+                ]
+            }
+        };
+
+        // Load scenario functions
+        function loadScenario(scenarioKey) {
+            const data = scenarios[scenarioKey];
+            const containerId = `${scenarioKey}-results`;
+            const container = document.getElementById(containerId);
+
+            if (!container) {
+                console.error(`Container ${containerId} not found`);
+                return;
+            }
+
+            const testResults = new TestResults(containerId);
+            testResults.render(data);
+        }
+
+        function loadScenario1() { loadScenario('scenario1'); }
+        function loadScenario2() { loadScenario('scenario2'); }
+        function loadScenario3() { loadScenario('scenario3'); }
+        function loadScenario4() { loadScenario('scenario4'); }
+        function loadScenario5() { loadScenario('scenario5'); }
+        function loadScenario6() { loadScenario('scenario6'); }
+        function loadScenario7() { loadScenario('scenario7'); }
+
+        // Sequential test runs
+        let runNumber = 1;
+        function sequentialTestRun() {
+            const runs = [
+                scenarios.scenario2,
+                scenarios.scenario3,
+                scenarios.scenario4
+            ];
+
+            let currentRun = 0;
+
+            function runNext() {
+                if (currentRun < runs.length) {
+                    const data = runs[currentRun];
+                    const testResults = new TestResults('scenario8-results');
+                    testResults.render(data);
+
+                    document.getElementById('run-count').textContent = currentRun + 1;
+                    document.getElementById('total-count').textContent = data.totalTests;
+                    document.getElementById('scenario8-stats').style.display = 'grid';
+
+                    currentRun++;
+                    setTimeout(runNext, 3000); // Run next scenario after 3 seconds
+                }
+            }
+
+            runNext();
+        }
+
+        // Screenshot function (for demonstration)
+        async function takeScreenshot(scenarioId) {
+            const element = document.querySelector(`#${scenarioId}-results`);
+            if (!element) {
+                alert('Results container not found');
+                return;
+            }
+
+            alert(`Screenshot functionality would save the results for scenario: ${scenarioId}`);
+        }
+
+        // Auto-load first scenario on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('Test Results Component loaded successfully');
+        });
+    </script>
+</body>
+</html>

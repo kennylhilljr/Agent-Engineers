@@ -1,0 +1,126 @@
+AI-205: Centralized Configuration Management
+============================================
+Date: 2026-02-17
+
+## Files Created
+
+1. /Users/bkh223/Documents/GitHub/agent-engineers/config.py
+   - AgentConfig dataclass with centralized configuration
+   - APIKeys dataclass for all API key management
+   - WindsurfMode enum (disabled/headless/interactive)
+   - LogLevel enum (debug/info/warning/error)
+   - get_config() singleton accessor
+   - reset_config() for testing
+
+2. /Users/bkh223/Documents/GitHub/agent-engineers/tests/test_config.py
+   - 78 comprehensive tests across 13 test classes
+
+## Test Results
+
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/bkh223/Documents/GitHub/agent-engineers
+configfile: pyproject.toml
+
+tests/test_config.py::TestWindsurfMode::test_disabled_value PASSED
+tests/test_config.py::TestWindsurfMode::test_headless_value PASSED
+tests/test_config.py::TestWindsurfMode::test_interactive_value PASSED
+tests/test_config.py::TestWindsurfMode::test_from_string_disabled PASSED
+tests/test_config.py::TestWindsurfMode::test_from_string_headless PASSED
+tests/test_config.py::TestWindsurfMode::test_from_string_interactive PASSED
+tests/test_config.py::TestWindsurfMode::test_invalid_value_raises PASSED
+tests/test_config.py::TestLogLevel::test_debug_value PASSED
+tests/test_config.py::TestLogLevel::test_info_value PASSED
+tests/test_config.py::TestLogLevel::test_warning_value PASSED
+tests/test_config.py::TestLogLevel::test_error_value PASSED
+tests/test_config.py::TestLogLevel::test_from_string_info PASSED
+tests/test_config.py::TestLogLevel::test_invalid_value_raises PASSED
+tests/test_config.py::TestAPIKeys::test_default_all_none_when_no_env PASSED
+tests/test_config.py::TestAPIKeys::test_anthropic_key_from_env PASSED
+tests/test_config.py::TestAPIKeys::test_openai_key_from_env PASSED
+tests/test_config.py::TestAPIKeys::test_gemini_key_uses_gemini_api_key PASSED
+tests/test_config.py::TestAPIKeys::test_gemini_key_falls_back_to_google_api_key PASSED
+tests/test_config.py::TestAPIKeys::test_gemini_key_prefers_gemini_over_google PASSED
+tests/test_config.py::TestAPIKeys::test_slack_key_from_env PASSED
+tests/test_config.py::TestAPIKeys::test_arcade_key_from_env PASSED
+tests/test_config.py::TestAPIKeys::test_validate_missing_anthropic PASSED
+tests/test_config.py::TestAPIKeys::test_validate_passes_when_anthropic_present PASSED
+tests/test_config.py::TestAPIKeys::test_github_key_from_env PASSED
+tests/test_config.py::TestAPIKeys::test_linear_key_from_env PASSED
+tests/test_config.py::TestAPIKeys::test_groq_key_from_env PASSED
+tests/test_config.py::TestAgentConfigDefaults::test_default_windsurf_mode_is_disabled PASSED
+tests/test_config.py::TestAgentConfigDefaults::test_default_timeout_is_300 PASSED
+tests/test_config.py::TestAgentConfigDefaults::test_default_log_level_is_info PASSED
+tests/test_config.py::TestAgentConfigDefaults::test_default_dashboard_port_is_8080 PASSED
+tests/test_config.py::TestAgentConfigDefaults::test_default_websocket_port_is_8765 PASSED
+tests/test_config.py::TestAgentConfigDefaults::test_default_control_plane_port_is_9100 PASSED
+tests/test_config.py::TestAgentConfigDefaults::test_default_max_workers_is_4 PASSED
+tests/test_config.py::TestAgentConfigDefaults::test_default_prompts_dir PASSED
+tests/test_config.py::TestAgentConfigDefaults::test_default_screenshots_dir PASSED
+tests/test_config.py::TestAgentConfigDefaults::test_default_github_repo_is_none PASSED
+tests/test_config.py::TestAgentConfigDefaults::test_default_linear_team_id_is_none PASSED
+tests/test_config.py::TestAgentConfigEnvOverrides::test_windsurf_mode_from_env PASSED
+tests/test_config.py::TestAgentConfigEnvOverrides::test_windsurf_mode_interactive_from_env PASSED
+tests/test_config.py::TestAgentConfigEnvOverrides::test_timeout_from_env PASSED
+tests/test_config.py::TestAgentConfigEnvOverrides::test_log_level_from_env PASSED
+tests/test_config.py::TestAgentConfigEnvOverrides::test_log_level_uppercase_from_env PASSED
+tests/test_config.py::TestAgentConfigEnvOverrides::test_dashboard_port_from_env PASSED
+tests/test_config.py::TestAgentConfigEnvOverrides::test_websocket_port_from_env PASSED
+tests/test_config.py::TestAgentConfigEnvOverrides::test_control_plane_port_from_env PASSED
+tests/test_config.py::TestAgentConfigEnvOverrides::test_max_workers_from_env PASSED
+tests/test_config.py::TestAgentConfigEnvOverrides::test_prompts_dir_from_env PASSED
+tests/test_config.py::TestAgentConfigEnvOverrides::test_screenshots_dir_from_env PASSED
+tests/test_config.py::TestAgentConfigEnvOverrides::test_github_repo_from_env PASSED
+tests/test_config.py::TestAgentConfigEnvOverrides::test_linear_team_id_from_env PASSED
+tests/test_config.py::TestAgentConfigFromEnv::test_from_env_returns_agent_config PASSED
+tests/test_config.py::TestAgentConfigFromEnv::test_from_env_reads_timeout PASSED
+tests/test_config.py::TestAgentConfigFromEnv::test_from_env_reads_api_keys PASSED
+tests/test_config.py::TestAgentConfigValidate::test_validate_missing_anthropic_key PASSED
+tests/test_config.py::TestAgentConfigValidate::test_validate_negative_timeout PASSED
+tests/test_config.py::TestAgentConfigValidate::test_validate_zero_timeout PASSED
+tests/test_config.py::TestAgentConfigValidate::test_validate_low_dashboard_port PASSED
+tests/test_config.py::TestAgentConfigValidate::test_validate_passes_with_all_required PASSED
+tests/test_config.py::TestAgentConfigValidate::test_is_valid_false_when_errors PASSED
+tests/test_config.py::TestAgentConfigValidate::test_is_valid_true_when_no_errors PASSED
+tests/test_config.py::TestGetConfig::test_get_config_returns_agent_config PASSED
+tests/test_config.py::TestGetConfig::test_get_config_singleton_same_instance PASSED
+tests/test_config.py::TestGetConfig::test_get_config_after_reset_is_new_instance PASSED
+tests/test_config.py::TestGetConfig::test_get_config_reads_env_vars PASSED
+tests/test_config.py::TestResetConfig::test_reset_clears_cached_config PASSED
+tests/test_config.py::TestResetConfig::test_reset_allows_fresh_env_read PASSED
+tests/test_config.py::TestResetConfig::test_reset_can_be_called_multiple_times PASSED
+tests/test_config.py::TestPathConfiguration::test_prompts_dir_is_path_type PASSED
+tests/test_config.py::TestPathConfiguration::test_screenshots_dir_is_path_type PASSED
+tests/test_config.py::TestPathConfiguration::test_prompts_dir_custom_relative PASSED
+tests/test_config.py::TestPathConfiguration::test_screenshots_dir_absolute_path PASSED
+tests/test_config.py::TestPortConfiguration::test_ports_are_integers PASSED
+tests/test_config.py::TestPortConfiguration::test_dashboard_port_boundary_1024 PASSED
+tests/test_config.py::TestPortConfiguration::test_dashboard_port_boundary_1023_invalid PASSED
+tests/test_config.py::TestPortConfiguration::test_all_default_ports_are_valid PASSED
+tests/test_config.py::TestAPIKeysStructure::test_api_keys_has_all_fields PASSED
+tests/test_config.py::TestAPIKeysStructure::test_api_keys_validate_returns_list PASSED
+tests/test_config.py::TestAgentConfigIntegration::test_full_config_from_env PASSED
+
+============================== 78 passed in 0.17s ==============================
+
+## Summary
+
+- 78 tests collected, 78 passed, 0 failed, 0 errors
+- Test run time: 0.17s
+- Python: 3.9.6, pytest: 8.4.2
+
+## Test Coverage by Category
+
+TestWindsurfMode          (7 tests)  - Enum values, construction, invalid value handling
+TestLogLevel              (6 tests)  - Enum values, construction, invalid value handling
+TestAPIKeys               (13 tests) - All 8 key fields, env var reads, GEMINI fallback, validate()
+TestAgentConfigDefaults   (11 tests) - All default values verified
+TestAgentConfigEnvOverrides (13 tests) - All env vars can override defaults
+TestAgentConfigFromEnv    (3 tests)  - from_env() classmethod
+TestAgentConfigValidate   (7 tests)  - validate() error cases, is_valid() boolean
+TestGetConfig             (4 tests)  - Singleton pattern, env var reads
+TestResetConfig           (3 tests)  - Cache clearing, fresh env reads, idempotency
+TestPathConfiguration     (4 tests)  - Path type enforcement, relative/absolute paths
+TestPortConfiguration     (4 tests)  - Integer types, boundary testing at port 1023/1024
+TestAPIKeysStructure      (2 tests)  - Field presence, validate() return type
+TestAgentConfigIntegration (1 test)  - End-to-end full configuration from env

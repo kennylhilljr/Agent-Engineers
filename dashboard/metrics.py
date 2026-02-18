@@ -17,6 +17,21 @@ and aggregated into agent profiles and session summaries.
 from typing import Literal, TypedDict
 
 
+class FileChange(TypedDict):
+    """File change record for a coding delegation.
+
+    Captures details about a file that was created, modified, or deleted
+    during a coding agent invocation.
+    """
+
+    path: str                                               # File path relative to project root
+    change_type: Literal["created", "modified", "deleted"]  # Type of change
+    lines_added: int                                        # Number of lines added
+    lines_removed: int                                      # Number of lines removed
+    language: str                                           # Programming language (e.g., "python", "javascript", "css")
+    diff: str                                               # Git diff output for this file
+
+
 class AgentEvent(TypedDict):
     """Single agent invocation record.
 
@@ -44,6 +59,9 @@ class AgentEvent(TypedDict):
     artifacts: list[str]                                    # List of artifacts: ["commit:abc123", "pr:#42", "file:src/foo.py", "issue:AI-12"]
     error_message: str                                      # Error details if status is "error", empty string if success
     model_used: str                                         # Model identifier: "claude-haiku-4-5", "claude-sonnet-4-5", etc.
+
+    # File changes - detailed breakdown of files changed during coding delegations
+    file_changes: list[FileChange]                         # List of file changes with diffs (empty for non-coding agents)
 
 
 class AgentProfile(TypedDict):
