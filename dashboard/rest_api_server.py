@@ -130,6 +130,9 @@ PANEL_AGENT_NAMES = [
     "gemini", "groq", "kimi", "windsurf",
 ]
 
+# AI-89: Global system pause flag
+_system_paused: bool = False
+
 # WebSocket clients connected to /api/ws for agent_status broadcasts
 _ws_clients: set = set()
 
@@ -340,9 +343,10 @@ class RESTAPIServer:
 
         # Agents - static routes BEFORE parameterized routes to avoid shadowing
         self.app.router.add_get('/api/agents', self.get_all_agents)
-        # Agent Controls - global pause/resume (AI-130) registered before {name} routes
+        # Agent Controls - global pause/resume (AI-130/AI-89) registered before {name} routes
         self.app.router.add_post('/api/agents/pause-all', self.pause_all_agents)
         self.app.router.add_post('/api/agents/resume-all', self.resume_all_agents)
+        self.app.router.add_get('/api/agents/system-status', self.get_system_status)
         self.app.router.add_get('/api/agent-controls', self.get_all_agent_controls)
         # Agent Status Panel endpoints (AI-79 / REQ-MONITOR-001)
         self.app.router.add_get('/api/agents/status', self.get_all_agents_status)
@@ -1055,53 +1059,157 @@ class RESTAPIServer:
     # -------------------------------------------------------------------------
 
     async def pause_all_agents(self, request: Request) -> Response:
-        """POST /api/agents/pause-all - Pause all agents.
+        """POST /api/agents/pause-all - Pause all 13 panel agents (AI-89).
+
+        Sets ALL agents to "paused" status, sets _system_paused = True,
+        adds a single orchestrator feed event, and broadcasts a
+        system_status_change WebSocket event.
 
         Returns:
-            200 OK with count and list of paused agent names
+            200 OK with paused_count and message
         """
+        global _system_paused
+
         for agent_name in ALL_AGENT_NAMES:
             _agent_states[agent_name] = 'paused'
+            # Sync the status panel details
+            if agent_name in _agent_status_details:
+                _agent_status_details[agent_name]['status'] = 'paused'
             # Ensure requirements entry exists in cache
             if agent_name not in _requirements_cache:
                 _requirements_cache[agent_name] = ''
 
+        _system_paused = True
+
+        timestamp = datetime.utcnow().isoformat() + 'Z'
+
+        # Add single orchestrator feed event
+        feed_event = {
+            'agent': 'orchestrator',
+            'ticket_key': None,
+            'duration_s': None,
+            'description': 'All agents paused by user',
+            'status': 'in_progress',
+            'timestamp': timestamp,
+        }
+        _rest_feed_events.append(feed_event)
+        if len(_rest_feed_events) > _REST_FEED_MAX:
+            _rest_feed_events.pop(0)
+
         _decisions_log.append({
-            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'timestamp': timestamp,
             'decision_type': 'pause_all',
             'agent_count': len(ALL_AGENT_NAMES)
         })
 
+        # Broadcast system_status_change via WebSocket
+        await self._broadcast_system_status()
+
         return web.json_response({
             'status': 'ok',
             'paused_count': len(ALL_AGENT_NAMES),
-            'agent_ids': ALL_AGENT_NAMES,
-            'message': f'All {len(ALL_AGENT_NAMES)} agents have been paused',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
+            'message': f'All {len(ALL_AGENT_NAMES)} agents paused',
+            'timestamp': timestamp,
         })
 
     async def resume_all_agents(self, request: Request) -> Response:
-        """POST /api/agents/resume-all - Resume all agents.
+        """POST /api/agents/resume-all - Resume all paused agents (AI-89).
+
+        Sets agents that are "paused" back to "idle" (does not affect
+        running agents), sets _system_paused = False, adds a feed event,
+        and broadcasts a system_status_change WebSocket event.
 
         Returns:
-            200 OK with count and list of resumed agent names
+            200 OK with resumed_count and message
         """
+        global _system_paused
+
+        # Only resume agents that are currently paused (don't affect running)
+        resumed = []
         for agent_name in ALL_AGENT_NAMES:
-            _agent_states[agent_name] = 'idle'
+            if _agent_states.get(agent_name, 'idle') == 'paused':
+                _agent_states[agent_name] = 'idle'
+                if agent_name in _agent_status_details:
+                    _agent_status_details[agent_name]['status'] = 'idle'
+                resumed.append(agent_name)
+
+        _system_paused = False
+
+        timestamp = datetime.utcnow().isoformat() + 'Z'
+
+        # Add orchestrator feed event
+        feed_event = {
+            'agent': 'orchestrator',
+            'ticket_key': None,
+            'duration_s': None,
+            'description': 'All agents resumed by user',
+            'status': 'success',
+            'timestamp': timestamp,
+        }
+        _rest_feed_events.append(feed_event)
+        if len(_rest_feed_events) > _REST_FEED_MAX:
+            _rest_feed_events.pop(0)
 
         _decisions_log.append({
-            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'timestamp': timestamp,
             'decision_type': 'resume_all',
-            'agent_count': len(ALL_AGENT_NAMES)
+            'agent_count': len(resumed)
         })
+
+        # Broadcast system_status_change via WebSocket
+        await self._broadcast_system_status()
 
         return web.json_response({
             'status': 'ok',
-            'resumed_count': len(ALL_AGENT_NAMES),
-            'agent_ids': ALL_AGENT_NAMES,
-            'message': f'All {len(ALL_AGENT_NAMES)} agents have been resumed',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
+            'resumed_count': len(resumed),
+            'message': f'{len(resumed)} agents resumed',
+            'timestamp': timestamp,
         })
+
+    async def get_system_status(self, request: Request) -> Response:
+        """GET /api/agents/system-status - Return global pause state (AI-89).
+
+        Returns:
+            200 OK with system_paused flag and per-status agent counts
+        """
+        paused_count = sum(
+            1 for s in _agent_states.values() if s == 'paused'
+        )
+        running_count = sum(
+            1 for s in _agent_states.values() if s == 'running'
+        )
+        return web.json_response({
+            'system_paused': _system_paused,
+            'paused_agent_count': paused_count,
+            'running_count': running_count,
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+        })
+
+    async def _broadcast_system_status(self) -> None:
+        """Broadcast a system_status_change event to all WebSocket clients (AI-89)."""
+        if not _ws_clients:
+            return
+
+        paused_count = sum(1 for s in _agent_states.values() if s == 'paused')
+        running_count = sum(1 for s in _agent_states.values() if s == 'running')
+
+        payload = json.dumps({
+            'type': 'system_status_change',
+            'system_paused': _system_paused,
+            'paused_agent_count': paused_count,
+            'running_count': running_count,
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+        })
+
+        dead_clients = set()
+        for ws in list(_ws_clients):
+            try:
+                await ws.send_str(payload)
+            except Exception:
+                dead_clients.add(ws)
+
+        for ws in dead_clients:
+            _ws_clients.discard(ws)
 
     async def get_all_agent_controls(self, request: Request) -> Response:
         """GET /api/agent-controls - Get pause/resume state and requirements for all agents.
