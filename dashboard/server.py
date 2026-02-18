@@ -80,6 +80,7 @@ from dashboard.metrics_store import MetricsStore
 from dashboard.chat_bridge import ChatBridge, IntentParser, AgentRouter
 from dashboard.auth import auth_middleware
 from dashboard.config import get_config
+from dashboard.latency_benchmark import LatencyTracker
 
 # In-memory store for requirements (ticket_key -> requirement text)
 _requirements_store: dict = {}
@@ -352,6 +353,9 @@ class DashboardServer:
             agent_router=AgentRouter(),
         )
 
+        # WebSocket latency tracker (AI-180 / REQ-PERF-001)
+        self.latency_tracker = LatencyTracker()
+
         # Register as a listener on the supplied collector (AI-171)
         if collector is not None:
             collector.register_event_callback(self._on_new_event)
@@ -419,6 +423,9 @@ class DashboardServer:
         self.app.router.add_post('/api/chat-stream', self.post_chat_stream)
         self.app.router.add_post('/api/control-ack', self.post_control_ack)
 
+        # Latency statistics endpoint (AI-180 / REQ-PERF-001)
+        self.app.router.add_get('/api/latency', self.get_latency_stats)
+
         # OPTIONS for CORS preflight
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/agents/{agent_name}', self.handle_options)
@@ -473,6 +480,22 @@ class DashboardServer:
             'session_count': stats['session_count'],
             'agent_count': stats['agent_count']
         })
+
+    async def get_latency_stats(self, request: Request) -> Response:
+        """GET /api/latency — return real-time WebSocket latency statistics.
+
+        Returns JSON with p50, p95, p99, max, mean, count, within_100ms_pct.
+        Latency is measured from just before send_json() through to delivery
+        completion for each broadcast_to_websockets() call (AI-180).
+
+        Returns:
+            JSON response with current latency statistics.
+        """
+        stats = self.latency_tracker.get_stats()
+        stats["target_ms"] = 100
+        stats["target_met"] = self.latency_tracker.check_target(100)
+        stats["timestamp"] = datetime.utcnow().isoformat() + "Z"
+        return web.json_response(stats)
 
     async def get_metrics(self, request: Request) -> Response:
         """Get all metrics data.
@@ -698,10 +721,18 @@ class DashboardServer:
     async def broadcast_to_websockets(self, message: dict) -> None:
         """Broadcast a JSON message to all connected WebSocket clients.
 
+        Optionally records latency via self.latency_tracker (AI-180 / REQ-PERF-001).
+        A unique event_id is stamped just before the send loop starts and marked
+        delivered immediately after all clients have received the message.
+
         Args:
             message: Dictionary to serialise and send to every active client.
                      Disconnected clients are silently removed from the pool.
         """
+        # Record emission timestamp for latency tracking
+        event_id = str(uuid4())
+        self.latency_tracker.record_emit(event_id)
+
         disconnected = set()
         for ws in self.websockets:
             try:
@@ -712,6 +743,9 @@ class DashboardServer:
         self.websockets -= disconnected
         if disconnected:
             logger.info(f"Removed {len(disconnected)} disconnected WebSocket clients during broadcast")
+
+        # Record delivery timestamp to complete the latency measurement
+        self.latency_tracker.record_delivery(event_id)
 
     def _on_new_event(self, event: dict) -> None:
         """Callback invoked by AgentMetricsCollector when a new event is recorded (AI-171).
