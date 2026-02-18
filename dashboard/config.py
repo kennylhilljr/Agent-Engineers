@@ -219,3 +219,82 @@ def reset_config():
     """Reset the global configuration singleton (useful for testing)."""
     global _config
     _config = None
+
+
+# ---------------------------------------------------------------------------
+# AgentConfig - AI-194: Centralized AI provider configuration
+# ---------------------------------------------------------------------------
+
+from dataclasses import dataclass, field
+
+
+@dataclass
+class AgentConfig:
+    """Centralized configuration for the Agent Dashboard AI providers.
+
+    Reads values from environment variables with sensible defaults.
+
+    Environment Variables:
+        DASHBOARD_HOST: Server host (default: localhost)
+        DASHBOARD_PORT: Server port (default: 8420)
+        LINEAR_API_KEY: Linear API key (default: empty)
+        ANTHROPIC_API_KEY: Anthropic API key (default: empty)
+        OPENAI_API_KEY: OpenAI API key (default: empty)
+        DEFAULT_PROVIDER: Default AI provider (default: claude)
+    """
+
+    # Server config
+    host: str = field(default_factory=lambda: os.environ.get("DASHBOARD_HOST", "localhost"))
+    port: int = field(default_factory=lambda: int(os.environ.get("DASHBOARD_PORT", "8420")))
+
+    # API Keys
+    linear_api_key: str = field(default_factory=lambda: os.environ.get("LINEAR_API_KEY", ""))
+    anthropic_api_key: str = field(default_factory=lambda: os.environ.get("ANTHROPIC_API_KEY", ""))
+    openai_api_key: str = field(default_factory=lambda: os.environ.get("OPENAI_API_KEY", ""))
+
+    # Provider config
+    default_provider: str = field(
+        default_factory=lambda: os.environ.get("DEFAULT_PROVIDER", "claude")
+    )
+
+    @classmethod
+    def from_env(cls) -> "AgentConfig":
+        """Create config from environment variables."""
+        return cls()
+
+    def is_provider_configured(self, provider: str) -> bool:
+        """Check if a provider has credentials configured.
+
+        Args:
+            provider: Provider name (claude, chatgpt, linear)
+
+        Returns:
+            True if credentials are present, False otherwise
+        """
+        key_map = {
+            "claude": self.anthropic_api_key,
+            "chatgpt": self.openai_api_key,
+            "linear": self.linear_api_key,
+        }
+        return bool(key_map.get(provider, ""))
+
+
+_default_agent_config: Optional[AgentConfig] = None
+
+
+def get_agent_config() -> AgentConfig:
+    """Get the global AgentConfig singleton (lazy init).
+
+    Returns:
+        AgentConfig instance
+    """
+    global _default_agent_config
+    if _default_agent_config is None:
+        _default_agent_config = AgentConfig.from_env()
+    return _default_agent_config
+
+
+def reset_agent_config() -> None:
+    """Reset the global AgentConfig singleton (useful for testing)."""
+    global _default_agent_config
+    _default_agent_config = None

@@ -5748,6 +5748,9 @@
             groq: { platform: 'groq', defaultModel: 'Llama 3.3 70B, Mixtral', role: 'Ultra-fast LPU inference', group: 'ai_provider' },
             kimi: { platform: 'kimi', defaultModel: 'Moonshot v1, Kimi k2', role: 'Ultra-long context (2M tokens)', group: 'ai_provider' },
             windsurf: { platform: 'windsurf', defaultModel: 'Cascade', role: 'Parallel IDE coding', group: 'ai_provider' },
+            openrouter_dev: { platform: 'openrouter', defaultModel: 'DeepSeek R1, Llama 3.3', role: 'Multi-model fallback (200+ models)', group: 'ai_provider' },
+            product_manager: { platform: 'claude', defaultModel: 'Claude Sonnet', role: 'Backlog, sprint planning, agent coordination', group: 'workflow' },
+            designer: { platform: 'claude', defaultModel: 'Claude Haiku', role: 'UI/UX design, CSS, accessibility', group: 'workflow' },
         };
 
         // Workflow agent icons (function-specific)
@@ -5784,6 +5787,14 @@
                 bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.3)',
                 svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M1 12h4m14 0h4M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83"/></svg>'
             },
+            product_manager: {
+                bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(168, 85, 247, 0.3)',
+                svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="2" stroke-linecap="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>'
+            },
+            designer: {
+                bg: 'rgba(236, 72, 153, 0.15)', border: 'rgba(236, 72, 153, 0.3)',
+                svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ec4899" stroke-width="2" stroke-linecap="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>'
+            },
         };
 
         // AI provider icons (brand-specific)
@@ -5812,6 +5823,10 @@
                 bg: 'rgba(6, 182, 212, 0.15)', border: 'rgba(6, 182, 212, 0.3)',
                 svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="2" stroke-linecap="round"><path d="M3 17c2-2 4-3 7-3s5 2 7 2 3-1 4-2M3 12c2-2 4-3 7-3s5 2 7 2 3-1 4-2M3 7c2-2 4-3 7-3s5 2 7 2 3-1 4-2"/></svg>'
             },
+            openrouter: {
+                bg: 'rgba(251, 146, 60, 0.15)', border: 'rgba(251, 146, 60, 0.3)',
+                svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fb923c" stroke-width="2" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>'
+            },
         };
 
         // Provider rate limits, console URLs, and agent-to-provider mapping
@@ -5819,7 +5834,7 @@
             claude: {
                 name: 'Claude (Anthropic)',
                 consoleUrl: 'https://console.anthropic.com/settings/usage',
-                agents: ['coding', 'coding_fast', 'linear', 'github', 'pr_reviewer', 'pr_reviewer_fast', 'slack', 'ops', 'claude'],
+                agents: ['coding', 'coding_fast', 'linear', 'github', 'pr_reviewer', 'pr_reviewer_fast', 'slack', 'ops', 'claude', 'product_manager', 'designer'],
                 modelPrefix: 'claude-',
                 limits: {
                     rpm: 4000,
@@ -5886,6 +5901,18 @@
                     monthly_actions: 50,
                 },
                 pricing: { input: 0, output: 0, unit: 'Free tier — 50 premium actions/mo' }
+            },
+            openrouter: {
+                name: 'OpenRouter',
+                consoleUrl: 'https://openrouter.ai/activity',
+                agents: ['openrouter_dev'],
+                modelPrefix: 'openrouter/',
+                limits: {
+                    rpm: 200,
+                    tpm: 1000000,
+                    daily_tokens: 100000000,
+                },
+                pricing: { input: 0.50, output: 1.50, unit: 'per 1M tokens (varies by model)' }
             },
         };
 

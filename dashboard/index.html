@@ -905,6 +905,36 @@
             font-weight: 600;
         }
 
+        /* PM Task Launcher */
+        .pm-launcher { padding: 16px; }
+        .pm-launcher select, .pm-launcher textarea, .pm-launcher button {
+            width: 100%; margin-bottom: 8px; padding: 8px 12px;
+            border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.05); color: #e2e8f0;
+            font-family: inherit; font-size: 13px;
+        }
+        .pm-launcher textarea { min-height: 60px; resize: vertical; display: none; }
+        .pm-launcher textarea.visible { display: block; }
+        .pm-launcher .pm-btn-row { display: flex; gap: 8px; }
+        .pm-launcher .pm-btn-row button { flex: 1; cursor: pointer; font-weight: 600; }
+        .pm-btn-run { background: rgba(168,85,247,0.25) !important; border-color: rgba(168,85,247,0.4) !important; }
+        .pm-btn-run:hover { background: rgba(168,85,247,0.4) !important; }
+        .pm-btn-stop { background: rgba(239,68,68,0.25) !important; border-color: rgba(239,68,68,0.4) !important; }
+        .pm-status-badge {
+            display: inline-block; padding: 2px 8px; border-radius: 10px;
+            font-size: 11px; font-weight: 600; margin-left: 8px;
+        }
+        .pm-status-idle { background: rgba(100,116,139,0.2); color: #94a3b8; }
+        .pm-status-running { background: rgba(34,197,94,0.2); color: #22c55e; }
+        .pm-log-viewer {
+            max-height: 200px; overflow-y: auto; padding: 8px;
+            background: rgba(0,0,0,0.3); border-radius: 6px;
+            font-family: 'SF Mono', monospace; font-size: 11px;
+            color: #94a3b8; white-space: pre-wrap; margin-top: 8px;
+            display: none;
+        }
+        .pm-log-viewer.visible { display: block; }
+
         /* Enhanced Agent Status Panel */
         .agent-details {
             display: flex;
@@ -2145,6 +2175,32 @@
                     </div>
                 </section>
 
+                <!-- PM Task Launcher -->
+                <section class="panel-section">
+                    <h2 class="panel-section-title">PM Task Launcher <span id="pm-status-badge" class="pm-status-badge pm-status-idle">idle</span></h2>
+                    <div class="pm-launcher">
+                        <select id="pm-task-select" onchange="togglePMCustom()">
+                            <option value="full-review">Full Project Review</option>
+                            <option value="backlog-review">Backlog Grooming</option>
+                            <option value="sprint-planning">Sprint Planning</option>
+                            <option value="prompt-review">Prompt Audit</option>
+                            <option value="agent-analysis">Agent Analysis</option>
+                            <option value="custom">Custom Task...</option>
+                        </select>
+                        <textarea id="pm-custom-prompt" placeholder="Describe the custom PM task..."></textarea>
+                        <select id="pm-model-select">
+                            <option value="sonnet">Sonnet</option>
+                            <option value="haiku">Haiku</option>
+                            <option value="opus">Opus</option>
+                        </select>
+                        <div class="pm-btn-row">
+                            <button class="pm-btn-run" onclick="runPMTask()">Run Task</button>
+                            <button class="pm-btn-stop" onclick="stopPMTask()">Stop</button>
+                        </div>
+                        <div id="pm-log-viewer" class="pm-log-viewer"></div>
+                    </div>
+                </section>
+
                 <!-- Orchestrator Flow Visualization -->
                 <section class="panel-section" id="orchestrator-flow-section">
                     <h2 class="panel-section-title">Orchestrator Flow</h2>
@@ -2386,6 +2442,9 @@
             { id: 'groq',            name: 'Groq',            model: 'haiku',  status: 'idle', description: 'Ultra-fast Llama 3.3 70B via Groq LPU.', invocations: 0, level: 1 },
             { id: 'kimi',            name: 'KIMI',            model: 'haiku',  status: 'idle', description: 'Moonshot AI with 2M token context.', invocations: 0, level: 1 },
             { id: 'windsurf',        name: 'Windsurf',        model: 'haiku',  status: 'idle', description: 'Windsurf IDE for parallel coding tasks.', invocations: 0, level: 1 },
+            { id: 'openrouter_dev', name: 'OpenRouter Dev', model: 'haiku',  status: 'idle', description: 'Multi-model access via OpenRouter (200+ models).', invocations: 0, level: 1 },
+            { id: 'product_manager',name: 'Product Manager',model: 'sonnet', status: 'idle', description: 'Backlog grooming, sprint planning, cross-agent coordination.', invocations: 0, level: 1 },
+            { id: 'designer',       name: 'Designer',       model: 'haiku',  status: 'idle', description: 'UI/UX design, CSS, design systems, accessibility.', invocations: 0, level: 1 },
         ];
 
         // ========================================
@@ -4725,6 +4784,72 @@
         window.loadCharts = loadCharts;
 
         // ========================================
+        // ── PM Task Launcher Functions ──────────────────────────────────
+        let _pmPollTimer = null;
+
+        function togglePMCustom() {
+            const sel = document.getElementById('pm-task-select');
+            const ta = document.getElementById('pm-custom-prompt');
+            if (ta) ta.classList.toggle('visible', sel.value === 'custom');
+        }
+
+        function updatePMBadge(running) {
+            const badge = document.getElementById('pm-status-badge');
+            if (!badge) return;
+            badge.textContent = running ? 'running' : 'idle';
+            badge.className = 'pm-status-badge ' + (running ? 'pm-status-running' : 'pm-status-idle');
+        }
+
+        async function runPMTask() {
+            const task = document.getElementById('pm-task-select').value;
+            const model = document.getElementById('pm-model-select').value;
+            const custom = document.getElementById('pm-custom-prompt').value;
+            try {
+                const resp = await fetch('/api/pm/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task, model, custom_prompt: custom }),
+                });
+                const data = await resp.json();
+                if (data.error) { alert(data.error); return; }
+                updatePMBadge(true);
+                startPMPoll();
+                const log = document.getElementById('pm-log-viewer');
+                if (log) { log.classList.add('visible'); log.textContent = 'Task started...\n'; }
+            } catch (e) { console.error('PM run error:', e); }
+        }
+
+        async function stopPMTask() {
+            try {
+                await fetch('/api/pm/stop', { method: 'POST' });
+                updatePMBadge(false);
+                stopPMPoll();
+            } catch (e) { console.error('PM stop error:', e); }
+        }
+
+        function startPMPoll() {
+            stopPMPoll();
+            _pmPollTimer = setInterval(checkPMStatus, 3000);
+        }
+        function stopPMPoll() {
+            if (_pmPollTimer) { clearInterval(_pmPollTimer); _pmPollTimer = null; }
+        }
+
+        async function checkPMStatus() {
+            try {
+                const resp = await fetch('/api/pm/status');
+                const data = await resp.json();
+                updatePMBadge(data.running);
+                const log = document.getElementById('pm-log-viewer');
+                if (log && data.log_tail) {
+                    log.classList.add('visible');
+                    log.textContent = data.log_tail;
+                    log.scrollTop = log.scrollHeight;
+                }
+                if (!data.running) stopPMPoll();
+            } catch (e) { /* ignore */ }
+        }
+
         function init() {
             // Initialize state
             state.agents = [...mockAgents];
