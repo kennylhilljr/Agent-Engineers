@@ -403,6 +403,11 @@ class DashboardServer:
                     "status": "idle",
                     "current_ticket": None,
                     "started_at": None,
+                    # AI-80 / REQ-MONITOR-002: active requirement display fields
+                    "ticket_title": None,
+                    "description": None,
+                    "token_count": 0,
+                    "estimated_cost": 0.0,
                 }
 
         # Setup WebSocket broadcasting
@@ -422,6 +427,9 @@ class DashboardServer:
         self.app.router.add_post('/api/agents/{agent_name}/status', self.update_agent_status_handler)
         self.app.router.add_get('/api/agents/{agent_name}', self.get_agent)
         self.app.router.add_get('/ws', self.websocket_handler)
+        # AI-80 / REQ-MONITOR-002: Active Requirement Display endpoints
+        self.app.router.add_get('/api/agents/{agent_name}/requirement', self.get_agent_requirement)
+        self.app.router.add_post('/api/agents/{agent_name}/metrics', self.update_agent_metrics)
 
         # Requirement sync endpoints
         self.app.router.add_get('/api/requirements/{ticket_key}', self.get_requirement)
@@ -689,6 +697,11 @@ class DashboardServer:
                 "status": detail.get("status", "idle"),
                 "current_ticket": detail.get("current_ticket"),
                 "elapsed_time": elapsed_time,
+                # AI-80 / REQ-MONITOR-002: active requirement display fields
+                "ticket_title": detail.get("ticket_title"),
+                "description": detail.get("description"),
+                "token_count": detail.get("token_count", 0),
+                "estimated_cost": detail.get("estimated_cost", 0.0),
             })
 
         return web.json_response({
@@ -723,10 +736,18 @@ class DashboardServer:
         current_ticket = body.get('current_ticket', None)
         timestamp = datetime.utcnow().isoformat() + 'Z'
 
+        # AI-80 / REQ-MONITOR-002: new optional fields for active requirement display
+        ticket_title = body.get('ticket_title', None)
+        description = body.get('description', None)
+        token_count = body.get('token_count', 0)
+        estimated_cost = body.get('estimated_cost', 0.0)
+
         if agent_name not in _dashboard_agent_status:
             _dashboard_agent_status[agent_name] = {
                 "name": agent_name, "status": "idle",
                 "current_ticket": None, "started_at": None,
+                "ticket_title": None, "description": None,
+                "token_count": 0, "estimated_cost": 0.0,
             }
 
         previous_status = _dashboard_agent_status[agent_name].get("status", "idle")
@@ -735,8 +756,16 @@ class DashboardServer:
 
         if new_status == "running":
             _dashboard_agent_status[agent_name]["started_at"] = timestamp
+            _dashboard_agent_status[agent_name]["ticket_title"] = ticket_title
+            _dashboard_agent_status[agent_name]["description"] = description
+            _dashboard_agent_status[agent_name]["token_count"] = token_count
+            _dashboard_agent_status[agent_name]["estimated_cost"] = estimated_cost
         elif new_status in ("idle", "error"):
             _dashboard_agent_status[agent_name]["started_at"] = None
+            _dashboard_agent_status[agent_name]["ticket_title"] = None
+            _dashboard_agent_status[agent_name]["description"] = None
+            _dashboard_agent_status[agent_name]["token_count"] = 0
+            _dashboard_agent_status[agent_name]["estimated_cost"] = 0.0
 
         # Broadcast via WebSocket
         message = {
@@ -754,6 +783,10 @@ class DashboardServer:
             'previous_status': previous_status,
             'new_status': new_status,
             'current_ticket': current_ticket if new_status == "running" else None,
+            'ticket_title': ticket_title if new_status == "running" else None,
+            'description': description if new_status == "running" else None,
+            'token_count': token_count if new_status == "running" else 0,
+            'estimated_cost': estimated_cost if new_status == "running" else 0.0,
             'timestamp': timestamp,
         })
 
@@ -830,6 +863,122 @@ class DashboardServer:
                 text=json.dumps({'error': str(e)}),
                 content_type='application/json'
             )
+
+    async def get_agent_requirement(self, request: Request) -> Response:
+        """GET /api/agents/{agent_name}/requirement - Get full requirement details for a running agent.
+
+        AI-80 / REQ-MONITOR-002: Returns ticket key, title, description, token_count,
+        estimated_cost, and elapsed_time for a running agent.
+        """
+        agent_name = request.match_info['agent_name']
+
+        if agent_name not in _PANEL_AGENT_NAMES:
+            return web.json_response({
+                'error': 'Agent not found',
+                'agent_name': agent_name,
+                'available_agents': _PANEL_AGENT_NAMES,
+            }, status=404)
+
+        detail = _dashboard_agent_status.get(agent_name, {
+            "name": agent_name,
+            "status": "idle",
+            "current_ticket": None,
+            "started_at": None,
+            "ticket_title": None,
+            "description": None,
+            "token_count": 0,
+            "estimated_cost": 0.0,
+        })
+
+        # Calculate elapsed time
+        elapsed_time = None
+        if detail.get("status") == "running" and detail.get("started_at"):
+            try:
+                started = datetime.fromisoformat(detail["started_at"].rstrip('Z'))
+                elapsed_time = round((datetime.utcnow() - started).total_seconds())
+            except (ValueError, AttributeError):
+                elapsed_time = None
+
+        return web.json_response({
+            "agent_name": agent_name,
+            "status": detail.get("status", "idle"),
+            "current_ticket": detail.get("current_ticket"),
+            "ticket_title": detail.get("ticket_title"),
+            "description": detail.get("description"),
+            "token_count": detail.get("token_count", 0),
+            "estimated_cost": detail.get("estimated_cost", 0.0),
+            "elapsed_time": elapsed_time,
+            "started_at": detail.get("started_at"),
+            "timestamp": datetime.utcnow().isoformat() + 'Z',
+        })
+
+    async def update_agent_metrics(self, request: Request) -> Response:
+        """POST /api/agents/{agent_name}/metrics - Update token_count and estimated_cost.
+
+        AI-80 / REQ-MONITOR-002: Real-time metrics update endpoint. Broadcasts
+        agent_metrics_update WebSocket message with updated values.
+        """
+        agent_name = request.match_info['agent_name']
+
+        if agent_name not in _PANEL_AGENT_NAMES:
+            return web.json_response({
+                'error': 'Agent not found',
+                'agent_name': agent_name,
+                'available_agents': _PANEL_AGENT_NAMES,
+            }, status=404)
+
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        token_count = body.get('token_count')
+        estimated_cost = body.get('estimated_cost')
+
+        if token_count is None and estimated_cost is None:
+            return web.json_response({
+                'error': 'At least one of token_count or estimated_cost must be provided'
+            }, status=400)
+
+        # Initialize if needed
+        if agent_name not in _dashboard_agent_status:
+            _dashboard_agent_status[agent_name] = {
+                "name": agent_name,
+                "status": "idle",
+                "current_ticket": None,
+                "started_at": None,
+                "ticket_title": None,
+                "description": None,
+                "token_count": 0,
+                "estimated_cost": 0.0,
+            }
+
+        # Update metrics
+        if token_count is not None:
+            _dashboard_agent_status[agent_name]["token_count"] = token_count
+        if estimated_cost is not None:
+            _dashboard_agent_status[agent_name]["estimated_cost"] = estimated_cost
+
+        timestamp = datetime.utcnow().isoformat() + 'Z'
+        detail = _dashboard_agent_status[agent_name]
+
+        # Broadcast agent_metrics_update via WebSocket
+        message = {
+            'type': 'agent_metrics_update',
+            'agent': agent_name,
+            'token_count': detail.get("token_count", 0),
+            'estimated_cost': detail.get("estimated_cost", 0.0),
+            'timestamp': timestamp,
+        }
+        await self.broadcast_to_websockets(message)
+
+        return web.json_response({
+            'status': 'success',
+            'agent_name': agent_name,
+            'token_count': detail.get("token_count", 0),
+            'estimated_cost': detail.get("estimated_cost", 0.0),
+            'timestamp': timestamp,
+        })
 
     async def get_requirement(self, request: Request) -> Response:
         """Get the current requirement text for a ticket.
