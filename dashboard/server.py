@@ -394,6 +394,9 @@ class DashboardServer:
         # Circular buffer for reasoning/thinking history (AI-160)
         self._reasoning_history: list = []
 
+        # AI-94/AI-95: Structured reasoning blocks store (last 20)
+        self._reasoning_blocks: list = []
+
         # Circular buffer for decision log (AI-161)
         self._decision_log: list = []
 
@@ -517,6 +520,10 @@ class DashboardServer:
         # Reasoning blocks history endpoint (AI-160)
         self.app.router.add_get('/api/reasoning/blocks', self.get_reasoning_blocks)
 
+        # AI-94/AI-95: Structured reasoning block endpoints
+        self.app.router.add_post('/api/reasoning/block', self.post_reasoning_block)
+        self.app.router.add_post('/api/reasoning/clear', self.clear_reasoning_blocks)
+
         # Decision log endpoints (AI-161)
         self.app.router.add_post('/api/decisions', self.post_decision)
         self.app.router.add_get('/api/decisions', self.get_decisions)
@@ -590,6 +597,8 @@ class DashboardServer:
         self.app.router.add_route('OPTIONS', '/api/reasoning', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/agent-thinking', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/reasoning/blocks', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/reasoning/block', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/reasoning/clear', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/decisions', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/decisions/export', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/decisions/summary', self.handle_options)
@@ -1683,6 +1692,85 @@ class DashboardServer:
             'blocks': blocks,
             'total': len(self._reasoning_history),
         })
+
+    async def post_reasoning_block(self, request: Request) -> Response:
+        """POST /api/reasoning/block — store and broadcast a structured reasoning block.
+
+        AI-94 (orchestrator decision display) and AI-95 (agent thinking inner monologue).
+
+        Expected JSON body::
+
+            {
+                "type": "orchestrator_decision|agent_thinking",
+                "agent": "coding",
+                "ticket_key": "AI-94",
+                "title": "Delegating to coding agent",
+                "complexity": "COMPLEX",
+                "content": "Reasoning text...",
+                "steps": [{"action": "read_file", "target": "server.py", "reason": "Check existing routes"}]
+            }
+
+        Returns:
+            JSON ``{"success": true, "block": {...}}`` on success, or
+            ``{"error": "<message>"}`` with status 400 for malformed requests.
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        block_type = body.get('type', 'agent_thinking')
+        valid_types = ('orchestrator_decision', 'agent_thinking')
+        if block_type not in valid_types:
+            block_type = 'agent_thinking'
+
+        timestamp = datetime.utcnow().isoformat() + 'Z'
+        block = {
+            'id': f"rb-{int(datetime.utcnow().timestamp() * 1000)}",
+            'type': block_type,
+            'agent': body.get('agent', ''),
+            'ticket_key': body.get('ticket_key', ''),
+            'title': body.get('title', ''),
+            'complexity': body.get('complexity', ''),
+            'content': body.get('content', ''),
+            'steps': body.get('steps', []),
+            'timestamp': timestamp,
+        }
+
+        # Store in _reasoning_blocks (capped at 20)
+        self._reasoning_blocks.append(block)
+        if len(self._reasoning_blocks) > 20:
+            del self._reasoning_blocks[0]
+
+        # Also append to legacy _reasoning_history (capped at _REASONING_HISTORY_MAX)
+        self._reasoning_history.append(block)
+        if len(self._reasoning_history) > _REASONING_HISTORY_MAX:
+            del self._reasoning_history[0]
+
+        # Broadcast via WebSocket as reasoning_block event
+        ws_message = {
+            'type': 'reasoning_block',
+            'block': block,
+        }
+        await self.broadcast_to_websockets(ws_message)
+        logger.info(
+            f"Reasoning block stored & broadcast: type={block_type!r}, "
+            f"agent={block['agent']!r}, ticket={block['ticket_key']!r}, "
+            f"complexity={block['complexity']!r}"
+        )
+
+        return web.json_response({'success': True, 'block': block})
+
+    async def clear_reasoning_blocks(self, request: Request) -> Response:
+        """POST /api/reasoning/clear — clear all stored reasoning blocks.
+
+        Returns:
+            JSON ``{"success": true, "cleared": N}`` indicating how many blocks were cleared.
+        """
+        count = len(self._reasoning_blocks)
+        self._reasoning_blocks.clear()
+        logger.info(f"Reasoning blocks cleared: {count} blocks removed")
+        return web.json_response({'success': True, 'cleared': count})
 
     async def post_decision(self, request: Request) -> Response:
         """POST /api/decisions — log an orchestrator decision and broadcast via WebSocket.
@@ -3252,9 +3340,11 @@ class DashboardServer:
         logger.info("  Requirements:")
         logger.info(f"    GET  {base}/api/requirements/{{ticket_key}}")
         logger.info(f"    PUT  {base}/api/requirements/{{ticket_key}}")
-        logger.info("  Reasoning (AI-158/160):")
+        logger.info("  Reasoning (AI-158/160/94/95):")
         logger.info(f"    POST {base}/api/reasoning")
         logger.info(f"    GET  {base}/api/reasoning/blocks")
+        logger.info(f"    POST {base}/api/reasoning/block")
+        logger.info(f"    POST {base}/api/reasoning/clear")
         logger.info("  Agent Thinking (AI-159):")
         logger.info(f"    POST {base}/api/agent-thinking")
         logger.info("  Decisions (AI-161/162):")
