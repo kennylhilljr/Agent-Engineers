@@ -392,6 +392,61 @@
             background: rgba(239, 68, 68, 0.1);
         }
 
+        /* AI-87/AI-88: Pause / Resume buttons and PAUSED badge */
+        .agent-pause-btn,
+        .agent-resume-btn {
+            font-size: 0.62rem;
+            padding: 1px 6px;
+            border-radius: 3px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            transition: opacity 0.15s ease;
+            flex-shrink: 0;
+            line-height: 1.4;
+        }
+
+        .agent-pause-btn {
+            background: rgba(234,179,8,0.18);
+            color: #eab308;
+        }
+
+        .agent-pause-btn:hover {
+            background: rgba(234,179,8,0.32);
+        }
+
+        .agent-resume-btn {
+            background: rgba(34,197,94,0.18);
+            color: #22c55e;
+        }
+
+        .agent-resume-btn:hover {
+            background: rgba(34,197,94,0.32);
+        }
+
+        .agent-paused-badge {
+            font-size: 0.58rem;
+            padding: 1px 4px;
+            border-radius: 3px;
+            background: rgba(234,179,8,0.2);
+            color: #eab308;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            flex-shrink: 0;
+        }
+
+        /* system message in chat */
+        .chat-message.system .chat-message-content {
+            font-style: italic;
+            color: var(--text-secondary, #8b949e);
+            background: rgba(255,255,255,0.04);
+            border-left: 2px solid #eab308;
+            padding-left: 8px;
+            font-size: 0.82em;
+        }
+
         /* AI-80: Active Requirement Display (REQ-MONITOR-002) */
         .agent-status-item.status-running {
             flex-direction: column;
@@ -5908,6 +5963,11 @@
                             if (message.event) {
                                 prependFeedEvent(message.event);
                             }
+                        } else if (message.type === 'system_message') {
+                            // AI-87/AI-88: System chat message from pause/resume
+                            if (message.text) {
+                                addSystemChatMessage(message.text);
+                            }
                         }
                     } catch (error) {
                         console.error('Error processing WebSocket message:', error);
@@ -6481,6 +6541,7 @@
                             <span class="agent-running-ticket">${ticket}</span>
                             <span class="agent-running-title" title="${title}">${title || displayName}</span>
                             <span class="agent-status-label label-running" id="agent-status-label-${name}">Running</span>
+                            <button class="agent-pause-btn" title="Pause ${displayName}" onclick="event.stopPropagation();pauseAgent('${name}')">&#9646;&#9646;</button>
                         </div>
                         <div class="agent-running-metrics">
                             <div class="agent-running-metric">
@@ -6505,11 +6566,23 @@
                 `;
             } else {
                 // Compact view for non-running agents
+                // AI-87/AI-88: show Pause button (idle/error), Resume button (paused), PAUSED badge
+                const pauseBtn = (status === 'idle' || status === 'error')
+                    ? `<button class="agent-pause-btn" title="Pause ${displayName}" onclick="event.stopPropagation();pauseAgent('${name}')">&#9646;&#9646;</button>`
+                    : '';
+                const resumeBtn = status === 'paused'
+                    ? `<button class="agent-resume-btn" title="Resume ${displayName}" onclick="event.stopPropagation();resumeAgent('${name}')">&#9654;</button>`
+                    : '';
+                const pausedBadge = status === 'paused'
+                    ? `<span class="agent-paused-badge">PAUSED</span>`
+                    : '';
                 return `
                     <div class="agent-status-item" id="agent-status-item-${name}" data-agent="${name}" data-status="${status}" onclick="openAgentDetail('${name}')" title="View ${displayName} profile">
                         <div class="agent-status-dot status-${status}" id="agent-status-dot-${name}"></div>
                         <span class="agent-status-name" title="${displayName}">${displayName}</span>
+                        ${pausedBadge}
                         <span class="agent-status-label label-${status}" id="agent-status-label-${name}">${label}</span>
+                        ${pauseBtn}${resumeBtn}
                     </div>
                 `;
             }
@@ -6580,6 +6653,83 @@
                 label.className = `agent-status-label label-${status}`;
                 label.textContent = displayLabel;
                 item.title = '';
+            }
+        }
+
+        // ==========================================
+        // AI-87: Pause Agent / AI-88: Resume Agent
+        // ==========================================
+
+        /**
+         * Add a system chat message to the chat panel.
+         * @param {string} text - Message text
+         */
+        function addSystemChatMessage(text) {
+            const container = document.getElementById('chat-messages');
+            if (!container) return;
+            const div = document.createElement('div');
+            div.className = 'chat-message system';
+            div.setAttribute('data-testid', 'chat-message-system');
+            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            div.innerHTML = `<div class="chat-message-content">${text}</div><div class="chat-timestamp">${timeStr}</div>`;
+            // Remove welcome message if present
+            const welcome = container.querySelector('.chat-welcome');
+            if (welcome) welcome.remove();
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        /**
+         * Pause an agent via POST /api/agents/{name}/pause.
+         * Updates UI immediately and shows system chat message.
+         * @param {string} agentName
+         */
+        async function pauseAgent(agentName) {
+            try {
+                const resp = await fetch(`${API_BASE_URL}/api/agents/${encodeURIComponent(agentName)}/pause`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    console.warn(`pauseAgent(${agentName}) failed:`, err);
+                    return;
+                }
+                const data = await resp.json();
+                // Immediate UI update
+                updateAgentStatusItem(agentName, 'paused', null);
+                // System chat message
+                addSystemChatMessage(`Agent ${agentName} paused by user`);
+                console.log(`Paused agent: ${agentName}`, data);
+            } catch (err) {
+                console.error(`pauseAgent(${agentName}) error:`, err);
+            }
+        }
+
+        /**
+         * Resume a paused agent via POST /api/agents/{name}/resume.
+         * Updates UI immediately and shows system chat message.
+         * @param {string} agentName
+         */
+        async function resumeAgent(agentName) {
+            try {
+                const resp = await fetch(`${API_BASE_URL}/api/agents/${encodeURIComponent(agentName)}/resume`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    console.warn(`resumeAgent(${agentName}) failed:`, err);
+                    return;
+                }
+                const data = await resp.json();
+                // Immediate UI update
+                updateAgentStatusItem(agentName, 'idle', null);
+                // System chat message
+                addSystemChatMessage(`Agent ${agentName} resumed by user`);
+                console.log(`Resumed agent: ${agentName}`, data);
+            } catch (err) {
+                console.error(`resumeAgent(${agentName}) error:`, err);
             }
         }
 
