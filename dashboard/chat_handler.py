@@ -37,6 +37,27 @@ _request_queue: asyncio.Queue = asyncio.Queue(maxsize=50)
 # Known AI provider names for conversation routing
 AI_PROVIDERS = {"claude", "chatgpt", "gemini", "groq", "kimi", "windsurf"}
 
+# ---------------------------------------------------------------------------
+# Provider bridge integration (REQ-TECH-009 / AI-110)
+# ---------------------------------------------------------------------------
+# Lazily imported so ChatRouter degrades gracefully if provider_bridge has
+# import issues (missing API keys, bridge module unavailable, etc.)
+
+_provider_bridge_registry = None
+
+
+def _get_provider_bridge_registry():
+    """Lazily initialise and cache the BridgeRegistry singleton."""
+    global _provider_bridge_registry
+    if _provider_bridge_registry is None:
+        try:
+            from dashboard.provider_bridge import BridgeRegistry
+            _provider_bridge_registry = BridgeRegistry()
+        except Exception as exc:
+            logger.warning("provider_bridge unavailable: %s", exc)
+            _provider_bridge_registry = None
+    return _provider_bridge_registry
+
 
 class ChatRouter:
     """Routes chat messages to the appropriate handler.
@@ -184,13 +205,8 @@ class ChatRouter:
             )
 
         else:
-            # conversation - handled by AI provider on the frontend
-            # For backend handling, return a placeholder
-            provider_name = provider.capitalize()
-            response = (
-                f"[{provider_name}] I understand your question. "
-                f"This message will be processed by the {provider_name} AI provider."
-            )
+            # conversation - route to ProviderBridgeRouter (REQ-TECH-009 / AI-110)
+            response = await self._route_to_provider(message, provider)
 
         # Store in chat history
         result = {
@@ -204,6 +220,65 @@ class ChatRouter:
         _chat_history[message_id] = result
 
         return result
+
+    async def _route_to_provider(
+        self,
+        message: str,
+        provider: str = "claude",
+        context: Optional[str] = None,
+    ) -> str:
+        """Route a conversation message to the specified AI provider bridge.
+
+        Uses the ProviderBridgeRouter (BridgeRegistry) to forward the message
+        to the appropriate AI provider bridge (REQ-TECH-009 / AI-110).
+
+        Args:
+            message: The user's message text
+            provider: The AI provider name (claude, chatgpt, gemini, groq, kimi, windsurf)
+            context: Optional system/context string to pass to the provider
+
+        Returns:
+            The provider's response text, or a fallback message if unavailable
+        """
+        registry = _get_provider_bridge_registry()
+        provider_name = provider.capitalize()
+
+        if registry is None:
+            logger.warning(
+                "ProviderBridgeRegistry unavailable; using placeholder for %s", provider
+            )
+            return (
+                f"[{provider_name}] I understand your question. "
+                f"This message will be processed by the {provider_name} AI provider."
+            )
+
+        try:
+            bridge = registry.get(provider)
+        except KeyError:
+            logger.warning("Unknown provider '%s'; using placeholder response", provider)
+            return (
+                f"[{provider_name}] Unknown provider. "
+                f"Available providers: claude, chatgpt, gemini, groq, kimi, windsurf."
+            )
+
+        logger.info(
+            "[ChatRouter] Routing conversation to provider=%s, available=%s",
+            provider,
+            bridge.is_available(),
+        )
+
+        try:
+            response = await bridge.send_message_async(message, context=context)
+            return response
+        except Exception as exc:
+            logger.error(
+                "[ChatRouter] Provider bridge error for %s: %s", provider, exc
+            )
+            return (
+                f"[{provider_name}] Error communicating with provider: {exc}. "
+                f"Please check your API configuration."
+            )
+
 
     async def enqueue_message(
         self,
