@@ -47,6 +47,15 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 # ---------------------------------------------------------------------------
+# Import BaseBridge for type hints (bridges/base_bridge.py)
+# ---------------------------------------------------------------------------
+try:
+    from bridges.base_bridge import BaseBridge as _BaseBridge, BridgeResponse as _BridgeResponse
+except ImportError:
+    _BaseBridge = None  # type: ignore[assignment,misc]
+    _BridgeResponse = None  # type: ignore[assignment]
+
+# ---------------------------------------------------------------------------
 # Abstract base
 # ---------------------------------------------------------------------------
 
@@ -134,7 +143,7 @@ class OpenAIBridge(ProviderBridge):
 
     def __init__(self) -> None:
         self._api_key: str = os.environ.get("OPENAI_API_KEY", "")
-        self._bridge: Any = None
+        self._bridge: Optional[_BaseBridge] = None
         self._session: Any = None
         if self._api_key:
             try:
@@ -184,7 +193,7 @@ class GeminiBridge(ProviderBridge):
         self._api_key: str = (
             os.environ.get("GOOGLE_API_KEY", "") or os.environ.get("GEMINI_API_KEY", "")
         )
-        self._bridge: Any = None
+        self._bridge: Optional[_BaseBridge] = None
         if self._api_key:
             try:
                 from bridges.gemini_bridge import (  # type: ignore
@@ -232,7 +241,7 @@ class GroqBridge(ProviderBridge):
 
     def __init__(self) -> None:
         self._api_key: str = os.environ.get("GROQ_API_KEY", "")
-        self._bridge: Any = None
+        self._bridge: Optional[_BaseBridge] = None
         if self._api_key:
             try:
                 from bridges.groq_bridge import (  # type: ignore
@@ -278,7 +287,7 @@ class KimiBridge(ProviderBridge):
         self._api_key: str = (
             os.environ.get("KIMI_API_KEY", "") or os.environ.get("MOONSHOT_API_KEY", "")
         )
-        self._bridge: Any = None
+        self._bridge: Optional[_BaseBridge] = None
         if self._api_key:
             try:
                 from bridges.kimi_bridge import (  # type: ignore
@@ -325,7 +334,7 @@ class WindsurfBridge(ProviderBridge):
     provider_name = "windsurf"
 
     def __init__(self) -> None:
-        self._bridge: Any = None
+        self._bridge: Optional[_BaseBridge] = None
         try:
             from bridges.windsurf_bridge import (  # type: ignore
                 WindsurfBridge as _WBridge,
@@ -366,7 +375,7 @@ class WindsurfBridge(ProviderBridge):
             )
             if context:
                 session.add_message("system", context)
-            resp = self._bridge.send_task(session, message)
+            resp = self._bridge.dispatch_task(session, message)
             return resp.content
         except Exception as exc:
             logger.error("WindsurfBridge error: %s", exc)

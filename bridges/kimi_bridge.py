@@ -19,6 +19,8 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from bridges.base_bridge import BaseBridge, BridgeResponse
+
 try:
     from openai import AsyncOpenAI, OpenAI
 except ImportError:
@@ -148,11 +150,32 @@ class KimiClient:
         session.add_message("assistant", full_content)
 
 
-class KimiBridge:
+class KimiBridge(BaseBridge):
     """Unified bridge for KIMI / Moonshot AI access."""
+
+    @property
+    def provider_name(self) -> str:
+        return "kimi"
 
     def __init__(self, client: KimiClient) -> None:
         self._client = client
+
+    async def send_task(self, task: str, **kwargs) -> BridgeResponse:
+        """Send a task to the Kimi API and return a BridgeResponse."""
+        session = self.create_session(
+            model=kwargs.get("model"),
+            system_prompt=kwargs.get("system_prompt"),
+        )
+        response = self._client.send_message(session, task)
+        tokens_used = None
+        if response.usage:
+            tokens_used = response.usage.get("total_tokens")
+        return BridgeResponse(
+            content=response.content,
+            model=response.model,
+            provider=self.provider_name,
+            tokens_used=tokens_used,
+        )
 
     @classmethod
     def from_env(cls) -> "KimiBridge":
