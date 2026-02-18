@@ -7095,6 +7095,11 @@
                 updateAgentStatusItem(agentName, 'idle', null);
                 // System chat message
                 addSystemChatMessage(`Agent ${agentName} resumed by user`);
+                // AI-92: if server returns an updated requirement, notify in chat
+                if (data.updated_requirement && data.updated_requirement.ticket_key) {
+                    const tk = data.updated_requirement.ticket_key;
+                    addSystemChatMessage(`Agent ${agentName} resumed with updated requirement for ticket ${tk}`);
+                }
                 console.log(`Resumed agent: ${agentName}`, data);
             } catch (err) {
                 console.error(`resumeAgent(${agentName}) error:`, err);
@@ -8732,7 +8737,12 @@
                 _reqModalState.editMode = false;
                 _setModalViewMode();
                 _updateModalActions();
-                _showReqToast('Requirement saved');
+                // AI-92: if agent is paused, show cycle guidance message
+                if (_reqModalState.agentStatus === 'paused') {
+                    _showReqToast('\u2705 Requirement saved. Resume agent to apply changes.');
+                } else {
+                    _showReqToast('Requirement saved');
+                }
             } catch (err) {
                 _showReqToast('Save failed: ' + err.message, true);
             } finally {
