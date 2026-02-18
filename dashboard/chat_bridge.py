@@ -32,6 +32,27 @@ from typing import Any, AsyncIterator, Dict, Optional
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# Sandbox policy integration (AI-177 / REQ-TECH-012)
+# ---------------------------------------------------------------------------
+# Lazily imported so ChatBridge degrades gracefully if dashboard.security has
+# import issues (mirrors the pattern used for provider_bridge above).
+
+_sandbox_policy = None
+
+
+def _get_sandbox_policy():
+    """Lazily initialise and cache the SandboxPolicy singleton."""
+    global _sandbox_policy
+    if _sandbox_policy is None:
+        try:
+            from dashboard.security import SandboxPolicy
+            _sandbox_policy = SandboxPolicy()
+        except Exception as exc:
+            logger.warning("dashboard.security unavailable: %s", exc)
+            _sandbox_policy = None
+    return _sandbox_policy
+
+# ---------------------------------------------------------------------------
 # Provider bridge integration (AI-174 / REQ-TECH-009)
 # ---------------------------------------------------------------------------
 # Lazy import so ChatBridge still works even if provider_bridge has import
@@ -529,10 +550,39 @@ class ChatBridge:
         agent: Optional[str],
         session_id: Optional[str],
     ) -> AsyncIterator[Dict[str, Any]]:
-        """Handle run_task intents by simulating task delegation."""
+        """Handle run_task intents by simulating task delegation.
+
+        AI-177 / REQ-TECH-012: validate the task command against SandboxPolicy
+        before delegating.  If the command is blocked, yield a clear error chunk
+        and return without delegating.
+        """
         task = intent.get("task", "")
         effective_agent = agent or "coding"
         await asyncio.sleep(0)
+
+        # --- Security check (AI-177) ---
+        policy = _get_sandbox_policy()
+        if policy is not None and task:
+            try:
+                policy.check_command(task)
+            except Exception as sec_exc:
+                from dashboard.security import SecurityError
+                if isinstance(sec_exc, SecurityError):
+                    yield self._chunk(
+                        "error",
+                        f"Security policy violation: {sec_exc}",
+                        {
+                            "error_code": "SECURITY_COMMAND_BLOCKED",
+                            "intent_type": INTENT_RUN_TASK,
+                            "agent": effective_agent,
+                            "task": task,
+                            "session_id": session_id,
+                        },
+                    )
+                    return
+                # Re-raise unexpected errors
+                raise
+
         yield self._chunk(
             "agent_response",
             f"Delegating task to {effective_agent} agent: {task}",
