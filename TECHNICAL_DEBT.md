@@ -3,7 +3,7 @@
 **Project:** Agent-Engineers
 **Linear Issue:** AI-202
 **Created:** 2026-02-17
-**Last Updated:** 2026-02-17
+**Last Updated:** 2026-02-18
 
 This document tracks all TODO/FIXME comments identified in the codebase, their
 resolution status, and the rationale for any deferred items. It is maintained
@@ -45,42 +45,57 @@ grep -rn "#.*TODO\|#.*FIXME\|#.*HACK\|#.*XXX" \
 | **File**    | `agent.py` |
 | **Line**    | 377 (original), now replaced with an explanatory block comment |
 | **Original**| `ticket_key=None  # TODO: extract from Linear context` |
-| **Priority**| Medium |
-| **Status**  | Comment clarified in AI-202; implementation deferred |
-| **Resolved**| Partially — TODO marker removed, rationale documented |
+| **Priority**| Medium → High (escalated in AI-231) |
+| **Status**  | **RESOLVED — 2026-02-18 (AI-231)** |
+| **Resolved**| Fully — regex extraction implemented in `run_agent_session()` |
 
 **Context:**
 
 The `run_agent_session` function accepts a `ticket_key` parameter that is used
 to broadcast the active ticket to the dashboard WebSocket server. In the
-_standalone main loop_ (`main_loop` function in `agent.py`), the loop invokes
-the agent using MCP tools to discover and pick up Linear tickets dynamically
-each session — it does not receive a pre-assigned ticket key.
+_standalone main loop_ (`run_autonomous_agent` function in `agent.py`), the
+loop invokes the agent using MCP tools to discover and pick up Linear tickets
+dynamically each session — it does not receive a pre-assigned ticket key.
 
 By contrast, the daemon path (`scripts/daemon.py` → `run_worker`) and the
 scalable worker pool (`daemon/worker_pool.py`) already pass `ticket_key`
 explicitly, because the ticket is known before the agent session starts.
 
-**Why it is deferred:**
+**Resolution (AI-231 — 2026-02-18):**
 
-Extracting the active ticket key in the standalone loop would require:
-1. A Linear API call (via MCP or REST) before each session to determine which
-   ticket is currently assigned to the agent, **or**
-2. Parsing the agent's response text to extract the ticket identifier it
-   decided to work on.
+Implemented Option A (preferred): after collecting `response_text` inside
+`run_agent_session()`, the code now calls `extract_ticket_key(response_text)`
+which scans for the `PROJECT_TICKET: <KEY>` pattern using a pre-compiled
+`re.compile` pattern (`TICKET_KEY_PATTERN`).
 
-Neither approach is trivial without refactoring the standalone loop to use
-the same pre-assignment model as the daemon. This work is scoped to a future
-Linear issue focused on standalone-loop improvements.
+Changes made:
 
-**What needs to happen:**
+1. **`agent.py`** — Added:
+   - `import re` at the top of the file.
+   - `TICKET_KEY_PATTERN = re.compile(r"PROJECT_TICKET:\s*([A-Z]+-\d+)")` constant.
+   - `extract_ticket_key(text: str) -> str | None` helper function.
+   - Logic in `run_agent_session()` to call `extract_ticket_key()` after
+     collecting `response_text`. When a key is found and no `ticket_key` was
+     pre-assigned, an intermediate `broadcast_agent_status(status="running",
+     metadata={"ticket_key": extracted_key})` call is made so the dashboard
+     updates within seconds of the agent outputting the pattern.
+   - `effective_ticket_key = ticket_key or extracted_key` ensures the
+     pre-assigned daemon-path key always takes precedence (no regression).
 
-- Refactor `main_loop` to call the Linear MCP tool before each session to
-  discover the next actionable ticket, then pass its key as `ticket_key`.
-- Alternatively, parse the session response for a `PROJECT_TICKET: <key>`
-  pattern (similar to how `SESSION_COMPLETE` is detected).
-- Update `broadcast_agent_status` callers to always supply a ticket key so
-  dashboard ticket tracking is complete.
+2. **`tests/test_agent.py`** — Added `TestExtractTicketKey` (20 unit tests)
+   and `TestRunAgentSessionTicketKeyExtraction` (3 integration tests) covering:
+   - Happy path extraction from various text positions.
+   - Extra/no whitespace after colon.
+   - Multiple mentions → first match returned.
+   - Missing pattern → `None` fallback.
+   - Empty/whitespace/`None` input → `None` fallback.
+   - Malformed patterns (lowercase, missing dash, numeric prefix, partial signal).
+   - Daemon-path regression: pre-assigned key not clobbered by response text.
+
+**Daemon path regression verified:** `effective_ticket_key = ticket_key or
+extracted_key` means a truthy pre-assigned `ticket_key` always wins. The extra
+"running" broadcast for the extracted key is guarded by `if extracted_key and
+not ticket_key`, so daemon workers are unaffected.
 
 ---
 
@@ -151,3 +166,4 @@ are clean with no deferred work markers.
 |------------|--------|
 | 2026-02-17 | Initial audit (AI-202). Found 1 active TODO. Replaced TODO marker with detailed explanatory comment. Added TD-001 entry. |
 | 2026-02-18 | AI-191 audit of dashboard/ directory. Zero TODO/FIXME/HACK comments found. Dashboard module is clean. |
+| 2026-02-18 | AI-231 resolves TD-001. Implemented `extract_ticket_key()` and `TICKET_KEY_PATTERN` in `agent.py`. Added 23 unit/integration tests in `tests/test_agent.py`. Dashboard now shows active ticket key for standalone sessions within 10 s of agent emitting `PROJECT_TICKET: <KEY>`. |
