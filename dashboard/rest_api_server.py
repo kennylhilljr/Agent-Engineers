@@ -539,6 +539,13 @@ class RESTAPIServer:
         # Also expose usage at legacy path used by dashboard.html
         self.app.router.add_get('/api/usage', self.get_billing_usage)
 
+        # AI-221: Stripe Billing endpoints
+        self.app.router.add_get('/api/billing/checkout', self.get_billing_checkout)
+        self.app.router.add_get('/api/billing/portal', self.get_billing_portal)
+        self.app.router.add_get('/api/billing/invoices', self.get_billing_invoices)
+        self.app.router.add_get('/api/billing/subscription', self.get_billing_subscription)
+        self.app.router.add_post('/api/billing/stripe-webhook', self.post_stripe_webhook)
+
         # OPTIONS for CORS preflight
         for route in ['/api/metrics', '/api/agents', '/api/sessions', '/api/providers',
                       '/api/chat', '/api/decisions', '/api/agents/status',
@@ -553,7 +560,10 @@ class RESTAPIServer:
                       '/api/billing/usage', '/api/billing/plan',
                       '/api/billing/upgrade',
                       '/api/billing/session/start', '/api/billing/session/end',
-                      '/api/usage']:
+                      '/api/usage',
+                      '/api/billing/checkout', '/api/billing/portal',
+                      '/api/billing/invoices', '/api/billing/subscription',
+                      '/api/billing/stripe-webhook']:
             self.app.router.add_route('OPTIONS', route, self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
@@ -4266,6 +4276,253 @@ async function showForgotPassword() {{
         result = manager.record_session_end(user_id, session_id)
         result["timestamp"] = datetime.utcnow().isoformat() + "Z"
         return web.json_response(result)
+
+    # =========================================================================
+    # AI-221: Stripe Billing endpoints
+    # =========================================================================
+
+    def _get_stripe_client(self):
+        """Return a StripeClient if STRIPE_SECRET_KEY is configured, else None."""
+        try:
+            from billing.stripe_client import StripeClient, StripeNotConfiguredError
+            return StripeClient()
+        except Exception:
+            return None
+
+    def _get_subscription_store(self):
+        """Return the global SubscriptionStore singleton."""
+        try:
+            from billing.subscription_store import get_subscription_store
+            return get_subscription_store()
+        except Exception:
+            return None
+
+    def _get_usage_tracker(self):
+        """Return the global UsageTracker singleton."""
+        try:
+            from billing.usage_tracker import get_usage_tracker
+            return get_usage_tracker()
+        except Exception:
+            return None
+
+    async def get_billing_checkout(self, request: Request) -> Response:
+        """GET /api/billing/checkout - Create Stripe Checkout session.
+
+        Query params:
+            plan: target plan name (builder, team, organization)
+            success_url: URL to redirect after successful payment
+            cancel_url: URL to redirect if user cancels
+
+        Returns:
+            200 with {'url': <checkout_url>} or mock URL if Stripe not configured.
+        """
+        plan = request.rel_url.query.get("plan", "builder")
+        user_id = self._get_billing_user_id(request)
+
+        # Default URLs for local dev
+        base_url = str(request.url.origin())
+        success_url = request.rel_url.query.get(
+            "success_url", f"{base_url}/?billing=success"
+        )
+        cancel_url = request.rel_url.query.get(
+            "cancel_url", f"{base_url}/?billing=canceled"
+        )
+
+        stripe = self._get_stripe_client()
+        if stripe is None:
+            # Stripe not configured - return mock URL
+            return web.json_response({
+                "url": f"#stripe-not-configured",
+                "mock": True,
+                "plan": plan,
+                "message": "Stripe is not configured. Set STRIPE_SECRET_KEY to enable real checkout.",
+            })
+
+        try:
+            from billing.stripe_client import STRIPE_PRICE_IDS
+            price_id = STRIPE_PRICE_IDS.get(plan, "")
+            if not price_id:
+                return web.json_response(
+                    {"error": f"No Stripe price configured for plan '{plan}'"}, status=400
+                )
+
+            # Get existing Stripe customer ID if available
+            sub_store = self._get_subscription_store()
+            customer_id = None
+            if sub_store:
+                rec = sub_store.get_subscription(user_id)
+                if rec:
+                    customer_id = rec.stripe_customer_id
+
+            session = await stripe.create_checkout_session(
+                user_id=user_id,
+                price_id=price_id,
+                success_url=success_url,
+                cancel_url=cancel_url,
+                customer_id=customer_id,
+            )
+            return web.json_response({"url": session.get("url", ""), "session_id": session.get("id")})
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).exception("Stripe checkout error")
+            return web.json_response({"error": str(exc)}, status=500)
+
+    async def get_billing_portal(self, request: Request) -> Response:
+        """GET /api/billing/portal - Create Stripe Customer Portal session.
+
+        Returns:
+            200 with {'url': <portal_url>} or mock URL if Stripe not configured.
+        """
+        user_id = self._get_billing_user_id(request)
+        base_url = str(request.url.origin())
+        return_url = request.rel_url.query.get("return_url", f"{base_url}/")
+
+        stripe = self._get_stripe_client()
+        if stripe is None:
+            return web.json_response({
+                "url": "#stripe-not-configured",
+                "mock": True,
+                "message": "Stripe is not configured. Set STRIPE_SECRET_KEY to enable the customer portal.",
+            })
+
+        sub_store = self._get_subscription_store()
+        if sub_store:
+            rec = sub_store.get_subscription(user_id)
+            if rec and rec.stripe_customer_id:
+                try:
+                    portal = await stripe.create_customer_portal_session(
+                        customer_id=rec.stripe_customer_id,
+                        return_url=return_url,
+                    )
+                    return web.json_response({"url": portal.get("url", "")})
+                except Exception as exc:
+                    return web.json_response({"error": str(exc)}, status=500)
+
+        return web.json_response({
+            "url": "#no-subscription",
+            "mock": True,
+            "message": "No active subscription found. Subscribe first to access the billing portal.",
+        })
+
+    async def get_billing_invoices(self, request: Request) -> Response:
+        """GET /api/billing/invoices - List invoices for current user.
+
+        Returns:
+            200 with {'invoices': [...], 'mock': bool}
+        """
+        user_id = self._get_billing_user_id(request)
+        limit = int(request.rel_url.query.get("limit", "10"))
+
+        stripe = self._get_stripe_client()
+        if stripe is None:
+            # Return mock invoice data
+            from billing.stripe_client import MOCK_INVOICES
+            return web.json_response({
+                "invoices": MOCK_INVOICES[:limit],
+                "mock": True,
+                "message": "Stripe not configured - showing mock invoice data.",
+            })
+
+        sub_store = self._get_subscription_store()
+        if sub_store:
+            rec = sub_store.get_subscription(user_id)
+            if rec and rec.stripe_customer_id:
+                try:
+                    invoices = await stripe.list_invoices(rec.stripe_customer_id, limit=limit)
+                    return web.json_response({"invoices": invoices, "mock": False})
+                except Exception as exc:
+                    return web.json_response({"error": str(exc)}, status=500)
+
+        from billing.stripe_client import MOCK_INVOICES
+        return web.json_response({
+            "invoices": MOCK_INVOICES[:limit],
+            "mock": True,
+            "message": "No subscription found - showing mock invoice data.",
+        })
+
+    async def get_billing_subscription(self, request: Request) -> Response:
+        """GET /api/billing/subscription - Get current subscription status.
+
+        Returns:
+            200 with subscription record dict.
+        """
+        user_id = self._get_billing_user_id(request)
+
+        sub_store = self._get_subscription_store()
+        stripe_configured = self._get_stripe_client() is not None
+
+        if sub_store:
+            rec = sub_store.get_subscription(user_id)
+            if rec:
+                data = rec.to_dict()
+                data["stripe_configured"] = stripe_configured
+                data["timestamp"] = datetime.utcnow().isoformat() + "Z"
+                return web.json_response(data)
+
+        # No subscription record - return explorer defaults
+        from billing.stripe_client import MOCK_SUBSCRIPTION
+        return web.json_response({
+            "user_id": user_id,
+            "plan": "explorer",
+            "status": "free",
+            "stripe_configured": stripe_configured,
+            "stripe_customer_id": None,
+            "stripe_subscription_id": None,
+            "current_period_end": None,
+            "grace_period_end": None,
+            "is_active": True,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        })
+
+    async def post_stripe_webhook(self, request: Request) -> Response:
+        """POST /api/billing/stripe-webhook - Handle Stripe webhook events.
+
+        Verifies Stripe-Signature header and processes the event.
+
+        Returns:
+            200 OK on success, 400 on bad signature, 500 on processing error.
+        """
+        import os
+
+        payload = await request.read()
+        sig_header = request.headers.get("Stripe-Signature", "")
+        webhook_secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+
+        try:
+            from billing.webhook_handler import StripeWebhookHandler
+            from billing.subscription_store import get_subscription_store
+
+            sub_store = get_subscription_store()
+            handler = StripeWebhookHandler(
+                subscription_store=sub_store,
+                webhook_secret=webhook_secret if webhook_secret else None,
+            )
+
+            # Verify signature (skipped in dev mode if no secret set)
+            if not handler.verify_signature(payload, sig_header, webhook_secret):
+                return web.json_response(
+                    {"error": "Invalid webhook signature"}, status=400
+                )
+
+            # Parse event
+            try:
+                event = json.loads(payload)
+            except json.JSONDecodeError:
+                return web.json_response({"error": "Invalid JSON"}, status=400)
+
+            event_type = event.get("type", "")
+            event_data = event.get("data", {})
+
+            result = await handler.handle_event(event_type, event_data)
+            return web.json_response({"received": True, "result": result})
+
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).exception("Webhook processing error")
+            return web.json_response(
+                {"error": "Webhook processing failed", "detail": str(exc)},
+                status=500,
+            )
 
     def run(self):
         """Start the REST API server.
