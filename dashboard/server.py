@@ -96,6 +96,18 @@ _dashboard_agent_status: dict = {}
 # {agent_name: [list of last 20 event dicts]}
 _agent_recent_events: dict = {}
 
+# AI-83: Global Metrics Bar (REQ-METRICS-001) - in-memory global metrics store
+_global_metrics: dict = {
+    "total_sessions": 0,
+    "total_tokens": 0,
+    "total_cost_usd": 0.0,
+    "uptime_seconds": 0,
+    "current_session": 0,
+    "agents_active": 0,
+    "tasks_completed_today": 0,
+    "_server_start_time": None,  # set at server startup
+}
+
 # AI-81: Fallback DEFAULT_MODELS dict (avoids importing claude_agent_sdk)
 _DEFAULT_MODELS = {
     "linear": "haiku",
@@ -417,6 +429,10 @@ class DashboardServer:
             "steps": _default_pipeline_steps,
         }
 
+        # AI-83: Record server start time for uptime calculation (REQ-METRICS-001)
+        if _global_metrics.get("_server_start_time") is None:
+            _global_metrics["_server_start_time"] = datetime.utcnow()
+
         # Structured loggers (AI-186 / REQ-OBS-001)
         self._ws_logger = RequestLogger()
         self._provider_routing_logger = ProviderRoutingLogger()
@@ -534,6 +550,11 @@ class DashboardServer:
 
         # Metrics health endpoint (AI-185 / REQ-REL-003)
         self.app.router.add_get('/api/health/metrics', self.get_metrics_health)
+
+        # AI-83: Global Metrics Bar (REQ-METRICS-001)
+        self.app.router.add_get('/api/metrics/global', self.get_global_metrics)
+        self.app.router.add_post('/api/metrics/global', self.post_global_metrics)
+        self.app.router.add_route('OPTIONS', '/api/metrics/global', self.handle_options)
 
         # OPTIONS for CORS preflight
         self.app.router.add_route('OPTIONS', '/api/metrics', self.handle_options)
@@ -2693,6 +2714,137 @@ class DashboardServer:
         })
 
         return web.json_response(copy.deepcopy(self._pipeline_state))
+
+    # =========================================================================
+    # AI-83: Global Metrics Bar (REQ-METRICS-001)
+    # =========================================================================
+
+    def _get_uptime_seconds(self) -> int:
+        """Return seconds since server started (or 0 if not tracked)."""
+        start = _global_metrics.get("_server_start_time")
+        if start is None:
+            return 0
+        try:
+            delta = (datetime.utcnow() - start).total_seconds()
+            return max(0, int(delta))
+        except Exception:
+            return 0
+
+    def _build_global_metrics_response(self) -> dict:
+        """Build the global metrics response dict from current state.
+
+        Merges the in-memory _global_metrics overrides with the persisted
+        DashboardState (total_sessions, total_tokens, total_cost_usd) and
+        live agent counts from _dashboard_agent_status.
+
+        Returns:
+            dict with all required fields for REQ-METRICS-001
+        """
+        # Load persisted metrics for totals (fallback to 0 on error)
+        try:
+            state = self.store.load()
+            persisted_sessions = state.get("total_sessions", 0)
+            persisted_tokens = state.get("total_tokens", 0)
+            persisted_cost = state.get("total_cost_usd", 0.0)
+            persisted_duration = state.get("total_duration_seconds", 0.0)
+            # current_session is the number of sessions in the list
+            current_session = len(state.get("sessions", []))
+        except Exception:
+            persisted_sessions = 0
+            persisted_tokens = 0
+            persisted_cost = 0.0
+            persisted_duration = 0.0
+            current_session = 0
+
+        # Allow in-memory overrides to take precedence when non-zero
+        total_sessions = _global_metrics.get("total_sessions") or persisted_sessions
+        total_tokens = _global_metrics.get("total_tokens") or persisted_tokens
+        total_cost_usd = _global_metrics.get("total_cost_usd") or persisted_cost
+
+        # agents_active: count agents with status "running"
+        agents_active = sum(
+            1 for info in _dashboard_agent_status.values()
+            if info.get("status") == "running"
+        )
+
+        return {
+            "total_sessions": total_sessions,
+            "total_tokens": total_tokens,
+            "total_cost_usd": round(total_cost_usd, 6),
+            "uptime_seconds": self._get_uptime_seconds(),
+            "current_session": _global_metrics.get("current_session") or current_session,
+            "agents_active": agents_active,
+            "tasks_completed_today": _global_metrics.get("tasks_completed_today", 0),
+        }
+
+    async def get_global_metrics(self, request: Request) -> Response:
+        """GET /api/metrics/global — return global metrics summary (AI-83 / REQ-METRICS-001).
+
+        Response shape:
+            {
+                "total_sessions": 42,
+                "total_tokens": 250000,
+                "total_cost_usd": 12.50,
+                "uptime_seconds": 86400,
+                "current_session": 8,
+                "agents_active": 3,
+                "tasks_completed_today": 15
+            }
+
+        Returns:
+            200 JSON with global metrics.
+        """
+        return web.json_response(self._build_global_metrics_response())
+
+    async def post_global_metrics(self, request: Request) -> Response:
+        """POST /api/metrics/global — increment global metrics (AI-83 / REQ-METRICS-001).
+
+        Request body (all fields optional, each increments the corresponding counter):
+            {
+                "total_sessions": 1,
+                "total_tokens": 500,
+                "total_cost_usd": 0.05,
+                "tasks_completed_today": 1,
+                "current_session": 9,
+                "agents_active": 2
+            }
+
+        Set ``"set"`` key to true to overwrite rather than increment.
+
+        Returns:
+            200 JSON with updated global metrics.
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        mode = "set" if body.get("set") else "increment"
+        incrementable = ("total_sessions", "total_tokens", "total_cost_usd",
+                         "tasks_completed_today", "current_session", "agents_active")
+
+        for field in incrementable:
+            if field in body:
+                val = body[field]
+                if mode == "set":
+                    _global_metrics[field] = val
+                else:
+                    current = _global_metrics.get(field, 0)
+                    if isinstance(current, float) or isinstance(val, float):
+                        _global_metrics[field] = round(float(current) + float(val), 6)
+                    else:
+                        _global_metrics[field] = int(current) + int(val)
+
+        metrics = self._build_global_metrics_response()
+
+        # Broadcast via WebSocket so frontend updates in real-time
+        await self.broadcast_to_websockets({
+            "type": "global_metrics_update",
+            "data": metrics,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        })
+
+        return web.json_response(metrics)
 
     async def websocket_handler(self, request: Request) -> WebSocketResponse:
         """WebSocket endpoint for real-time metrics streaming.
