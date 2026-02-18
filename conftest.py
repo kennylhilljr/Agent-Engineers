@@ -121,3 +121,11 @@ _worktree_orchestrator_hook_path = _WORKTREE_ROOT / "dashboard" / "orchestrator_
 if _worktree_orchestrator_hook_path.exists():
     _load_module_from_file("dashboard.orchestrator_hook", _worktree_orchestrator_hook_path)
 
+# 7. Load dashboard.crash_isolation from the worktree (AI-183 / REQ-REL-001)
+_worktree_crash_isolation_path = _WORKTREE_ROOT / "dashboard" / "crash_isolation.py"
+if _worktree_crash_isolation_path.exists() and "dashboard.crash_isolation" not in sys.modules:
+    try:
+        _load_module_from_file("dashboard.crash_isolation", _worktree_crash_isolation_path)
+    except Exception:
+        pass
+

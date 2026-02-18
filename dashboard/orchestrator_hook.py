@@ -25,13 +25,23 @@ Usage (HTTP-based, when running without a local collector)::
 
     hook.emit_delegation("linear", "Check for new tickets", "Need to fetch issues")
 
+Usage (crash-isolated wrapper for orchestrator callers)::
+
+    from dashboard.crash_isolation import IsolatedDashboardClient
+
+    hook = OrchestratorHook()
+    client = IsolatedDashboardClient(hook)   # or IsolatedDashboardClient(None)
+    client.emit_delegation("coding", "task", "reasoning")  # never raises
+
 The module is intentionally self-contained and imports no heavy dependencies so
 that it can be used in environments where the full dashboard stack is not
 installed.
 
-Design principles:
+Design principles (REQ-REL-001):
 - All public emit_* methods are non-blocking (fire-and-forget via threading)
 - Graceful fallback when no collector or server is attached
+- Dashboard unavailability never propagates exceptions to the orchestrator
+- All delivery errors are caught, logged, and swallowed (crash isolation)
 - Minimal code changes required in the orchestrator
 """
 
