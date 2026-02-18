@@ -119,6 +119,14 @@ if _worktree_structured_logging_path.exists() and "dashboard.structured_logging"
     except Exception:
         pass
 
+# 4i. Load dashboard.compat from the worktree (AI-187 / REQ-COMPAT-001) — before server
+_worktree_compat_path = _WORKTREE_ROOT / "dashboard" / "compat.py"
+if _worktree_compat_path.exists() and "dashboard.compat" not in sys.modules:
+    try:
+        _load_module_from_file("dashboard.compat", _worktree_compat_path)
+    except Exception:
+        pass
+
 # 4b. Override dashboard.server with the worktree's AI-161 version
 _worktree_server_path = _WORKTREE_ROOT / "dashboard" / "server.py"
 if _worktree_server_path.exists():
