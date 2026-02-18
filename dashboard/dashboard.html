@@ -5455,9 +5455,292 @@
                 display: block !important;
             }
         }
+
+        /* ===== AI-226: Onboarding Wizard Styles ===== */
+
+        .ob-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background: rgba(0, 0, 0, 0.75);
+            align-items: center;
+            justify-content: center;
+            animation: ob-fade-in 0.25s ease;
+        }
+
+        @keyframes ob-fade-in {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+        }
+
+        .ob-modal {
+            background: var(--bg-secondary, #161b22);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: 16px;
+            padding: 36px 40px 28px;
+            width: min(560px, 94vw);
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+            color: var(--text-primary, #e6edf3);
+            animation: ob-slide-up 0.3s ease;
+            position: relative;
+        }
+
+        @keyframes ob-slide-up {
+            from { transform: translateY(24px); opacity: 0; }
+            to   { transform: translateY(0);    opacity: 1; }
+        }
+
+        /* Progress dots */
+        .ob-progress {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-bottom: 28px;
+        }
+
+        .ob-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--border-color, #30363d);
+            transition: background 0.25s, transform 0.25s;
+        }
+
+        .ob-dot-active {
+            background: var(--accent, #58a6ff);
+            transform: scale(1.3);
+        }
+
+        .ob-dot-done {
+            background: #3fb950;
+        }
+
+        /* Step content */
+        .ob-step-panel {
+            text-align: center;
+        }
+
+        .ob-step-icon {
+            font-size: 2.5rem;
+            margin-bottom: 12px;
+            display: block;
+        }
+
+        .ob-step-title {
+            font-size: 1.35rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: var(--text-primary, #e6edf3);
+        }
+
+        .ob-step-desc {
+            font-size: 0.92rem;
+            color: var(--text-secondary, #8b949e);
+            margin-bottom: 20px;
+            line-height: 1.55;
+        }
+
+        .ob-optional {
+            font-size: 0.75rem;
+            font-weight: 400;
+            color: var(--text-secondary, #8b949e);
+        }
+
+        /* Plan cards */
+        .ob-plan-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 8px;
+            text-align: left;
+        }
+
+        .ob-plan-card {
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: 10px;
+            padding: 14px 16px;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+            background: transparent;
+        }
+
+        .ob-plan-card:hover {
+            border-color: var(--accent, #58a6ff);
+            background: rgba(88, 166, 255, 0.06);
+        }
+
+        .ob-plan-card.selected {
+            border-color: var(--accent, #58a6ff);
+            background: rgba(88, 166, 255, 0.12);
+        }
+
+        .ob-plan-name {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: var(--text-primary, #e6edf3);
+        }
+
+        /* Form elements */
+        .ob-label {
+            display: block;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-secondary, #8b949e);
+            margin-bottom: 6px;
+            text-align: left;
+        }
+
+        .ob-input {
+            width: 100%;
+            background: var(--bg-primary, #0d1117);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: 8px;
+            padding: 9px 12px;
+            font-size: 0.9rem;
+            color: var(--text-primary, #e6edf3);
+            margin-bottom: 16px;
+            outline: none;
+            transition: border-color 0.2s;
+            box-sizing: border-box;
+        }
+
+        .ob-input:focus {
+            border-color: var(--accent, #58a6ff);
+        }
+
+        .ob-select {
+            appearance: none;
+            cursor: pointer;
+        }
+
+        /* Demo log */
+        .ob-demo-log {
+            background: var(--bg-primary, #0d1117);
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: 8px;
+            padding: 14px;
+            height: 160px;
+            overflow-y: auto;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 0.78rem;
+            text-align: left;
+            margin-bottom: 12px;
+        }
+
+        .ob-demo-line {
+            padding: 3px 0;
+            color: #3fb950;
+            animation: ob-line-appear 0.2s ease;
+        }
+
+        @keyframes ob-line-appear {
+            from { opacity: 0; transform: translateX(-4px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+
+        .ob-celebration {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #3fb950;
+            padding: 12px;
+            border-radius: 8px;
+            background: rgba(63, 185, 80, 0.1);
+            border: 1px solid rgba(63, 185, 80, 0.3);
+            line-height: 1.6;
+        }
+
+        .ob-dashboard-link {
+            display: block;
+            margin-top: 8px;
+            color: var(--accent, #58a6ff);
+            text-decoration: none;
+            font-size: 0.88rem;
+        }
+
+        .ob-dashboard-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Navigation */
+        .ob-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-color, #30363d);
+        }
+
+        .ob-nav-right {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .ob-btn {
+            padding: 9px 20px;
+            border-radius: 8px;
+            border: none;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: background 0.15s, opacity 0.15s;
+        }
+
+        .ob-btn-primary {
+            background: var(--accent, #58a6ff);
+            color: #0d1117;
+        }
+
+        .ob-btn-primary:hover {
+            opacity: 0.88;
+        }
+
+        .ob-btn-secondary {
+            background: var(--border-color, #30363d);
+            color: var(--text-primary, #e6edf3);
+        }
+
+        .ob-btn-secondary:hover {
+            background: #444c56;
+        }
+
+        .ob-btn-ghost {
+            background: transparent;
+            color: var(--text-secondary, #8b949e);
+        }
+
+        .ob-btn-ghost:hover {
+            color: var(--text-primary, #e6edf3);
+        }
+
+        /* Settings "Restart Setup Wizard" button */
+        .ob-restart-btn {
+            background: transparent;
+            border: 1px solid var(--border-color, #30363d);
+            color: var(--text-secondary, #8b949e);
+            border-radius: 8px;
+            padding: 7px 14px;
+            font-size: 0.82rem;
+            cursor: pointer;
+            transition: border-color 0.2s, color 0.2s;
+        }
+
+        .ob-restart-btn:hover {
+            border-color: var(--accent, #58a6ff);
+            color: var(--accent, #58a6ff);
+        }
     </style>
 </head>
 <body>
+    <!-- AI-226: Onboarding Wizard Modal Overlay: built entirely by onboarding.js -->
+
     <!-- AI-228: Pull-to-refresh placeholder (CSS only) -->
     <div class="ptr-indicator" id="ptr-indicator" aria-hidden="true">&#8595; Pull to refresh</div>
 
@@ -5890,6 +6173,17 @@
                     GitHub Access
                 </h2>
                 <button class="leaderboard-refresh-btn" id="github-refresh-btn" onclick="fetchGithubRepo()" aria-label="Refresh GitHub info">&#8635; Refresh</button>
+            </div>
+
+            <!-- AI-226: Settings > Restart Setup Wizard -->
+            <div style="margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border-color, #30363d);">
+                <button
+                    class="ob-restart-btn"
+                    id="ob-restart-wizard-btn"
+                    data-testid="ob-restart-wizard-btn"
+                    onclick="if(window.onboardingWizard){window.onboardingWizard.reset();window.onboardingWizard.show();}"
+                    aria-label="Restart Setup Wizard"
+                >&#9881; Restart Setup Wizard</button>
             </div>
 
             <!-- Repo info bar -->
@@ -10581,6 +10875,417 @@
             };
         }
     })();
+    </script>
+
+    <!-- AI-226: Onboarding Wizard (sourced from dashboard/onboarding.js) -->
+    <script>
+    // ---- BEGIN onboarding.js (AI-226) ----
+    (function (global) {
+        'use strict';
+
+        var STORAGE_KEY_STEP = 'onboarding_step';
+        var STORAGE_KEY_COMPLETE = 'onboarding_complete';
+        var STORAGE_KEY_DATA = 'onboarding_data';
+        var TOTAL_STEPS = 5;
+
+        var PLAN_LABELS = {
+            explorer: 'Explorer \u2014 Free',
+            builder: 'Builder \u2014 $29/mo',
+            team: 'Team \u2014 $99/mo',
+            scale: 'Scale \u2014 Custom'
+        };
+
+        var MODEL_OPTIONS = [
+            { value: 'claude-haiku-3-5', label: 'Claude Haiku (Default \u2013 Free)' },
+            { value: 'claude-sonnet-4-5', label: 'Claude Sonnet' },
+            { value: 'claude-opus-4-6', label: 'Claude Opus' }
+        ];
+
+        var DEMO_STEPS = [
+            'Fetching ticket AI-001: "Add pagination to API"...',
+            'Analyzing codebase structure...',
+            'Planning implementation (3 files)...',
+            'Writing code changes...',
+            'Running tests... (12/12 passing)',
+            'Creating pull request...',
+            'Done! PR #42 opened successfully.'
+        ];
+
+        function OnboardingWizard(options) {
+            options = options || {};
+            this._storage = options.storage || (typeof localStorage !== 'undefined' ? localStorage : null);
+            this._document = options.document || (typeof document !== 'undefined' ? document : null);
+            this._overlayId = 'onboarding-overlay';
+            this._demoTimer = null;
+            this._demoIndex = 0;
+        }
+
+        OnboardingWizard.prototype.getCurrentStep = function () {
+            if (!this._storage) return 1;
+            var val = parseInt(this._storage.getItem(STORAGE_KEY_STEP), 10);
+            if (isNaN(val) || val < 1 || val > TOTAL_STEPS) return 1;
+            return val;
+        };
+
+        OnboardingWizard.prototype.setCurrentStep = function (step) {
+            if (!this._storage) return;
+            this._storage.setItem(STORAGE_KEY_STEP, String(step));
+        };
+
+        OnboardingWizard.prototype.isComplete = function () {
+            if (!this._storage) return false;
+            return this._storage.getItem(STORAGE_KEY_COMPLETE) === 'true';
+        };
+
+        OnboardingWizard.prototype.markComplete = function () {
+            if (!this._storage) return;
+            this._storage.setItem(STORAGE_KEY_COMPLETE, 'true');
+            this._storage.removeItem(STORAGE_KEY_STEP);
+        };
+
+        OnboardingWizard.prototype.reset = function () {
+            if (!this._storage) return;
+            this._storage.removeItem(STORAGE_KEY_COMPLETE);
+            this._storage.removeItem(STORAGE_KEY_STEP);
+            this._storage.removeItem(STORAGE_KEY_DATA);
+        };
+
+        OnboardingWizard.prototype.saveData = function (data) {
+            if (!this._storage) return;
+            try {
+                var existing = this.loadData();
+                var merged = Object.assign({}, existing, data);
+                this._storage.setItem(STORAGE_KEY_DATA, JSON.stringify(merged));
+            } catch (e) { /* ignore quota errors */ }
+        };
+
+        OnboardingWizard.prototype.loadData = function () {
+            if (!this._storage) return {};
+            try {
+                var raw = this._storage.getItem(STORAGE_KEY_DATA);
+                return raw ? JSON.parse(raw) : {};
+            } catch (e) {
+                return {};
+            }
+        };
+
+        OnboardingWizard.prototype.shouldShow = function () {
+            return !this.isComplete();
+        };
+
+        OnboardingWizard.prototype.init = function () {
+            if (!this.shouldShow()) return;
+            this.show();
+        };
+
+        OnboardingWizard.prototype.show = function () {
+            var doc = this._document;
+            if (!doc) return;
+            var overlay = doc.getElementById(this._overlayId);
+            if (!overlay) {
+                overlay = this._buildOverlay(doc);
+                doc.body.appendChild(overlay);
+            }
+            overlay.style.display = 'flex';
+            overlay.setAttribute('aria-hidden', 'false');
+            this._renderStep(this.getCurrentStep());
+        };
+
+        OnboardingWizard.prototype.hide = function () {
+            var doc = this._document;
+            if (!doc) return;
+            var overlay = doc.getElementById(this._overlayId);
+            if (overlay) {
+                overlay.style.display = 'none';
+                overlay.setAttribute('aria-hidden', 'true');
+            }
+            this._stopDemo();
+        };
+
+        OnboardingWizard.prototype.nextStep = function () {
+            var step = this.getCurrentStep();
+            this._collectStepData(step);
+            if (step < TOTAL_STEPS) {
+                step += 1;
+                this.setCurrentStep(step);
+                this._renderStep(step);
+            } else {
+                this._finish();
+            }
+        };
+
+        OnboardingWizard.prototype.prevStep = function () {
+            var step = this.getCurrentStep();
+            if (step > 1) {
+                step -= 1;
+                this.setCurrentStep(step);
+                this._renderStep(step);
+            }
+        };
+
+        OnboardingWizard.prototype.skipStep = function () {
+            var step = this.getCurrentStep();
+            if (step < TOTAL_STEPS) {
+                step += 1;
+                this.setCurrentStep(step);
+                this._renderStep(step);
+            } else {
+                this._finish();
+            }
+        };
+
+        OnboardingWizard.prototype._finish = function () {
+            this.markComplete();
+            this.hide();
+            this._notifyServer();
+        };
+
+        OnboardingWizard.prototype._notifyServer = function () {
+            try {
+                if (typeof fetch !== 'undefined') {
+                    fetch('/api/onboarding/complete', { method: 'GET' }).catch(function () {});
+                }
+            } catch (e) { /* ignore */ }
+        };
+
+        OnboardingWizard.prototype._collectStepData = function (step) {
+            var doc = this._document;
+            if (!doc) return;
+            var data = {};
+            if (step === 1) {
+                var selected = doc.querySelector('.ob-plan-card.selected');
+                if (selected) data.plan = selected.getAttribute('data-plan');
+            } else if (step === 2) {
+                var repoInput = doc.getElementById('ob-repo-url');
+                if (repoInput) data.repoUrl = repoInput.value;
+                var branchInput = doc.getElementById('ob-branch');
+                if (branchInput) data.branch = branchInput.value || 'main';
+            } else if (step === 3) {
+                var apiKeyInput = doc.getElementById('ob-linear-api-key');
+                if (apiKeyInput) data.linearApiKey = apiKeyInput.value;
+                var projectInput = doc.getElementById('ob-linear-project');
+                if (projectInput) data.linearProject = projectInput.value;
+            } else if (step === 4) {
+                var ticketInput = doc.getElementById('ob-ticket');
+                if (ticketInput) data.ticket = ticketInput.value;
+                var modelSelect = doc.getElementById('ob-model');
+                if (modelSelect) data.model = modelSelect.value;
+            }
+            if (Object.keys(data).length > 0) {
+                this.saveData(data);
+            }
+        };
+
+        OnboardingWizard.prototype._renderStep = function (step) {
+            var doc = this._document;
+            if (!doc) return;
+            this._stopDemo();
+            for (var i = 1; i <= TOTAL_STEPS; i++) {
+                var dot = doc.getElementById('ob-dot-' + i);
+                if (dot) {
+                    dot.className = 'ob-dot' + (i === step ? ' ob-dot-active' : '') + (i < step ? ' ob-dot-done' : '');
+                }
+            }
+            var panels = doc.querySelectorAll('.ob-step-panel');
+            for (var p = 0; p < panels.length; p++) {
+                panels[p].style.display = 'none';
+            }
+            var active = doc.getElementById('ob-step-' + step);
+            if (active) active.style.display = 'block';
+            var backBtn = doc.getElementById('ob-btn-back');
+            var skipBtn = doc.getElementById('ob-btn-skip');
+            var nextBtn = doc.getElementById('ob-btn-next');
+            if (backBtn) backBtn.style.display = step > 1 ? 'inline-flex' : 'none';
+            if (skipBtn) skipBtn.style.display = step > 1 ? 'inline-flex' : 'none';
+            if (nextBtn) {
+                if (step === TOTAL_STEPS) {
+                    nextBtn.textContent = 'Go to Dashboard';
+                } else if (step === 4) {
+                    nextBtn.textContent = 'Run your first ticket';
+                } else if (step === 1) {
+                    nextBtn.textContent = 'Start for free';
+                } else {
+                    nextBtn.textContent = 'Next';
+                }
+            }
+            this._restoreStepData(step);
+            if (step === TOTAL_STEPS) {
+                this._startDemo();
+            }
+        };
+
+        OnboardingWizard.prototype._restoreStepData = function (step) {
+            var doc = this._document;
+            var data = this.loadData();
+            if (!doc || !data) return;
+            if (step === 1 && data.plan) {
+                var cards = doc.querySelectorAll('.ob-plan-card');
+                for (var c = 0; c < cards.length; c++) {
+                    if (cards[c].getAttribute('data-plan') === data.plan) {
+                        cards[c].classList.add('selected');
+                    } else {
+                        cards[c].classList.remove('selected');
+                    }
+                }
+            } else if (step === 2) {
+                if (data.repoUrl) { var repoInput = doc.getElementById('ob-repo-url'); if (repoInput) repoInput.value = data.repoUrl; }
+                if (data.branch) { var branchInput = doc.getElementById('ob-branch'); if (branchInput) branchInput.value = data.branch; }
+            } else if (step === 3) {
+                if (data.linearApiKey) { var apiKeyInput = doc.getElementById('ob-linear-api-key'); if (apiKeyInput) apiKeyInput.value = data.linearApiKey; }
+                if (data.linearProject) { var projectInput = doc.getElementById('ob-linear-project'); if (projectInput) projectInput.value = data.linearProject; }
+            } else if (step === 4) {
+                if (data.ticket) { var ticketInput = doc.getElementById('ob-ticket'); if (ticketInput) ticketInput.value = data.ticket; }
+                if (data.model) { var modelSelect = doc.getElementById('ob-model'); if (modelSelect) modelSelect.value = data.model; }
+            }
+        };
+
+        OnboardingWizard.prototype._startDemo = function () {
+            var self = this;
+            var doc = this._document;
+            if (!doc) return;
+            var log = doc.getElementById('ob-demo-log');
+            var celebration = doc.getElementById('ob-celebration');
+            if (!log) return;
+            log.innerHTML = '';
+            if (celebration) celebration.style.display = 'none';
+            self._demoIndex = 0;
+            function tick() {
+                if (self._demoIndex >= DEMO_STEPS.length) {
+                    if (celebration) celebration.style.display = 'block';
+                    return;
+                }
+                var line = doc.createElement('div');
+                line.className = 'ob-demo-line';
+                line.textContent = DEMO_STEPS[self._demoIndex];
+                log.appendChild(line);
+                log.scrollTop = log.scrollHeight;
+                self._demoIndex += 1;
+                self._demoTimer = setTimeout(tick, 800);
+            }
+            self._demoTimer = setTimeout(tick, 400);
+        };
+
+        OnboardingWizard.prototype._stopDemo = function () {
+            if (this._demoTimer) { clearTimeout(this._demoTimer); this._demoTimer = null; }
+            this._demoIndex = 0;
+        };
+
+        OnboardingWizard.prototype._buildOverlay = function (doc) {
+            var self = this;
+            var overlay = doc.createElement('div');
+            overlay.id = this._overlayId;
+            overlay.className = 'ob-overlay';
+            overlay.setAttribute('role', 'dialog');
+            overlay.setAttribute('aria-modal', 'true');
+            overlay.setAttribute('aria-label', 'Setup Wizard');
+            overlay.setAttribute('data-testid', 'onboarding-overlay');
+            var modal = doc.createElement('div');
+            modal.className = 'ob-modal';
+            modal.innerHTML = this._buildModalHTML();
+            overlay.appendChild(modal);
+            setTimeout(function () {
+                var backBtn = doc.getElementById('ob-btn-back');
+                var skipBtn = doc.getElementById('ob-btn-skip');
+                var nextBtn = doc.getElementById('ob-btn-next');
+                if (backBtn) backBtn.addEventListener('click', function () { self.prevStep(); });
+                if (skipBtn) skipBtn.addEventListener('click', function () { self.skipStep(); });
+                if (nextBtn) nextBtn.addEventListener('click', function () { self.nextStep(); });
+                var planCards = doc.querySelectorAll('.ob-plan-card');
+                for (var i = 0; i < planCards.length; i++) {
+                    (function (card) {
+                        card.addEventListener('click', function () {
+                            var allCards = doc.querySelectorAll('.ob-plan-card');
+                            for (var j = 0; j < allCards.length; j++) { allCards[j].classList.remove('selected'); }
+                            card.classList.add('selected');
+                        });
+                    })(planCards[i]);
+                }
+            }, 0);
+            return overlay;
+        };
+
+        OnboardingWizard.prototype._buildModalHTML = function () {
+            var modelOptionsHTML = MODEL_OPTIONS.map(function (m) {
+                return '<option value="' + m.value + '"' + (m.value === 'claude-haiku-3-5' ? ' selected' : '') + '>' + m.label + '</option>';
+            }).join('');
+            var planCardsHTML = Object.keys(PLAN_LABELS).map(function (key) {
+                return '<div class="ob-plan-card' + (key === 'explorer' ? ' selected' : '') + '" data-plan="' + key + '" role="button" tabindex="0"><div class="ob-plan-name">' + PLAN_LABELS[key] + '</div></div>';
+            }).join('');
+            return '<div class="ob-progress">' +
+                '<div id="ob-dot-1" class="ob-dot ob-dot-active" aria-label="Step 1"></div>' +
+                '<div id="ob-dot-2" class="ob-dot" aria-label="Step 2"></div>' +
+                '<div id="ob-dot-3" class="ob-dot" aria-label="Step 3"></div>' +
+                '<div id="ob-dot-4" class="ob-dot" aria-label="Step 4"></div>' +
+                '<div id="ob-dot-5" class="ob-dot" aria-label="Step 5"></div>' +
+                '</div>' +
+                '<div id="ob-step-1" class="ob-step-panel">' +
+                '<div class="ob-step-icon">&#128640;</div>' +
+                '<h2 class="ob-step-title">Welcome to Agent Dashboard</h2>' +
+                '<p class="ob-step-desc">Your AI-powered engineering workflow starts here. Pick a plan to get started.</p>' +
+                '<div class="ob-plan-grid">' + planCardsHTML + '</div>' +
+                '</div>' +
+                '<div id="ob-step-2" class="ob-step-panel" style="display:none">' +
+                '<div class="ob-step-icon">&#128279;</div>' +
+                '<h2 class="ob-step-title">Connect Repository</h2>' +
+                '<p class="ob-step-desc">Enter your GitHub repository URL to let agents create PRs and commits.</p>' +
+                '<label class="ob-label" for="ob-repo-url">GitHub Repository URL</label>' +
+                '<input id="ob-repo-url" class="ob-input" type="url" placeholder="https://github.com/org/repo" autocomplete="off" />' +
+                '<label class="ob-label" for="ob-branch">Default Branch</label>' +
+                '<input id="ob-branch" class="ob-input" type="text" placeholder="main" value="main" autocomplete="off" />' +
+                '</div>' +
+                '<div id="ob-step-3" class="ob-step-panel" style="display:none">' +
+                '<div class="ob-step-icon">&#9889;</div>' +
+                '<h2 class="ob-step-title">Connect Linear <span class="ob-optional">(Optional)</span></h2>' +
+                '<p class="ob-step-desc">Provide your Linear API key to let agents pick up tickets automatically.</p>' +
+                '<label class="ob-label" for="ob-linear-api-key">Linear API Key</label>' +
+                '<input id="ob-linear-api-key" class="ob-input" type="password" placeholder="lin_api_..." autocomplete="off" />' +
+                '<label class="ob-label" for="ob-linear-project">Project Name</label>' +
+                '<input id="ob-linear-project" class="ob-input" type="text" placeholder="My Project" autocomplete="off" />' +
+                '</div>' +
+                '<div id="ob-step-4" class="ob-step-panel" style="display:none">' +
+                '<div class="ob-step-icon">&#128736;</div>' +
+                '<h2 class="ob-step-title">Configure First Agent Run</h2>' +
+                '<p class="ob-step-desc">Pick a sample ticket and model for your first automated run.</p>' +
+                '<label class="ob-label" for="ob-ticket">Sample Ticket</label>' +
+                '<input id="ob-ticket" class="ob-input" type="text" value="AI-001: Add pagination to the REST API" autocomplete="off" />' +
+                '<label class="ob-label" for="ob-model">Model</label>' +
+                '<select id="ob-model" class="ob-input ob-select">' + modelOptionsHTML + '</select>' +
+                '</div>' +
+                '<div id="ob-step-5" class="ob-step-panel" style="display:none">' +
+                '<div class="ob-step-icon">&#127775;</div>' +
+                '<h2 class="ob-step-title">Watch It Work</h2>' +
+                '<p class="ob-step-desc">Your agent is running! Here\'s a live preview of what it does.</p>' +
+                '<div id="ob-demo-log" class="ob-demo-log" aria-live="polite"></div>' +
+                '<div id="ob-celebration" class="ob-celebration" style="display:none">&#127881; Agent run complete! Your dashboard is ready.' +
+                '<a href="/" class="ob-dashboard-link">Go to Dashboard &rarr;</a></div>' +
+                '</div>' +
+                '<div class="ob-nav">' +
+                '<button id="ob-btn-back" class="ob-btn ob-btn-secondary" style="display:none" type="button">&#8592; Back</button>' +
+                '<div class="ob-nav-right">' +
+                '<button id="ob-btn-skip" class="ob-btn ob-btn-ghost" style="display:none" type="button">Skip</button>' +
+                '<button id="ob-btn-next" class="ob-btn ob-btn-primary" type="button">Start for free</button>' +
+                '</div></div>';
+        };
+
+        function initOnboarding(options) {
+            var wizard = new OnboardingWizard(options);
+            global.onboardingWizard = wizard;
+            return wizard;
+        }
+
+        global.OnboardingWizard = OnboardingWizard;
+        global.initOnboarding = initOnboarding;
+
+    }(typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : {})));
+    // ---- END onboarding.js (AI-226) ----
+
+    // Initialise on DOM ready
+    document.addEventListener('DOMContentLoaded', function () {
+        if (typeof initOnboarding === 'function') {
+            var wizard = initOnboarding();
+            wizard.init();
+        }
+    });
     </script>
 </body>
 </html>

@@ -651,6 +651,12 @@ class DashboardServer:
         self.app.router.add_route('OPTIONS', '/api/usage/record', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/usage/reset', self.handle_options)
 
+        # AI-226: Onboarding endpoints
+        self.app.router.add_get('/api/onboarding/status', self.get_onboarding_status)
+        self.app.router.add_get('/api/onboarding/complete', self.get_onboarding_complete)
+        self.app.router.add_route('OPTIONS', '/api/onboarding/status', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/onboarding/complete', self.handle_options)
+
     async def handle_options(self, request: Request) -> Response:
         """Handle CORS preflight OPTIONS requests."""
         return web.Response(status=204)
@@ -3596,6 +3602,57 @@ class DashboardServer:
 
         usage = self._usage_meter.reset_period(str(user_id))
         return web.json_response(usage.to_dict())
+
+    # -------------------------------------------------------------------------
+    # AI-226: Onboarding endpoints
+    # -------------------------------------------------------------------------
+
+    async def get_onboarding_status(self, request: Request) -> Response:
+        """GET /api/onboarding/status — check environment setup completeness (AI-226).
+
+        Inspects environment variables to report which integrations are configured.
+
+        Response:
+            {
+                "github_connected": bool,
+                "linear_connected": bool,
+                "api_key_set": bool,
+                "setup_complete": bool
+            }
+
+        Returns:
+            200 JSON with setup status.
+        """
+        github_connected = bool(os.environ.get('GITHUB_TOKEN', '').strip())
+        linear_connected = bool(os.environ.get('LINEAR_API_KEY', '').strip())
+        api_key_set = bool(os.environ.get('ANTHROPIC_API_KEY', '').strip())
+        setup_complete = github_connected and linear_connected and api_key_set
+
+        return web.json_response({
+            'github_connected': github_connected,
+            'linear_connected': linear_connected,
+            'api_key_set': api_key_set,
+            'setup_complete': setup_complete,
+        })
+
+    async def get_onboarding_complete(self, request: Request) -> Response:
+        """GET /api/onboarding/complete — mark onboarding done server-side (AI-226).
+
+        This is a fire-and-forget acknowledgement endpoint called by the frontend
+        when the user finishes (or skips) the onboarding wizard.  Currently it
+        simply returns a success response; in future it could persist state to a
+        user profile store.
+
+        Response:
+            {"status": "ok", "message": "Onboarding marked complete"}
+
+        Returns:
+            200 JSON acknowledgement.
+        """
+        return web.json_response({
+            'status': 'ok',
+            'message': 'Onboarding marked complete',
+        })
 
     def run(self):
         """Start the HTTP server with WebSocket support.
