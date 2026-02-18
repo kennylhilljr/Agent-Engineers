@@ -48,6 +48,11 @@ for _sub in ["logging_config", "metrics", "metrics_store", "collector"]:
             except Exception:
                 pass  # best-effort; some sub-modules may have further deps
 
+# 3a. Override dashboard.metrics_store with the worktree's AI-185 version
+_worktree_metrics_store_path = _WORKTREE_ROOT / "dashboard" / "metrics_store.py"
+if _worktree_metrics_store_path.exists():
+    _load_module_from_file("dashboard.metrics_store", _worktree_metrics_store_path)
+
 # 3. Override dashboard.collector with the worktree's AI-171 version
 _worktree_collector_path = _WORKTREE_ROOT / "dashboard" / "collector.py"
 if _worktree_collector_path.exists():

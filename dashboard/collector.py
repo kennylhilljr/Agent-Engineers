@@ -625,6 +625,51 @@ class AgentMetricsCollector:
         """
         return self.store.load()
 
+    def is_healthy(self) -> bool:
+        """Return True if the metrics file is present and contains valid JSON.
+
+        This implements the health check required by REQ-REL-003.  A collector
+        is considered *healthy* when ``.agent_metrics.json`` exists AND can be
+        parsed as valid JSON.  A missing file or corrupted JSON both result in
+        False.
+
+        Returns:
+            True when metrics file exists and is valid JSON, False otherwise.
+        """
+        metrics_path = self.store.metrics_path
+        if not metrics_path.exists():
+            return False
+        try:
+            import json as _json
+            with open(metrics_path, "r", encoding="utf-8") as fh:
+                data = _json.load(fh)
+            return self.store._validate_state(data)
+        except Exception:
+            return False
+
+    def get_degradation_reason(self) -> Optional[str]:
+        """Return None when healthy; otherwise a string describing the problem.
+
+        This implements REQ-REL-003 graceful degradation reporting.
+
+        Returns:
+            None   – collector is healthy (metrics file exists and is valid).
+            str    – human-readable reason for degradation (file missing or
+                     JSON corrupted).
+        """
+        metrics_path = self.store.metrics_path
+        if not metrics_path.exists():
+            return f"Metrics file missing: {metrics_path}"
+        try:
+            import json as _json
+            with open(metrics_path, "r", encoding="utf-8") as fh:
+                data = _json.load(fh)
+            if not self.store._validate_state(data):
+                return f"Metrics file has invalid structure: {metrics_path}"
+            return None
+        except Exception as exc:
+            return f"Metrics file corrupted (invalid JSON): {metrics_path} — {exc}"
+
     def subscribe(self, callback: Callable[[str, AgentEvent], None]) -> None:
         """Subscribe to agent event notifications.
 
