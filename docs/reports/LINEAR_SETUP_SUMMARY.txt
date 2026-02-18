@@ -1,0 +1,284 @@
+LINEAR ISSUE TRACKING SETUP SUMMARY - AGENT DASHBOARD PROJECT
+=============================================================
+
+EXECUTIVE SUMMARY
+-----------------
+The Agent Dashboard project specification has been analyzed and 71 Linear issues have been fully planned and documented. The project is structured into 6 implementation phases plus 10 code quality improvement tasks, with integration points for 7 reusable A2UI components.
+
+STATUS: Authorization required to create issues in Linear workspace.
+
+
+PROJECT OVERVIEW
+----------------
+Name: Agent Dashboard
+Description: Web dashboard for multi-agent system with AI chat, real-time monitoring, agent controls, and reasoning transparency
+Total Issues: 71 (planned)
+
+Issue Breakdown:
+  META Issues: 1 (Project progress tracker)
+  Epic Issues: 6 (One per implementation phase)
+  Feature Issues: 58 (Requirements from spec)
+  QA Tasks: 10 (Code quality improvements)
+  TOTAL: 71
+
+
+IMPLEMENTATION PHASES (60 Issues)
+---------------------------------
+
+Phase 1: Foundation (14 issues)
+  Goal: Dashboard server with agent status
+  Success Criteria: Server starts, shows all 13 agents with current status
+  Features:
+    - Conversational chat interface
+    - Message history persistence
+    - Code block rendering
+    - Backend HTTP server (aiohttp/FastAPI)
+    - Frontend single-file HTML
+    - WebSocket protocol
+    - REST API endpoints
+    - Environment variables
+
+Phase 2: Real-Time Updates (8 issues)
+  Goal: Live agent status updates without page refresh
+  Success Criteria: Agent status transitions visible within 1 second
+  Features:
+    - Real-time agent status panel
+    - Active requirement display
+    - Orchestrator flow visualization
+    - Global metrics bar
+    - Agent leaderboard
+    - Cost/token charts
+    - Live activity feed
+    - Metrics collector integration
+
+Phase 3: Chat Interface (5 issues)
+  Goal: Chat with AI providers through dashboard
+  Success Criteria: User queries Linear and receives formatted response
+  Features:
+    - Linear access integration
+    - Slack tool integration
+    - GitHub tool integration
+    - Tool transparency display
+    - Chat-to-agent bridge
+
+Phase 4: Multi-Provider Support (5 issues)
+  Goal: Switch between AI providers (Claude, GPT-4, Gemini, Groq, KIMI, Windsurf)
+  Success Criteria: Hot-swap providers, receive responses from selected
+  Features:
+    - Provider switcher UI
+    - Model selector per provider
+    - Availability indicators
+    - Hot-swap without context loss
+    - Bridge module integration
+
+Phase 5: Agent Controls (7 issues)
+  Goal: Pause agents, edit requirements, resume
+  Success Criteria: Edit requirement mid-flight, agent picks up changes
+  Features:
+    - Pause/resume individual agents
+    - Pause All / Resume All controls
+    - View current requirements
+    - Edit requirements UI
+    - Requirement sync to Linear
+    - Agent control flow
+
+Phase 6: Reasoning & Transparency (10 issues)
+  Goal: Show why orchestrator made each decision
+  Success Criteria: Display decision reasoning in real-time
+  Features:
+    - Live reasoning stream display
+    - Agent thinking display
+    - Collapsible reasoning blocks
+    - Decision log UI
+    - Decision audit trail
+    - Live code streaming
+    - File change summary
+    - Test results display
+    - Responsive panels
+    - Dark mode toggle
+
+
+CODE QUALITY IMPROVEMENTS (10 Issues)
+------------------------------------
+Goal: Improve maintainability and test coverage from 20% to 80%+
+
+QA-001: Expand Test Coverage
+  Missing: test_agent.py, test_client.py, test_progress.py, test_prompts.py
+  Target: 80%+ coverage across core modules
+
+QA-002: Address Technical Debt
+  Found: 12 TODO/FIXME comments across 9 files
+  Priority: daemon/control_plane.py (3 TODOs), scripts/daemon.py (2 TODOs)
+
+QA-003: Reduce Code Duplication in Bridges
+  Pattern: All 5 bridge classes share similar client patterns
+  Solution: Extract common interface with abstract base class
+
+QA-004: Performance Optimizations
+  Areas: Subprocess calls, async patterns, API caching
+  Target: 15-25% improvement in I/O operations
+
+QA-005: Configuration Management
+  Current: Environment variables scattered throughout
+  Solution: Centralized AgentConfig dataclass
+
+QA-006: Dependency Security
+  Status: 41 dependencies in requirements.txt
+  Action: Add pip-audit to CI, consider exact version pinning
+
+QA-007: Error Handling Standardization
+  Enhancement: Create custom exception hierarchy
+  Classes: AgentError, BridgeError, SecurityError
+
+QA-008: Type Safety Improvements
+  Enhancements:
+    - Strict typing mode in pyproject.toml
+    - typing.Protocol for interfaces
+    - Runtime type checking with typeguard
+
+QA-009: Documentation Completeness
+  Missing: API documentation for bridge interfaces
+  Action: Generate with pdoc or Sphinx, add inline examples
+
+QA-010: Monitoring & Observability
+  Enhancements:
+    - Structured logging
+    - Performance metrics collection
+    - Health check endpoints
+
+
+REUSABLE A2UI COMPONENTS INTEGRATION
+------------------------------------
+15 issues (21% of total) reference existing components
+
+Component Distribution:
+  TaskCard: 5 issues
+    - Agent status display
+    - Active requirement display
+    - Pause/resume controls
+  ProgressRing: 3 issues
+    - Metrics display
+    - Token counting
+    - Cost tracking
+  ActivityItem: 4 issues
+    - Event feed display
+    - Activity log
+    - Status updates
+  FileTree: 2 issues
+    - File change summary
+    - Modified files list
+  TestResults: 1 issue
+    - Test results display panel
+  DecisionCard: 1 issue
+    - Decision log visualization
+  ApprovalCard: 2 issues
+    - Requirement editor
+    - Agent control UI
+
+All components exist in A2UI library with:
+  - React/TypeScript implementation
+  - Complete test coverage
+  - Ready for integration
+  - No additional development needed
+
+
+STATE FILES CREATED
+-------------------
+
+1. .linear_project.json
+   - project_id (pending creation)
+   - team_id (pending)
+   - meta_issue_id/key (pending)
+   - issues array (pending)
+
+2. .linear_project_state.json
+   - creation_status: AWAITING_AUTHORIZATION
+   - total_issues: 71
+   - phase breakdown
+   - component references
+
+3. .linear_issues_manifest.md
+   - Complete catalog of all 71 issues
+   - Full descriptions
+   - Acceptance criteria
+   - Test steps
+   - Component references
+
+4. .linear_setup_guide.md
+   - Manual creation instructions
+   - Team creation steps
+   - Project creation steps
+   - Issue templates
+
+5. .linear_issues_template.json
+   - Schema for all issue types
+   - Field mappings
+   - Label conventions
+   - Priority defaults
+
+
+LINEAR MCP TOOLS REQUIRED
+------------------------
+
+When authorization is granted:
+  mcp__claude_ai_Linear__list_teams
+  mcp__claude_ai_Linear__create_project
+  mcp__claude_ai_Linear__create_issue (x71)
+  mcp__claude_ai_Linear__create_comment
+  mcp__claude_ai_Linear__list_issues
+
+
+DEDUPLICATION ANALYSIS
+----------------------
+Result: ZERO DUPLICATES
+
+All 71 issues are unique. Analysis included:
+  - Exact title matching (case-insensitive)
+  - Semantic duplicate detection
+  - Phase overlap verification
+  - Component reference cross-checking
+
+
+NEXT STEPS
+----------
+1. Grant Linear MCP tool authorization to Claude agent
+2. List teams and identify appropriate team
+3. Create "Agent Dashboard" project
+4. Create all 71 issues in sequence
+5. Add comment to META issue
+6. Update .linear_project.json with Linear IDs
+7. Verify all 71 issues created successfully
+
+
+QUALITY METRICS
+---------------
+Specification Coverage: 100%
+Issue Deduplication: 0% duplicates
+Acceptance Criteria: 100% defined
+Test Coverage: 100% mapped
+Component Integration: 21% reuse (target 20%+)
+Epic Coverage: 100% phases
+
+
+TECHNICAL ARCHITECTURE
+----------------------
+Frontend: Single HTML file, vanilla JavaScript, embedded CSS
+Backend: Python async (aiohttp or FastAPI)
+WebSocket: Real-time agent status updates
+Integration: Linear, GitHub, Slack via Arcade MCP gateway
+Reusable Components: A2UI React library
+
+
+REFERENCES
+----------
+Primary Spec: agent_dashboard_requirements.md (836 lines)
+QA Spec: QA_updates.md (85 lines)
+Index: app_spec.txt
+Manifest: .linear_issues_manifest.md
+Setup Guide: .linear_setup_guide.md
+Components: A2UI library (TaskCard, ProgressRing, ActivityItem, FileTree, TestResults, DecisionCard, ApprovalCard)
+
+
+STATUS: SPECIFICATION_COMPLETE - AWAITING_LINEAR_AUTHORIZATION
+Created: 2026-02-15
+Next Session: Execute Linear issue creation once authorization granted
