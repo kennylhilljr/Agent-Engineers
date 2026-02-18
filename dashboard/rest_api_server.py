@@ -485,6 +485,15 @@ class RESTAPIServer:
         self.app.router.add_post('/api/webhooks/inbound/run-ticket', self.rest_inbound_run_ticket)
         self.app.router.add_post('/api/webhooks/inbound/run-spec', self.rest_inbound_run_spec)
 
+        # AI-220: Free Tier / Billing endpoints
+        self.app.router.add_get('/api/billing/usage', self.get_billing_usage)
+        self.app.router.add_get('/api/billing/plan', self.get_billing_plan)
+        self.app.router.add_post('/api/billing/upgrade', self.post_billing_upgrade)
+        self.app.router.add_post('/api/billing/session/start', self.post_billing_session_start)
+        self.app.router.add_post('/api/billing/session/end', self.post_billing_session_end)
+        # Also expose usage at legacy path used by dashboard.html
+        self.app.router.add_get('/api/usage', self.get_billing_usage)
+
         # OPTIONS for CORS preflight
         for route in ['/api/metrics', '/api/agents', '/api/sessions', '/api/providers',
                       '/api/chat', '/api/decisions', '/api/agents/status',
@@ -495,7 +504,11 @@ class RESTAPIServer:
                       '/api/pm/stop', '/api/pm/history',
                       '/api/webhooks', '/api/webhooks/deliveries',
                       '/api/webhooks/inbound/run-ticket',
-                      '/api/webhooks/inbound/run-spec']:
+                      '/api/webhooks/inbound/run-spec',
+                      '/api/billing/usage', '/api/billing/plan',
+                      '/api/billing/upgrade',
+                      '/api/billing/session/start', '/api/billing/session/end',
+                      '/api/usage']:
             self.app.router.add_route('OPTIONS', route, self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
@@ -3462,6 +3475,197 @@ class RESTAPIServer:
             "message": f"Agent {agent} queued to process spec",
             "timestamp": datetime.utcnow().isoformat() + "Z",
         }, status=202)
+
+    # ==========================================================================
+    # AI-220: Free Tier / Billing endpoints
+    # ==========================================================================
+
+    def _get_free_tier_manager(self):
+        """Lazily import and return the FreeTierManager singleton."""
+        try:
+            from dashboard.free_tier import get_free_tier_manager
+            return get_free_tier_manager()
+        except Exception as exc:
+            return None
+
+    def _get_billing_user_id(self, request: Request) -> str:
+        """Extract user ID for billing purposes.
+
+        For now (single-user mode, AI-220), returns a fixed 'default' user.
+        Multi-user auth is introduced in AI-222.
+
+        Returns:
+            User identifier string.
+        """
+        return "default"
+
+    async def get_billing_usage(self, request: Request) -> Response:
+        """GET /api/billing/usage (also /api/usage) - Return current usage stats.
+
+        Returns:
+            200 OK with usage dict including hours_used, hours_limit, percent_used,
+            plan, period_start, reset_date, show_upgrade_cta
+        """
+        manager = self._get_free_tier_manager()
+        if manager is None:
+            return web.json_response(
+                {"error": "Billing module not available"}, status=503
+            )
+        user_id = self._get_billing_user_id(request)
+        usage = manager.get_usage(user_id)
+        usage["timestamp"] = datetime.utcnow().isoformat() + "Z"
+        # Include active sessions
+        usage["active_sessions"] = manager.get_active_sessions(user_id)
+        return web.json_response(usage)
+
+    async def get_billing_plan(self, request: Request) -> Response:
+        """GET /api/billing/plan - Return current plan info.
+
+        Returns:
+            200 OK with plan dict including features, pricing, limits
+        """
+        manager = self._get_free_tier_manager()
+        if manager is None:
+            return web.json_response(
+                {"error": "Billing module not available"}, status=503
+            )
+        user_id = self._get_billing_user_id(request)
+        plan = manager.get_plan(user_id)
+        plan["timestamp"] = datetime.utcnow().isoformat() + "Z"
+        return web.json_response(plan)
+
+    async def post_billing_upgrade(self, request: Request) -> Response:
+        """POST /api/billing/upgrade - Request an upgrade (mock for AI-220).
+
+        Returns:
+            200 OK with upgrade tier comparison and redirect URL
+        """
+        manager = self._get_free_tier_manager()
+        if manager is None:
+            return web.json_response(
+                {"error": "Billing module not available"}, status=503
+            )
+
+        # Parse optional target plan from request body
+        try:
+            body = await request.json()
+            target_plan = body.get("plan", "builder")
+        except Exception:
+            target_plan = "builder"
+
+        upgrade_info = manager.get_upgrade_info()
+        upgrade_info["requested_plan"] = target_plan
+        upgrade_info["message"] = (
+            "Upgrade request received. In production, this would redirect to billing. "
+            "Billing integration is available in AI-221."
+        )
+        upgrade_info["timestamp"] = datetime.utcnow().isoformat() + "Z"
+        return web.json_response(upgrade_info)
+
+    async def post_billing_session_start(self, request: Request) -> Response:
+        """POST /api/billing/session/start - Record session start for usage tracking.
+
+        Body:
+            {session_id: str, model: str (optional)}
+
+        Returns:
+            200 OK with session info, or 403 if limits exceeded
+        """
+        manager = self._get_free_tier_manager()
+        if manager is None:
+            return web.json_response(
+                {"error": "Billing module not available"}, status=503
+            )
+
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+
+        user_id = self._get_billing_user_id(request)
+        session_id = body.get("session_id", "")
+        model = body.get("model", None)
+
+        if not session_id:
+            return web.json_response(
+                {"error": "session_id is required"}, status=400
+            )
+
+        # Check limits before starting
+        if not manager.check_agent_hour_limit(user_id):
+            usage = manager.get_usage(user_id)
+            return web.json_response(
+                {
+                    "error": "agent_hour_limit_exceeded",
+                    "message": f"Monthly agent-hour limit of {usage['hours_limit']}h exceeded. "
+                               "Please upgrade your plan.",
+                    "usage": usage,
+                },
+                status=403,
+            )
+
+        if not manager.check_concurrency_limit(user_id):
+            plan = manager.get_plan(user_id)
+            active = manager.get_active_sessions(user_id)
+            return web.json_response(
+                {
+                    "error": "concurrency_limit_exceeded",
+                    "message": f"Concurrency limit of {plan['max_concurrent_agents']} agent(s) reached. "
+                               "Please upgrade your plan or wait for a session to complete.",
+                    "active_sessions": active,
+                    "plan": plan,
+                },
+                status=403,
+            )
+
+        if model and not manager.check_model_allowed(user_id, model):
+            plan = manager.get_plan(user_id)
+            return web.json_response(
+                {
+                    "error": "model_not_allowed",
+                    "message": f"Model '{model}' is not available on the {plan['display_name']} plan. "
+                               "Please upgrade to access Sonnet/Opus models.",
+                    "allowed_models": plan["allowed_models"],
+                    "plan": plan,
+                },
+                status=403,
+            )
+
+        result = manager.record_session_start(user_id, session_id, model=model)
+        result["timestamp"] = datetime.utcnow().isoformat() + "Z"
+        return web.json_response(result)
+
+    async def post_billing_session_end(self, request: Request) -> Response:
+        """POST /api/billing/session/end - Record session end for usage tracking.
+
+        Body:
+            {session_id: str}
+
+        Returns:
+            200 OK with session info and updated usage
+        """
+        manager = self._get_free_tier_manager()
+        if manager is None:
+            return web.json_response(
+                {"error": "Billing module not available"}, status=503
+            )
+
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+
+        user_id = self._get_billing_user_id(request)
+        session_id = body.get("session_id", "")
+
+        if not session_id:
+            return web.json_response(
+                {"error": "session_id is required"}, status=400
+            )
+
+        result = manager.record_session_end(user_id, session_id)
+        result["timestamp"] = datetime.utcnow().isoformat() + "Z"
+        return web.json_response(result)
 
     def run(self):
         """Start the REST API server.
