@@ -470,7 +470,7 @@ class TestWindsurfBridgeAvailablePaths:
         mock_ws_bridge = MagicMock()
         mock_response = MagicMock()
         mock_response.content = "Windsurf task complete!"
-        mock_ws_bridge.send_task.return_value = mock_response
+        mock_ws_bridge.dispatch_task.return_value = mock_response
 
         bridge._bridge = mock_ws_bridge
         bridge._session_cls = MagicMock(return_value=mock_session)
@@ -495,7 +495,7 @@ class TestWindsurfBridgeAvailablePaths:
 
     def test_send_message_raises_on_error(self):
         bridge = self._make_available_bridge()
-        bridge._bridge.send_task.side_effect = RuntimeError("Windsurf error")
+        bridge._bridge.dispatch_task.side_effect = RuntimeError("Windsurf error")
         with pytest.raises(RuntimeError, match="Windsurf error"):
             bridge.send_message("Task!")
 
