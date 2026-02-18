@@ -2028,6 +2028,123 @@
             color: #64748b;
         }
 
+        /* AI-224: Usage Meter Widget */
+        .usage-meter-card {
+            background: var(--card-bg, rgba(15, 23, 42, 0.8));
+            border: 1px solid var(--border-color, #30363d);
+            border-radius: 12px;
+            padding: 14px 20px;
+            margin: 10px 0 14px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .usage-meter-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .usage-meter-icon {
+            font-size: 1.1rem;
+        }
+        .usage-meter-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-primary, #e6edf3);
+            flex: 1;
+        }
+        .usage-meter-tier {
+            background: rgba(88, 166, 255, 0.15);
+            color: #58a6ff;
+            border: 1px solid rgba(88, 166, 255, 0.3);
+            border-radius: 6px;
+            padding: 2px 8px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .usage-meter-alert {
+            border-radius: 6px;
+            padding: 2px 8px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .usage-meter-alert.warning {
+            background: rgba(245, 158, 11, 0.15);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+        .usage-meter-alert.critical {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+        .usage-meter-bar-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .usage-meter-bar-track {
+            flex: 1;
+            height: 10px;
+            background: rgba(148, 163, 184, 0.15);
+            border-radius: 5px;
+            position: relative;
+            overflow: hidden;
+        }
+        .usage-meter-bar-fill {
+            height: 100%;
+            border-radius: 5px;
+            background: linear-gradient(90deg, #3b82f6, #60a5fa);
+            transition: width 0.4s ease, background 0.4s ease;
+            max-width: 100%;
+        }
+        .usage-meter-bar-fill.warning {
+            background: linear-gradient(90deg, #d97706, #f59e0b);
+        }
+        .usage-meter-bar-fill.critical {
+            background: linear-gradient(90deg, #dc2626, #ef4444);
+        }
+        .usage-meter-bar-warning {
+            position: absolute;
+            top: 0;
+            left: 80%;
+            width: 2px;
+            height: 100%;
+            background: rgba(245, 158, 11, 0.6);
+        }
+        .usage-meter-percent {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #60a5fa;
+            min-width: 38px;
+            text-align: right;
+        }
+        .usage-meter-stats {
+            font-size: 0.75rem;
+            color: var(--text-secondary, #8b949e);
+        }
+        .usage-meter-sep {
+            margin: 0 4px;
+            opacity: 0.5;
+        }
+        [data-theme="light"] .usage-meter-card {
+            background: rgba(255, 255, 255, 0.9);
+            border-color: rgba(148, 163, 184, 0.3);
+        }
+        [data-theme="light"] .usage-meter-percent {
+            color: #2563eb;
+        }
+        [data-theme="light"] .usage-meter-tier {
+            background: rgba(9, 105, 218, 0.1);
+            color: #0969da;
+            border-color: rgba(9, 105, 218, 0.2);
+        }
+
         /* Loading State */
         .loading {
             display: flex;
@@ -5548,6 +5665,29 @@
             </div>
         </div>
 
+        <!-- AI-224: Usage Meter Widget -->
+        <div class="usage-meter-card" id="usage-meter-card">
+            <div class="usage-meter-header">
+                <span class="usage-meter-icon">&#9889;</span>
+                <span class="usage-meter-title">Agent-Hour Usage</span>
+                <span class="usage-meter-tier" id="usage-tier-badge">explorer</span>
+                <span class="usage-meter-alert" id="usage-alert-badge" style="display:none"></span>
+            </div>
+            <div class="usage-meter-bar-container">
+                <div class="usage-meter-bar-track">
+                    <div class="usage-meter-bar-fill" id="usage-bar-fill" style="width: 0%"></div>
+                    <div class="usage-meter-bar-warning" id="usage-bar-warning"></div>
+                </div>
+                <span class="usage-meter-percent" id="usage-percent-label">0%</span>
+            </div>
+            <div class="usage-meter-stats">
+                <span id="usage-hours-used">0.00</span>h used of
+                <span id="usage-hours-limit">10.00</span>h limit
+                <span class="usage-meter-sep">&bull;</span>
+                Period: <span id="usage-period-start">--</span>
+            </div>
+        </div>
+
         <!-- Global Stats -->
         <div class="stats-grid" id="stats-grid">
             <div class="loading">
@@ -8592,9 +8732,89 @@
             // AI-89: Initialize system pause banner from server state
             await fetchSystemStatus();
 
+            // AI-224: Initialize usage meter
+            await fetchUsageMeter();
+            startUsageMeterPolling();
+
             console.log('Dashboard initialized');
             console.log('WebSocket live updates enabled with auto-reconnect');
             console.log(`Fallback polling: every ${REFRESH_INTERVAL/1000}s`);
+        }
+
+        // =========================================================
+        // AI-224: Usage Meter Widget
+        // =========================================================
+
+        let _usageMeterPollInterval = null;
+        const USAGE_METER_POLL_MS = 30000; // 30 seconds per spec
+
+        function renderUsageMeter(data) {
+            if (!data) return;
+
+            const tierBadge = document.getElementById('usage-tier-badge');
+            const alertBadge = document.getElementById('usage-alert-badge');
+            const barFill = document.getElementById('usage-bar-fill');
+            const percentLabel = document.getElementById('usage-percent-label');
+            const hoursUsed = document.getElementById('usage-hours-used');
+            const hoursLimit = document.getElementById('usage-hours-limit');
+            const periodStart = document.getElementById('usage-period-start');
+
+            if (!tierBadge || !barFill) return;
+
+            const pct = Math.min(parseFloat(data.percentage || 0), 100);
+            const alertLevel = data.alert_level || null;
+
+            // Tier badge
+            tierBadge.textContent = data.tier || 'explorer';
+
+            // Alert badge
+            if (alertLevel) {
+                alertBadge.textContent = alertLevel === 'critical' ? 'OVER LIMIT' : '80% WARNING';
+                alertBadge.className = 'usage-meter-alert ' + alertLevel;
+                alertBadge.style.display = '';
+            } else {
+                alertBadge.style.display = 'none';
+            }
+
+            // Progress bar
+            barFill.style.width = pct + '%';
+            barFill.className = 'usage-meter-bar-fill' + (alertLevel ? ' ' + alertLevel : '');
+
+            // Percent label
+            percentLabel.textContent = pct.toFixed(1) + '%';
+            percentLabel.style.color = alertLevel === 'critical' ? '#ef4444' :
+                                       alertLevel === 'warning'  ? '#f59e0b' : '';
+
+            // Stats
+            if (hoursUsed) hoursUsed.textContent = (parseFloat(data.agent_hours_used || 0)).toFixed(2);
+            if (hoursLimit) hoursLimit.textContent = (parseFloat(data.agent_hours_limit || 0)).toFixed(2);
+            if (periodStart && data.period_start) {
+                try {
+                    const d = new Date(data.period_start);
+                    periodStart.textContent = d.toLocaleDateString();
+                } catch(e) {
+                    periodStart.textContent = data.period_start;
+                }
+            }
+        }
+
+        async function fetchUsageMeter() {
+            try {
+                const resp = await fetch(`${API_BASE_URL}/api/usage`);
+                if (!resp.ok) {
+                    console.warn('[AI-224] Usage meter fetch failed:', resp.status);
+                    return;
+                }
+                const data = await resp.json();
+                renderUsageMeter(data);
+            } catch (err) {
+                console.warn('[AI-224] Usage meter error:', err);
+            }
+        }
+
+        function startUsageMeterPolling() {
+            if (_usageMeterPollInterval) clearInterval(_usageMeterPollInterval);
+            _usageMeterPollInterval = setInterval(fetchUsageMeter, USAGE_METER_POLL_MS);
         }
 
         // ==========================================
