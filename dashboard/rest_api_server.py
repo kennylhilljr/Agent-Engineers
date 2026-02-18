@@ -60,6 +60,32 @@ VALID_AGENT_STATUSES = ("idle", "running", "paused", "error")
 # {agent_name: [list of last 20 event dicts]}
 _rest_agent_recent_events: Dict[str, list] = {}
 
+# AI-82: Orchestrator Pipeline Visualization (REQ-MONITOR-004)
+# Pipeline state: {"active": bool, "ticket_key": str, "ticket_title": str, "steps": [...]}
+_PIPELINE_STEP_IDS = [
+    "ops-start", "coding", "github", "ops-review", "pr_reviewer", "ops-done"
+]
+_PIPELINE_DEFAULT_STEPS = [
+    {"id": "ops-start",    "label": "ops: Starting",          "status": "pending", "duration": None},
+    {"id": "coding",       "label": "coding: Implement",      "status": "pending", "duration": None},
+    {"id": "github",       "label": "github: Commit & PR",    "status": "pending", "duration": None},
+    {"id": "ops-review",   "label": "ops: PR Ready",          "status": "pending", "duration": None},
+    {"id": "pr_reviewer",  "label": "pr_reviewer: Review",    "status": "pending", "duration": None},
+    {"id": "ops-done",     "label": "ops: Done",              "status": "pending", "duration": None},
+]
+
+def _make_default_pipeline() -> Dict[str, Any]:
+    """Return a fresh default (inactive) pipeline state."""
+    import copy
+    return {
+        "active": False,
+        "ticket_key": None,
+        "ticket_title": None,
+        "steps": copy.deepcopy(_PIPELINE_DEFAULT_STEPS),
+    }
+
+_pipeline_state: Dict[str, Any] = _make_default_pipeline()
+
 # AI-81: Fallback DEFAULT_MODELS mapping (avoids importing claude_agent_sdk)
 _REST_DEFAULT_MODELS: Dict[str, str] = {
     "linear": "haiku",
@@ -331,9 +357,15 @@ class RESTAPIServer:
         # WebSocket for agent_status broadcasts
         self.app.router.add_get('/api/ws', self.ws_handler)
 
+        # AI-82: Orchestrator Pipeline Visualization (REQ-MONITOR-004)
+        self.app.router.add_get('/api/orchestrator/pipeline', self.get_pipeline)
+        self.app.router.add_post('/api/orchestrator/pipeline', self.set_pipeline)
+        self.app.router.add_post('/api/orchestrator/pipeline/step', self.update_pipeline_step)
+
         # OPTIONS for CORS preflight
         for route in ['/api/metrics', '/api/agents', '/api/sessions', '/api/providers',
-                      '/api/chat', '/api/decisions', '/api/agents/status']:
+                      '/api/chat', '/api/decisions', '/api/agents/status',
+                      '/api/orchestrator/pipeline']:
             self.app.router.add_route('OPTIONS', route, self.handle_options)
 
     async def handle_options(self, request: Request) -> Response:
@@ -1640,6 +1672,157 @@ class RESTAPIServer:
             "agent": agent_name,
             "status": status,
             "timestamp": datetime.utcnow().isoformat() + "Z"
+        })
+
+        dead_clients = set()
+        for ws in list(_ws_clients):
+            try:
+                await ws.send_str(payload)
+            except Exception:
+                dead_clients.add(ws)
+
+        for ws in dead_clients:
+            _ws_clients.discard(ws)
+
+    # -------------------------------------------------------------------------
+    # AI-82: Orchestrator Pipeline Visualization - REQ-MONITOR-004
+    # -------------------------------------------------------------------------
+
+    async def get_pipeline(self, request: Request) -> Response:
+        """GET /api/orchestrator/pipeline - Return current pipeline state.
+
+        Returns:
+            200 OK with pipeline state including active flag, ticket_key, and 6 steps
+        """
+        import copy
+        return web.json_response(copy.deepcopy(_pipeline_state))
+
+    async def set_pipeline(self, request: Request) -> Response:
+        """POST /api/orchestrator/pipeline - Set the full pipeline state.
+
+        Request body:
+            {
+                "active": true,
+                "ticket_key": "AI-82",
+                "ticket_title": "Pipeline Steps",
+                "steps": [
+                    {"id": "ops-start", "label": "...", "status": "completed", "duration": 2.3},
+                    ...
+                ]
+            }
+
+        Returns:
+            200 OK with updated pipeline state
+            400 Bad Request for invalid input
+        """
+        global _pipeline_state
+        import copy
+
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        # Validate required fields
+        if 'active' not in body:
+            return web.json_response({'error': 'Missing required field: active'}, status=400)
+
+        active = bool(body.get('active', False))
+        ticket_key = body.get('ticket_key', None)
+        ticket_title = body.get('ticket_title', None)
+
+        # Build steps: accept provided steps or default
+        steps_input = body.get('steps', None)
+        if steps_input is not None:
+            if not isinstance(steps_input, list):
+                return web.json_response({'error': 'steps must be an array'}, status=400)
+            # Normalise each step
+            steps = []
+            for s in steps_input:
+                step_id = s.get('id', '')
+                steps.append({
+                    'id': step_id,
+                    'label': s.get('label', step_id),
+                    'status': s.get('status', 'pending'),
+                    'duration': s.get('duration', None),
+                })
+        else:
+            steps = copy.deepcopy(_PIPELINE_DEFAULT_STEPS)
+
+        _pipeline_state = {
+            'active': active,
+            'ticket_key': ticket_key,
+            'ticket_title': ticket_title,
+            'steps': steps,
+        }
+
+        # Broadcast via WebSocket
+        await self._broadcast_pipeline_update()
+
+        return web.json_response(copy.deepcopy(_pipeline_state))
+
+    async def update_pipeline_step(self, request: Request) -> Response:
+        """POST /api/orchestrator/pipeline/step - Update a single pipeline step.
+
+        Request body:
+            {
+                "id": "coding",
+                "status": "completed",
+                "duration": 12.5
+            }
+
+        Returns:
+            200 OK with updated pipeline state
+            400 Bad Request for invalid step ID or missing fields
+        """
+        global _pipeline_state
+        import copy
+
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'error': 'Invalid JSON body'}, status=400)
+
+        step_id = body.get('id')
+        if not step_id:
+            return web.json_response({'error': 'Missing required field: id'}, status=400)
+
+        new_status = body.get('status')
+        if not new_status:
+            return web.json_response({'error': 'Missing required field: status'}, status=400)
+
+        # Find and update the step
+        found = False
+        for step in _pipeline_state.get('steps', []):
+            if step['id'] == step_id:
+                step['status'] = new_status
+                if 'duration' in body:
+                    step['duration'] = body['duration']
+                found = True
+                break
+
+        if not found:
+            valid_ids = [s['id'] for s in _pipeline_state.get('steps', [])]
+            return web.json_response({
+                'error': f'Step ID not found: {step_id!r}',
+                'valid_ids': valid_ids,
+            }, status=400)
+
+        # Broadcast via WebSocket
+        await self._broadcast_pipeline_update()
+
+        return web.json_response(copy.deepcopy(_pipeline_state))
+
+    async def _broadcast_pipeline_update(self) -> None:
+        """Broadcast a pipeline_update event to all connected WebSocket clients."""
+        if not _ws_clients:
+            return
+
+        import copy
+        payload = json.dumps({
+            'type': 'pipeline_update',
+            'pipeline': copy.deepcopy(_pipeline_state),
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
         })
 
         dead_clients = set()

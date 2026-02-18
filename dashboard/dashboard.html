@@ -934,6 +934,141 @@
             cursor: pointer;
         }
 
+        /* AI-82: Pipeline Visualization Styles (REQ-MONITOR-004) */
+        .pipeline-panel {
+            padding: 6px 0 4px 0;
+        }
+
+        .pipeline-ticket-key {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--accent, #58a6ff);
+            padding: 0 10px 4px 10px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .pipeline-ticket-title {
+            font-size: 0.67rem;
+            color: var(--text-secondary, #8b949e);
+            padding: 0 10px 6px 10px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .pipeline-empty {
+            font-size: 0.72rem;
+            color: var(--text-secondary, #8b949e);
+            opacity: 0.6;
+            font-style: italic;
+            padding: 6px 10px;
+        }
+
+        .pipeline-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            padding: 0 10px;
+        }
+
+        .pipeline-step {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            position: relative;
+        }
+
+        .pipeline-step-connector {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-shrink: 0;
+            width: 16px;
+        }
+
+        .pipeline-step-icon {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            flex-shrink: 0;
+            z-index: 1;
+        }
+
+        .pipeline-step-icon.status-completed {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+            border: 1.5px solid #22c55e;
+        }
+
+        .pipeline-step-icon.status-active {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+            border: 1.5px solid #3b82f6;
+            animation: pipeline-pulse 1.5s ease-in-out infinite;
+        }
+
+        .pipeline-step-icon.status-pending {
+            background: transparent;
+            color: var(--text-secondary, #8b949e);
+            border: 1.5px solid var(--border-color, #30363d);
+        }
+
+        @keyframes pipeline-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+            50% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0); }
+        }
+
+        .pipeline-step-line {
+            width: 1.5px;
+            height: 14px;
+            background: var(--border-color, #30363d);
+            flex-shrink: 0;
+        }
+
+        .pipeline-step-line.line-completed {
+            background: #22c55e;
+        }
+
+        .pipeline-step-body {
+            flex: 1;
+            min-width: 0;
+            padding-bottom: 8px;
+        }
+
+        .pipeline-step-label {
+            font-size: 0.7rem;
+            color: var(--text-primary, #e6edf3);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.4;
+        }
+
+        .pipeline-step-label.status-pending {
+            color: var(--text-secondary, #8b949e);
+        }
+
+        .pipeline-step-label.status-active {
+            color: #3b82f6;
+            font-weight: 600;
+        }
+
+        .pipeline-step-label.status-completed {
+            color: var(--text-primary, #e6edf3);
+        }
+
+        .pipeline-step-duration {
+            font-size: 0.63rem;
+            color: #22c55e;
+            margin-top: 1px;
+        }
+
         /* Header */
         .header {
             text-align: center;
@@ -3727,6 +3862,20 @@
                         <div style="padding:5px 10px;font-size:0.72rem;color:var(--text-secondary,#8b949e);opacity:0.7;">Loading...</div>
                     </div>
                 </div>
+
+                <!-- AI-82: Pipeline Visualization (REQ-MONITOR-004) -->
+                <span class="panel-section-label" style="margin-top:8px;">Pipeline</span>
+                <div class="pipeline-panel" id="pipeline-panel">
+                    <!-- Populated by renderPipelinePanel() -->
+                    <div class="pipeline-empty" id="pipeline-empty">No active pipeline</div>
+                    <div id="pipeline-active-content" style="display:none;">
+                        <div class="pipeline-ticket-key" id="pipeline-ticket-key"></div>
+                        <div class="pipeline-ticket-title" id="pipeline-ticket-title"></div>
+                        <div class="pipeline-steps" id="pipeline-steps">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
             </nav>
         </aside>
 
@@ -5217,6 +5366,12 @@
                                     if (costEl) costEl.textContent = formatCost(_agentPanelStatus[agentName].estimated_cost);
                                 }
                             }
+                        } else if (message.type === 'pipeline_update') {
+                            // AI-82: Real-time pipeline visualization update (REQ-MONITOR-004)
+                            console.log('Received pipeline_update via WebSocket', message);
+                            if (message.pipeline) {
+                                renderPipelinePanel(message.pipeline);
+                            }
                         }
                     } catch (error) {
                         console.error('Error processing WebSocket message:', error);
@@ -5929,6 +6084,107 @@
             _agentStatusPollTimer = setInterval(fetchAgentStatusPanel, 5000);
         }
 
+        // ==========================================
+        // AI-82: Pipeline Visualization (REQ-MONITOR-004)
+        // ==========================================
+
+        /**
+         * Render the pipeline panel based on pipeline state data.
+         * @param {Object} pipeline - Pipeline state from API
+         */
+        function renderPipelinePanel(pipeline) {
+            const emptyEl = document.getElementById('pipeline-empty');
+            const activeEl = document.getElementById('pipeline-active-content');
+            const ticketKeyEl = document.getElementById('pipeline-ticket-key');
+            const ticketTitleEl = document.getElementById('pipeline-ticket-title');
+            const stepsEl = document.getElementById('pipeline-steps');
+
+            if (!emptyEl || !activeEl || !stepsEl) return;
+
+            if (!pipeline || !pipeline.active) {
+                emptyEl.style.display = '';
+                activeEl.style.display = 'none';
+                return;
+            }
+
+            emptyEl.style.display = 'none';
+            activeEl.style.display = '';
+
+            // Set ticket key and title
+            if (ticketKeyEl) ticketKeyEl.textContent = pipeline.ticket_key || '';
+            if (ticketTitleEl) {
+                ticketTitleEl.textContent = pipeline.ticket_title || '';
+                ticketTitleEl.style.display = pipeline.ticket_title ? '' : 'none';
+            }
+
+            // Render steps
+            const steps = pipeline.steps || [];
+            stepsEl.innerHTML = '';
+
+            steps.forEach((step, idx) => {
+                const isLast = idx === steps.length - 1;
+                const status = step.status || 'pending';
+
+                // Icon character
+                let iconChar = '○';
+                if (status === 'completed') iconChar = '✓';
+                else if (status === 'active') iconChar = '●';
+
+                // Connector (icon + line)
+                const connectorDiv = document.createElement('div');
+                connectorDiv.className = 'pipeline-step-connector';
+
+                const iconDiv = document.createElement('div');
+                iconDiv.className = `pipeline-step-icon status-${status}`;
+                iconDiv.textContent = iconChar;
+                connectorDiv.appendChild(iconDiv);
+
+                if (!isLast) {
+                    const lineDiv = document.createElement('div');
+                    lineDiv.className = `pipeline-step-line${status === 'completed' ? ' line-completed' : ''}`;
+                    connectorDiv.appendChild(lineDiv);
+                }
+
+                // Body
+                const bodyDiv = document.createElement('div');
+                bodyDiv.className = 'pipeline-step-body';
+
+                const labelDiv = document.createElement('div');
+                labelDiv.className = `pipeline-step-label status-${status}`;
+                labelDiv.textContent = step.label || step.id || '';
+                bodyDiv.appendChild(labelDiv);
+
+                if (status === 'completed' && step.duration != null) {
+                    const durDiv = document.createElement('div');
+                    durDiv.className = 'pipeline-step-duration';
+                    durDiv.textContent = `${parseFloat(step.duration).toFixed(1)}s`;
+                    bodyDiv.appendChild(durDiv);
+                }
+
+                // Step row
+                const stepDiv = document.createElement('div');
+                stepDiv.className = 'pipeline-step';
+                stepDiv.dataset.stepId = step.id || '';
+                stepDiv.appendChild(connectorDiv);
+                stepDiv.appendChild(bodyDiv);
+                stepsEl.appendChild(stepDiv);
+            });
+        }
+
+        /**
+         * Fetch current pipeline state from API and render.
+         */
+        async function fetchPipelinePanel() {
+            try {
+                const resp = await fetch(`${API_BASE_URL}/api/orchestrator/pipeline`);
+                if (!resp.ok) return;
+                const pipeline = await resp.json();
+                renderPipelinePanel(pipeline);
+            } catch (err) {
+                console.warn('Pipeline panel fetch failed:', err);
+            }
+        }
+
         // Initialize Dashboard
         async function init() {
             console.log('Initializing Agent Status Dashboard...');
@@ -5944,6 +6200,9 @@
             startAgentStatusPolling();
             // AI-80: Start elapsed time counter
             startElapsedTimer();
+
+            // AI-82: Initialize Pipeline Panel
+            await fetchPipelinePanel();
 
             console.log('Dashboard initialized');
             console.log('WebSocket live updates enabled with auto-reconnect');
