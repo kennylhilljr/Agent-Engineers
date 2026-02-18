@@ -4583,7 +4583,7 @@
             } catch (error) {
                 console.error('Error creating WebSocket:', error);
                 updateConnectionStatus('disconnected', 'Connection failed');
-                scheduleReconnect();
+                WS_RECONNECT.schedule(connectWebSocket);
             }
         }
 
