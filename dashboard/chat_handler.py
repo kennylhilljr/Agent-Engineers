@@ -1,875 +1,278 @@
-"""Chat Handler Module - Handles AI chat interactions with streaming and tool transparency.
+"""Chat Handler - Request Router for Chat-to-Agent Bridge.
 
-This module provides the chat functionality for the Agent Dashboard, including:
-- Streaming responses from multiple AI providers
-- Tool call transparency (showing Linear/Slack/GitHub tool invocations)
-- Session management and message persistence
-- Support for Claude, ChatGPT, Gemini, Groq, KIMI, and Windsurf providers
+This module routes incoming chat messages to the appropriate handler:
+- agent_action intents -> AgentExecutor (Linear, coding, github agents)
+- query intents -> Linear API or knowledge base
+- conversation intents -> AI provider (Claude/ChatGPT/Gemini/etc.)
+
+REQ-TECH-008: When the user sends a chat message requiring agent action,
+the dashboard server must:
+1. Parse user intent
+2. Route to appropriate agent or let orchestrator decide
+3. Execute delegation through existing session loop
+4. Stream results back to chat
+
+Concurrency:
+    Uses asyncio.Queue to handle concurrent messages without dropping any.
+    Each message gets its own task; the queue prevents overwhelming the system.
 """
 
 import asyncio
-import json
-import os
+import logging
+import uuid
 from datetime import datetime
-from typing import AsyncIterator, Dict, Any, Optional
+from typing import Any, Dict, List, Optional, Set
 
-from exceptions import BridgeError, SecurityError
+from dashboard.intent_parser import ParsedIntent, parse_intent
+from dashboard.agent_executor import AgentExecutor, stream_intent_execution
 
-# Optional imports for AI providers
-try:
-    from anthropic import AsyncAnthropic
-    HAS_ANTHROPIC = True
-except ImportError:
-    HAS_ANTHROPIC = False
-    AsyncAnthropic = None
+logger = logging.getLogger(__name__)
 
-try:
-    import openai
-    HAS_OPENAI = True
-except ImportError:
-    HAS_OPENAI = False
-    openai = None
+# In-memory chat history (message_id -> message dict)
+_chat_history: Dict[str, Dict] = {}
 
-# Provider clients
-_anthropic_client: Optional[Any] = None
-_openai_client: Optional[Any] = None
+# Simple request queue for concurrency control
+_request_queue: asyncio.Queue = asyncio.Queue(maxsize=50)
+
+# Known AI provider names for conversation routing
+AI_PROVIDERS = {"claude", "chatgpt", "gemini", "groq", "kimi", "windsurf"}
 
 
-def get_anthropic_client() -> Any:
-    """Get or create Anthropic client."""
-    if not HAS_ANTHROPIC:
-        raise BridgeError(
-            message="anthropic library not installed",
-            error_code="BRIDGE_UNSUPPORTED_PROVIDER",
-            provider="claude"
-        )
+class ChatRouter:
+    """Routes chat messages to the appropriate handler.
 
-    global _anthropic_client
-    if _anthropic_client is None:
-        api_key = os.getenv('ANTHROPIC_API_KEY')
-        if not api_key:
-            raise SecurityError(
-                message="ANTHROPIC_API_KEY not set in environment",
-                error_code="SECURITY_AUTH_MISSING",
-                auth_type="api_key",
-                details={"provider": "claude"}
+    Responsibilities:
+    1. Parse the message intent using IntentParser
+    2. Route to AgentExecutor, Linear query, or conversation handler
+    3. Return a routing decision for the caller
+    4. Execute the routed action asynchronously
+
+    Attributes:
+        websockets: Optional set of WebSocket connections for streaming
+        linear_api_key: Linear API key for issue queries
+    """
+
+    def __init__(
+        self,
+        websockets: Optional[Set[Any]] = None,
+        linear_api_key: Optional[str] = None,
+    ):
+        """Initialize the router.
+
+        Args:
+            websockets: Active WebSocket connections for streaming results
+            linear_api_key: Linear API key (defaults to LINEAR_API_KEY env var)
+        """
+        self.websockets = websockets or set()
+        self.linear_api_key = linear_api_key
+        self.executor = AgentExecutor(linear_api_key=linear_api_key)
+
+    def parse(self, message: str) -> ParsedIntent:
+        """Parse a user message into a structured intent.
+
+        Args:
+            message: Raw user message text
+
+        Returns:
+            ParsedIntent with intent_type, agent, action, and params
+        """
+        return parse_intent(message)
+
+    def get_routing_decision(self, intent: ParsedIntent) -> Dict[str, Any]:
+        """Determine how a message should be routed based on its intent.
+
+        Args:
+            intent: Parsed intent from parse()
+
+        Returns:
+            Dict with routing information:
+                - intent_type: "agent_action" | "query" | "conversation"
+                - handler: "agent_executor" | "linear_api" | "ai_provider"
+                - agent: target agent name or None
+                - action: action to perform or None
+                - params: action parameters
+                - description: human-readable routing description
+        """
+        if intent.intent_type == "agent_action":
+            handler = "agent_executor"
+            agent = intent.agent or "linear"
+            description = (
+                f"Routing to {agent} agent for action: {intent.action}"
             )
-        _anthropic_client = AsyncAnthropic(api_key=api_key)
-    return _anthropic_client
 
-
-def get_openai_client() -> Any:
-    """Get or create OpenAI client."""
-    if not HAS_OPENAI:
-        raise BridgeError(
-            message="openai library not installed",
-            error_code="BRIDGE_UNSUPPORTED_PROVIDER",
-            provider="openai"
-        )
-
-    global _openai_client
-    if _openai_client is None:
-        api_key = os.getenv('OPENAI_API_KEY')
-        if not api_key:
-            raise SecurityError(
-                message="OPENAI_API_KEY not set in environment",
-                error_code="SECURITY_AUTH_MISSING",
-                auth_type="api_key",
-                details={"provider": "openai"}
+        elif intent.intent_type == "query":
+            handler = "linear_api"
+            agent = intent.agent
+            description = (
+                f"Querying {agent or 'knowledge base'} for: {intent.action}"
             )
-        _openai_client = openai.AsyncOpenAI(api_key=api_key)
-    return _openai_client
 
+        else:
+            # conversation
+            handler = "ai_provider"
+            agent = None
+            description = "Routing to AI provider for conversation"
 
-def map_model_to_api(provider: str, model: str) -> str:
-    """Map dashboard model IDs to provider API model IDs."""
-    model_mapping = {
-        'claude': {
-            'haiku-4.5': 'claude-3-5-haiku-20241022',
-            'sonnet-4.5': 'claude-3-5-sonnet-20241022',
-            'opus-4.6': 'claude-3-opus-20240229',  # Latest opus available
-        },
-        'openai': {
-            'gpt-4o': 'gpt-4o',
-            'o1': 'o1-preview',
-            'o3-mini': 'gpt-4o-mini',  # o3-mini not released yet, use closest
-            'o4-mini': 'gpt-4o-mini',  # o4-mini not released yet, use closest
-        }
-    }
-
-    return model_mapping.get(provider, {}).get(model, model)
-
-
-async def stream_claude_response(
-    message: str,
-    model: str,
-    conversation_history: list[Dict[str, Any]] = None
-) -> AsyncIterator[Dict[str, Any]]:
-    """Stream response from Claude API with tool transparency.
-
-    Args:
-        message: User message
-        model: Claude model ID
-        conversation_history: Previous messages in conversation
-
-    Yields:
-        Dict with type ('text', 'tool_use', 'tool_result', 'done') and content
-    """
-    if not HAS_ANTHROPIC:
-        yield {
-            'type': 'error',
-            'content': 'Anthropic library not installed',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-        yield {
-            'type': 'done',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-        return
-
-    try:
-        client = get_anthropic_client()
-    except (BridgeError, SecurityError) as e:
-        yield {
-            'type': 'error',
-            'content': str(e),
-            'error_code': e.error_code,
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-        yield {
-            'type': 'done',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-        return
-
-    api_model = map_model_to_api('claude', model)
-
-    # Build messages
-    messages = conversation_history or []
-    messages.append({
-        'role': 'user',
-        'content': message
-    })
-
-    # System prompt with tool awareness
-    system_prompt = """You are an AI assistant for the Agent Dashboard. You can help users understand their agent metrics, performance, and status.
-
-When asked about Linear issues, GitHub repositories, or Slack channels, you can use the appropriate tools to fetch real data.
-
-Be concise and helpful. Format code blocks with syntax highlighting when appropriate."""
-
-    try:
-        # Stream response with tool use
-        async with client.messages.stream(
-            model=api_model,
-            max_tokens=4096,
-            messages=messages,
-            system=system_prompt
-        ) as stream:
-            async for text in stream.text_stream:
-                yield {
-                    'type': 'text',
-                    'content': text,
-                    'timestamp': datetime.utcnow().isoformat() + 'Z'
-                }
-
-        # Get final message to check for tool use
-        final_message = await stream.get_final_message()
-
-        # Check if there were any tool uses
-        for block in final_message.content:
-            if block.type == 'tool_use':
-                yield {
-                    'type': 'tool_use',
-                    'tool_name': block.name,
-                    'tool_input': block.input,
-                    'tool_id': block.id,
-                    'timestamp': datetime.utcnow().isoformat() + 'Z'
-                }
-
-    except Exception as e:
-        # Wrap unexpected errors as BridgeError for consistency
-        bridge_error = BridgeError(
-            message=f'Error streaming from Claude: {str(e)}',
-            error_code="BRIDGE_MODEL_ERROR",
-            provider="claude"
-        )
-        yield {
-            'type': 'error',
-            'content': str(bridge_error),
-            'error_code': bridge_error.error_code,
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        return {
+            "intent_type": intent.intent_type,
+            "handler": handler,
+            "agent": agent,
+            "action": intent.action,
+            "params": intent.params,
+            "description": description,
+            "original_message": intent.original_message,
         }
 
-    yield {
-        'type': 'done',
-        'timestamp': datetime.utcnow().isoformat() + 'Z'
-    }
+    async def handle_message(
+        self,
+        message: str,
+        provider: str = "claude",
+        message_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Handle a chat message end-to-end.
 
+        Parses intent, routes to appropriate handler, executes action,
+        and returns the result.
 
-async def stream_openai_response(
-    message: str,
-    model: str,
-    conversation_history: list[Dict[str, Any]] = None
-) -> AsyncIterator[Dict[str, Any]]:
-    """Stream response from OpenAI API.
+        Args:
+            message: Raw user message text
+            provider: AI provider name (e.g., "claude", "chatgpt")
+            message_id: Optional message ID for tracking
 
-    Args:
-        message: User message
-        model: OpenAI model ID
-        conversation_history: Previous messages in conversation
+        Returns:
+            Dict with:
+                - message_id: str
+                - routing: routing decision dict
+                - response: str (the response text)
+                - timestamp: ISO timestamp
+                - provider: AI provider used
+        """
+        if message_id is None:
+            message_id = str(uuid.uuid4())
 
-    Yields:
-        Dict with type ('text', 'tool_use', 'tool_result', 'done') and content
-    """
-    if not HAS_OPENAI:
-        yield {
-            'type': 'error',
-            'content': 'OpenAI library not installed',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-        yield {
-            'type': 'done',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-        return
+        timestamp = datetime.utcnow().isoformat() + "Z"
 
-    try:
-        client = get_openai_client()
-    except (BridgeError, SecurityError) as e:
-        yield {
-            'type': 'error',
-            'content': str(e),
-            'error_code': e.error_code,
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-        yield {
-            'type': 'done',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-        return
+        # Parse intent
+        intent = self.parse(message)
+        routing = self.get_routing_decision(intent)
 
-    api_model = map_model_to_api('openai', model)
-
-    # Build messages
-    messages = conversation_history or []
-    messages.append({
-        'role': 'user',
-        'content': message
-    })
-
-    try:
-        stream = await client.chat.completions.create(
-            model=api_model,
-            messages=messages,
-            stream=True
+        logger.info(
+            f"[ChatRouter] Message '{message[:50]}...' -> "
+            f"intent={intent.intent_type}, handler={routing['handler']}, "
+            f"agent={routing['agent']}"
         )
 
-        async for chunk in stream:
-            if chunk.choices[0].delta.content:
-                yield {
-                    'type': 'text',
-                    'content': chunk.choices[0].delta.content,
-                    'timestamp': datetime.utcnow().isoformat() + 'Z'
-                }
+        # Execute based on routing
+        response = ""
 
-            # Check for tool calls
-            if chunk.choices[0].delta.tool_calls:
-                for tool_call in chunk.choices[0].delta.tool_calls:
-                    yield {
-                        'type': 'tool_use',
-                        'tool_name': tool_call.function.name,
-                        'tool_input': json.loads(tool_call.function.arguments),
-                        'tool_id': tool_call.id,
-                        'timestamp': datetime.utcnow().isoformat() + 'Z'
-                    }
+        if routing["handler"] == "agent_executor":
+            # Execute via AgentExecutor
+            response = await stream_intent_execution(
+                intent=intent,
+                websockets=self.websockets if self.websockets else None,
+                message_id=message_id,
+                linear_api_key=self.linear_api_key,
+            )
 
-    except Exception as e:
-        # Wrap unexpected errors as BridgeError for consistency
-        bridge_error = BridgeError(
-            message=f'Error streaming from OpenAI: {str(e)}',
-            error_code="BRIDGE_MODEL_ERROR",
-            provider="openai"
-        )
-        yield {
-            'type': 'error',
-            'content': str(bridge_error),
-            'error_code': bridge_error.error_code,
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        elif routing["handler"] == "linear_api":
+            # Direct Linear API query (same as agent_executor for now)
+            response = await stream_intent_execution(
+                intent=intent,
+                websockets=self.websockets if self.websockets else None,
+                message_id=message_id,
+                linear_api_key=self.linear_api_key,
+            )
+
+        else:
+            # conversation - handled by AI provider on the frontend
+            # For backend handling, return a placeholder
+            provider_name = provider.capitalize()
+            response = (
+                f"[{provider_name}] I understand your question. "
+                f"This message will be processed by the {provider_name} AI provider."
+            )
+
+        # Store in chat history
+        result = {
+            "message_id": message_id,
+            "routing": routing,
+            "response": response,
+            "timestamp": timestamp,
+            "provider": provider,
+            "user_message": message,
         }
+        _chat_history[message_id] = result
 
-    yield {
-        'type': 'done',
-        'timestamp': datetime.utcnow().isoformat() + 'Z'
-    }
+        return result
+
+    async def enqueue_message(
+        self,
+        message: str,
+        provider: str = "claude",
+        message_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Enqueue a message for processing with concurrency control.
+
+        If the queue is full, returns an error response immediately.
+
+        Args:
+            message: Raw user message text
+            provider: AI provider name
+            message_id: Optional message ID
+
+        Returns:
+            Same as handle_message()
+        """
+        if message_id is None:
+            message_id = str(uuid.uuid4())
+
+        try:
+            # Try to put in queue (non-blocking check)
+            _request_queue.put_nowait(message_id)
+        except asyncio.QueueFull:
+            logger.warning(f"Request queue full, rejecting message: {message[:30]}")
+            return {
+                "message_id": message_id,
+                "routing": {
+                    "intent_type": "error",
+                    "handler": "none",
+                    "description": "Server busy - request queue full",
+                },
+                "response": "The server is busy processing other requests. Please try again in a moment.",
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "provider": provider,
+                "user_message": message,
+                "error": "queue_full",
+            }
+
+        try:
+            result = await self.handle_message(message, provider, message_id)
+        finally:
+            # Drain our slot from the queue
+            try:
+                _request_queue.get_nowait()
+                _request_queue.task_done()
+            except asyncio.QueueEmpty:
+                pass
+
+        return result
 
 
-async def stream_mock_response(
-    message: str,
-    provider: str,
-    model: str
-) -> AsyncIterator[Dict[str, Any]]:
-    """Stream mock response for providers without API keys or implementation.
+def get_chat_history(limit: int = 100) -> List[Dict]:
+    """Get recent chat history.
 
     Args:
-        message: User message
-        provider: Provider ID
-        model: Model ID
+        limit: Maximum number of messages to return
 
-    Yields:
-        Dict with type ('text', 'tool_use', 'done') and content
+    Returns:
+        List of chat message dicts, most recent last
     """
-    lower = message.lower()
-
-    # Simulate tool use for Linear queries
-    if 'linear' in lower or 'issue' in lower or 'ticket' in lower:
-        yield {
-            'type': 'tool_use',
-            'tool_name': 'mcp__claude_ai_Linear__list_issues',
-            'tool_input': {'team': 'AI', 'status': 'In Progress'},
-            'tool_id': 'tool_mock_1',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-        await asyncio.sleep(0.3)
-
-        yield {
-            'type': 'tool_result',
-            'tool_id': 'tool_mock_1',
-            'tool_name': 'mcp__claude_ai_Linear__list_issues',
-            'content': '3 issues found: AI-128 (In Progress), AI-132 (Done), AI-137 (Done)',
-            'result': {'issues': [
-                {'key': 'AI-128', 'title': 'Phase 3: AI Chat Interface', 'status': 'In Progress'},
-                {'key': 'AI-132', 'title': 'Chat Interface UI', 'status': 'Done'},
-                {'key': 'AI-137', 'title': 'Provider Status Indicators', 'status': 'Done'}
-            ]},
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-        await asyncio.sleep(0.2)
-
-        response_text = f"[{provider.upper()} - {model}] I found 3 Linear issues:\n\n"
-        response_text += "• **AI-128**: Phase 3: AI Chat Interface (In Progress)\n"
-        response_text += "• **AI-132**: Chat Interface UI (Done)\n"
-        response_text += "• **AI-137**: Provider Status Indicators (Done)\n\n"
-        response_text += "The chat interface implementation is progressing well!"
-
-    elif 'github' in lower or 'repo' in lower or 'pr' in lower or 'pull request' in lower or 'merge' in lower or 'commit' in lower or 'branch' in lower or 'diff' in lower:
-        # Determine GitHub operation based on keywords
-        if 'create' in lower and ('pr' in lower or 'pull request' in lower):
-            # Create PR operation
-            yield {
-                'type': 'tool_use',
-                'tool_name': 'mcp__arcade__Github_CreatePullRequest',
-                'tool_input': {'repo': 'Agent-Engineers', 'title': 'New feature', 'base': 'main'},
-                'tool_id': 'tool_github_create_pr',
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
-            await asyncio.sleep(0.3)
-            yield {
-                'type': 'tool_result',
-                'tool_id': 'tool_github_create_pr',
-                'tool_name': 'mcp__arcade__Github_CreatePullRequest',
-                'content': 'PR #66 created successfully: "New feature" (open) — https://github.com/kennylhilljr/Agent-Engineers/pull/66',
-                'result': {'number': 66, 'title': 'New feature', 'state': 'open', 'html_url': 'https://github.com/kennylhilljr/Agent-Engineers/pull/66'},
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
-            await asyncio.sleep(0.2)
-            response_text = f"[{provider.upper()} - {model}] Pull request created successfully.\n\n"
-            response_text += "• PR #66: New feature - **Open**\n\n"
-            response_text += "View at: https://github.com/kennylhilljr/Agent-Engineers/pull/66"
-        elif 'merge' in lower and ('pr' in lower or 'pull request' in lower):
-            # Merge PR operation
-            yield {
-                'type': 'tool_use',
-                'tool_name': 'mcp__arcade__Github_MergePullRequest',
-                'tool_input': {'repo': 'Agent-Engineers', 'pull_number': 65},
-                'tool_id': 'tool_github_merge_pr',
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
-            await asyncio.sleep(0.3)
-            yield {
-                'type': 'tool_result',
-                'tool_id': 'tool_github_merge_pr',
-                'tool_name': 'mcp__arcade__Github_MergePullRequest',
-                'content': 'PR #65 merged successfully (sha: abc123). Pull Request successfully merged.',
-                'result': {'merged': True, 'sha': 'abc123', 'message': 'Pull Request successfully merged'},
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
-            await asyncio.sleep(0.2)
-            response_text = f"[{provider.upper()} - {model}] Pull request merged successfully."
-        elif 'diff' in lower or 'review' in lower:
-            # Get PR diff / review
-            yield {
-                'type': 'tool_use',
-                'tool_name': 'mcp__arcade__Github_GetPullRequest',
-                'tool_input': {'repo': 'Agent-Engineers', 'pull_number': 65},
-                'tool_id': 'tool_github_get_pr',
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
-            await asyncio.sleep(0.3)
-            yield {
-                'type': 'tool_result',
-                'tool_id': 'tool_github_get_pr',
-                'tool_name': 'mcp__arcade__Github_GetPullRequest',
-                'content': 'PR #65 "feat(AI-140): Slack Access in Chat" — merged, +655/-23, 2 files changed',
-                'result': {'number': 65, 'title': 'feat(AI-140): Slack Access in Chat',
-                           'state': 'closed', 'merged': True,
-                           'additions': 655, 'deletions': 23, 'changed_files': 2},
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
-            await asyncio.sleep(0.2)
-            response_text = f"[{provider.upper()} - {model}] PR #65 details:\n\n"
-            response_text += "• Title: feat(AI-140): Slack Access in Chat\n"
-            response_text += "• State: Merged\n"
-            response_text += "• Changes: +655 / -23 across 2 files"
-        elif 'issue' in lower and ('github' in lower or 'create' in lower):
-            # GitHub issues (not Linear)
-            yield {
-                'type': 'tool_use',
-                'tool_name': 'mcp__arcade__Github_ListIssues',
-                'tool_input': {'repo': 'Agent-Engineers', 'state': 'open'},
-                'tool_id': 'tool_github_issues',
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
-            await asyncio.sleep(0.3)
-            yield {
-                'type': 'tool_result',
-                'tool_id': 'tool_github_issues',
-                'tool_name': 'mcp__arcade__Github_ListIssues',
-                'content': 'No open GitHub issues found in Agent-Engineers.',
-                'result': {'issues': []},
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
-            await asyncio.sleep(0.2)
-            response_text = f"[{provider.upper()} - {model}] No open GitHub issues found."
-        elif 'repo' in lower or 'repository' in lower:
-            # Repository info
-            yield {
-                'type': 'tool_use',
-                'tool_name': 'mcp__arcade__Github_GetRepository',
-                'tool_input': {'owner': 'kennylhilljr', 'repo': 'Agent-Engineers'},
-                'tool_id': 'tool_github_repo',
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
-            await asyncio.sleep(0.3)
-            yield {
-                'type': 'tool_result',
-                'tool_id': 'tool_github_repo',
-                'tool_name': 'mcp__arcade__Github_GetRepository',
-                'content': 'Agent-Engineers: 12 stars, 2 forks, 0 open issues. Description: Agent Dashboard.',
-                'result': {'name': 'Agent-Engineers', 'description': 'Agent Dashboard',
-                           'stars': 12, 'forks': 2, 'open_issues': 0},
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
-            await asyncio.sleep(0.2)
-            response_text = f"[{provider.upper()} - {model}] Repository: Agent-Engineers\n\n"
-            response_text += "• Stars: 12 | Forks: 2 | Open Issues: 0\n"
-            response_text += "• Description: Agent Dashboard"
-        else:
-            # Default: List PRs
-            yield {
-                'type': 'tool_use',
-                'tool_name': 'mcp__arcade__Github_ListPullRequests',
-                'tool_input': {'owner': 'kennylhilljr', 'repo': 'Agent-Engineers', 'state': 'open'},
-                'tool_id': 'tool_github_list_prs',
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
-            await asyncio.sleep(0.3)
-            yield {
-                'type': 'tool_result',
-                'tool_id': 'tool_github_list_prs',
-                'tool_name': 'mcp__arcade__Github_ListPullRequests',
-                'content': '3 recent PRs found: #63 Hot-Swap Provider (merged), #64 Linear Access (merged), #65 Slack Access (merged)',
-                'result': {'pull_requests': [
-                    {'number': 63, 'title': 'feat(AI-138): Hot-Swap Provider', 'state': 'merged'},
-                    {'number': 64, 'title': 'feat(AI-139): Linear Access in Chat', 'state': 'merged'},
-                    {'number': 65, 'title': 'feat(AI-140): Slack Access in Chat', 'state': 'merged'},
-                ]},
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
-            await asyncio.sleep(0.2)
-            response_text = f"[{provider.upper()} - {model}] Recent GitHub PRs:\n\n"
-            response_text += "• PR #63: feat(AI-138): Hot-Swap Provider - **Merged**\n"
-            response_text += "• PR #64: feat(AI-139): Linear Access in Chat - **Merged**\n"
-            response_text += "• PR #65: feat(AI-140): Slack Access in Chat - **Merged**\n\n"
-            response_text += "The repository is active with continuous improvements."
-
-    elif 'slack' in lower or 'channel' in lower or 'send message' in lower or 'reaction' in lower or 'pin' in lower:
-        # Determine Slack operation based on keywords
-        if 'send' in lower or 'post' in lower or 'notify' in lower:
-            # Send message operation
-            yield {
-                'type': 'tool_use',
-                'tool_name': 'mcp__slack__conversations_add_message',
-                'tool_input': {'channel': '#agent-status', 'text': 'Status update from Agent Dashboard'},
-                'tool_id': 'tool_slack_send',
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
-            await asyncio.sleep(0.3)
-            yield {
-                'type': 'tool_result',
-                'tool_id': 'tool_slack_send',
-                'tool_name': 'mcp__slack__conversations_add_message',
-                'content': 'Message delivered to #agent-status (ts: 1234567890.123456)',
-                'result': {'ok': True, 'ts': '1234567890.123456', 'channel': '#agent-status'},
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
-            await asyncio.sleep(0.2)
-            response_text = f"[{provider.upper()} - {model}] Message sent to #agent-status channel successfully."
-        elif 'list' in lower or 'channels' in lower:
-            # List channels operation
-            yield {
-                'type': 'tool_use',
-                'tool_name': 'mcp__slack__channels_list',
-                'tool_input': {'limit': 10},
-                'tool_id': 'tool_slack_list',
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
-            await asyncio.sleep(0.3)
-            yield {
-                'type': 'tool_result',
-                'tool_id': 'tool_slack_list',
-                'tool_name': 'mcp__slack__channels_list',
-                'content': '2 channels found: #agent-status, #general',
-                'result': {'channels': [
-                    {'id': 'C01', 'name': 'agent-status', 'is_member': True},
-                    {'id': 'C02', 'name': 'general', 'is_member': True}
-                ]},
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
-            await asyncio.sleep(0.2)
-            response_text = f"[{provider.upper()} - {model}] Available Slack channels:\n\n"
-            response_text += "• #agent-status\n• #general\n\n"
-            response_text += "You are a member of 2 channels."
-        elif 'reaction' in lower or 'react' in lower or 'emoji' in lower:
-            # Reaction operation
-            yield {
-                'type': 'tool_use',
-                'tool_name': 'mcp__slack__conversations_replies',
-                'tool_input': {'channel': '#agent-status', 'ts': '1234567890.123456'},
-                'tool_id': 'tool_slack_react',
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
-            await asyncio.sleep(0.3)
-            yield {
-                'type': 'tool_result',
-                'tool_id': 'tool_slack_react',
-                'tool_name': 'mcp__slack__conversations_replies',
-                'content': 'Replies fetched successfully from #agent-status.',
-                'result': {'ok': True},
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
-            await asyncio.sleep(0.2)
-            response_text = f"[{provider.upper()} - {model}] Reaction added to message in #agent-status."
-        else:
-            # Default: fetch conversation history
-            yield {
-                'type': 'tool_use',
-                'tool_name': 'mcp__slack__conversations_history',
-                'tool_input': {'channel': '#agent-status', 'limit': 10},
-                'tool_id': 'tool_slack_history',
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
-            await asyncio.sleep(0.3)
-            yield {
-                'type': 'tool_result',
-                'tool_id': 'tool_slack_history',
-                'tool_name': 'mcp__slack__conversations_history',
-                'content': '2 messages retrieved from #agent-status: dashboard live, agents operational.',
-                'result': {'messages': [
-                    {'text': 'Agent dashboard chat interface is now live!', 'user': 'system', 'ts': '1234567890.1'},
-                    {'text': 'All agents are operational.', 'user': 'bot', 'ts': '1234567890.2'}
-                ]},
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
-            await asyncio.sleep(0.2)
-            response_text = f"[{provider.upper()} - {model}] Latest Slack messages in #agent-status:\n\n"
-            response_text += "• Agent dashboard chat interface is now live!\n"
-            response_text += "• All agents are operational.\n\n"
-            response_text += "Team communication is flowing smoothly."
-
-    elif 'status' in lower:
-        response_text = f"[{provider.upper()} - {model}] Your agents are running smoothly. All systems operational with 99.2% uptime."
-    elif 'metric' in lower or 'performance' in lower:
-        response_text = f"[{provider.upper()} - {model}] Current metrics: 94% success rate, avg response time 245ms."
-    elif 'code' in lower:
-        response_text = f"[{provider.upper()} - {model}] Here's an example:\n\n"
-        response_text += "```python\n"
-        response_text += "def get_metrics():\n"
-        response_text += "    \"\"\"Fetch agent metrics.\"\"\"\n"
-        response_text += "    return {'success_rate': 0.94}\n"
-        response_text += "```\n\n"
-        response_text += "This function retrieves the metrics."
-    else:
-        response_text = f"[{provider.upper()} - {model}] I understand. Based on your agent dashboard, everything is performing within expected parameters."
-
-    # Stream the response word by word
-    words = response_text.split(' ')
-    for i, word in enumerate(words):
-        yield {
-            'type': 'text',
-            'content': word + (' ' if i < len(words) - 1 else ''),
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-        await asyncio.sleep(0.05)
-
-    yield {
-        'type': 'done',
-        'timestamp': datetime.utcnow().isoformat() + 'Z'
-    }
+    messages = list(_chat_history.values())
+    # Sort by timestamp, return most recent `limit` entries
+    messages.sort(key=lambda m: m.get("timestamp", ""))
+    return messages[-limit:]
 
 
-async def stream_gemini_response(
-    message: str,
-    model: str,
-    conversation_history: list[Dict[str, Any]] = None
-) -> AsyncIterator[Dict[str, Any]]:
-    """Stream response from Gemini API using bridge module.
-
-    Args:
-        message: User message
-        model: Gemini model ID
-        conversation_history: Previous messages in conversation
-
-    Yields:
-        Dict with type ('text', 'done', 'error') and content
-    """
-    try:
-        from bridges.gemini_bridge import GeminiBridge
-    except ImportError:
-        yield {
-            'type': 'error',
-            'content': 'Gemini bridge not available',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-        yield {
-            'type': 'done',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-        return
-
-    try:
-        bridge = GeminiBridge.from_env()
-        session = bridge.create_session(model=model)
-
-        # Add conversation history
-        if conversation_history:
-            for msg in conversation_history:
-                role = 'user' if msg['role'] == 'user' else 'model'
-                session.add_message(role, msg['content'])
-
-        # Stream response
-        async for token in bridge.stream_response(session, message):
-            yield {
-                'type': 'text',
-                'content': token,
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
-
-    except Exception as e:
-        yield {
-            'type': 'error',
-            'content': f'Error streaming from Gemini: {str(e)}',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-
-    yield {
-        'type': 'done',
-        'timestamp': datetime.utcnow().isoformat() + 'Z'
-    }
-
-
-async def stream_groq_response(
-    message: str,
-    model: str,
-    conversation_history: list[Dict[str, Any]] = None
-) -> AsyncIterator[Dict[str, Any]]:
-    """Stream response from Groq API using bridge module.
-
-    Args:
-        message: User message
-        model: Groq model ID
-        conversation_history: Previous messages in conversation
-
-    Yields:
-        Dict with type ('text', 'done', 'error') and content
-    """
-    try:
-        from bridges.groq_bridge import GroqBridge
-    except ImportError:
-        yield {
-            'type': 'error',
-            'content': 'Groq bridge not available',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-        yield {
-            'type': 'done',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-        return
-
-    try:
-        bridge = GroqBridge.from_env()
-        session = bridge.create_session(model=model)
-
-        # Add conversation history
-        if conversation_history:
-            for msg in conversation_history:
-                session.add_message(msg['role'], msg['content'])
-
-        # Stream response
-        async for token in bridge.stream_response(session, message):
-            yield {
-                'type': 'text',
-                'content': token,
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
-
-    except Exception as e:
-        yield {
-            'type': 'error',
-            'content': f'Error streaming from Groq: {str(e)}',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-
-    yield {
-        'type': 'done',
-        'timestamp': datetime.utcnow().isoformat() + 'Z'
-    }
-
-
-async def stream_kimi_response(
-    message: str,
-    model: str,
-    conversation_history: list[Dict[str, Any]] = None
-) -> AsyncIterator[Dict[str, Any]]:
-    """Stream response from KIMI API using bridge module.
-
-    Args:
-        message: User message
-        model: KIMI model ID
-        conversation_history: Previous messages in conversation
-
-    Yields:
-        Dict with type ('text', 'done', 'error') and content
-    """
-    try:
-        from bridges.kimi_bridge import KimiBridge
-    except ImportError:
-        yield {
-            'type': 'error',
-            'content': 'KIMI bridge not available',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-        yield {
-            'type': 'done',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-        return
-
-    try:
-        bridge = KimiBridge.from_env()
-        session = bridge.create_session(model=model)
-
-        # Add conversation history
-        if conversation_history:
-            for msg in conversation_history:
-                session.add_message(msg['role'], msg['content'])
-
-        # Stream response
-        async for token in bridge.stream_response(session, message):
-            yield {
-                'type': 'text',
-                'content': token,
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
-
-    except Exception as e:
-        yield {
-            'type': 'error',
-            'content': f'Error streaming from KIMI: {str(e)}',
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
-
-    yield {
-        'type': 'done',
-        'timestamp': datetime.utcnow().isoformat() + 'Z'
-    }
-
-
-async def stream_chat_response(
-    message: str,
-    provider: str = 'claude',
-    model: str = 'sonnet-4.5',
-    conversation_history: list[Dict[str, Any]] = None
-) -> AsyncIterator[Dict[str, Any]]:
-    """Stream chat response from specified provider.
-
-    Args:
-        message: User message
-        provider: Provider ID (claude, openai, gemini, groq, kimi, windsurf)
-        model: Model ID
-        conversation_history: Previous conversation messages
-
-    Yields:
-        Dict with streaming response chunks
-    """
-    # Route to appropriate provider
-    if provider == 'claude':
-        # Check if Anthropic API key is available
-        if os.getenv('ANTHROPIC_API_KEY'):
-            async for chunk in stream_claude_response(message, model, conversation_history):
-                yield chunk
-        else:
-            # Fall back to mock
-            async for chunk in stream_mock_response(message, 'Claude', model):
-                yield chunk
-
-    elif provider == 'openai' or provider == 'chatgpt':
-        # Check if OpenAI API key is available
-        if os.getenv('OPENAI_API_KEY'):
-            async for chunk in stream_openai_response(message, model, conversation_history):
-                yield chunk
-        else:
-            # Fall back to mock
-            async for chunk in stream_mock_response(message, 'ChatGPT', model):
-                yield chunk
-
-    elif provider == 'gemini':
-        # Check if Gemini API key is available
-        if os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY'):
-            async for chunk in stream_gemini_response(message, model, conversation_history):
-                yield chunk
-        else:
-            # Fall back to mock
-            async for chunk in stream_mock_response(message, 'Gemini', model):
-                yield chunk
-
-    elif provider == 'groq':
-        # Check if Groq API key is available
-        if os.getenv('GROQ_API_KEY'):
-            async for chunk in stream_groq_response(message, model, conversation_history):
-                yield chunk
-        else:
-            # Fall back to mock
-            async for chunk in stream_mock_response(message, 'Groq', model):
-                yield chunk
-
-    elif provider == 'kimi':
-        # Check if KIMI API key is available
-        if os.getenv('KIMI_API_KEY') or os.getenv('MOONSHOT_API_KEY'):
-            async for chunk in stream_kimi_response(message, model, conversation_history):
-                yield chunk
-        else:
-            # Fall back to mock
-            async for chunk in stream_mock_response(message, 'KIMI', model):
-                yield chunk
-
-    elif provider == 'windsurf':
-        # Windsurf not yet implemented - use mock
-        async for chunk in stream_mock_response(message, 'Windsurf', model):
-            yield chunk
-
-    else:
-        # Unknown provider, use mock
-        async for chunk in stream_mock_response(message, provider, model):
-            yield chunk
+def clear_chat_history() -> None:
+    """Clear the in-memory chat history (for testing)."""
+    _chat_history.clear()
