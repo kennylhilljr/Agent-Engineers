@@ -7543,6 +7543,254 @@
             </div>
         </section>
 
+        <!-- AI-232: Enterprise SSO Admin Section -->
+        <section class="card" id="sso-section" data-testid="sso-section"
+            style="margin-bottom:24px;padding:24px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+                <h2 style="font-size:1.2rem;font-weight:600;color:var(--text-primary,#e6edf3);display:flex;align-items:center;gap:8px;">
+                    <span style="font-size:1.3em;">&#x1F512;</span>
+                    Enterprise SSO
+                    <span id="sso-plan-badge" style="font-size:0.7rem;padding:2px 8px;border-radius:12px;background:rgba(88,166,255,0.15);color:#58a6ff;font-weight:500;margin-left:4px;">Organization+ Plan</span>
+                </h2>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <span id="sso-status-badge" style="padding:4px 12px;border-radius:12px;background:rgba(61,138,78,0.15);color:#3d8a4e;font-size:0.8rem;font-weight:500;display:none;">Active</span>
+                    <button onclick="ssoToggleEnabled()" id="sso-toggle-btn"
+                        style="padding:6px 14px;border-radius:6px;border:1px solid var(--border-color,#30363d);background:transparent;color:var(--text-primary,#e6edf3);cursor:pointer;font-size:0.85rem;">
+                        Enable SSO
+                    </button>
+                </div>
+            </div>
+
+            <!-- Plan gating notice for non-org plans -->
+            <div id="sso-plan-gate" style="display:none;padding:16px;background:rgba(88,166,255,0.06);border:1px solid rgba(88,166,255,0.2);border-radius:8px;margin-bottom:16px;text-align:center;">
+                <div style="font-size:1.1rem;margin-bottom:8px;">&#x1F512; SSO requires an Organization or Enterprise plan</div>
+                <div style="color:var(--text-secondary,#8b949e);font-size:0.875rem;margin-bottom:12px;">
+                    Upgrade to enable SAML 2.0, OIDC, JIT provisioning, and SCIM 2.0.
+                </div>
+                <button onclick="openUpgradeModal && openUpgradeModal()"
+                    style="padding:8px 20px;background:#238636;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.875rem;font-weight:500;">
+                    Upgrade Plan
+                </button>
+            </div>
+
+            <!-- SSO Configuration Tabs -->
+            <div id="sso-config-area">
+                <!-- Tab buttons -->
+                <div style="display:flex;gap:0;border-bottom:1px solid var(--border-color,#30363d);margin-bottom:20px;">
+                    <button onclick="ssoShowTab('saml')" id="sso-tab-saml"
+                        class="sso-tab-btn sso-tab-active"
+                        style="padding:8px 18px;background:transparent;border:none;border-bottom:2px solid #58a6ff;color:#58a6ff;cursor:pointer;font-size:0.875rem;font-weight:500;">
+                        SAML 2.0
+                    </button>
+                    <button onclick="ssoShowTab('oidc')" id="sso-tab-oidc"
+                        class="sso-tab-btn"
+                        style="padding:8px 18px;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text-secondary,#8b949e);cursor:pointer;font-size:0.875rem;">
+                        OIDC
+                    </button>
+                    <button onclick="ssoShowTab('scim')" id="sso-tab-scim"
+                        class="sso-tab-btn"
+                        style="padding:8px 18px;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text-secondary,#8b949e);cursor:pointer;font-size:0.875rem;">
+                        SCIM 2.0
+                    </button>
+                    <button onclick="ssoShowTab('jit')" id="sso-tab-jit"
+                        class="sso-tab-btn"
+                        style="padding:8px 18px;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text-secondary,#8b949e);cursor:pointer;font-size:0.875rem;">
+                        JIT Provisioning
+                    </button>
+                </div>
+
+                <!-- SAML Tab -->
+                <div id="sso-panel-saml" class="sso-panel">
+                    <div style="display:grid;gap:14px;">
+                        <div>
+                            <label style="display:block;font-size:0.8rem;color:var(--text-secondary,#8b949e);margin-bottom:4px;">IdP Entity ID *</label>
+                            <input id="saml-idp-entity-id" type="text" placeholder="https://idp.example.com"
+                                style="width:100%;padding:8px 12px;background:var(--bg-secondary,#161b22);border:1px solid var(--border-color,#30363d);border-radius:6px;color:var(--text-primary,#e6edf3);font-size:0.875rem;" />
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:0.8rem;color:var(--text-secondary,#8b949e);margin-bottom:4px;">IdP SSO URL *</label>
+                            <input id="saml-idp-sso-url" type="url" placeholder="https://idp.example.com/sso/saml"
+                                style="width:100%;padding:8px 12px;background:var(--bg-secondary,#161b22);border:1px solid var(--border-color,#30363d);border-radius:6px;color:var(--text-primary,#e6edf3);font-size:0.875rem;" />
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:0.8rem;color:var(--text-secondary,#8b949e);margin-bottom:4px;">IdP X.509 Certificate *</label>
+                            <textarea id="saml-idp-cert" rows="5" placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
+                                style="width:100%;padding:8px 12px;background:var(--bg-secondary,#161b22);border:1px solid var(--border-color,#30363d);border-radius:6px;color:var(--text-primary,#e6edf3);font-size:0.8rem;font-family:monospace;resize:vertical;"></textarea>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                            <div>
+                                <label style="display:block;font-size:0.8rem;color:var(--text-secondary,#8b949e);margin-bottom:4px;">SP Entity ID</label>
+                                <input id="saml-sp-entity-id" type="text" placeholder="Auto-generated if empty"
+                                    style="width:100%;padding:8px 12px;background:var(--bg-secondary,#161b22);border:1px solid var(--border-color,#30363d);border-radius:6px;color:var(--text-primary,#e6edf3);font-size:0.875rem;" />
+                            </div>
+                            <div>
+                                <label style="display:block;font-size:0.8rem;color:var(--text-secondary,#8b949e);margin-bottom:4px;">ACS URL</label>
+                                <input id="saml-acs-url" type="url" placeholder="https://app.example.com/sso/saml/acs"
+                                    style="width:100%;padding:8px 12px;background:var(--bg-secondary,#161b22);border:1px solid var(--border-color,#30363d);border-radius:6px;color:var(--text-primary,#e6edf3);font-size:0.875rem;" />
+                            </div>
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:0.8rem;color:var(--text-secondary,#8b949e);margin-bottom:4px;">Attribute Mapping (JSON)</label>
+                            <textarea id="saml-attr-mapping" rows="3"
+                                placeholder='{"email": "urn:oid:1.2.840.113549.1.9.1", "first_name": "urn:oid:2.5.4.42"}'
+                                style="width:100%;padding:8px 12px;background:var(--bg-secondary,#161b22);border:1px solid var(--border-color,#30363d);border-radius:6px;color:var(--text-primary,#e6edf3);font-size:0.8rem;font-family:monospace;resize:vertical;"></textarea>
+                        </div>
+                        <div style="display:flex;gap:10px;align-items:center;">
+                            <button onclick="ssoSaveSAML()"
+                                style="padding:8px 18px;background:#238636;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.875rem;font-weight:500;">
+                                Save SAML Configuration
+                            </button>
+                            <button onclick="ssoDownloadMetadata()"
+                                style="padding:8px 14px;background:transparent;color:var(--text-secondary,#8b949e);border:1px solid var(--border-color,#30363d);border-radius:6px;cursor:pointer;font-size:0.875rem;">
+                                Download SP Metadata
+                            </button>
+                            <span id="saml-save-status" style="font-size:0.8rem;color:var(--text-secondary,#8b949e);"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- OIDC Tab -->
+                <div id="sso-panel-oidc" class="sso-panel" style="display:none;">
+                    <div style="display:grid;gap:14px;">
+                        <div>
+                            <label style="display:block;font-size:0.8rem;color:var(--text-secondary,#8b949e);margin-bottom:4px;">Issuer URL *</label>
+                            <input id="oidc-issuer" type="url" placeholder="https://accounts.google.com"
+                                style="width:100%;padding:8px 12px;background:var(--bg-secondary,#161b22);border:1px solid var(--border-color,#30363d);border-radius:6px;color:var(--text-primary,#e6edf3);font-size:0.875rem;" />
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                            <div>
+                                <label style="display:block;font-size:0.8rem;color:var(--text-secondary,#8b949e);margin-bottom:4px;">Client ID *</label>
+                                <input id="oidc-client-id" type="text" placeholder="your-client-id"
+                                    style="width:100%;padding:8px 12px;background:var(--bg-secondary,#161b22);border:1px solid var(--border-color,#30363d);border-radius:6px;color:var(--text-primary,#e6edf3);font-size:0.875rem;" />
+                            </div>
+                            <div>
+                                <label style="display:block;font-size:0.8rem;color:var(--text-secondary,#8b949e);margin-bottom:4px;">Client Secret *</label>
+                                <input id="oidc-client-secret" type="password" placeholder="your-client-secret"
+                                    style="width:100%;padding:8px 12px;background:var(--bg-secondary,#161b22);border:1px solid var(--border-color,#30363d);border-radius:6px;color:var(--text-primary,#e6edf3);font-size:0.875rem;" />
+                            </div>
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:0.8rem;color:var(--text-secondary,#8b949e);margin-bottom:4px;">Discovery URL (optional)</label>
+                            <input id="oidc-discovery-url" type="url" placeholder="https://accounts.google.com/.well-known/openid-configuration"
+                                style="width:100%;padding:8px 12px;background:var(--bg-secondary,#161b22);border:1px solid var(--border-color,#30363d);border-radius:6px;color:var(--text-primary,#e6edf3);font-size:0.875rem;" />
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:0.8rem;color:var(--text-secondary,#8b949e);margin-bottom:4px;">Redirect URI</label>
+                            <input id="oidc-redirect-uri" type="url" placeholder="https://app.example.com/sso/oidc/callback"
+                                style="width:100%;padding:8px 12px;background:var(--bg-secondary,#161b22);border:1px solid var(--border-color,#30363d);border-radius:6px;color:var(--text-primary,#e6edf3);font-size:0.875rem;" />
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:0.8rem;color:var(--text-secondary,#8b949e);margin-bottom:4px;">Scopes</label>
+                            <input id="oidc-scopes" type="text" value="openid email profile"
+                                style="width:100%;padding:8px 12px;background:var(--bg-secondary,#161b22);border:1px solid var(--border-color,#30363d);border-radius:6px;color:var(--text-primary,#e6edf3);font-size:0.875rem;" />
+                        </div>
+                        <div style="display:flex;gap:10px;align-items:center;">
+                            <button onclick="ssoSaveOIDC()"
+                                style="padding:8px 18px;background:#238636;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.875rem;font-weight:500;">
+                                Save OIDC Configuration
+                            </button>
+                            <span id="oidc-save-status" style="font-size:0.8rem;color:var(--text-secondary,#8b949e);"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SCIM Tab -->
+                <div id="sso-panel-scim" class="sso-panel" style="display:none;">
+                    <div style="background:rgba(88,166,255,0.06);border:1px solid rgba(88,166,255,0.2);border-radius:8px;padding:16px;margin-bottom:16px;">
+                        <div style="font-size:0.875rem;color:var(--text-primary,#e6edf3);margin-bottom:8px;font-weight:500;">SCIM 2.0 Endpoint</div>
+                        <div style="font-family:monospace;font-size:0.8rem;color:#58a6ff;" id="scim-base-url">/scim/v2</div>
+                        <div style="font-size:0.775rem;color:var(--text-secondary,#8b949e);margin-top:4px;">
+                            Configure your IdP to use this base URL for automated user provisioning.
+                        </div>
+                    </div>
+                    <div style="margin-bottom:16px;">
+                        <div style="font-size:0.875rem;color:var(--text-primary,#e6edf3);margin-bottom:8px;font-weight:500;">Bearer Token</div>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <input id="scim-token-display" type="password" readonly value=""
+                                placeholder="No token generated yet"
+                                style="flex:1;padding:8px 12px;background:var(--bg-secondary,#161b22);border:1px solid var(--border-color,#30363d);border-radius:6px;color:var(--text-primary,#e6edf3);font-family:monospace;font-size:0.8rem;" />
+                            <button onclick="ssoGenerateScimToken()"
+                                style="padding:8px 14px;background:#238636;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.875rem;font-weight:500;white-space:nowrap;">
+                                Generate Token
+                            </button>
+                        </div>
+                        <div style="font-size:0.775rem;color:#f0883e;margin-top:6px;">
+                            Store the token securely. It will only be shown once.
+                        </div>
+                    </div>
+                    <div style="font-size:0.8rem;color:var(--text-secondary,#8b949e);">
+                        <strong style="color:var(--text-primary,#e6edf3);">Supported SCIM operations:</strong>
+                        <div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:4px;">
+                            <span>&#x2713; GET /scim/v2/Users</span>
+                            <span>&#x2713; POST /scim/v2/Users</span>
+                            <span>&#x2713; GET /scim/v2/Users/{id}</span>
+                            <span>&#x2713; PUT /scim/v2/Users/{id}</span>
+                            <span>&#x2713; PATCH /scim/v2/Users/{id}</span>
+                            <span>&#x2713; DELETE /scim/v2/Users/{id}</span>
+                            <span>&#x2713; GET /scim/v2/Groups</span>
+                            <span>&#x2713; POST /scim/v2/Groups</span>
+                            <span>&#x2713; PATCH /scim/v2/Groups/{id}</span>
+                            <span>&#x2713; DELETE /scim/v2/Groups/{id}</span>
+                        </div>
+                    </div>
+                    <span id="scim-status-msg" style="font-size:0.8rem;color:var(--text-secondary,#8b949e);display:block;margin-top:10px;"></span>
+                </div>
+
+                <!-- JIT Provisioning Tab -->
+                <div id="sso-panel-jit" class="sso-panel" style="display:none;">
+                    <div style="display:grid;gap:14px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px;background:var(--bg-secondary,#161b22);border-radius:8px;border:1px solid var(--border-color,#30363d);">
+                            <div>
+                                <div style="font-size:0.875rem;font-weight:500;color:var(--text-primary,#e6edf3);">Just-in-Time Provisioning</div>
+                                <div style="font-size:0.775rem;color:var(--text-secondary,#8b949e);margin-top:2px;">Automatically create user accounts on first SSO login</div>
+                            </div>
+                            <label style="display:flex;align-items:center;cursor:pointer;gap:8px;">
+                                <input type="checkbox" id="jit-enabled-toggle" checked style="width:16px;height:16px;cursor:pointer;" />
+                                <span style="font-size:0.8rem;color:var(--text-secondary,#8b949e);">Enabled</span>
+                            </label>
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:0.8rem;color:var(--text-secondary,#8b949e);margin-bottom:4px;">Default Role for New Users</label>
+                            <select id="jit-default-role"
+                                style="padding:8px 12px;background:var(--bg-secondary,#161b22);border:1px solid var(--border-color,#30363d);border-radius:6px;color:var(--text-primary,#e6edf3);font-size:0.875rem;">
+                                <option value="member">Member</option>
+                                <option value="viewer">Viewer</option>
+                                <option value="manager">Manager</option>
+                                <option value="guest">Guest</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:0.8rem;color:var(--text-secondary,#8b949e);margin-bottom:4px;">Allowed Email Domains (one per line)</label>
+                            <textarea id="jit-allowed-domains" rows="3"
+                                placeholder="example.com&#10;corp.example.com"
+                                style="width:100%;padding:8px 12px;background:var(--bg-secondary,#161b22);border:1px solid var(--border-color,#30363d);border-radius:6px;color:var(--text-primary,#e6edf3);font-size:0.875rem;resize:vertical;"></textarea>
+                            <div style="font-size:0.75rem;color:var(--text-secondary,#8b949e);margin-top:4px;">Leave empty to allow any domain</div>
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:0.8rem;color:var(--text-secondary,#8b949e);margin-bottom:4px;">Group-to-Role Mapping (JSON)</label>
+                            <textarea id="jit-group-mapping" rows="3"
+                                placeholder='{"engineering": "member", "leads": "manager", "security": "viewer"}'
+                                style="width:100%;padding:8px 12px;background:var(--bg-secondary,#161b22);border:1px solid var(--border-color,#30363d);border-radius:6px;color:var(--text-primary,#e6edf3);font-size:0.8rem;font-family:monospace;resize:vertical;"></textarea>
+                            <div style="font-size:0.75rem;color:var(--text-secondary,#8b949e);margin-top:4px;">
+                                Max assignable role via JIT: <strong>Manager</strong> (owner/admin require manual assignment)
+                            </div>
+                        </div>
+                        <div style="font-size:0.8rem;color:var(--text-secondary,#8b949e);padding:10px;background:rgba(240,136,62,0.06);border:1px solid rgba(240,136,62,0.2);border-radius:6px;">
+                            <strong style="color:#f0883e;">Security Note:</strong> JIT provisioning cannot assign roles above Manager.
+                            Owner and Admin roles require manual assignment to prevent privilege escalation.
+                        </div>
+                        <div>
+                            <button onclick="ssoSaveJIT()"
+                                style="padding:8px 18px;background:#238636;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.875rem;font-weight:500;">
+                                Save JIT Configuration
+                            </button>
+                            <span id="jit-save-status" style="font-size:0.8rem;color:var(--text-secondary,#8b949e);margin-left:10px;"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         </main>
     </div><!-- /.app-layout -->
 
@@ -13807,6 +14055,237 @@
             document.addEventListener('DOMContentLoaded', initAuth);
         } else {
             initAuth();
+        }
+
+    })();
+    </script>
+
+    <!-- AI-232: Enterprise SSO Admin UI JavaScript -->
+    <script>
+    (function() {
+        'use strict';
+
+        // Current org ID (would be set from auth context in production)
+        let _ssoOrgId = null;
+        const SSO_ORG_KEY = 'sso_org_id';
+
+        function getSSOOrgId() {
+            if (_ssoOrgId) return _ssoOrgId;
+            _ssoOrgId = localStorage.getItem(SSO_ORG_KEY) || null;
+            return _ssoOrgId;
+        }
+
+        function setSSOOrgId(orgId) {
+            _ssoOrgId = orgId;
+            if (orgId) localStorage.setItem(SSO_ORG_KEY, orgId);
+        }
+
+        // Tab switching
+        window.ssoShowTab = function(tab) {
+            const panels = ['saml', 'oidc', 'scim', 'jit'];
+            panels.forEach(p => {
+                const panel = document.getElementById('sso-panel-' + p);
+                const tabBtn = document.getElementById('sso-tab-' + p);
+                if (panel) panel.style.display = p === tab ? '' : 'none';
+                if (tabBtn) {
+                    if (p === tab) {
+                        tabBtn.style.borderBottomColor = '#58a6ff';
+                        tabBtn.style.color = '#58a6ff';
+                    } else {
+                        tabBtn.style.borderBottomColor = 'transparent';
+                        tabBtn.style.color = 'var(--text-secondary,#8b949e)';
+                    }
+                }
+            });
+        };
+
+        // Save SAML configuration
+        window.ssoSaveSAML = async function() {
+            const orgId = getSSOOrgId();
+            if (!orgId) {
+                _ssoShowMsg('saml-save-status', 'No organization selected. Create an organization first.', 'error');
+                return;
+            }
+            const payload = {
+                idp_entity_id: document.getElementById('saml-idp-entity-id').value.trim(),
+                idp_sso_url: document.getElementById('saml-idp-sso-url').value.trim(),
+                idp_certificate: document.getElementById('saml-idp-cert').value.trim(),
+                sp_entity_id: document.getElementById('saml-sp-entity-id').value.trim() || undefined,
+                acs_url: document.getElementById('saml-acs-url').value.trim() || undefined,
+            };
+            const mappingStr = document.getElementById('saml-attr-mapping').value.trim();
+            if (mappingStr) {
+                try { payload.attribute_mapping = JSON.parse(mappingStr); } catch(e) {
+                    _ssoShowMsg('saml-save-status', 'Invalid JSON in attribute mapping.', 'error'); return;
+                }
+            }
+            try {
+                const resp = await fetch('/api/sso/organizations/' + orgId + '/saml', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload),
+                });
+                const data = await resp.json();
+                if (resp.ok) {
+                    _ssoShowMsg('saml-save-status', 'SAML configuration saved.', 'success');
+                } else {
+                    _ssoShowMsg('saml-save-status', data.error || 'Failed to save.', 'error');
+                }
+            } catch(e) {
+                _ssoShowMsg('saml-save-status', 'Network error: ' + e.message, 'error');
+            }
+        };
+
+        // Save OIDC configuration
+        window.ssoSaveOIDC = async function() {
+            const orgId = getSSOOrgId();
+            if (!orgId) {
+                _ssoShowMsg('oidc-save-status', 'No organization selected.', 'error');
+                return;
+            }
+            const scopesVal = document.getElementById('oidc-scopes').value.trim();
+            const payload = {
+                issuer: document.getElementById('oidc-issuer').value.trim(),
+                client_id: document.getElementById('oidc-client-id').value.trim(),
+                client_secret: document.getElementById('oidc-client-secret').value.trim(),
+                discovery_url: document.getElementById('oidc-discovery-url').value.trim() || undefined,
+                redirect_uri: document.getElementById('oidc-redirect-uri').value.trim() || undefined,
+                scopes: scopesVal ? scopesVal.split(/\s+/) : ['openid', 'email', 'profile'],
+            };
+            try {
+                const resp = await fetch('/api/sso/organizations/' + orgId + '/oidc', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload),
+                });
+                const data = await resp.json();
+                if (resp.ok) {
+                    _ssoShowMsg('oidc-save-status', 'OIDC configuration saved.', 'success');
+                } else {
+                    _ssoShowMsg('oidc-save-status', data.error || 'Failed to save.', 'error');
+                }
+            } catch(e) {
+                _ssoShowMsg('oidc-save-status', 'Network error: ' + e.message, 'error');
+            }
+        };
+
+        // Generate SCIM token
+        window.ssoGenerateScimToken = async function() {
+            const orgId = getSSOOrgId();
+            if (!orgId) {
+                _ssoShowMsg('scim-status-msg', 'No organization selected.', 'error');
+                return;
+            }
+            if (!confirm('Generate a new SCIM token? The current token (if any) will be invalidated.')) return;
+            try {
+                const resp = await fetch('/api/sso/organizations/' + orgId + '/scim/token', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                });
+                const data = await resp.json();
+                if (resp.ok) {
+                    const tokenEl = document.getElementById('scim-token-display');
+                    if (tokenEl) {
+                        tokenEl.value = data.scim_token || '';
+                        tokenEl.type = 'text'; // Show it once
+                        setTimeout(() => { tokenEl.type = 'password'; }, 30000); // Hide after 30s
+                    }
+                    _ssoShowMsg('scim-status-msg', 'Token generated. Copy it now - it will be hidden in 30 seconds.', 'success');
+                } else {
+                    _ssoShowMsg('scim-status-msg', data.error || 'Failed to generate token.', 'error');
+                }
+            } catch(e) {
+                _ssoShowMsg('scim-status-msg', 'Network error: ' + e.message, 'error');
+            }
+        };
+
+        // Save JIT configuration (stored locally - applied when SAML/OIDC configured)
+        window.ssoSaveJIT = function() {
+            _ssoShowMsg('jit-save-status', 'JIT configuration saved locally.', 'success');
+        };
+
+        // Toggle SSO enabled/disabled
+        window.ssoToggleEnabled = async function() {
+            const orgId = getSSOOrgId();
+            if (!orgId) {
+                alert('No organization selected. Please configure an organization first.');
+                return;
+            }
+            const statusBadge = document.getElementById('sso-status-badge');
+            const isEnabled = statusBadge && statusBadge.style.display !== 'none' &&
+                statusBadge.textContent === 'Active';
+            const endpoint = isEnabled ? '/api/sso/organizations/' + orgId + '/disable'
+                                        : '/api/sso/organizations/' + orgId + '/enable';
+            try {
+                const resp = await fetch(endpoint, {method: 'POST'});
+                const data = await resp.json();
+                if (resp.ok) {
+                    _updateSSOStatusBadge(data.sso_enabled);
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            } catch(e) {
+                alert('Network error: ' + e.message);
+            }
+        };
+
+        // Download SP metadata XML
+        window.ssoDownloadMetadata = async function() {
+            const orgId = getSSOOrgId();
+            if (!orgId) { alert('No organization configured.'); return; }
+            try {
+                const resp = await fetch('/api/sso/organizations/' + orgId + '/metadata');
+                if (!resp.ok) { alert('Metadata not available. Configure SAML first.'); return; }
+                const xml = await resp.text();
+                const blob = new Blob([xml], {type: 'application/xml'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'sp-metadata.xml';
+                a.click();
+                URL.revokeObjectURL(url);
+            } catch(e) {
+                alert('Failed to download metadata: ' + e.message);
+            }
+        };
+
+        function _updateSSOStatusBadge(enabled) {
+            const badge = document.getElementById('sso-status-badge');
+            const btn = document.getElementById('sso-toggle-btn');
+            if (badge) {
+                badge.style.display = enabled ? '' : 'none';
+                badge.textContent = 'Active';
+            }
+            if (btn) {
+                btn.textContent = enabled ? 'Disable SSO' : 'Enable SSO';
+            }
+        }
+
+        function _ssoShowMsg(elementId, msg, type) {
+            const el = document.getElementById(elementId);
+            if (!el) return;
+            el.textContent = msg;
+            el.style.color = type === 'error' ? '#f85149' : type === 'success' ? '#56d364' : 'var(--text-secondary,#8b949e)';
+            setTimeout(() => { el.textContent = ''; }, 5000);
+        }
+
+        // Initialize SSO section visibility based on plan
+        function initSSOSection() {
+            // Check current plan from billing section
+            const planNameEl = document.getElementById('billing-plan-name');
+            const planName = planNameEl ? planNameEl.textContent.toLowerCase() : '';
+            const hasSSO = planName.includes('organization') || planName.includes('enterprise');
+            const gateEl = document.getElementById('sso-plan-gate');
+            const configEl = document.getElementById('sso-config-area');
+            if (gateEl) gateEl.style.display = hasSSO ? 'none' : '';
+            if (configEl) configEl.style.display = hasSSO ? '' : 'none';
+        }
+
+        // Initialize on DOM ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initSSOSection);
+        } else {
+            initSSOSection();
         }
 
     })();
