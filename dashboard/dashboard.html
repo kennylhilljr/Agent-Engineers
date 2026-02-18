@@ -300,6 +300,98 @@
             width: 100%;
         }
 
+        /* AI-79: Agent Status Panel (REQ-MONITOR-001) */
+        .agent-status-panel {
+            margin-top: 8px;
+        }
+
+        .agent-status-list {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .agent-status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.75rem;
+            color: var(--text-secondary, #8b949e);
+            transition: background 0.15s ease;
+        }
+
+        .agent-status-item:hover {
+            background: rgba(255,255,255,0.04);
+        }
+
+        .agent-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        /* Status colors */
+        .agent-status-dot.status-idle {
+            background: #475569;
+        }
+
+        .agent-status-dot.status-running {
+            background: #22c55e;
+            animation: pulse-green 1.5s ease-in-out infinite;
+        }
+
+        .agent-status-dot.status-paused {
+            background: #eab308;
+        }
+
+        .agent-status-dot.status-error {
+            background: #ef4444;
+        }
+
+        @keyframes pulse-green {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6); opacity: 1; }
+            50% { box-shadow: 0 0 0 4px rgba(34, 197, 94, 0); opacity: 0.8; }
+        }
+
+        .agent-status-name {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 0.74rem;
+        }
+
+        .agent-status-label {
+            font-size: 0.68rem;
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-weight: 500;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .agent-status-label.label-idle {
+            color: #475569;
+        }
+
+        .agent-status-label.label-running {
+            color: #22c55e;
+            background: rgba(34, 197, 94, 0.1);
+        }
+
+        .agent-status-label.label-paused {
+            color: #eab308;
+            background: rgba(234, 179, 8, 0.1);
+        }
+
+        .agent-status-label.label-error {
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+        }
+
         /* Header */
         .header {
             text-align: center;
@@ -3084,6 +3176,15 @@
                     <span class="panel-nav-icon">&#128172;</span>
                     <span>Chat Interface</span>
                 </button>
+
+                <!-- AI-79: Agent Status Panel (REQ-MONITOR-001) -->
+                <span class="panel-section-label" style="margin-top:8px;">Agent Status</span>
+                <div class="agent-status-panel" id="agent-status-panel">
+                    <div class="agent-status-list" id="agent-status-list">
+                        <!-- Populated by renderAgentStatusPanel() -->
+                        <div style="padding:5px 10px;font-size:0.72rem;color:var(--text-secondary,#8b949e);opacity:0.7;">Loading...</div>
+                    </div>
+                </div>
             </nav>
         </aside>
 
@@ -4551,6 +4652,10 @@
                         } else if (message.type === 'test_results') {
                             console.log('Received test_results event via WebSocket', message);
                             renderTestResults(message);
+                        } else if (message.type === 'agent_status') {
+                            // AI-79: Real-time agent status update from WebSocket (REQ-MONITOR-001)
+                            console.log('Received agent_status event via WebSocket', message);
+                            updateAgentStatusItem(message.agent, message.status, message.ticket || null);
                         }
                     } catch (error) {
                         console.error('Error processing WebSocket message:', error);
@@ -5006,6 +5111,110 @@
             handleMetricsUpdate(data);
         }
 
+        // =========================================================
+        // AI-79: Agent Status Panel (REQ-MONITOR-001)
+        // =========================================================
+
+        // The 13 canonical panel agents
+        const PANEL_AGENTS = [
+            'linear', 'coding', 'github', 'slack', 'pr_reviewer',
+            'ops', 'coding_fast', 'pr_reviewer_fast', 'chatgpt',
+            'gemini', 'groq', 'kimi', 'windsurf'
+        ];
+
+        // In-memory cache of agent statuses for the panel
+        const _agentPanelStatus = {};
+        PANEL_AGENTS.forEach(name => {
+            _agentPanelStatus[name] = { status: 'idle', current_ticket: null, elapsed_time: null };
+        });
+
+        // Display name formatter
+        function agentDisplayName(name) {
+            const names = {
+                linear: 'Linear', coding: 'Coding', github: 'GitHub',
+                slack: 'Slack', pr_reviewer: 'PR Reviewer',
+                ops: 'Ops', coding_fast: 'Coding Fast',
+                pr_reviewer_fast: 'PR Rev Fast', chatgpt: 'ChatGPT',
+                gemini: 'Gemini', groq: 'Groq', kimi: 'KIMI', windsurf: 'Windsurf'
+            };
+            return names[name] || name;
+        }
+
+        function renderAgentStatusPanel() {
+            const list = document.getElementById('agent-status-list');
+            if (!list) return;
+
+            list.innerHTML = PANEL_AGENTS.map(name => {
+                const info = _agentPanelStatus[name] || { status: 'idle', current_ticket: null };
+                const status = info.status || 'idle';
+                const displayName = agentDisplayName(name);
+                const labelMap = { idle: 'Idle', running: 'Running', paused: 'Paused', error: 'Error' };
+                const label = labelMap[status] || status;
+
+                return `
+                    <div class="agent-status-item" id="agent-status-item-${name}" data-agent="${name}" data-status="${status}">
+                        <div class="agent-status-dot status-${status}" id="agent-status-dot-${name}"></div>
+                        <span class="agent-status-name" title="${displayName}">${displayName}</span>
+                        <span class="agent-status-label label-${status}" id="agent-status-label-${name}">${label}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateAgentStatusItem(agentName, status, currentTicket) {
+            if (!PANEL_AGENTS.includes(agentName)) return;
+
+            _agentPanelStatus[agentName] = { status, current_ticket: currentTicket };
+
+            // Update the DOM element if it exists
+            const item = document.getElementById(`agent-status-item-${agentName}`);
+            const dot = document.getElementById(`agent-status-dot-${agentName}`);
+            const label = document.getElementById(`agent-status-label-${agentName}`);
+
+            if (item && dot && label) {
+                const labelMap = { idle: 'Idle', running: 'Running', paused: 'Paused', error: 'Error' };
+                const displayLabel = labelMap[status] || status;
+
+                item.setAttribute('data-status', status);
+                dot.className = `agent-status-dot status-${status}`;
+                label.className = `agent-status-label label-${status}`;
+                label.textContent = displayLabel;
+                if (currentTicket && status === 'running') {
+                    item.title = `Running: ${currentTicket}`;
+                } else {
+                    item.title = '';
+                }
+            }
+        }
+
+        async function fetchAgentStatusPanel() {
+            try {
+                const resp = await fetch(`${API_BASE_URL}/api/agents/status`);
+                if (!resp.ok) return;
+                const data = await resp.json();
+                const agents = data.agents || [];
+                agents.forEach(agent => {
+                    if (agent.name && PANEL_AGENTS.includes(agent.name)) {
+                        _agentPanelStatus[agent.name] = {
+                            status: agent.status || 'idle',
+                            current_ticket: agent.current_ticket || null,
+                            elapsed_time: agent.elapsed_time || null,
+                        };
+                    }
+                });
+                renderAgentStatusPanel();
+            } catch (err) {
+                console.warn('Agent status panel fetch failed:', err);
+            }
+        }
+
+        // Poll agent status every 5 seconds as WebSocket fallback
+        let _agentStatusPollTimer = null;
+        function startAgentStatusPolling() {
+            if (_agentStatusPollTimer) return;
+            _agentStatusPollTimer = setInterval(fetchAgentStatusPanel, 5000);
+        }
+
         // Initialize Dashboard
         async function init() {
             console.log('Initializing Agent Status Dashboard...');
@@ -5015,6 +5224,10 @@
 
             // Connect to WebSocket for live updates
             connectWebSocket();
+
+            // AI-79: Initialize Agent Status Panel
+            await fetchAgentStatusPanel();
+            startAgentStatusPolling();
 
             console.log('Dashboard initialized');
             console.log('WebSocket live updates enabled with auto-reconnect');
