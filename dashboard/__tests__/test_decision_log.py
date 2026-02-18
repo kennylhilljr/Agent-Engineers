@@ -491,3 +491,187 @@ class TestDecisionLogWebSocketBroadcast(TestDecisionLogBase):
             assert decision['decision'] == 'Retry with backoff strategy'
             assert 'id' in decision
             assert 'timestamp' in decision
+
+
+# ---------------------------------------------------------------------------
+# 9. GET /api/decisions default limit capped at 50 (AI-97)
+# ---------------------------------------------------------------------------
+
+class TestDecisionDefaultLimit(TestDecisionLogBase):
+    """GET /api/decisions defaults to returning at most 50 decisions."""
+
+    @unittest_run_loop
+    async def test_default_limit_returns_at_most_50(self):
+        """GET /api/decisions without limit param returns at most 50 results."""
+        # Directly fill the buffer with 60 decisions (fast, no HTTP calls)
+        for i in range(60):
+            self._ds._decision_log.append({
+                'id': str(i),
+                'type': 'other',
+                'ticket': f'AI-{i}',
+                'decision': f'Decision {i:03d}',
+                'reason': '',
+                'outcome': 'pending',
+                'timestamp': '2026-01-01T00:00:00',
+                'input_factors': {},
+                'agent_selected': '',
+                'model_used': '',
+                'agent_event_id': '',
+                'duration_ms': None,
+                'session_id': '',
+            })
+
+        resp = await self.client.request('GET', '/api/decisions')
+        data = await resp.json()
+        assert resp.status == 200
+        assert data['total'] == 50
+        assert len(data['decisions']) == 50
+
+    @unittest_run_loop
+    async def test_default_limit_returns_most_recent_50(self):
+        """GET /api/decisions default limit returns the 50 most recent entries."""
+        for i in range(60):
+            self._ds._decision_log.append({
+                'id': str(i),
+                'type': 'other',
+                'ticket': f'AI-{i}',
+                'decision': f'Decision {i:03d}',
+                'reason': '',
+                'outcome': 'pending',
+                'timestamp': '2026-01-01T00:00:00',
+                'input_factors': {},
+                'agent_selected': '',
+                'model_used': '',
+                'agent_event_id': '',
+                'duration_ms': None,
+                'session_id': '',
+            })
+
+        resp = await self.client.request('GET', '/api/decisions')
+        data = await resp.json()
+        # Most recent 50 = IDs 59 down to 10
+        ids = [int(d['id']) for d in data['decisions']]
+        assert ids[0] == 59   # most recent
+        assert ids[-1] == 10  # oldest within the default limit
+
+    @unittest_run_loop
+    async def test_explicit_limit_overrides_default(self):
+        """GET /api/decisions?limit=5 overrides the default 50 limit."""
+        for i in range(20):
+            self._ds._decision_log.append({
+                'id': str(i),
+                'type': 'other',
+                'ticket': '',
+                'decision': f'Decision {i:03d}',
+                'reason': '',
+                'outcome': 'pending',
+                'timestamp': '2026-01-01T00:00:00',
+                'input_factors': {},
+                'agent_selected': '',
+                'model_used': '',
+                'agent_event_id': '',
+                'duration_ms': None,
+                'session_id': '',
+            })
+
+        resp = await self.client.request('GET', '/api/decisions?limit=5')
+        data = await resp.json()
+        assert data['total'] == 5
+        assert len(data['decisions']) == 5
+
+    @unittest_run_loop
+    async def test_invalid_limit_falls_back_to_default_50(self):
+        """GET /api/decisions?limit=invalid falls back to default 50."""
+        for i in range(60):
+            self._ds._decision_log.append({
+                'id': str(i),
+                'type': 'other',
+                'ticket': '',
+                'decision': f'Decision {i:03d}',
+                'reason': '',
+                'outcome': 'pending',
+                'timestamp': '2026-01-01T00:00:00',
+                'input_factors': {},
+                'agent_selected': '',
+                'model_used': '',
+                'agent_event_id': '',
+                'duration_ms': None,
+                'session_id': '',
+            })
+
+        resp = await self.client.request('GET', '/api/decisions?limit=notanumber')
+        assert resp.status == 200
+        data = await resp.json()
+        # Should fall back to default 50
+        assert data['total'] == 50
+
+
+# ---------------------------------------------------------------------------
+# 10. POST /api/decisions with alternatives and linked_event_id fields (AI-98)
+# ---------------------------------------------------------------------------
+
+class TestDecisionAuditTrailFields(TestDecisionLogBase):
+    """POST /api/decisions with AI-97/98 extended schema fields."""
+
+    @unittest_run_loop
+    async def test_post_stores_linked_event_id(self):
+        """POST /api/decisions stores linked_event_id (alias for agent_event_id)."""
+        payload = {
+            'type': 'agent_selection',
+            'ticket': 'AI-97',
+            'decision': 'Select coding agent',
+            'input_factors': {'keywords': ['new component'], 'verification_status': 'pass'},
+            'outcome': {'agent': 'coding', 'model': 'sonnet', 'reason': 'Complex new component'},
+            'agent_event_id': 'event-uuid-123',
+        }
+        resp = await self._post_decision(payload)
+        assert resp.status == 201
+        data = await resp.json()
+        assert data['agent_event_id'] == 'event-uuid-123'
+
+    @unittest_run_loop
+    async def test_post_all_five_decision_types(self):
+        """POST /api/decisions accepts all 5 named decision types plus 'other'."""
+        expected_types = [
+            'agent_selection', 'complexity', 'verification',
+            'pr_routing', 'error_recovery', 'other',
+        ]
+        for dtype in expected_types:
+            payload = {'type': dtype, 'ticket': 'AI-98', 'decision': f'Test {dtype}'}
+            resp = await self._post_decision(payload)
+            assert resp.status == 201, f'Failed for type: {dtype}'
+            data = await resp.json()
+            assert data['type'] == dtype
+
+    @unittest_run_loop
+    async def test_get_by_id_returns_404(self):
+        """GET /api/decisions/{id} returns 404 for unknown id."""
+        resp = await self.client.request('GET', '/api/decisions/unknown-uuid-ai97')
+        assert resp.status == 404
+
+    @unittest_run_loop
+    async def test_post_decision_has_auto_generated_id_and_timestamp(self):
+        """POST /api/decisions returns record with auto-generated id and timestamp."""
+        payload = {'type': 'complexity', 'ticket': 'AI-98', 'decision': 'Complexity check'}
+        resp = await self._post_decision(payload)
+        assert resp.status == 201
+        data = await resp.json()
+        assert 'id' in data and len(data['id']) > 0
+        assert 'timestamp' in data and len(data['timestamp']) > 0
+
+    @unittest_run_loop
+    async def test_get_decisions_returns_reverse_chronological(self):
+        """GET /api/decisions returns decisions in reverse-chronological order."""
+        for i in range(5):
+            await self._post_decision({
+                'type': 'other',
+                'ticket': f'AI-{i}',
+                'decision': f'Decision {i}',
+            })
+
+        resp = await self.client.request('GET', '/api/decisions')
+        data = await resp.json()
+        tickets = [d['ticket'] for d in data['decisions']]
+        # Last posted (AI-4) should appear first
+        assert tickets[0] == 'AI-4'
+        assert tickets[-1] == 'AI-0'

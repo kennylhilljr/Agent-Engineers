@@ -3425,6 +3425,34 @@
             flex-wrap: wrap;
         }
 
+        /* AI-97: Decision type filter dropdown */
+        .decision-type-select {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            border-radius: 8px;
+            color: #f1f5f9;
+            font-size: 0.85rem;
+            padding: 7px 10px;
+            outline: none;
+            cursor: pointer;
+            transition: border-color 0.2s ease;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' viewBox='0 0 10 6'%3E%3Cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            padding-right: 28px;
+        }
+
+        .decision-type-select:focus {
+            border-color: rgba(96, 165, 250, 0.5);
+        }
+
+        .decision-type-select option {
+            background: #1e293b;
+            color: #f1f5f9;
+        }
+
         .decision-search {
             background: rgba(30, 41, 59, 0.8);
             border: 1px solid rgba(148, 163, 184, 0.3);
@@ -5084,12 +5112,28 @@
                     Decision Log
                 </h2>
                 <div class="decision-log-controls">
+                    <!-- AI-97: Filter by type dropdown -->
+                    <select
+                        id="decision-type-filter-select"
+                        class="decision-type-select"
+                        aria-label="Filter decisions by type"
+                        data-testid="decision-type-filter-select"
+                        onchange="onDecisionTypeSelectChange(this.value)"
+                    >
+                        <option value="">All Types</option>
+                        <option value="agent_selection">Agent Selection</option>
+                        <option value="complexity">Complexity</option>
+                        <option value="verification">Verification</option>
+                        <option value="pr_routing">PR Routing</option>
+                        <option value="error_recovery">Error Recovery</option>
+                        <option value="other">Other</option>
+                    </select>
                     <input
                         type="text"
                         id="decision-search"
                         class="decision-search"
-                        placeholder="Search decisions or tickets..."
-                        aria-label="Search decisions"
+                        placeholder="Search ticket key..."
+                        aria-label="Search decisions by ticket"
                         data-testid="decision-search"
                         oninput="filterDecisions()"
                     />
@@ -6553,8 +6597,28 @@
             updateConnectionStatus('disconnected', 'Disconnected');
         }
 
-        // AI-94/AI-95: In-memory store for reasoning block collapse state {blockId: bool}
+        // AI-94/AI-95/AI-96: In-memory + sessionStorage store for reasoning block collapse state {blockId: bool}
         const _reasoningBlockCollapseState = {};
+        const _REASONING_COLLAPSE_SS_KEY = 'reasoningBlockCollapseState';
+
+        function _saveReasoningCollapseState() {
+            try {
+                sessionStorage.setItem(_REASONING_COLLAPSE_SS_KEY, JSON.stringify(_reasoningBlockCollapseState));
+            } catch (e) { /* sessionStorage unavailable */ }
+        }
+
+        function _loadReasoningCollapseState() {
+            try {
+                const raw = sessionStorage.getItem(_REASONING_COLLAPSE_SS_KEY);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    Object.assign(_reasoningBlockCollapseState, parsed);
+                }
+            } catch (e) { /* ignore */ }
+        }
+
+        // Load persisted collapse state on startup (AI-96)
+        _loadReasoningCollapseState();
 
         // Step action -> icon mapping (AI-95)
         function _reasoningStepIcon(action) {
@@ -6625,8 +6689,14 @@
                 </div>
             `;
 
-            // Default: collapsed (start state)
-            _reasoningBlockCollapseState[blockId] = false;
+            // Default: collapsed, but restore from sessionStorage if persisted (AI-96)
+            const persistedExpanded = _reasoningBlockCollapseState[blockId];
+            if (persistedExpanded === true) {
+                card.classList.add('expanded');
+                _reasoningBlockCollapseState[blockId] = true;
+            } else {
+                _reasoningBlockCollapseState[blockId] = false;
+            }
 
             container.prepend(card);
 
@@ -6635,15 +6705,16 @@
             if (countEl) countEl.textContent = `${total} reasoning block${total !== 1 ? 's' : ''}`;
         }
 
-        // Toggle collapse state for a reasoning block card
+        // Toggle collapse state for a reasoning block card (AI-96: persists to sessionStorage)
         function toggleReasoningBlockCard(blockId) {
             const card = document.getElementById(blockId);
             if (!card) return;
             const expanded = card.classList.toggle('expanded');
             _reasoningBlockCollapseState[blockId] = expanded;
+            _saveReasoningCollapseState();
         }
 
-        // Expand all reasoning block cards in the panel
+        // Expand all reasoning block cards in the panel (AI-96: persists to sessionStorage)
         function expandAllReasoningBlocks() {
             const container = document.getElementById('reasoning-stream-blocks');
             if (!container) return;
@@ -6651,9 +6722,10 @@
                 card.classList.add('expanded');
                 _reasoningBlockCollapseState[card.dataset.blockId] = true;
             });
+            _saveReasoningCollapseState();
         }
 
-        // Collapse all reasoning block cards in the panel
+        // Collapse all reasoning block cards in the panel (AI-96: persists to sessionStorage)
         function collapseAllReasoningBlocks() {
             const container = document.getElementById('reasoning-stream-blocks');
             if (!container) return;
@@ -6661,6 +6733,7 @@
                 card.classList.remove('expanded');
                 _reasoningBlockCollapseState[card.dataset.blockId] = false;
             });
+            _saveReasoningCollapseState();
         }
 
         // Clear all reasoning block cards and hide panel
@@ -8223,13 +8296,24 @@
             // Toggle: click same type again to clear filter
             if (_decisionTypeFilter === type) {
                 _decisionTypeFilter = '';
-                var search = document.getElementById('decision-search');
-                if (search) search.value = '';
             } else {
                 _decisionTypeFilter = type;
-                var search = document.getElementById('decision-search');
-                if (search) search.value = type;
             }
+            // Sync the dropdown (AI-97)
+            var select = document.getElementById('decision-type-filter-select');
+            if (select) select.value = _decisionTypeFilter;
+            // Clear search when switching via badge-click to avoid confusion
+            var search = document.getElementById('decision-search');
+            if (search) search.value = '';
+            filterDecisions();
+        }
+
+        // AI-97: Called when the type filter <select> changes
+        function onDecisionTypeSelectChange(value) {
+            _decisionTypeFilter = value;
+            // Clear text search when using dropdown
+            var search = document.getElementById('decision-search');
+            if (search) search.value = '';
             filterDecisions();
         }
 
@@ -8265,24 +8349,24 @@
         }
 
         function filterDecisions() {
+            // AI-97: Apply type dropdown filter + ticket search independently
             var search = document.getElementById('decision-search');
-            if (!search) return;
-            var term = search.value.toLowerCase().trim();
-            // Sync type filter with search box content
-            _decisionTypeFilter = '';
-            if (!term) {
-                renderDecisionList(_decisionCache);
-                return;
-            }
+            var term = search ? search.value.toLowerCase().trim() : '';
+
             var filtered = _decisionCache.filter(function(d) {
-                return (
-                    (d.decision || '').toLowerCase().includes(term) ||
-                    (d.ticket || '').toLowerCase().includes(term) ||
-                    (d.reason || '').toLowerCase().includes(term) ||
-                    (d.type || '').toLowerCase().includes(term) ||
-                    (d.agent_selected || '').toLowerCase().includes(term) ||
-                    (d.model_used || '').toLowerCase().includes(term)
-                );
+                // Type filter from dropdown
+                if (_decisionTypeFilter && (d.type || '') !== _decisionTypeFilter) return false;
+                // Ticket search from text input
+                if (term) {
+                    return (
+                        (d.ticket || '').toLowerCase().includes(term) ||
+                        (d.decision || '').toLowerCase().includes(term) ||
+                        (d.reason || '').toLowerCase().includes(term) ||
+                        (d.agent_selected || '').toLowerCase().includes(term) ||
+                        (d.model_used || '').toLowerCase().includes(term)
+                    );
+                }
+                return true;
             });
             renderDecisionList(filtered);
         }
