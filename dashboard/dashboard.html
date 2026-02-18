@@ -3216,6 +3216,175 @@
             border-color: rgba(248, 113, 113, 0.4);
         }
 
+        /* AI-94/AI-95: Reasoning Stream Panel in Chat Area */
+        .reasoning-stream-panel {
+            border: 1px solid rgba(96, 165, 250, 0.25);
+            border-radius: 8px;
+            margin: 0 0 10px 0;
+            background: rgba(15, 23, 42, 0.5);
+            overflow: hidden;
+            max-height: 320px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .reasoning-stream-panel .reasoning-controls {
+            border-radius: 0;
+            border: none;
+            border-bottom: 1px solid rgba(96, 165, 250, 0.2);
+            margin-bottom: 0;
+            flex-shrink: 0;
+        }
+
+        .reasoning-icon {
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+
+        .reasoning-stream-blocks {
+            overflow-y: auto;
+            flex: 1;
+            padding: 6px 8px;
+        }
+
+        .reasoning-stream-blocks::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .reasoning-stream-blocks::-webkit-scrollbar-thumb {
+            background: rgba(96, 165, 250, 0.3);
+            border-radius: 2px;
+        }
+
+        /* AI-94/AI-95: Structured reasoning block card */
+        .reasoning-block-card {
+            font-family: 'Courier New', Courier, monospace;
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            border-radius: 6px;
+            margin: 5px 0;
+            background: rgba(15, 23, 42, 0.7);
+            overflow: hidden;
+            animation: reasoning-fade-in 0.35s ease forwards;
+        }
+
+        .reasoning-block-card.type-orchestrator_decision {
+            border-color: rgba(96, 165, 250, 0.35);
+        }
+
+        .reasoning-block-card.type-agent_thinking {
+            border-color: rgba(167, 139, 250, 0.35);
+        }
+
+        @keyframes reasoning-fade-in {
+            from { opacity: 0; transform: translateY(-4px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .reasoning-block-card-header {
+            display: flex;
+            align-items: center;
+            padding: 7px 10px;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(30, 41, 59, 0.85);
+            gap: 7px;
+        }
+
+        .reasoning-block-card-header:hover {
+            background: rgba(51, 65, 85, 0.85);
+        }
+
+        .reasoning-block-card-brain {
+            font-size: 0.85rem;
+            flex-shrink: 0;
+        }
+
+        .reasoning-block-card-title {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #93c5fd;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .reasoning-block-card.type-agent_thinking .reasoning-block-card-title {
+            color: #c4b5fd;
+        }
+
+        .reasoning-block-card-agent {
+            font-size: 0.68rem;
+            color: #64748b;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .reasoning-block-card-ticket {
+            font-size: 0.68rem;
+            color: #94a3b8;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .reasoning-block-card-toggle {
+            font-size: 0.7rem;
+            color: #64748b;
+            flex-shrink: 0;
+            transition: transform 0.2s ease;
+        }
+
+        .reasoning-block-card.expanded .reasoning-block-card-toggle {
+            transform: rotate(180deg);
+        }
+
+        .reasoning-block-card-body {
+            display: none;
+            padding: 8px 10px;
+            font-size: 0.77rem;
+            color: #cbd5e1;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+            border-top: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .reasoning-block-card.expanded .reasoning-block-card-body {
+            display: block;
+        }
+
+        .reasoning-block-steps {
+            margin-top: 8px;
+            padding-top: 6px;
+            border-top: 1px solid rgba(148, 163, 184, 0.1);
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .reasoning-block-step {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            padding: 3px 0;
+            font-size: 0.73rem;
+            color: #94a3b8;
+        }
+
+        .reasoning-step-icon {
+            flex-shrink: 0;
+            font-size: 0.8rem;
+        }
+
+        .reasoning-step-target {
+            font-weight: 700;
+            color: #e2e8f0;
+        }
+
+        .reasoning-step-reason {
+            color: #64748b;
+            font-style: italic;
+        }
+
         /* Decision Log Panel Styles (AI-161) */
         #decision-log-panel {
             background: rgba(15, 23, 42, 0.8);
@@ -4983,6 +5152,17 @@
                     </select>
                     <span class="provider-badge" id="provider-badge" data-testid="provider-badge">Claude</span>
                 </div>
+                <!-- AI-94/AI-95: Reasoning Stream Panel -->
+                <div id="reasoning-stream-panel" class="reasoning-stream-panel" style="display:none;">
+                    <div class="reasoning-controls" id="reasoning-stream-controls">
+                        <span class="reasoning-icon">&#x1F9E0;</span>
+                        <span class="reasoning-controls-count" id="reasoning-stream-count">0 reasoning blocks</span>
+                        <button class="reasoning-controls-btn expand-all" onclick="expandAllReasoningBlocks()" data-testid="expand-all-reasoning">Expand All</button>
+                        <button class="reasoning-controls-btn collapse-all" onclick="collapseAllReasoningBlocks()" data-testid="collapse-all-reasoning">Collapse All</button>
+                        <button class="reasoning-controls-btn" style="color:#f87171;border-color:rgba(248,113,113,0.3);" onclick="clearReasoningStreamPanel()" data-testid="clear-reasoning">Clear</button>
+                    </div>
+                    <div id="reasoning-stream-blocks" class="reasoning-stream-blocks"></div>
+                </div>
                 <div id="chat-messages" class="chat-messages">
                     <div class="chat-welcome">
                         <p>Welcome to the Agent Dashboard Chat. Ask me anything about your agent status, metrics, or general questions!</p>
@@ -6253,6 +6433,10 @@
                         if (message.type === 'metrics_update') {
                             console.log('Received metrics update via WebSocket');
                             handleMetricsUpdate(message.data);
+                        } else if (message.type === 'reasoning_block') {
+                            // AI-94/AI-95: Structured reasoning block in chat area
+                            console.log('Received reasoning_block event via WebSocket', message);
+                            renderReasoningBlockCard(message.block);
                         } else if (message.type === 'reasoning') {
                             console.log('Received reasoning event via WebSocket', message);
                             renderReasoningBlock(message);
@@ -6367,6 +6551,128 @@
             }
 
             updateConnectionStatus('disconnected', 'Disconnected');
+        }
+
+        // AI-94/AI-95: In-memory store for reasoning block collapse state {blockId: bool}
+        const _reasoningBlockCollapseState = {};
+
+        // Step action -> icon mapping (AI-95)
+        function _reasoningStepIcon(action) {
+            if (!action) return '\uD83D\uDCDD';
+            const a = action.toLowerCase();
+            if (a.includes('read') || a.includes('file')) return '\uD83D\uDCC4';
+            if (a.includes('exec') || a.includes('run') || a.includes('cmd') || a.includes('command')) return '\u2699\uFE0F';
+            if (a.includes('test')) return '\uD83E\uDDEA';
+            if (a.includes('write') || a.includes('create') || a.includes('edit')) return '\u270F\uFE0F';
+            return '\uD83D\uDCDD';
+        }
+
+        // Render a structured reasoning block card in the chat reasoning panel (AI-94/AI-95)
+        function renderReasoningBlockCard(block) {
+            if (!block) return;
+            const panel = document.getElementById('reasoning-stream-panel');
+            const container = document.getElementById('reasoning-stream-blocks');
+            const countEl = document.getElementById('reasoning-stream-count');
+            if (!panel || !container) return;
+
+            // Show panel
+            panel.style.display = 'flex';
+
+            const blockId = block.id || ('rb-' + Date.now());
+            const blockType = block.type || 'agent_thinking';
+            const title = block.title || (blockType === 'orchestrator_decision' ? 'Orchestrator Decision' : 'Agent Thinking');
+            const complexity = block.complexity || '';
+            const agent = block.agent || '';
+            const ticketKey = block.ticket_key || '';
+            const content = (block.content || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const steps = Array.isArray(block.steps) ? block.steps : [];
+
+            // Build complexity badge HTML
+            const badgeHtml = complexity
+                ? `<span class="complexity-badge ${complexity}" style="margin-right:4px;">${complexity}</span>`
+                : '';
+
+            // Build steps HTML
+            let stepsHtml = '';
+            if (steps.length > 0) {
+                stepsHtml = '<ul class="reasoning-block-steps">';
+                steps.forEach(step => {
+                    const icon = _reasoningStepIcon(step.action || '');
+                    const target = step.target ? `<span class="reasoning-step-target">${step.target.replace(/</g,'&lt;')}</span>` : '';
+                    const reason = step.reason ? ` — <span class="reasoning-step-reason">${step.reason.replace(/</g,'&lt;')}</span>` : '';
+                    stepsHtml += `<li class="reasoning-block-step"><span class="reasoning-step-icon">${icon}</span>${target}${reason}</li>`;
+                });
+                stepsHtml += '</ul>';
+            }
+
+            const brainIcon = blockType === 'orchestrator_decision' ? '\uD83E\uDDE0' : '\uD83D\uDCAD';
+
+            const card = document.createElement('div');
+            card.className = `reasoning-block-card type-${blockType}`;
+            card.id = blockId;
+            card.dataset.blockId = blockId;
+            card.innerHTML = `
+                <div class="reasoning-block-card-header" onclick="toggleReasoningBlockCard('${blockId}')">
+                    <span class="reasoning-block-card-brain">${brainIcon}</span>
+                    <span class="reasoning-block-card-title">${title.replace(/</g,'&lt;')}</span>
+                    ${badgeHtml}
+                    ${agent ? `<span class="reasoning-block-card-agent">[${agent}]</span>` : ''}
+                    ${ticketKey ? `<span class="reasoning-block-card-ticket">${ticketKey}</span>` : ''}
+                    <span class="reasoning-block-card-toggle">&#9660;</span>
+                </div>
+                <div class="reasoning-block-card-body">
+                    ${content}${stepsHtml}
+                </div>
+            `;
+
+            // Default: collapsed (start state)
+            _reasoningBlockCollapseState[blockId] = false;
+
+            container.prepend(card);
+
+            // Update count
+            const total = container.querySelectorAll('.reasoning-block-card').length;
+            if (countEl) countEl.textContent = `${total} reasoning block${total !== 1 ? 's' : ''}`;
+        }
+
+        // Toggle collapse state for a reasoning block card
+        function toggleReasoningBlockCard(blockId) {
+            const card = document.getElementById(blockId);
+            if (!card) return;
+            const expanded = card.classList.toggle('expanded');
+            _reasoningBlockCollapseState[blockId] = expanded;
+        }
+
+        // Expand all reasoning block cards in the panel
+        function expandAllReasoningBlocks() {
+            const container = document.getElementById('reasoning-stream-blocks');
+            if (!container) return;
+            container.querySelectorAll('.reasoning-block-card').forEach(card => {
+                card.classList.add('expanded');
+                _reasoningBlockCollapseState[card.dataset.blockId] = true;
+            });
+        }
+
+        // Collapse all reasoning block cards in the panel
+        function collapseAllReasoningBlocks() {
+            const container = document.getElementById('reasoning-stream-blocks');
+            if (!container) return;
+            container.querySelectorAll('.reasoning-block-card').forEach(card => {
+                card.classList.remove('expanded');
+                _reasoningBlockCollapseState[card.dataset.blockId] = false;
+            });
+        }
+
+        // Clear all reasoning block cards and hide panel
+        function clearReasoningStreamPanel() {
+            const container = document.getElementById('reasoning-stream-blocks');
+            const panel = document.getElementById('reasoning-stream-panel');
+            const countEl = document.getElementById('reasoning-stream-count');
+            if (container) container.innerHTML = '';
+            if (panel) panel.style.display = 'none';
+            if (countEl) countEl.textContent = '0 reasoning blocks';
+            // Also call API to clear server-side
+            fetch('/api/reasoning/clear', { method: 'POST' }).catch(() => {});
         }
 
         // Render a reasoning block in the activity feed (AI-158)
