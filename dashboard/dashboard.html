@@ -1212,6 +1212,65 @@
             50% { opacity: 0.5; }
         }
 
+        /* AI-89: Global control buttons (Pause All / Resume All) */
+        .global-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .btn-pause-all, .btn-resume-all {
+            font-size: 0.85rem;
+            font-weight: 600;
+            padding: 7px 18px;
+            border-radius: 8px;
+            border: 1px solid;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            letter-spacing: 0.02em;
+        }
+
+        .btn-pause-all {
+            background: rgba(234, 179, 8, 0.15);
+            color: #eab308;
+            border-color: rgba(234, 179, 8, 0.4);
+        }
+
+        .btn-pause-all:hover {
+            background: rgba(234, 179, 8, 0.28);
+        }
+
+        .btn-resume-all {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+            border-color: rgba(34, 197, 94, 0.4);
+        }
+
+        .btn-resume-all:hover {
+            background: rgba(34, 197, 94, 0.28);
+        }
+
+        /* AI-89: System-paused banner */
+        #system-paused-banner {
+            display: none;
+            width: 100%;
+            background: rgba(234, 179, 8, 0.12);
+            border: 1px solid rgba(234, 179, 8, 0.45);
+            border-radius: 10px;
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #eab308;
+        }
+
+        #system-paused-banner.visible {
+            display: block;
+        }
+
         /* Grid Layout */
         .dashboard-grid {
             display: grid;
@@ -4290,6 +4349,28 @@
                     title="Toggle dark/light mode"
                 ><span id="theme-toggle-icon">&#9728;&#65039;</span> <span id="theme-toggle-label">Light</span></button>
             </div>
+            <!-- AI-89: Global Pause All / Resume All controls -->
+            <div class="global-controls">
+                <button
+                    class="btn-pause-all"
+                    id="btn-pause-all"
+                    onclick="pauseAllAgents()"
+                    data-testid="pause-all-btn"
+                    title="Pause all agents"
+                >&#9646;&#9646; Pause All</button>
+                <button
+                    class="btn-resume-all"
+                    id="btn-resume-all"
+                    onclick="resumeAllAgents()"
+                    data-testid="resume-all-btn"
+                    title="Resume all agents"
+                >&#9654; Resume All</button>
+            </div>
+        </div>
+
+        <!-- AI-89: System-paused global banner -->
+        <div id="system-paused-banner" role="alert" aria-live="polite">
+            &#9888;&#65039; All agents paused &mdash; system is idle
         </div>
 
         <!-- AI-83: Global Metrics Bar (REQ-METRICS-001) -->
@@ -5968,6 +6049,10 @@
                             if (message.text) {
                                 addSystemChatMessage(message.text);
                             }
+                        } else if (message.type === 'system_status_change') {
+                            // AI-89: Global pause/resume state changed
+                            console.log('[AI-89] system_status_change received', message);
+                            applySystemPausedState(message.system_paused);
                         }
                     } catch (error) {
                         console.error('Error processing WebSocket message:', error);
@@ -6949,6 +7034,75 @@
             _globalMetricsTimer = setInterval(fetchGlobalMetrics, 10000);
         }
 
+        // =============================================
+        // AI-89: Global Pause All / Resume All
+        // =============================================
+
+        /**
+         * Update the system-paused banner visibility and button states
+         * based on the current system_paused flag.
+         */
+        function applySystemPausedState(paused) {
+            const banner = document.getElementById('system-paused-banner');
+            if (banner) {
+                if (paused) {
+                    banner.classList.add('visible');
+                } else {
+                    banner.classList.remove('visible');
+                }
+            }
+        }
+
+        /** Fetch system status on page load and apply banner state. */
+        async function fetchSystemStatus() {
+            try {
+                const resp = await fetch(`${API_BASE_URL}/api/agents/system-status`);
+                if (!resp.ok) return;
+                const data = await resp.json();
+                applySystemPausedState(data.system_paused);
+            } catch (err) {
+                console.warn('System status fetch failed:', err);
+            }
+        }
+
+        /** POST /api/agents/pause-all - Pause all agents. */
+        async function pauseAllAgents() {
+            const btn = document.getElementById('btn-pause-all');
+            if (btn) { btn.disabled = true; btn.textContent = 'Pausing...'; }
+            try {
+                const resp = await fetch(`${API_BASE_URL}/api/agents/pause-all`, { method: 'POST' });
+                if (resp.ok) {
+                    applySystemPausedState(true);
+                    console.log('[AI-89] All agents paused');
+                } else {
+                    console.error('[AI-89] Pause-all failed:', resp.status);
+                }
+            } catch (err) {
+                console.error('[AI-89] Pause-all error:', err);
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = '&#9646;&#9646; Pause All'; }
+            }
+        }
+
+        /** POST /api/agents/resume-all - Resume all paused agents. */
+        async function resumeAllAgents() {
+            const btn = document.getElementById('btn-resume-all');
+            if (btn) { btn.disabled = true; btn.textContent = 'Resuming...'; }
+            try {
+                const resp = await fetch(`${API_BASE_URL}/api/agents/resume-all`, { method: 'POST' });
+                if (resp.ok) {
+                    applySystemPausedState(false);
+                    console.log('[AI-89] All agents resumed');
+                } else {
+                    console.error('[AI-89] Resume-all failed:', resp.status);
+                }
+            } catch (err) {
+                console.error('[AI-89] Resume-all error:', err);
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = '&#9654; Resume All'; }
+            }
+        }
+
         // Initialize Dashboard
         async function init() {
             console.log('Initializing Agent Status Dashboard...');
@@ -6971,6 +7125,9 @@
             // AI-83: Initialize Global Metrics Bar
             await fetchGlobalMetrics();
             startGlobalMetricsPolling();
+
+            // AI-89: Initialize system pause banner from server state
+            await fetchSystemStatus();
 
             console.log('Dashboard initialized');
             console.log('WebSocket live updates enabled with auto-reconnect');
