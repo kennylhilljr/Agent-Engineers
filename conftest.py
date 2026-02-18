@@ -90,6 +90,14 @@ if _worktree_security_path.exists() and "dashboard.security" not in sys.modules:
     except Exception:
         pass
 
+# 4f. Load dashboard.latency_benchmark from the worktree (AI-180 / REQ-PERF-001) — before server
+_worktree_latency_benchmark_path = _WORKTREE_ROOT / "dashboard" / "latency_benchmark.py"
+if _worktree_latency_benchmark_path.exists() and "dashboard.latency_benchmark" not in sys.modules:
+    try:
+        _load_module_from_file("dashboard.latency_benchmark", _worktree_latency_benchmark_path)
+    except Exception:
+        pass
+
 # 4b. Override dashboard.server with the worktree's AI-161 version
 _worktree_server_path = _WORKTREE_ROOT / "dashboard" / "server.py"
 if _worktree_server_path.exists():
