@@ -22,6 +22,7 @@ from arcade_config import (
     get_coding_tools,
     get_github_tools,
     get_linear_tools,
+    get_qa_tools,
     get_slack_tools,
 )
 from claude_agent_sdk.types import AgentDefinition
@@ -59,6 +60,7 @@ DEFAULT_MODELS: Final[dict[str, ModelOption]] = {
     "jira": "haiku",
     "gitlab": "haiku",
     "knowledge_base": "haiku",
+    "qa": "sonnet",
 }
 
 
@@ -129,6 +131,7 @@ AGENT_GIT_IDENTITIES: Final[dict[str, GitIdentity]] = {
     "jira": GitIdentity("Jira Agent", "jira-agent@claude-agents.dev"),
     "gitlab": GitIdentity("GitLab Agent", "gitlab-agent@claude-agents.dev"),
     "knowledge_base": GitIdentity("Knowledge Base Agent", "knowledge-base-agent@claude-agents.dev"),
+    "qa": GitIdentity("QA Agent", "qa-agent@claude-agents.dev"),
 }
 
 
@@ -387,6 +390,18 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
             tools=FILE_TOOLS + ["Bash"],
             model=_get_model("knowledge_base"),
         ),
+        "qa": AgentDefinition(
+            description=(
+                "Dedicated QA/testing agent. Writes unit, integration, and E2E tests "
+                "using pytest and Playwright. Runs coverage audits, identifies untested "
+                "code paths, investigates flaky tests, and validates regression suites. "
+                "Use instead of the coding agent when the primary goal is test writing "
+                "or coverage improvement rather than feature implementation."
+            ),
+            prompt=_prompt("qa", "qa_agent_prompt"),
+            tools=get_qa_tools(),
+            model=_get_model("qa"),
+        ),
     }
 
 
@@ -436,6 +451,7 @@ DESIGNER_AGENT = AGENT_DEFINITIONS["designer"]
 JIRA_AGENT = AGENT_DEFINITIONS["jira"]
 GITLAB_AGENT = AGENT_DEFINITIONS["gitlab"]
 KNOWLEDGE_BASE_AGENT = AGENT_DEFINITIONS["knowledge_base"]
+QA_AGENT = AGENT_DEFINITIONS["qa"]
 
 
 def create_agent_definitions_with_routing(
@@ -541,6 +557,7 @@ __all__ = [
     "PR_REVIEWER_AGENT",
     "PR_REVIEWER_FAST_AGENT",
     "PRODUCT_MANAGER_AGENT",
+    "QA_AGENT",
     "SLACK_AGENT",
     "WINDSURF_AGENT",
     # Model routing exports (re-exported for convenience)

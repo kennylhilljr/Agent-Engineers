@@ -18,6 +18,7 @@ from agents.definitions import (
     KIMI_AGENT,
     LINEAR_AGENT,
     PR_REVIEWER_AGENT,
+    QA_AGENT,
     SLACK_AGENT,
     WINDSURF_AGENT,
 )
@@ -34,6 +35,7 @@ __all__ = [
     "SLACK_AGENT",
     "CODING_AGENT",
     "PR_REVIEWER_AGENT",
+    "QA_AGENT",
     "CHATGPT_AGENT",
     "GEMINI_AGENT",
     "GROQ_AGENT",

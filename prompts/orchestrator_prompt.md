@@ -31,6 +31,7 @@ Use the Task tool to delegate to these specialized agents:
 | `coding` | sonnet | Complex feature implementation, testing, Playwright verification |
 | `coding_fast` | haiku | Simple changes: copy, CSS, config, tests, docs, renames |
 | `github` | haiku | Git commits, branches, pull requests (per story) |
+| `qa` | sonnet | Dedicated test writing, coverage audits, regression suites, flaky test fixes |
 | `pr_reviewer` | sonnet | Full PR review for high-risk changes (backend, auth, >5 files) |
 | `pr_reviewer_fast` | haiku | Quick PR review for low-risk changes (frontend, <=3 files, additive) |
 | `chatgpt` | haiku | Cross-validate code, second opinions (GPT-4o, o1, o3-mini) |
@@ -117,14 +118,21 @@ Follow the continuation task steps. Key flow per ticket:
 
 ```
 1. ops: ":construction: Starting" + transition to In Progress  (1 delegation)
-2. coding/coding_fast: Implement + test + screenshot            (1 delegation)
-3. github: Commit + PR                                          (1 delegation)
-4. ops: Transition to Review + ":mag: PR ready"                 (1 delegation)
-5. pr_reviewer/pr_reviewer_fast: Review → APPROVED/CHANGES_REQ  (1 delegation)
-6. ops: Transition to Done + ":white_check_mark: Completed"     (1 delegation)
+2. coding/coding_fast: Implement + screenshot                   (1 delegation)
+3. qa: Write tests + run coverage + report gaps                 (1 delegation, optional — see below)
+4. github: Commit + PR                                          (1 delegation)
+5. ops: Transition to Review + ":mag: PR ready"                 (1 delegation)
+6. pr_reviewer/pr_reviewer_fast: Review → APPROVED/CHANGES_REQ  (1 delegation)
+7. ops: Transition to Done + ":white_check_mark: Completed"     (1 delegation)
 ```
 
-**6 delegations per ticket** (down from 9-11 in the old sequential model).
+**QA agent step (step 3) is triggered when:**
+- The feature touches >3 files or critical paths (auth, payments, data)
+- The coding agent reports <80% coverage on new code
+- The orchestrator explicitly requests a coverage audit
+- Skip QA step for simple changes (copy, CSS, config) handled by `coding_fast`
+
+**6-7 delegations per ticket** depending on QA step inclusion.
 
 ---
 
@@ -155,6 +163,10 @@ Follow the continuation task steps. Key flow per ticket:
 | Git commit + PR | `github` | Files, issue key, branch |
 | Low-risk PR review | `pr_reviewer_fast` | PR number, files, test steps |
 | High-risk PR review | `pr_reviewer` | PR number, files, test steps |
+| Write/improve test suite | `qa` | Feature context, files changed, coverage gaps |
+| Coverage audit | `qa` | Project directory, coverage targets |
+| Fix flaky/failing tests | `qa` | Test names, error output, source files |
+| Regression test suite | `qa` | Changed files, core user flows |
 | Verification test | `coding` | Run init.sh, test features |
 | Ultra-long context analysis (>100K tokens) | `kimi` | Full codebase/doc + task |
 | Bilingual Chinese/English tasks | `kimi` | Content + language instructions |
@@ -203,6 +215,12 @@ Routing decision:
 - Use `pr_reviewer` when: > 200 lines changed OR any file in auth/, billing/, security/, core/, architecture/
   OR any migration file OR > 3 files with >50% change ratio
 - Label `review:opus` escalates to Opus model tier
+
+**qa vs coding (for test work):**
+- Use `qa` when: primary goal is writing tests, improving coverage, fixing flaky tests, or running a coverage audit
+- Use `coding` when: implementing a feature that includes tests as part of the implementation
+- Use `qa` after `coding` when: coding agent's coverage is below 80%, or the feature is in a critical path
+- Use `qa` for regression suites after refactors or large-scale changes
 
 **chatgpt vs gemini vs groq vs kimi:**
 - `groq`: speed-critical validation, context < 32K tokens, fastest responses
