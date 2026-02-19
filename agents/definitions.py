@@ -47,7 +47,7 @@ DEFAULT_MODELS: Final[dict[str, ModelOption]] = {
     "windsurf": "haiku",
     "openrouter_dev": "haiku",
     "product_manager": "sonnet",
-    "designer": "haiku",
+    "designer": "sonnet",
 }
 
 
@@ -82,7 +82,7 @@ def get_orchestrator_model() -> OrchestratorModelOption:
     value = os.environ.get("ORCHESTRATOR_MODEL", "").lower().strip()
     if _is_valid_orchestrator_model(value):
         return value
-    return "haiku"
+    return "sonnet"
 
 
 class GitIdentity(NamedTuple):

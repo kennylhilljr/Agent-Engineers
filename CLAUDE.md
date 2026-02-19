@@ -145,7 +145,7 @@ There is no test framework — tests use a custom `test_hook()` harness that run
 | `GENERATIONS_BASE_PATH` | No | Where to create projects (default: `./generations`) |
 | `GITHUB_REPO` | No | `owner/repo` for GitHub integration |
 | `SLACK_CHANNEL` | No | Slack channel for notifications |
-| `ORCHESTRATOR_MODEL` | No | haiku/sonnet/opus (default: haiku) |
+| `ORCHESTRATOR_MODEL` | No | haiku/sonnet/opus (default: sonnet) |
 | `LINEAR_AGENT_MODEL` | No | haiku/sonnet/opus/inherit |
 | `CODING_AGENT_MODEL` | No | haiku/sonnet/opus/inherit |
 | `GITHUB_AGENT_MODEL` | No | haiku/sonnet/opus/inherit |
