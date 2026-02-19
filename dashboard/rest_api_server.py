@@ -808,10 +808,6 @@ class RESTAPIServer:
         Path params:
             session_id: The session identifier to look up.
 
-        Query params:
-            cap_usd: Override the cost cap for this response (default: org cap
-                     from AGENT_COST_CAP_USD env var or $5.00).
-
         Returns:
             200 OK with cost summary dict, or 404 if session not found.
         """
@@ -832,19 +828,13 @@ class RESTAPIServer:
                 status=404
             )
 
-        # Determine cost cap
+        # Determine cost cap — always sourced from the org config, never from
+        # an unauthenticated query parameter.
         try:
-            cap_usd = float(request.query.get('cap_usd', '0') or '0')
-        except (ValueError, TypeError):
-            cap_usd = 0.0
-
-        if cap_usd <= 0:
-            # Fall back to env-var / default cap
-            try:
-                from agents.model_routing import get_cost_cap_for_org
-                cap_usd = get_cost_cap_for_org()
-            except ImportError:
-                cap_usd = 5.00
+            from agents.model_routing import get_cost_cap_for_org
+            cap_usd = get_cost_cap_for_org()
+        except ImportError:
+            cap_usd = 5.00
 
         # Build per-model-tier cost breakdown from event records
         cost_by_model: Dict[str, float] = {}

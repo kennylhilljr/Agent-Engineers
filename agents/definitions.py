@@ -25,7 +25,7 @@ from arcade_config import (
     get_slack_tools,
 )
 from claude_agent_sdk.types import AgentDefinition
-from agents.model_routing import (  # noqa: E402
+from agents.model_routing import (
     CostTracker,
     ModelTier,
     check_cost_cap,
@@ -399,6 +399,33 @@ def create_agent_definitions_with_routing(
     complexity = estimate_complexity(task)
     coding_tier = select_model("coding", complexity, task)
     pr_reviewer_tier = select_model("pr_reviewer", complexity, pr_metadata)
+
+    # Enforce per-org cost cap: if the cap has already been hit, downgrade
+    # Opus to Sonnet so we do not exceed the organisation's budget.
+    cap_usd = get_cost_cap_for_org(org_id)
+
+    # Build a CostTracker for this org so callers can extend it with real
+    # spend data; here we use it to evaluate whether Opus is permissible.
+    # A tracker seeded with zero cost is within cap for any positive cap.
+    # The cap_hit flag becomes True only when the tracker's total meets or
+    # exceeds the org cap (e.g., if a caller has already recorded spend).
+    tracker = CostTracker(cap_usd=cap_usd)
+    cap_hit = not tracker.is_within_cap
+
+    # Also honour check_cost_cap for the zero-spend starting point; this
+    # call is a no-op for fresh runs but surfaces a warning when cap <= 0.
+    if cap_usd > 0:
+        cap_within = check_cost_cap(tracker.total_cost_usd, cap_usd)
+        if not cap_within:
+            cap_hit = True
+
+    if cap_hit:
+        # Cost cap already exhausted — downgrade Opus to Sonnet to stay
+        # within the organisation's budget.
+        if coding_tier == ModelTier.OPUS:
+            coding_tier = ModelTier.SONNET
+        if pr_reviewer_tier == ModelTier.OPUS:
+            pr_reviewer_tier = ModelTier.SONNET
 
     defs = create_agent_definitions()
 

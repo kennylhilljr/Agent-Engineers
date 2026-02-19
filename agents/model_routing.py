@@ -54,10 +54,11 @@ PR_DIFF_LINE_THRESHOLD = 500
 # Number of high-change-ratio files needed to trigger Opus
 HIGH_CHANGE_RATIO_FILE_THRESHOLD = 3
 
-# Migration-related file path patterns (lower-cased for comparison)
+# Migration-related file path patterns (lower-cased for comparison).
+# Note: "migration" already matches paths containing "migrations" as a
+# substring, so "migrations" is not listed separately.
 MIGRATION_FILE_PATTERNS: tuple[str, ...] = (
     "migration",
-    "migrations",
     "schema",
     "alembic",
     "flyway",
