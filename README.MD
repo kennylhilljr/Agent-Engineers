@@ -976,6 +976,16 @@ Run `npm install -g @google/gemini-cli` then `gemini` to complete OAuth setup
 
 *From feature request to merged PR — autonomously.*
 
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Operations Runbook](docs/OPERATIONS_RUNBOOK.md) | Production operations guide: monitoring, incident response, deployment procedures, SLA definitions |
+| [API Reference](docs/API.md) | REST API endpoint documentation |
+| [Security Guide](docs/SECURITY.md) | Security model and hardening notes |
+| [Developer Guide](docs/DEVELOPER_GUIDE.md) | Local development setup and contribution guidelines |
+| [Environment Configuration](docs/ENVIRONMENT_CONFIGURATION.md) | Full environment variable reference |
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
