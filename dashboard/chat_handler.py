@@ -351,3 +351,140 @@ def get_chat_history(limit: int = 100) -> List[Dict]:
 def clear_chat_history() -> None:
     """Clear the in-memory chat history (for testing)."""
     _chat_history.clear()
+
+
+# ---------------------------------------------------------------------------
+# Provider-specific streaming helpers (REQ-TECH-009)
+# ---------------------------------------------------------------------------
+# These async generator functions provide a chunk-based streaming interface
+# for specific AI providers via the BridgeRegistry. Each generator yields
+# dicts of the form:
+#   {'type': 'text',  'text': '...'} — a text chunk
+#   {'type': 'error', 'text': '...'} — an error message
+#   {'type': 'done'}                  — signals end of stream
+#
+# This matches the WebSocket streaming protocol used by the dashboard server.
+
+
+async def _stream_provider_chunks(
+    message: str,
+    provider: str,
+    model: Optional[str] = None,
+    context: Optional[str] = None,
+):
+    """Internal async generator: stream chunks from a provider bridge.
+
+    Yields chunk dicts. On error, yields an error chunk followed by done.
+    For providers without a configured bridge, yields a placeholder text chunk
+    followed by done.
+    """
+    registry = _get_provider_bridge_registry()
+
+    # Check if this provider's bridge is available; if not, yield fallback + done
+    if registry is None:
+        yield {"type": "error", "text": f"Provider bridge registry unavailable for {provider}"}
+        yield {"type": "done"}
+        return
+
+    try:
+        bridge = registry.get(provider)
+    except KeyError:
+        # Unknown provider — yield a placeholder text response
+        yield {"type": "text", "text": f"[{provider.capitalize()}] Unknown provider. Available: claude, chatgpt, gemini, groq, kimi, windsurf."}
+        yield {"type": "done"}
+        return
+
+    if not bridge.is_available():
+        yield {"type": "error", "text": f"Provider '{provider}' bridge is not configured (missing API key)."}
+        yield {"type": "done"}
+        return
+
+    try:
+        router = ChatRouter()
+        response = await router._route_to_provider(message, provider=provider, context=context)
+        # Yield text in a single chunk (bridges currently return full responses)
+        if response:
+            yield {"type": "text", "text": response}
+        yield {"type": "done"}
+    except Exception as exc:
+        logger.error("[stream_provider_chunks] %s error: %s", provider, exc)
+        yield {"type": "error", "text": str(exc)}
+        yield {"type": "done"}
+
+
+async def stream_gemini_response(
+    message: str,
+    model: Optional[str] = None,
+    context: Optional[str] = None,
+):
+    """Async generator: stream response chunks from the Gemini provider bridge.
+
+    Yields dicts with keys 'type' ('content'|'error'|'done') and optional 'text'.
+
+    Args:
+        message: The user's message to send to Gemini
+        model: Optional model name (e.g., '2.5-flash')
+        context: Optional system/context string
+    """
+    async for chunk in _stream_provider_chunks(message, "gemini", model=model, context=context):
+        yield chunk
+
+
+async def stream_groq_response(
+    message: str,
+    model: Optional[str] = None,
+    context: Optional[str] = None,
+):
+    """Async generator: stream response chunks from the Groq provider bridge.
+
+    Yields dicts with keys 'type' ('content'|'error'|'done') and optional 'text'.
+
+    Args:
+        message: The user's message to send to Groq
+        model: Optional model name (e.g., 'llama-3.3-70b')
+        context: Optional system/context string
+    """
+    async for chunk in _stream_provider_chunks(message, "groq", model=model, context=context):
+        yield chunk
+
+
+async def stream_kimi_response(
+    message: str,
+    model: Optional[str] = None,
+    context: Optional[str] = None,
+):
+    """Async generator: stream response chunks from the Kimi (Moonshot AI) bridge.
+
+    Yields dicts with keys 'type' ('content'|'error'|'done') and optional 'text'.
+
+    Args:
+        message: The user's message to send to Kimi
+        model: Optional model name
+        context: Optional system/context string
+    """
+    async for chunk in _stream_provider_chunks(message, "kimi", model=model, context=context):
+        yield chunk
+
+
+async def stream_chat_response(
+    message: str,
+    provider: str = "claude",
+    model: Optional[str] = None,
+    context: Optional[str] = None,
+):
+    """Async generator: stream response chunks from any configured AI provider.
+
+    Generic streaming wrapper that routes to the specified provider via
+    the BridgeRegistry. Use provider-specific functions (stream_gemini_response,
+    etc.) for type-safe, named access to individual providers.
+
+    Yields dicts with keys 'type' ('content'|'error'|'done') and optional 'text'.
+
+    Args:
+        message: The user's message
+        provider: AI provider name ("claude", "chatgpt", "gemini", "groq", "kimi", "windsurf")
+        model: Optional model name
+        context: Optional system/context string
+    """
+    async for chunk in _stream_provider_chunks(message, provider, model=model, context=context):
+        yield chunk

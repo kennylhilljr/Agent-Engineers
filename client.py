@@ -195,6 +195,7 @@ def create_client(
     model: str,
     cwd: Path | None = None,
     agent_overrides: dict | None = None,
+    system_prompt: str | None = None,
 ) -> ClaudeSDKClient:
     """
     Create a Claude Agent SDK client with multi-layered security.
@@ -207,6 +208,8 @@ def create_client(
         agent_overrides: Optional agent definitions to use instead of the
             default AGENT_DEFINITIONS. Used by daemon_v2 for per-pool
             model routing.
+        system_prompt: Optional system prompt override. If not provided,
+            the default orchestrator prompt is loaded from prompts/.
 
     Returns:
         Configured ClaudeSDKClient
@@ -241,8 +244,8 @@ def create_client(
     print(f"Security settings: {settings_file}")
     print(f"   Sandbox: on | Dir: {project_dir.resolve()} | MCP: {mcp_label}")
 
-    # Load orchestrator prompt (cached at module level)
-    orchestrator_prompt = _get_cached_orchestrator_prompt()
+    # Use provided system prompt or load the default orchestrator prompt
+    orchestrator_prompt = system_prompt if system_prompt is not None else _get_cached_orchestrator_prompt()
 
     # Use provided agent definitions or fall back to defaults
     agents = agent_overrides if agent_overrides is not None else AGENT_DEFINITIONS

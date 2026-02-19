@@ -26,9 +26,6 @@ screenshots/
 # Agent metrics
 .agent_metrics.json
 
-# AI-225: Multi-project config (local file, not committed)
-.agent_projects.json
-
 # Worktrees
 .worktrees/
 
@@ -51,7 +48,3 @@ ALL_ISSUES_CHECKLIST.txt
 
 # Coverage
 .coverage
-
-# AI-227: Telemetry event storage (local JSONL — not committed)
-.telemetry_events.jsonl
-.telemetry_optout

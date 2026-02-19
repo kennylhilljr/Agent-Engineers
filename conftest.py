@@ -195,6 +195,30 @@ if _worktree_free_tier_path.exists() and "dashboard.free_tier" not in sys.module
     except Exception:
         pass
 
+# 4b-3. Override dashboard.chat_handler with worktree version (AI-99/AI-114 streaming)
+_worktree_chat_handler_path = _WORKTREE_ROOT / "dashboard" / "chat_handler.py"
+if _worktree_chat_handler_path.exists():
+    try:
+        _load_module_from_file("dashboard.chat_handler", _worktree_chat_handler_path)
+    except Exception:
+        pass
+
+# 4b-4. Override dashboard.intent_parser with worktree version
+_worktree_intent_parser_path = _WORKTREE_ROOT / "dashboard" / "intent_parser.py"
+if _worktree_intent_parser_path.exists() and "dashboard.intent_parser" not in sys.modules:
+    try:
+        _load_module_from_file("dashboard.intent_parser", _worktree_intent_parser_path)
+    except Exception:
+        pass
+
+# 4b-5. Override dashboard.agent_executor with worktree version
+_worktree_agent_executor_path = _WORKTREE_ROOT / "dashboard" / "agent_executor.py"
+if _worktree_agent_executor_path.exists() and "dashboard.agent_executor" not in sys.modules:
+    try:
+        _load_module_from_file("dashboard.agent_executor", _worktree_agent_executor_path)
+    except Exception:
+        pass
+
 # 4b. Override dashboard.server with the worktree's AI-161 version
 _worktree_server_path = _WORKTREE_ROOT / "dashboard" / "server.py"
 if _worktree_server_path.exists():
