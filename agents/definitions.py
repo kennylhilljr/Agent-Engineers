@@ -56,6 +56,7 @@ DEFAULT_MODELS: Final[dict[str, ModelOption]] = {
     "openrouter_dev": "haiku",
     "product_manager": "sonnet",
     "designer": "haiku",
+    "jira": "haiku",
 }
 
 
@@ -123,6 +124,7 @@ AGENT_GIT_IDENTITIES: Final[dict[str, GitIdentity]] = {
         "Product Manager Agent", "product-manager-agent@claude-agents.dev"
     ),
     "designer": GitIdentity("Designer Agent", "designer-agent@claude-agents.dev"),
+    "jira": GitIdentity("Jira Agent", "jira-agent@claude-agents.dev"),
 }
 
 
@@ -172,6 +174,17 @@ def _get_pm_agent_tools() -> list[str]:
 def _get_designer_agent_tools() -> list[str]:
     """Tools for designer agent — file ops + bash + Slack for collaboration."""
     return get_slack_tools() + FILE_TOOLS + ["Bash", "Grep"]
+
+
+def _get_jira_agent_tools() -> list[str]:
+    """Tools for Jira integration agent — Jira MCP + file ops + bash."""
+    # Import here to avoid circular imports at module load time
+    try:
+        from arcade_config import get_jira_tools  # type: ignore[import]
+        return get_jira_tools() + FILE_TOOLS + ["Bash"]
+    except (ImportError, AttributeError):
+        # Jira MCP tools not yet configured — fall back to file ops only
+        return FILE_TOOLS + ["Bash"]
 
 
 def create_agent_definitions() -> dict[str, AgentDefinition]:
@@ -322,6 +335,18 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
             tools=_get_designer_agent_tools(),
             model=_get_model("designer"),
         ),
+        "jira": AgentDefinition(
+            description=(
+                "Jira integration agent for bidirectional issue sync. "
+                "Handles inbound Jira webhooks, maps Jira issues to Agent-Engineers "
+                "format, and posts completion updates (PR links, test summaries) "
+                "back to Jira. Enables enterprise Jira customers to use "
+                "Agent-Engineers without migrating to Linear."
+            ),
+            prompt=_prompt("linear", "linear_agent_prompt"),  # Reuse linear prompt as base
+            tools=_get_jira_agent_tools(),
+            model=_get_model("jira"),
+        ),
     }
 
 
@@ -368,6 +393,7 @@ WINDSURF_AGENT = AGENT_DEFINITIONS["windsurf"]
 OPENROUTER_DEV_AGENT = AGENT_DEFINITIONS["openrouter_dev"]
 PRODUCT_MANAGER_AGENT = AGENT_DEFINITIONS["product_manager"]
 DESIGNER_AGENT = AGENT_DEFINITIONS["designer"]
+JIRA_AGENT = AGENT_DEFINITIONS["jira"]
 
 
 def create_agent_definitions_with_routing(
@@ -463,6 +489,7 @@ __all__ = [
     "GEMINI_AGENT",
     "GITHUB_AGENT",
     "GROQ_AGENT",
+    "JIRA_AGENT",
     "KIMI_AGENT",
     "LINEAR_AGENT",
     "ModelOption",
