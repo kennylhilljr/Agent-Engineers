@@ -108,6 +108,14 @@ except ImportError:
     _TELEMETRY_AVAILABLE = False
     logger.warning("telemetry module not found — analytics disabled")
 
+# AI-245: Team Management - Roles & Permissions
+try:
+    from teams.routes import register_team_routes
+    _TEAMS_AVAILABLE = True
+except ImportError:
+    _TEAMS_AVAILABLE = False
+    logger.warning("teams module not found — team management disabled")
+
 
 def _collect_event(event_type: str, properties: Optional[dict] = None) -> None:
     """Fire-and-forget telemetry event collection.
@@ -733,6 +741,10 @@ class DashboardServer:
         self.app.router.add_route('OPTIONS', '/api/webhooks/{webhook_id}/test', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/webhooks/inbound/run-ticket', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/webhooks/inbound/run-spec', self.handle_options)
+
+        # AI-245: Team Management - Roles & Permissions
+        if _TEAMS_AVAILABLE:
+            register_team_routes(self.app)
 
     async def handle_options(self, request: Request) -> Response:
         """Handle CORS preflight OPTIONS requests."""
