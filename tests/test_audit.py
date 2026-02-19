@@ -211,6 +211,15 @@ class TestAuditEntryImmutability:
         # The entry should keep the original value
         assert entry.details["key"] == "value"
 
+    def test_details_dict_is_immutable_mapping_proxy(self):
+        """details is wrapped in MappingProxyType — direct mutation must raise."""
+        entry = AuditEntry.create(
+            org_id="org1", actor_id="u", event_type=AUTH_LOGIN,
+            details={"ip": "1.2.3.4"},
+        )
+        with pytest.raises((TypeError, AttributeError)):
+            entry.details["tampered"] = "yes"  # Must raise — MappingProxyType
+
     def test_to_dict_returns_all_fields(self):
         entry = AuditEntry.create(
             org_id="org1", actor_id="u1", event_type=AUTH_LOGOUT,
@@ -272,11 +281,30 @@ class TestAuditStoreAppendOnly:
         with pytest.raises(ImmutabilityError):
             store.delete("anything")
 
-    def test_clear_empties_store_for_testing(self, store):
+    def test_clear_empties_store_for_testing(self, store, monkeypatch):
+        monkeypatch.setenv("ENVIRONMENT", "test")
         store.record(org_id="o", actor_id="a", event_type=AUTH_LOGIN)
         assert store.total_count == 1
         store.clear()
         assert store.total_count == 0
+
+    def test_clear_works_in_testing_env(self, store, monkeypatch):
+        monkeypatch.setenv("ENVIRONMENT", "testing")
+        store.record(org_id="o", actor_id="a", event_type=AUTH_LOGIN)
+        store.clear()
+        assert store.total_count == 0
+
+    def test_clear_works_in_development_env(self, store, monkeypatch):
+        monkeypatch.setenv("ENVIRONMENT", "development")
+        store.record(org_id="o", actor_id="a", event_type=AUTH_LOGIN)
+        store.clear()
+        assert store.total_count == 0
+
+    def test_clear_raises_in_production_env(self, store, monkeypatch):
+        monkeypatch.setenv("ENVIRONMENT", "production")
+        store.record(org_id="o", actor_id="a", event_type=AUTH_LOGIN)
+        with pytest.raises(ImmutabilityError, match="not allowed in production"):
+            store.clear()
 
     def test_entries_are_immutable_in_store(self, store):
         entry = store.record(org_id="o", actor_id="a", event_type=AUTH_LOGIN)
@@ -595,6 +623,38 @@ class TestExport:
         reader = csv.DictReader(io.StringIO(csv_str))
         rows = list(reader)
         assert len(rows) == 0
+
+    def test_json_export_has_total_exported_field(self, store):
+        self._seed(store)
+        data = json.loads(store.export_json(org_id="org1"))
+        assert "total_exported" in data
+        assert data["total_exported"] == 3
+
+    def test_csv_export_returns_all_entries_over_500(self, store):
+        """Export must not silently truncate at 500 entries."""
+        n = 510
+        for i in range(n):
+            store.record(
+                org_id="org_big", actor_id="bulk_user",
+                event_type=AUTH_LOGIN, details={"seq": i},
+            )
+        csv_str = store.export_csv(org_id="org_big")
+        reader = csv.DictReader(io.StringIO(csv_str))
+        rows = list(reader)
+        assert len(rows) == n, f"Expected {n} rows, got {len(rows)} (export truncated?)"
+
+    def test_json_export_returns_all_entries_over_500(self, store):
+        """JSON export must not silently truncate at 500 entries."""
+        n = 510
+        for i in range(n):
+            store.record(
+                org_id="org_big2", actor_id="bulk_user",
+                event_type=AUTH_LOGIN, details={"seq": i},
+            )
+        data = json.loads(store.export_json(org_id="org_big2"))
+        assert data["count"] == n, f"Expected {n}, got {data['count']} (export truncated?)"
+        assert data["total_exported"] == n
+        assert len(data["audit_log"]) == n
 
 
 # ============================================================================

@@ -26,10 +26,12 @@ PostgreSQL design notes (for future migration):
 import csv
 import io
 import json
+import os
+import types
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Mapping, Optional, Tuple
 
 from audit.events import ALL_EVENT_TYPES
 
@@ -70,7 +72,7 @@ class AuditEntry:
     actor_id: str        # user_id of the actor
     event_type: str      # one of audit.events.*
     resource_id: str     # ID of the affected resource (agent, project, user, …)
-    details: Dict[str, Any]
+    details: Mapping[str, Any]
     timestamp: str       # ISO-8601 UTC string
 
     # ------------------------------------------------------------------
@@ -89,13 +91,16 @@ class AuditEntry:
     ) -> "AuditEntry":
         """Create a new immutable AuditEntry with a generated entry_id."""
         ts = timestamp or datetime.now(timezone.utc)
+        # Wrap in MappingProxyType so the dict contents cannot be mutated
+        # after creation, even though the dataclass is frozen=True.
+        frozen_details = types.MappingProxyType(dict(details or {}))
         return cls(
             entry_id=str(uuid.uuid4()),
             org_id=org_id,
             actor_id=actor_id,
             event_type=event_type,
             resource_id=resource_id or "",
-            details=dict(details or {}),
+            details=frozen_details,
             timestamp=ts.isoformat(),
         )
 
@@ -111,7 +116,7 @@ class AuditEntry:
             "actor_id": self.actor_id,
             "event_type": self.event_type,
             "resource_id": self.resource_id,
-            "details": self.details,
+            "details": dict(self.details),
             "timestamp": self.timestamp,
         }
 
@@ -123,7 +128,7 @@ class AuditEntry:
             self.actor_id,
             self.event_type,
             self.resource_id,
-            json.dumps(self.details),
+            json.dumps(dict(self.details)),
             self.timestamp,
         ]
 
@@ -390,21 +395,33 @@ class AuditStore:
         since: Optional[datetime] = None,
         until: Optional[datetime] = None,
     ) -> str:
-        """Export matching entries as a CSV string (header + rows)."""
+        """Export ALL matching entries as a CSV string (header + rows).
+
+        Iterates all pages to avoid the 500-entry truncation bug.
+        """
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow(AuditEntry.csv_header())
 
-        entries, _ = self.get_entries(
-            org_id=org_id,
-            actor_id=actor_id,
-            event_type=event_type,
-            resource_id=resource_id,
-            since=since,
-            until=until,
-            limit=500,
-        )
-        for entry in entries:
+        all_entries: List[AuditEntry] = []
+        cursor: Optional[str] = None
+        while True:
+            page, next_cursor = self.get_entries(
+                org_id=org_id,
+                actor_id=actor_id,
+                event_type=event_type,
+                resource_id=resource_id,
+                since=since,
+                until=until,
+                cursor=cursor,
+                limit=1000,
+            )
+            all_entries.extend(page)
+            if next_cursor is None:
+                break
+            cursor = next_cursor
+
+        for entry in all_entries:
             writer.writerow(entry.to_csv_row())
 
         return output.getvalue()
@@ -418,20 +435,34 @@ class AuditStore:
         since: Optional[datetime] = None,
         until: Optional[datetime] = None,
     ) -> str:
-        """Export matching entries as a JSON string (array of entry dicts)."""
-        entries, _ = self.get_entries(
-            org_id=org_id,
-            actor_id=actor_id,
-            event_type=event_type,
-            resource_id=resource_id,
-            since=since,
-            until=until,
-            limit=500,
-        )
+        """Export ALL matching entries as a JSON string.
+
+        Iterates all pages to avoid the 500-entry truncation bug.
+        Includes ``total_exported`` count in the metadata.
+        """
+        all_entries: List[AuditEntry] = []
+        cursor: Optional[str] = None
+        while True:
+            page, next_cursor = self.get_entries(
+                org_id=org_id,
+                actor_id=actor_id,
+                event_type=event_type,
+                resource_id=resource_id,
+                since=since,
+                until=until,
+                cursor=cursor,
+                limit=1000,
+            )
+            all_entries.extend(page)
+            if next_cursor is None:
+                break
+            cursor = next_cursor
+
         return json.dumps(
             {
-                "audit_log": [e.to_dict() for e in entries],
-                "count": len(entries),
+                "audit_log": [e.to_dict() for e in all_entries],
+                "count": len(all_entries),
+                "total_exported": len(all_entries),
                 "exported_at": datetime.now(timezone.utc).isoformat(),
             },
             indent=2,
@@ -442,7 +473,12 @@ class AuditStore:
     # ------------------------------------------------------------------
 
     def clear(self) -> None:
-        """Remove all entries (testing use only)."""
+        """Remove all entries. ONLY allowed in test/development environments."""
+        env = os.environ.get("ENVIRONMENT", "production").lower()
+        if env not in ("test", "testing", "development"):
+            raise ImmutabilityError(
+                "clear() is not allowed in production environment"
+            )
         self._entries.clear()
         self._entry_id_set.clear()
 

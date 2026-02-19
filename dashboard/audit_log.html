@@ -576,6 +576,15 @@ let state = {
    INIT
    ============================================= */
 document.addEventListener('DOMContentLoaded', () => {
+  // Event delegation for details-cell clicks — avoids inline onclick XSS
+  document.getElementById('audit-tbody').addEventListener('click', (event) => {
+    const cell = event.target.closest('[data-entry-index]');
+    if (!cell) return;
+    const idx = parseInt(cell.getAttribute('data-entry-index'), 10);
+    const entry = _entryMap.get(idx);
+    if (entry) showDetails(entry);
+  });
+
   loadEventTypes().then(() => {
     loadEntries();
   });
@@ -656,9 +665,15 @@ async function loadEntries(cursor) {
 /* =============================================
    RENDER TABLE
    ============================================= */
+// Map from data-entry-index → entry object (populated during renderTable)
+const _entryMap = new Map();
+
 function renderTable() {
   const tbody = document.getElementById('audit-tbody');
   const countEl = document.getElementById('result-count');
+
+  // Clear old click listeners by removing and recreating tbody contents
+  _entryMap.clear();
 
   if (!state.entries.length) {
     tbody.innerHTML = `<tr class="empty-row"><td colspan="6">No audit events found matching the current filters.</td></tr>`;
@@ -668,21 +683,24 @@ function renderTable() {
 
   countEl.textContent = `${state.entries.length} entries on this page`;
 
-  tbody.innerHTML = state.entries.map(entry => {
+  tbody.innerHTML = state.entries.map((entry, idx) => {
     const ts = formatTimestamp(entry.timestamp);
     const badge = eventTypeBadge(entry.event_type);
     const details = JSON.stringify(entry.details);
     const shortId = entry.entry_id.split('-')[0];
+    _entryMap.set(idx, entry);
+    // Use data-entry-index instead of inline onclick to avoid XSS via JSON injection
     return `<tr>
       <td>${ts}</td>
       <td>${badge}</td>
       <td><code style="font-size:0.75rem;color:var(--accent-blue-lt)">${esc(entry.actor_id)}</code></td>
       <td><code style="font-size:0.75rem">${esc(entry.resource_id || '—')}</code></td>
-      <td class="details-cell" title="${esc(details)}" onclick="showDetails(${esc(JSON.stringify(entry))})">${esc(details)}</td>
+      <td class="details-cell" title="${esc(details)}" data-entry-index="${idx}">${esc(details)}</td>
       <td><code style="font-size:0.72rem;color:var(--text-muted)">${esc(shortId)}…</code></td>
     </tr>`;
   }).join('');
 }
+
 
 /* =============================================
    STATS UPDATE
@@ -784,8 +802,17 @@ function exportData(format) {
 function showDetails(entry) {
   const json = JSON.stringify(entry, null, 2);
   const win = window.open('', '_blank', 'width=600,height=500,scrollbars=yes');
-  win.document.write(`<pre style="font-family:monospace;padding:1rem;background:#0f172a;color:#f1f5f9;font-size:13px;white-space:pre-wrap">${esc(json)}</pre>`);
+  if (!win) return; // popup blocked
+  // Use DOM manipulation instead of document.write to avoid XSS
+  win.document.open();
+  win.document.close();
   win.document.title = `Audit Entry: ${entry.entry_id}`;
+  const style = win.document.createElement('style');
+  style.textContent = 'body{margin:0;background:#0f172a;} pre{font-family:monospace;padding:1rem;color:#f1f5f9;font-size:13px;white-space:pre-wrap;}';
+  win.document.head.appendChild(style);
+  const pre = win.document.createElement('pre');
+  pre.textContent = json;  // textContent is XSS-safe — no HTML parsing
+  win.document.body.appendChild(pre);
 }
 
 /* =============================================
