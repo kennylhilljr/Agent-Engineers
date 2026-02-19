@@ -152,6 +152,72 @@ Follow the continuation task steps. Key flow per ticket:
 
 ---
 
+### Routing Rationale (AI-255)
+
+Every agent assignment MUST be accompanied by an explicit routing rationale.
+Before delegating, state:
+
+1. **Agent selected** — which agent and why
+2. **Alternatives considered** — which agents were evaluated but rejected and why
+3. **Complexity score** — your estimated 1–10 complexity for the task
+4. **Model tier** — haiku / sonnet / opus and the trigger that selected it
+5. **Fallback plan** — which agent to use if the preferred one is unavailable
+
+**Example routing statement (include this before every Task delegation):**
+```
+Routing decision:
+  agent_selected: coding
+  routing_reason: task contains 'refactor', files_changed > 3
+  alternatives_considered: [coding_fast — rejected: complexity keywords present]
+  complexity_score: 7
+  model_tier: sonnet
+  fallback: coding_fast
+```
+
+#### Explicit Routing Rules by Agent Type Pair
+
+**coding_fast vs coding:**
+- Use `coding_fast` when: <= 3 files, no complexity keywords, < 4000 estimated tokens, < 3 modules
+- Use `coding` when: > 3 files OR any of these keywords in task: implement, refactor, architecture,
+  redesign, migration, integration, performance, database, schema, security, auth, billing
+- Complexity keywords always override file count
+
+**pr_reviewer_fast vs pr_reviewer:**
+- Use `pr_reviewer_fast` when: <= 200 lines changed, <= 3 files, no sensitive directories, frontend-only
+- Use `pr_reviewer` when: > 200 lines changed OR any file in auth/, billing/, security/, core/, architecture/
+  OR any migration file OR > 3 files with >50% change ratio
+- Label `review:opus` escalates to Opus model tier
+
+**chatgpt vs gemini vs groq vs kimi:**
+- `groq`: speed-critical validation, context < 32K tokens, fastest responses
+- `gemini`: research, Google ecosystem, large docs, context up to 1M tokens
+- `kimi`: context > 100K tokens, bilingual Chinese/English, context up to 2M tokens
+- `chatgpt`: default for code review, second opinions, logic cross-validation
+- Always prefer `kimi` for entire-codebase analysis; `groq` for quick sanity checks
+
+**Opus escalation (coding/pr_reviewer only):**
+- `coding` → Opus: keywords refactor/architecture/redesign/migration in description, OR complexity > 8, OR 5+ modules
+- `pr_reviewer` → Opus: diff > 500 lines, OR sensitive directory, OR migration file, OR label `review:opus`
+
+#### Fallback Logic
+
+When preferred agent is unavailable (API key missing, 5xx error, rate limit):
+- `coding` → fall back to `coding_fast`
+- `pr_reviewer` → fall back to `pr_reviewer_fast`
+- `kimi` → fall back to `gemini`, then `chatgpt`
+- `gemini` → fall back to `chatgpt`, then `kimi`
+- `groq` → fall back to `chatgpt`
+- `chatgpt` → fall back to `gemini`, then `groq`
+
+Always log the fallback in your routing statement:
+```
+  routing_reason: Fallback from kimi (unavailable) — using gemini for large-context analysis
+```
+
+See `docs/AGENT_ROUTING.md` for the full decision tree reference.
+
+---
+
 ### Complexity Assessment Guide
 
 **Simple (→ `coding_fast` + `pr_reviewer_fast`):**
