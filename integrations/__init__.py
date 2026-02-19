@@ -5,4 +5,4 @@ and project management tools, enabling enterprise customers to connect
 their existing workflows with Agent-Engineers.
 """
 
-__all__ = ["jira"]
+__all__ = ["jira", "gitlab"]

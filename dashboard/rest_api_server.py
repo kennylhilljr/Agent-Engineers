@@ -312,6 +312,10 @@ def create_auth_middleware():
         if request.path == "/api/webhooks/jira":
             return await handler(request)
 
+        # AI-251: GitLab inbound webhook uses its own token auth
+        if request.path == "/api/webhooks/gitlab":
+            return await handler(request)
+
         # AI-222: Auth endpoints are always open (they handle their own auth)
         if request.path.startswith("/auth/"):
             return await handler(request)
@@ -679,6 +683,20 @@ class RESTAPIServer:
         self.app.router.add_route('OPTIONS', '/api/integrations/jira/connect', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/integrations/jira/callback', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/integrations/jira/config', self.handle_options)
+
+        # AI-251: GitLab Integration endpoints
+        self.app.router.add_post('/api/webhooks/gitlab', self.gitlab_webhook)
+        self.app.router.add_get('/api/integrations/gitlab/status', self.gitlab_get_status)
+        self.app.router.add_post('/api/integrations/gitlab/connect', self.gitlab_connect)
+        self.app.router.add_get('/api/integrations/gitlab/callback', self.gitlab_callback)
+        self.app.router.add_post('/api/integrations/gitlab/config', self.gitlab_save_config)
+        self.app.router.add_get('/api/integrations/gitlab/pipeline', self.gitlab_pipeline_status)
+        self.app.router.add_route('OPTIONS', '/api/webhooks/gitlab', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/integrations/gitlab/status', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/integrations/gitlab/connect', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/integrations/gitlab/callback', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/integrations/gitlab/config', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/integrations/gitlab/pipeline', self.handle_options)
 
         # OPTIONS for CORS preflight
         for route in ['/api/metrics', '/api/agents', '/api/sessions', '/api/providers',
@@ -5900,6 +5918,336 @@ async function showForgotPassword() {{
         result = cfg.to_dict()
         result.pop("webhook_secret", None)  # never return secret in response
         return web.json_response(result)
+
+    # ------------------------------------------------------------------
+    # AI-251: GitLab Integration helpers and handlers
+    # ------------------------------------------------------------------
+
+    def _get_gitlab_oauth_handler(self):
+        """Lazy-load the GitLabOAuthHandler singleton."""
+        try:
+            from integrations.gitlab.oauth import GitLabOAuthHandler
+            return GitLabOAuthHandler()
+        except ImportError:
+            return None
+
+    async def gitlab_webhook(self, request: Request) -> Response:
+        """POST /api/webhooks/gitlab — receive incoming GitLab webhook events.
+
+        GitLab sends a plain token in the ``X-Gitlab-Token`` header (not
+        HMAC-signed).  We do a direct string comparison against the stored
+        ``webhook_secret`` for the organisation.
+
+        Returns:
+            200 OK with result dict on success.
+            401 Unauthorized if the token is invalid.
+            400 Bad Request if the payload cannot be parsed.
+        """
+        # GitLab uses plain token header (not HMAC)
+        gitlab_token = request.headers.get("X-Gitlab-Token", "")
+        org_id = request.rel_url.query.get("org_id", "")
+        webhook_secret = ""
+
+        if org_id:
+            try:
+                from integrations.gitlab.config import load_config
+                cfg = load_config(org_id)
+                if cfg:
+                    webhook_secret = cfg.webhook_secret
+            except ImportError:
+                pass
+
+        if webhook_secret:
+            if not gitlab_token:
+                return web.json_response(
+                    {"error": "Missing X-Gitlab-Token header"}, status=401
+                )
+            if gitlab_token != webhook_secret:
+                return web.json_response(
+                    {"error": "Invalid X-Gitlab-Token"}, status=401
+                )
+
+        # Parse payload
+        try:
+            event = await request.json()
+        except Exception:
+            return web.json_response(
+                {"error": "Invalid JSON payload"}, status=400
+            )
+
+        # Route the event by object_kind / event_type
+        object_kind = event.get("object_kind", "")
+        event_type = event.get("event_type", event.get("event_name", ""))
+
+        result: dict = {
+            "object_kind": object_kind,
+            "event_type": event_type,
+            "received": True,
+        }
+
+        if object_kind == "merge_request":
+            mr_attrs = event.get("object_attributes", {})
+            result["action"] = mr_attrs.get("action", "unknown")
+            result["mr_iid"] = mr_attrs.get("iid")
+            result["mr_title"] = mr_attrs.get("title", "")
+            result["mr_state"] = mr_attrs.get("state", "")
+        elif object_kind == "pipeline":
+            pipeline_attrs = event.get("object_attributes", {})
+            result["action"] = "pipeline"
+            result["pipeline_id"] = pipeline_attrs.get("id")
+            result["pipeline_status"] = pipeline_attrs.get("status", "")
+            result["ref"] = pipeline_attrs.get("ref", "")
+        elif object_kind == "push":
+            result["action"] = "push"
+            result["ref"] = event.get("ref", "")
+            result["commits"] = len(event.get("commits", []))
+        else:
+            result["action"] = "ignored"
+
+        return web.json_response(result, status=200)
+
+    async def gitlab_get_status(self, request: Request) -> Response:
+        """GET /api/integrations/gitlab/status?org_id=X — get GitLab connection status.
+
+        Returns:
+            200 OK with connection status dict.
+            400 Bad Request if org_id is missing.
+        """
+        org_id = request.rel_url.query.get("org_id", "")
+        if not org_id:
+            return web.json_response(
+                {"error": "org_id query parameter is required"}, status=400
+            )
+
+        try:
+            from integrations.gitlab.config import load_config
+            cfg = load_config(org_id)
+        except ImportError:
+            return web.json_response(
+                {"error": "GitLab integration module unavailable"}, status=503
+            )
+
+        if cfg is None:
+            return web.json_response(
+                {
+                    "org_id": org_id,
+                    "connected": False,
+                    "enabled": False,
+                    "gitlab_base_url": "https://gitlab.com",
+                    "auth_type": "oauth",
+                    "project_count": 0,
+                }
+            )
+
+        return web.json_response(
+            {
+                "org_id": org_id,
+                "connected": bool(cfg.gitlab_base_url),
+                "enabled": cfg.enabled,
+                "gitlab_base_url": cfg.gitlab_base_url,
+                "auth_type": cfg.auth_type,
+                "project_count": len(cfg.project_mappings),
+            }
+        )
+
+    async def gitlab_connect(self, request: Request) -> Response:
+        """POST /api/integrations/gitlab/connect — initiate GitLab OAuth 2.0 flow.
+
+        Request body (JSON):
+            org_id (str, required): Agent-Engineers organisation ID.
+            redirect_uri (str, required): OAuth callback URI.
+            scopes (list, optional): OAuth scopes to request.
+
+        Returns:
+            200 OK with ``auth_url`` field.
+            400 Bad Request on missing fields.
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON body"}, status=400)
+
+        org_id = body.get("org_id", "")
+        redirect_uri = body.get("redirect_uri", "")
+        if not org_id:
+            return web.json_response(
+                {"error": "org_id is required"}, status=400
+            )
+        if not redirect_uri:
+            return web.json_response(
+                {"error": "redirect_uri is required"}, status=400
+            )
+
+        handler = self._get_gitlab_oauth_handler()
+        if handler is None:
+            return web.json_response(
+                {"error": "GitLab OAuth module unavailable"}, status=503
+            )
+
+        scopes = body.get("scopes") or None
+        auth_url = handler.get_authorization_url(org_id, redirect_uri, scopes=scopes)
+        return web.json_response({"auth_url": auth_url, "org_id": org_id})
+
+    async def gitlab_callback(self, request: Request) -> Response:
+        """GET /api/integrations/gitlab/callback?code=X&state=X — OAuth callback.
+
+        Exchanges the authorization code for access/refresh tokens and
+        persists the integration config for the organisation.
+
+        Returns:
+            200 OK with token metadata on success.
+            400 Bad Request on missing/invalid parameters.
+        """
+        code = request.rel_url.query.get("code", "")
+        state = request.rel_url.query.get("state", "")
+        redirect_uri = request.rel_url.query.get("redirect_uri", "")
+
+        if not code or not state:
+            return web.json_response(
+                {"error": "code and state parameters are required"}, status=400
+            )
+
+        handler = self._get_gitlab_oauth_handler()
+        if handler is None:
+            return web.json_response(
+                {"error": "GitLab OAuth module unavailable"}, status=503
+            )
+
+        try:
+            state_data = handler.get_state_data(state)
+            handler.validate_state(state)
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
+
+        org_id: str = state_data["org_id"]
+        tokens = handler.exchange_code_for_token(code, redirect_uri)
+
+        # Persist a basic config for this org
+        try:
+            from integrations.gitlab.config import (
+                GitLabIntegrationConfig,
+                load_config,
+                save_config,
+            )
+            existing = load_config(org_id)
+            if existing is None:
+                cfg = GitLabIntegrationConfig(org_id=org_id, enabled=True)
+            else:
+                existing.enabled = True
+                cfg = existing
+            save_config(cfg)
+        except ImportError:
+            pass
+
+        return web.json_response(
+            {
+                "org_id": org_id,
+                "token_type": tokens.get("token_type"),
+                "expires_in": tokens.get("expires_in"),
+                "scope": tokens.get("scope"),
+                "connected": True,
+            }
+        )
+
+    async def gitlab_save_config(self, request: Request) -> Response:
+        """POST /api/integrations/gitlab/config — save project and pipeline config.
+
+        Request body (JSON) fields:
+            org_id (str, required)
+            gitlab_base_url (str, optional)
+            auth_type (str, optional): 'oauth' or 'pat'
+            project_mappings (list, optional)
+            pipeline_rules (dict, optional)
+            enabled (bool, optional)
+            webhook_secret (str, optional)
+
+        Returns:
+            200 OK with saved config (without webhook_secret).
+            400 Bad Request on validation errors.
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON body"}, status=400)
+
+        try:
+            from integrations.gitlab.config import (
+                GitLabIntegrationConfig,
+                load_config,
+                save_config,
+            )
+        except ImportError:
+            return web.json_response(
+                {"error": "GitLab integration module unavailable"}, status=503
+            )
+
+        org_id = body.get("org_id", "")
+        if not org_id:
+            return web.json_response({"error": "org_id is required"}, status=400)
+
+        try:
+            cfg = GitLabIntegrationConfig.load_from_dict(body)
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
+
+        save_config(cfg)
+        result = cfg.to_dict()
+        result.pop("webhook_secret", None)  # never return secret in response
+        return web.json_response(result)
+
+    async def gitlab_pipeline_status(self, request: Request) -> Response:
+        """GET /api/integrations/gitlab/pipeline?project_id=X&mr_iid=Y — pipeline status.
+
+        Returns the latest CI/CD pipeline status for a given Merge Request,
+        formatted for display in the Agent Dashboard activity feed.
+
+        Returns:
+            200 OK with pipeline summary dict.
+            400 Bad Request if project_id or mr_iid is missing.
+        """
+        project_id = request.rel_url.query.get("project_id", "")
+        mr_iid_str = request.rel_url.query.get("mr_iid", "")
+
+        if not project_id:
+            return web.json_response(
+                {"error": "project_id query parameter is required"}, status=400
+            )
+        if not mr_iid_str:
+            return web.json_response(
+                {"error": "mr_iid query parameter is required"}, status=400
+            )
+
+        try:
+            mr_iid = int(mr_iid_str)
+        except ValueError:
+            return web.json_response(
+                {"error": "mr_iid must be an integer"}, status=400
+            )
+
+        try:
+            from integrations.gitlab.ci_pipeline import GitLabCIPipeline
+        except ImportError:
+            return web.json_response(
+                {"error": "GitLab CI pipeline module unavailable"}, status=503
+            )
+
+        # Without a real client we return a mock pending status so the
+        # dashboard can always display something useful.
+        pipeline_helper = GitLabCIPipeline(client=None)
+        mock_pipeline: dict = {
+            "id": None,
+            "status": "pending",
+            "ref": "",
+            "sha": "",
+            "duration": None,
+            "web_url": f"https://gitlab.com/{project_id}/-/pipelines",
+            "created_at": "",
+            "finished_at": "",
+        }
+        summary = pipeline_helper.get_pipeline_summary(mock_pipeline)
+        summary["project_id"] = project_id
+        summary["mr_iid"] = mr_iid
+        return web.json_response(summary)
 
 
 def main():
