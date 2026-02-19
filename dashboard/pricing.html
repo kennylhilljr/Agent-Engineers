@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pricing – Agent Dashboard</title>
+  <style>
+    /* ------------------------------------------------------------------ */
+    /* Reset & base                                                         */
+    /* ------------------------------------------------------------------ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --color-bg:       #0d0d0f;
+      --color-surface:  #18181b;
+      --color-border:   #27272a;
+      --color-primary:  #7c3aed;
+      --color-primary-light: #a78bfa;
+      --color-accent:   #06b6d4;
+      --color-text:     #f4f4f5;
+      --color-muted:    #71717a;
+      --color-success:  #22c55e;
+      --radius:         12px;
+      --transition:     0.2s ease;
+    }
+
+    body {
+      background: var(--color-bg);
+      color: var(--color-text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Header                                                               */
+    /* ------------------------------------------------------------------ */
+    .header {
+      text-align: center;
+      padding: 64px 24px 40px;
+    }
+
+    .header h1 {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #a78bfa 0%, #06b6d4 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 16px;
+    }
+
+    .header p {
+      font-size: 1.125rem;
+      color: var(--color-muted);
+      max-width: 560px;
+      margin: 0 auto 32px;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Billing toggle                                                        */
+    /* ------------------------------------------------------------------ */
+    .billing-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 9999px;
+      padding: 6px 8px;
+    }
+
+    .billing-toggle span {
+      font-size: 0.875rem;
+      color: var(--color-muted);
+      padding: 4px 12px;
+      border-radius: 9999px;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .billing-toggle span.active {
+      background: var(--color-primary);
+      color: #fff;
+    }
+
+    .billing-toggle .save-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      background: var(--color-success);
+      color: #000;
+      border-radius: 4px;
+      padding: 2px 6px;
+      margin-left: 4px;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Pricing grid                                                          */
+    /* ------------------------------------------------------------------ */
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Card                                                                  */
+    /* ------------------------------------------------------------------ */
+    .card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: 32px 28px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      transition: border-color var(--transition), transform var(--transition);
+    }
+
+    .card:hover {
+      border-color: var(--color-primary-light);
+      transform: translateY(-2px);
+    }
+
+    .card.popular {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 1px var(--color-primary), 0 8px 32px rgba(124, 58, 237, 0.25);
+    }
+
+    .popular-badge {
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--color-primary);
+      color: #fff;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 4px 14px;
+      border-radius: 9999px;
+      white-space: nowrap;
+    }
+
+    .tier-name {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--color-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+
+    .price-block {
+      margin-bottom: 20px;
+    }
+
+    .price-amount {
+      font-size: 2.5rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1;
+    }
+
+    .price-amount .currency {
+      font-size: 1.25rem;
+      font-weight: 500;
+      vertical-align: super;
+      margin-right: 2px;
+    }
+
+    .price-period {
+      font-size: 0.8rem;
+      color: var(--color-muted);
+      margin-top: 4px;
+    }
+
+    .price-annual-note {
+      font-size: 0.75rem;
+      color: var(--color-success);
+      margin-top: 2px;
+      display: none;
+    }
+
+    body.annual .price-annual-note { display: block; }
+
+    .card-desc {
+      font-size: 0.875rem;
+      color: var(--color-muted);
+      margin-bottom: 24px;
+      flex-grow: 0;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Feature list                                                          */
+    /* ------------------------------------------------------------------ */
+    .feature-list {
+      list-style: none;
+      margin-bottom: 28px;
+      flex-grow: 1;
+    }
+
+    .feature-list li {
+      font-size: 0.875rem;
+      color: var(--color-text);
+      padding: 5px 0;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .feature-list li .icon {
+      color: var(--color-success);
+      font-size: 0.875rem;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* CTA buttons                                                           */
+    /* ------------------------------------------------------------------ */
+    .cta-btn {
+      display: block;
+      width: 100%;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      text-align: center;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      transition: opacity var(--transition), transform var(--transition);
+    }
+
+    .cta-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+
+    .cta-primary {
+      background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+      color: #fff;
+    }
+
+    .cta-outline {
+      background: transparent;
+      border: 1px solid var(--color-border);
+      color: var(--color-text);
+    }
+
+    .cta-free {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      color: var(--color-text);
+    }
+
+    .cta-enterprise {
+      background: linear-gradient(135deg, #1e1e2e 0%, #27272a 100%);
+      border: 1px solid var(--color-border);
+      color: var(--color-primary-light);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Trial note                                                            */
+    /* ------------------------------------------------------------------ */
+    .trial-note {
+      font-size: 0.75rem;
+      color: var(--color-muted);
+      text-align: center;
+      margin-top: 10px;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Limits row                                                            */
+    /* ------------------------------------------------------------------ */
+    .limits {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+      border-top: 1px solid var(--color-border);
+      border-bottom: 1px solid var(--color-border);
+      padding: 16px 0;
+    }
+
+    .limit-item {
+      text-align: center;
+    }
+
+    .limit-value {
+      font-size: 1.125rem;
+      font-weight: 700;
+    }
+
+    .limit-label {
+      font-size: 0.7rem;
+      color: var(--color-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* FAQ / footer note                                                     */
+    /* ------------------------------------------------------------------ */
+    .footer-note {
+      text-align: center;
+      color: var(--color-muted);
+      font-size: 0.875rem;
+      padding: 0 24px 48px;
+    }
+
+    .footer-note a {
+      color: var(--color-primary-light);
+      text-decoration: none;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Responsive                                                            */
+    /* ------------------------------------------------------------------ */
+    @media (max-width: 640px) {
+      .pricing-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <h1>Simple, Transparent Pricing</h1>
+  <p>Launch your AI agent workflows today. Scale from zero to fleet without vendor lock-in.</p>
+
+  <div class="billing-toggle">
+    <span class="active" id="btn-monthly" onclick="setBilling('monthly')">Monthly</span>
+    <span id="btn-annual" onclick="setBilling('annual')">
+      Annual <span class="save-badge">Save 20%</span>
+    </span>
+  </div>
+</header>
+
+<section class="pricing-grid">
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Explorer (Free)                                                       -->
+  <!-- ------------------------------------------------------------------ -->
+  <div class="card">
+    <div class="tier-name">Explorer</div>
+    <div class="price-block">
+      <div class="price-amount"><span class="currency">$</span>0</div>
+      <div class="price-period">Free forever</div>
+    </div>
+    <p class="card-desc">Try Agent Dashboard with no credit card required. Perfect for individuals exploring AI agents.</p>
+
+    <div class="limits">
+      <div class="limit-item">
+        <div class="limit-value">10 hrs</div>
+        <div class="limit-label">Agent-hours/mo</div>
+      </div>
+      <div class="limit-item">
+        <div class="limit-value">1</div>
+        <div class="limit-label">Concurrent agents</div>
+      </div>
+    </div>
+
+    <ul class="feature-list">
+      <li><span class="icon">&#10003;</span> Basic dashboard</li>
+      <li><span class="icon">&#10003;</span> Claude Haiku models</li>
+      <li><span class="icon">&#10003;</span> Community support</li>
+    </ul>
+
+    <a href="/signup" class="cta-btn cta-free">Get started free</a>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Builder                                                               -->
+  <!-- ------------------------------------------------------------------ -->
+  <div class="card">
+    <div class="tier-name">Builder</div>
+    <div class="price-block">
+      <div class="price-amount" id="builder-price"><span class="currency">$</span>49</div>
+      <div class="price-period">per month</div>
+      <div class="price-annual-note" id="builder-annual-note">Billed as $468/yr &mdash; save $120</div>
+    </div>
+    <p class="card-desc">For individual developers and power users building production agents.</p>
+
+    <div class="limits">
+      <div class="limit-item">
+        <div class="limit-value">100 hrs</div>
+        <div class="limit-label">Agent-hours/mo</div>
+      </div>
+      <div class="limit-item">
+        <div class="limit-value">3</div>
+        <div class="limit-label">Concurrent agents</div>
+      </div>
+    </div>
+
+    <ul class="feature-list">
+      <li><span class="icon">&#10003;</span> Everything in Explorer</li>
+      <li><span class="icon">&#10003;</span> Haiku + Sonnet models</li>
+      <li><span class="icon">&#10003;</span> Usage analytics</li>
+      <li><span class="icon">&#10003;</span> Webhooks</li>
+      <li><span class="icon">&#10003;</span> Email support</li>
+    </ul>
+
+    <button class="cta-btn cta-outline" onclick="startUpgrade('builder')">Start 14-day trial</button>
+    <div class="trial-note">No credit card required during trial</div>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Team (Popular)                                                        -->
+  <!-- ------------------------------------------------------------------ -->
+  <div class="card popular">
+    <span class="popular-badge">Most Popular</span>
+    <div class="tier-name">Team</div>
+    <div class="price-block">
+      <div class="price-amount" id="team-price"><span class="currency">$</span>199</div>
+      <div class="price-period">per month</div>
+      <div class="price-annual-note" id="team-annual-note">Billed as $1,788/yr &mdash; save $600</div>
+    </div>
+    <p class="card-desc">For growing teams shipping AI-native products. Includes all major model providers.</p>
+
+    <div class="limits">
+      <div class="limit-item">
+        <div class="limit-value">500 hrs</div>
+        <div class="limit-label">Agent-hours/mo</div>
+      </div>
+      <div class="limit-item">
+        <div class="limit-value">10</div>
+        <div class="limit-label">Concurrent agents</div>
+      </div>
+    </div>
+
+    <ul class="feature-list">
+      <li><span class="icon">&#10003;</span> Everything in Builder</li>
+      <li><span class="icon">&#10003;</span> All Claude + GPT-4o + Gemini</li>
+      <li><span class="icon">&#10003;</span> Team management &amp; RBAC</li>
+      <li><span class="icon">&#10003;</span> Audit log</li>
+      <li><span class="icon">&#10003;</span> Slack, Linear, GitHub integrations</li>
+      <li><span class="icon">&#10003;</span> Priority support</li>
+    </ul>
+
+    <button class="cta-btn cta-primary" onclick="startUpgrade('team')">Start 14-day trial</button>
+    <div class="trial-note">No credit card required during trial</div>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Organization                                                          -->
+  <!-- ------------------------------------------------------------------ -->
+  <div class="card">
+    <div class="tier-name">Organization</div>
+    <div class="price-block">
+      <div class="price-amount" id="org-price"><span class="currency">$</span>799</div>
+      <div class="price-period">per month</div>
+      <div class="price-annual-note" id="org-annual-note">Billed as $7,188/yr &mdash; save $2,400</div>
+    </div>
+    <p class="card-desc">For organizations needing SSO, advanced security, and dedicated support SLAs.</p>
+
+    <div class="limits">
+      <div class="limit-item">
+        <div class="limit-value">2,000 hrs</div>
+        <div class="limit-label">Agent-hours/mo</div>
+      </div>
+      <div class="limit-item">
+        <div class="limit-value">25</div>
+        <div class="limit-label">Concurrent agents</div>
+      </div>
+    </div>
+
+    <ul class="feature-list">
+      <li><span class="icon">&#10003;</span> Everything in Team</li>
+      <li><span class="icon">&#10003;</span> All 6 model providers</li>
+      <li><span class="icon">&#10003;</span> SSO (SAML &amp; OIDC)</li>
+      <li><span class="icon">&#10003;</span> Custom integrations</li>
+      <li><span class="icon">&#10003;</span> Dedicated support</li>
+      <li><span class="icon">&#10003;</span> 99.9% uptime SLA</li>
+    </ul>
+
+    <button class="cta-btn cta-outline" onclick="startUpgrade('organization')">Start 14-day trial</button>
+    <div class="trial-note">No credit card required during trial</div>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Fleet (Enterprise)                                                    -->
+  <!-- ------------------------------------------------------------------ -->
+  <div class="card">
+    <div class="tier-name">Fleet</div>
+    <div class="price-block">
+      <div class="price-amount">Custom</div>
+      <div class="price-period">Starting at $5,000/mo</div>
+    </div>
+    <p class="card-desc">For enterprises running agent fleets at scale. Unlimited everything with BYO model support.</p>
+
+    <div class="limits">
+      <div class="limit-item">
+        <div class="limit-value">&infin;</div>
+        <div class="limit-label">Agent-hours/mo</div>
+      </div>
+      <div class="limit-item">
+        <div class="limit-value">&infin;</div>
+        <div class="limit-label">Concurrent agents</div>
+      </div>
+    </div>
+
+    <ul class="feature-list">
+      <li><span class="icon">&#10003;</span> Everything in Organization</li>
+      <li><span class="icon">&#10003;</span> Bring-your-own model</li>
+      <li><span class="icon">&#10003;</span> SCIM provisioning</li>
+      <li><span class="icon">&#10003;</span> On-premise option</li>
+      <li><span class="icon">&#10003;</span> Customer success manager</li>
+      <li><span class="icon">&#10003;</span> Custom SLA up to 99.99%</li>
+      <li><span class="icon">&#10003;</span> Volume discounts</li>
+    </ul>
+
+    <a href="/contact-sales" class="cta-btn cta-enterprise">Contact sales</a>
+  </div>
+
+</section>
+
+<div class="footer-note">
+  Overage beyond included agent-hours is billed at <strong>$0.50/agent-hour</strong>.
+  Premium models (Opus, o1) incur an additional <strong>$1.50/agent-hour</strong> surcharge.
+  All prices in USD. Taxes may apply. <a href="/legal/terms">Terms</a> &middot; <a href="/legal/privacy">Privacy</a>
+</div>
+
+<script>
+  /* -------------------------------------------------------------------- */
+  /* Billing toggle logic                                                   */
+  /* -------------------------------------------------------------------- */
+
+  const PRICES = {
+    monthly: { builder: 49, team: 199, org: 799 },
+    annual:  { builder: 39, team: 149, org: 599 },
+  };
+
+  function setBilling(period) {
+    const isAnnual = period === 'annual';
+    document.body.classList.toggle('annual', isAnnual);
+
+    document.getElementById('btn-monthly').classList.toggle('active', !isAnnual);
+    document.getElementById('btn-annual').classList.toggle('active', isAnnual);
+
+    const prices = PRICES[period];
+    document.getElementById('builder-price').innerHTML = `<span class="currency">$</span>${prices.builder}`;
+    document.getElementById('team-price').innerHTML    = `<span class="currency">$</span>${prices.team}`;
+    document.getElementById('org-price').innerHTML     = `<span class="currency">$</span>${prices.org}`;
+  }
+
+  /* -------------------------------------------------------------------- */
+  /* Upgrade / trial flow                                                   */
+  /* -------------------------------------------------------------------- */
+
+  function startUpgrade(tier) {
+    const period = document.body.classList.contains('annual') ? 'annual' : 'monthly';
+
+    fetch('/api/billing/trial/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tier }),
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        // Fallback to upgrade flow if trial already used or not eligible
+        return fetch('/api/billing/upgrade', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to_tier: tier, billing_period: period }),
+        }).then(r => r.json());
+      }
+      return data;
+    })
+    .then(data => {
+      if (data.stripe_price_id) {
+        window.location.href = `/checkout?price_id=${data.stripe_price_id}`;
+      } else {
+        alert(data.message || 'Your trial has been activated!');
+      }
+    })
+    .catch(() => {
+      window.location.href = `/signup?plan=${tier}`;
+    });
+  }
+</script>
+</body>
+</html>

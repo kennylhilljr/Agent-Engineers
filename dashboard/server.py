@@ -116,6 +116,14 @@ except ImportError:
     _TEAMS_AVAILABLE = False
     logger.warning("teams module not found — team management disabled")
 
+# AI-247: GA Launch - Full Pricing Tier Activation & Enforcement
+try:
+    from billing.routes import register_billing_routes
+    _BILLING_ROUTES_AVAILABLE = True
+except ImportError:
+    _BILLING_ROUTES_AVAILABLE = False
+    logger.warning("billing routes not found — pricing endpoints disabled")
+
 
 def _collect_event(event_type: str, properties: Optional[dict] = None) -> None:
     """Fire-and-forget telemetry event collection.
@@ -745,6 +753,10 @@ class DashboardServer:
         # AI-245: Team Management - Roles & Permissions
         if _TEAMS_AVAILABLE:
             register_team_routes(self.app)
+
+        # AI-247: GA Launch - Pricing Tier Activation & Enforcement
+        if _BILLING_ROUTES_AVAILABLE:
+            register_billing_routes(self.app)
 
     async def handle_options(self, request: Request) -> Response:
         """Handle CORS preflight OPTIONS requests."""
