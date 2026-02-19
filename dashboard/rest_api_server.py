@@ -53,6 +53,34 @@ except ImportError:
 # Module-level benchmark storage singleton (in-memory, 90-day retention)
 _benchmark_storage: Optional[Any] = None
 
+# AI-249: Advanced Analytics — lazy imports so missing deps don't break the server
+try:
+    from analytics.tier_gate import TierGate as _TierGate
+    from analytics.efficiency import AgentEfficiencyAnalyzer as _AgentEfficiencyAnalyzer
+    from analytics.cost_optimizer import CostOptimizer as _CostOptimizer
+    from analytics.model_performance import ModelPerformanceComparator as _ModelPerformanceComparator
+    from analytics.sprint_velocity import SprintVelocityTracker as _SprintVelocityTracker
+    from analytics.exporter import AnalyticsExporter as _AnalyticsExporter
+    _ANALYTICS_AVAILABLE = True
+except ImportError:
+    _ANALYTICS_AVAILABLE = False
+
+# Module-level singletons for analytics (lazy init)
+_analytics_tier_gate: Optional[Any] = None
+_analytics_efficiency: Optional[Any] = None
+_analytics_costs: Optional[Any] = None
+_analytics_models: Optional[Any] = None
+_analytics_velocity: Optional[Any] = None
+_analytics_exporter: Optional[Any] = None
+
+
+def _get_analytics_tier_gate() -> Any:
+    """Return TierGate singleton (lazy init)."""
+    global _analytics_tier_gate  # noqa: PLW0603
+    if _analytics_tier_gate is None and _ANALYTICS_AVAILABLE:
+        _analytics_tier_gate = _TierGate()
+    return _analytics_tier_gate
+
 
 def _get_benchmark_storage() -> Any:
     """Return the module-level BenchmarkStorage singleton (lazy init)."""
@@ -78,7 +106,7 @@ try:
     from sso.jit_provisioner import JITProvisioner, JITError, JITDomainError
     from sso.scim_handler import SCIMHandler, SCIMError, SCIMAuthError, SCIMNotFoundError
     _SSO_AVAILABLE = True
-except ImportError:
+except (ImportError, SyntaxError):
     _SSO_AVAILABLE = False
 
 # SSO singleton instances (initialized lazily)
@@ -623,6 +651,18 @@ class RESTAPIServer:
         self.app.router.add_get('/api/benchmarks/regression-alerts', self.get_benchmark_regression_alerts)
         self.app.router.add_route('OPTIONS', '/api/benchmarks', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/benchmarks/regression-alerts', self.handle_options)
+
+        # AI-249: Advanced Analytics (Organization/Fleet tier gated)
+        self.app.router.add_get('/api/analytics/efficiency', self.get_analytics_efficiency)
+        self.app.router.add_get('/api/analytics/costs', self.get_analytics_costs)
+        self.app.router.add_get('/api/analytics/model-performance', self.get_analytics_model_performance)
+        self.app.router.add_get('/api/analytics/sprint-velocity', self.get_analytics_sprint_velocity)
+        self.app.router.add_get('/api/analytics/export', self.get_analytics_export)
+        self.app.router.add_route('OPTIONS', '/api/analytics/efficiency', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/analytics/costs', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/analytics/model-performance', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/analytics/sprint-velocity', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/analytics/export', self.handle_options)
 
         # OPTIONS for CORS preflight
         for route in ['/api/metrics', '/api/agents', '/api/sessions', '/api/providers',
@@ -5376,6 +5416,208 @@ async function showForgotPassword() {{
             "alerts": alerts,
             "count": len(alerts),
         })
+
+    # ------------------------------------------------------------------
+    # AI-249: Advanced Analytics endpoints (Organization/Fleet tier only)
+    # ------------------------------------------------------------------
+
+    def _check_analytics_tier(self, request: Request):
+        """Return None if analytics access is allowed, or a 403 Response.
+
+        Reads ``tier`` from the request query parameters.  If the tier is
+        not an analytics-enabled tier (organization / fleet / enterprise),
+        returns a JSON 403 response.  Otherwise returns None.
+        """
+        if not _ANALYTICS_AVAILABLE:
+            return web.json_response(
+                {"error": "Analytics module not available"}, status=503
+            )
+        tier = request.rel_url.query.get("tier", "")
+        gate = _get_analytics_tier_gate()
+        if gate is None or not gate.is_analytics_enabled(tier):
+            return web.json_response(
+                {
+                    "error": "Forbidden",
+                    "message": (
+                        "Advanced analytics requires an Organization or Fleet "
+                        "tier subscription."
+                    ),
+                    "tier_provided": tier,
+                    "analytics_tiers": ["organization", "fleet", "enterprise"],
+                },
+                status=403,
+            )
+        return None
+
+    async def get_analytics_efficiency(self, request: Request) -> Response:
+        """GET /api/analytics/efficiency - Agent efficiency metrics.
+
+        Query parameters:
+            org_id (str, required): Organisation identifier.
+            days (int, optional): Rolling window in days (default 30).
+            tier (str, required): Billing tier for gate check.
+
+        Returns:
+            200 OK with efficiency data.
+            403 if tier is not organization/fleet.
+        """
+        gate_response = self._check_analytics_tier(request)
+        if gate_response is not None:
+            return gate_response
+
+        if not _ANALYTICS_AVAILABLE:
+            return web.json_response({"error": "Analytics module unavailable"}, status=503)
+
+        org_id = request.rel_url.query.get("org_id", "default")
+        try:
+            days = int(request.rel_url.query.get("days", "30"))
+        except ValueError:
+            days = 30
+
+        analyzer = _AgentEfficiencyAnalyzer()
+        data = {
+            "org_id": org_id,
+            "days": days,
+            "agent_rankings": analyzer.rank_agents_by_efficiency(),
+            "success_rate_trends": {
+                agent: analyzer.get_success_rate_trend(agent, days=days)
+                for agent in ["coding", "pr_reviewer", "linear", "github"]
+            },
+            "idle_vs_active": {
+                agent: analyzer.get_idle_vs_active_ratio(agent)
+                for agent in ["coding", "pr_reviewer", "linear", "github"]
+            },
+        }
+        return web.json_response(data)
+
+    async def get_analytics_costs(self, request: Request) -> Response:
+        """GET /api/analytics/costs - Cost optimisation metrics.
+
+        Query parameters:
+            org_id (str, required): Organisation identifier.
+            days (int, optional): Rolling window in days (default 30).
+            tier (str, required): Billing tier for gate check.
+
+        Returns:
+            200 OK with cost data.
+            403 if tier is not organization/fleet.
+        """
+        gate_response = self._check_analytics_tier(request)
+        if gate_response is not None:
+            return gate_response
+
+        if not _ANALYTICS_AVAILABLE:
+            return web.json_response({"error": "Analytics module unavailable"}, status=503)
+
+        org_id = request.rel_url.query.get("org_id", "default")
+        try:
+            days = int(request.rel_url.query.get("days", "30"))
+        except ValueError:
+            days = 30
+
+        optimizer = _CostOptimizer()
+        data = {
+            "org_id": org_id,
+            "days": days,
+            "cost_per_ticket_by_tier": optimizer.get_cost_per_ticket_by_tier(
+                org_id, days=days
+            ),
+            "monthly_cost_trend": optimizer.get_monthly_cost_trend(org_id, months=6),
+            "roi": optimizer.calculate_roi(org_id),
+            "overage_risk": optimizer.check_overage_risk(org_id),
+        }
+        return web.json_response(data)
+
+    async def get_analytics_model_performance(self, request: Request) -> Response:
+        """GET /api/analytics/model-performance - Model quality comparisons.
+
+        Query parameters:
+            org_id (str, optional): Organisation identifier (for context).
+            tier (str, required): Billing tier for gate check.
+
+        Returns:
+            200 OK with model performance data.
+            403 if tier is not organization/fleet.
+        """
+        gate_response = self._check_analytics_tier(request)
+        if gate_response is not None:
+            return gate_response
+
+        if not _ANALYTICS_AVAILABLE:
+            return web.json_response({"error": "Analytics module unavailable"}, status=503)
+
+        org_id = request.rel_url.query.get("org_id", "default")
+        comparator = _ModelPerformanceComparator()
+        data = {
+            "org_id": org_id,
+            "quality_scores": comparator.get_quality_scores_by_provider(),
+            "task_affinity_matrix": comparator.get_task_affinity_matrix(),
+            "cross_validation_agreement_rate": (
+                comparator.get_crossvalidation_agreement_rate()
+            ),
+        }
+        return web.json_response(data)
+
+    async def get_analytics_sprint_velocity(self, request: Request) -> Response:
+        """GET /api/analytics/sprint-velocity - Sprint velocity charts.
+
+        Query parameters:
+            org_id (str, required): Organisation identifier.
+            weeks (int, optional): Number of weeks of history (default 12).
+            tier (str, required): Billing tier for gate check.
+
+        Returns:
+            200 OK with velocity data.
+            403 if tier is not organization/fleet.
+        """
+        gate_response = self._check_analytics_tier(request)
+        if gate_response is not None:
+            return gate_response
+
+        if not _ANALYTICS_AVAILABLE:
+            return web.json_response({"error": "Analytics module unavailable"}, status=503)
+
+        org_id = request.rel_url.query.get("org_id", "default")
+        try:
+            weeks = int(request.rel_url.query.get("weeks", "12"))
+        except ValueError:
+            weeks = 12
+
+        tracker = _SprintVelocityTracker()
+        data = {
+            "org_id": org_id,
+            "weeks": weeks,
+            "weekly_velocity": tracker.get_weekly_velocity(org_id, weeks=weeks),
+            "trend_line": tracker.get_velocity_trend_line(org_id),
+            "blocked_analysis": tracker.get_blocked_tickets_analysis(org_id),
+        }
+        return web.json_response(data)
+
+    async def get_analytics_export(self, request: Request) -> Response:
+        """GET /api/analytics/export - Export monthly report as JSON.
+
+        Query parameters:
+            org_id (str, required): Organisation identifier.
+            month (str, optional): 'YYYY-MM' (default: current month).
+            tier (str, required): Billing tier for gate check.
+
+        Returns:
+            200 OK with the full monthly report dict.
+            403 if tier is not organization/fleet.
+        """
+        gate_response = self._check_analytics_tier(request)
+        if gate_response is not None:
+            return gate_response
+
+        if not _ANALYTICS_AVAILABLE:
+            return web.json_response({"error": "Analytics module unavailable"}, status=503)
+
+        org_id = request.rel_url.query.get("org_id", "default")
+        month = request.rel_url.query.get("month", None)
+
+        exporter = _AnalyticsExporter()
+        report = exporter.export_monthly_report(org_id, month=month)
+        return web.json_response(report)
 
 
 def main():
