@@ -169,9 +169,15 @@ class TestStreamChatResponse:
 
     @pytest.mark.asyncio
     async def test_stream_chat_gemini_uses_mock(self):
-        """Test Gemini uses mock (not implemented yet)."""
-        # Clear Gemini API keys to force mock usage
-        with patch.dict(os.environ, {'GEMINI_API_KEY': '', 'GOOGLE_API_KEY': ''}, clear=False):
+        """Test Gemini falls back to mock when bridge is unavailable."""
+        from unittest.mock import MagicMock
+        # Simulate bridge unavailable (e.g., no API key configured)
+        mock_bridge = MagicMock()
+        mock_bridge.is_available.return_value = False
+        mock_registry = MagicMock()
+        mock_registry.get.return_value = mock_bridge
+
+        with patch('dashboard.chat_handler._provider_bridge_registry', mock_registry):
             chunks = []
             async for chunk in stream_chat_response('Hello', 'gemini', '2.5-flash'):
                 chunks.append(chunk)

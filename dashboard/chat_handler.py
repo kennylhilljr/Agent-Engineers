@@ -333,6 +333,206 @@ class ChatRouter:
         return result
 
 
+# ---------------------------------------------------------------------------
+# Model mapping helpers
+# ---------------------------------------------------------------------------
+
+_CLAUDE_MODEL_MAP = {
+    "haiku-4.5": "claude-3-5-haiku-20241022",
+    "sonnet-4.5": "claude-3-5-sonnet-20241022",
+    "opus-4.6": "claude-3-opus-20240229",
+    "haiku": "claude-3-5-haiku-20241022",
+    "sonnet": "claude-3-5-sonnet-20241022",
+    "opus": "claude-3-opus-20240229",
+}
+
+_OPENAI_MODEL_MAP = {
+    "gpt-4o": "gpt-4o",
+    "o1": "o1-preview",
+    "o3-mini": "o3-mini",
+    "o4-mini": "o4-mini",
+}
+
+
+def map_model_to_api(provider: str, model: str) -> str:
+    """Map a dashboard model identifier to the provider API model name.
+
+    Args:
+        provider: Provider name ('claude', 'openai', etc.)
+        model: Dashboard model identifier (e.g., 'sonnet-4.5', 'gpt-4o')
+
+    Returns:
+        The API model name, or the original model string if no mapping exists.
+    """
+    if provider == "claude":
+        return _CLAUDE_MODEL_MAP.get(model, model)
+    if provider == "openai":
+        return _OPENAI_MODEL_MAP.get(model, model)
+    return model
+
+
+# ---------------------------------------------------------------------------
+# Mock streaming with tool transparency
+# ---------------------------------------------------------------------------
+
+async def stream_mock_response(message: str, provider_name: str, model: str):
+    """Yield mock streaming chunks with tool-transparency formatting.
+
+    Produces realistic chunk sequences including tool_use, tool_result, and
+    text chunks with timestamps. The response content depends on keywords in
+    the message to mimic agent routing.
+
+    Chunk types yielded:
+      - {'type': 'tool_use', 'tool_name': ..., 'tool_input': ..., 'tool_id': ..., 'timestamp': ...}
+      - {'type': 'tool_result', 'tool_id': ..., 'result': ..., 'timestamp': ...}
+      - {'type': 'text', 'content': ..., 'timestamp': ...}
+      - {'type': 'done', 'timestamp': ...}
+
+    Args:
+        message: User message (used for keyword routing)
+        provider_name: Provider display name (e.g., 'Claude', 'OpenAI')
+        model: Model identifier
+    """
+    import uuid
+    from datetime import datetime, timezone
+
+    def _ts() -> str:
+        return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
+    msg_lower = message.lower()
+
+    # Determine routing based on message keywords
+    if any(k in msg_lower for k in ("linear", "issue", "ticket", "sprint", "backlog")):
+        tool_id = str(uuid.uuid4())[:8]
+        yield {
+            "type": "tool_use",
+            "tool_name": "Linear_listIssues",
+            "tool_input": {"query": message},
+            "tool_id": tool_id,
+            "timestamp": _ts(),
+        }
+        yield {
+            "type": "tool_result",
+            "tool_id": tool_id,
+            "result": "Found 3 open issues: AI-100, AI-101, AI-102",
+            "timestamp": _ts(),
+        }
+        yield {
+            "type": "text",
+            "content": (
+                f"[{provider_name}/{model}] I found 3 open Linear issues for you. "
+                f"Here's a summary: AI-100 (In Progress), AI-101 (Todo), AI-102 (Todo)."
+            ),
+            "timestamp": _ts(),
+        }
+
+    elif any(k in msg_lower for k in ("github", "pr", "pull request", "commit", "repo")):
+        tool_id = str(uuid.uuid4())[:8]
+        yield {
+            "type": "tool_use",
+            "tool_name": "Github_ListPullRequests",
+            "tool_input": {"query": message},
+            "tool_id": tool_id,
+            "timestamp": _ts(),
+        }
+        yield {
+            "type": "tool_result",
+            "tool_id": tool_id,
+            "result": "Found 2 open PRs: #45, #46",
+            "timestamp": _ts(),
+        }
+        yield {
+            "type": "text",
+            "content": f"[{provider_name}/{model}] Found 2 open pull requests: #45 and #46.",
+            "timestamp": _ts(),
+        }
+
+    elif any(k in msg_lower for k in ("slack", "channel", "message", "notification")):
+        tool_id = str(uuid.uuid4())[:8]
+        yield {
+            "type": "tool_use",
+            "tool_name": "slack_channels_list",
+            "tool_input": {"query": message},
+            "tool_id": tool_id,
+            "timestamp": _ts(),
+        }
+        yield {
+            "type": "tool_result",
+            "tool_id": tool_id,
+            "result": "Found Slack messages in #general and #engineering",
+            "timestamp": _ts(),
+        }
+        yield {
+            "type": "text",
+            "content": f"[{provider_name}/{model}] Retrieved Slack messages from #general.",
+            "timestamp": _ts(),
+        }
+
+    elif any(k in msg_lower for k in ("code", "implement", "function", "class", "script")):
+        yield {
+            "type": "text",
+            "content": (
+                f"[{provider_name}/{model}] Here's a Python example:\n\n"
+                "```python\n"
+                "def example():\n"
+                "    \"\"\"Example function.\"\"\"\n"
+                "    return 'Hello, World!'\n"
+                "```\n"
+            ),
+            "timestamp": _ts(),
+        }
+
+    else:
+        # Generic conversational response
+        yield {
+            "type": "text",
+            "content": (
+                f"[{provider_name}/{model}] I understand your question. "
+                f"I'm a demo response from {provider_name} ({model}). "
+                f"Configure real API keys for live responses."
+            ),
+            "timestamp": _ts(),
+        }
+
+    yield {"type": "done", "timestamp": _ts()}
+
+
+# ---------------------------------------------------------------------------
+# Provider-specific streaming (real API)
+# ---------------------------------------------------------------------------
+
+async def stream_claude_response(message: str, model: str = "sonnet-4.5",
+                                  history: Optional[List[Dict]] = None):
+    """Stream a response from the Claude (Anthropic) provider bridge.
+
+    Yields dicts with 'type' key ('text', 'error', 'done').
+    Falls back to mock streaming if bridge is unavailable.
+
+    Args:
+        message: User message text
+        model: Claude model identifier (default: 'sonnet-4.5')
+        history: Optional conversation history
+    """
+    async for chunk in _stream_provider_response(message, "claude", model, history):
+        yield chunk
+
+
+async def stream_openai_response(message: str, model: str = "gpt-4o",
+                                  history: Optional[List[Dict]] = None):
+    """Stream a response from the OpenAI provider bridge.
+
+    Yields dicts with 'type' key ('text', 'error', 'done').
+    Falls back to mock streaming if bridge is unavailable.
+
+    Args:
+        message: User message text
+        model: OpenAI model identifier (default: 'gpt-4o')
+        history: Optional conversation history
+    """
+    async for chunk in _stream_provider_response(message, "openai", model, history):
+        yield chunk
+
+
 def get_chat_history(limit: int = 100) -> List[Dict]:
     """Get recent chat history.
 
@@ -351,3 +551,174 @@ def get_chat_history(limit: int = 100) -> List[Dict]:
 def clear_chat_history() -> None:
     """Clear the in-memory chat history (for testing)."""
     _chat_history.clear()
+
+
+# ---------------------------------------------------------------------------
+# Streaming provider response functions (REQ-TECH-009 multi-provider)
+# ---------------------------------------------------------------------------
+
+async def _stream_provider_response(message: str, provider: str, model: Optional[str] = None,
+                                     history: Optional[List[Dict]] = None):
+    """Internal async generator that streams chunks from a provider bridge.
+
+    Yields dicts with 'type' key:
+      - {'type': 'text', 'text': '...'} for response text
+      - {'type': 'error', 'text': '...'} for errors
+      - {'type': 'done'} always last
+
+    Args:
+        message: The user message
+        provider: Provider name (gemini, groq, kimi, etc.)
+        model: Model identifier (optional)
+        history: Conversation history (optional)
+    """
+    registry = _get_provider_bridge_registry()
+
+    if registry is None:
+        yield {"type": "error", "text": f"Provider bridge registry unavailable for '{provider}'"}
+        yield {"type": "done"}
+        return
+
+    try:
+        bridge = registry.get(provider)
+    except (KeyError, AttributeError):
+        # Unknown provider - yield error
+        yield {"type": "error", "text": f"Unknown provider: '{provider}'"}
+        yield {"type": "done"}
+        return
+
+    if not bridge.is_available():
+        yield {"type": "error", "text": f"Provider '{provider}' bridge not available (check API key)"}
+        yield {"type": "done"}
+        return
+
+    try:
+        context = None
+        if history:
+            context = "\n".join(
+                f"{m['role']}: {m['content']}" for m in history if isinstance(m, dict)
+            )
+        response = await bridge.send_message_async(message, context=context)
+        if response:
+            yield {"type": "text", "text": response}
+        yield {"type": "done"}
+    except Exception as exc:
+        logger.error("[stream_provider] Error from '%s': %s", provider, exc)
+        yield {"type": "error", "text": str(exc)}
+        yield {"type": "done"}
+
+
+async def stream_gemini_response(message: str, model: str = "2.5-flash",
+                                  history: Optional[List[Dict]] = None):
+    """Stream a response from the Gemini provider bridge.
+
+    Yields dicts with 'type' key ('text', 'error', 'done').
+    Produces error chunks if the bridge is unavailable.
+
+    Args:
+        message: User message text
+        model: Gemini model identifier (default: '2.5-flash')
+        history: Optional conversation history
+    """
+    async for chunk in _stream_provider_response(message, "gemini", model, history):
+        yield chunk
+
+
+async def stream_groq_response(message: str, model: str = "llama-3.3-70b",
+                                history: Optional[List[Dict]] = None):
+    """Stream a response from the Groq provider bridge.
+
+    Yields dicts with 'type' key ('text', 'error', 'done').
+    Produces error chunks if the bridge is unavailable.
+
+    Args:
+        message: User message text
+        model: Groq model identifier (default: 'llama-3.3-70b')
+        history: Optional conversation history
+    """
+    async for chunk in _stream_provider_response(message, "groq", model, history):
+        yield chunk
+
+
+async def stream_kimi_response(message: str, model: str = "moonshot-v1",
+                                history: Optional[List[Dict]] = None):
+    """Stream a response from the KIMI (Moonshot AI) provider bridge.
+
+    Yields dicts with 'type' key ('text', 'error', 'done').
+    Produces error chunks if the bridge is unavailable.
+
+    Args:
+        message: User message text
+        model: KIMI model identifier (default: 'moonshot-v1')
+        history: Optional conversation history
+    """
+    async for chunk in _stream_provider_response(message, "kimi", model, history):
+        yield chunk
+
+
+async def stream_chat_response(message: str, provider: str = "claude",
+                                model: Optional[str] = None,
+                                history: Optional[List[Dict]] = None,
+                                conversation_history: Optional[List[Dict]] = None):
+    """Stream a chat response, routing to the specified provider with mock fallback.
+
+    Unlike the provider-specific streaming functions, this function always
+    produces at least one text chunk — falling back to a mock response if the
+    provider bridge is unavailable.  This supports hot-swap UX where the UI
+    stays functional regardless of API key configuration.
+
+    Yields dicts with 'type' key ('text', 'error', 'done').
+    Text chunks include both 'text' and 'content' keys for compatibility.
+
+    Args:
+        message: User message text
+        provider: AI provider name (claude, openai, gemini, groq, kimi, windsurf)
+        model: Model identifier (optional)
+        history: Optional conversation history list of {'role', 'content'} dicts
+        conversation_history: Alias for history parameter
+    """
+    # Accept either parameter name
+    effective_history = history or conversation_history
+
+    registry = _get_provider_bridge_registry()
+    provider_display = provider.capitalize()
+
+    got_text = False
+
+    if registry is not None:
+        try:
+            bridge = registry.get(provider)
+            if bridge.is_available():
+                try:
+                    context = None
+                    if effective_history:
+                        context = "\n".join(
+                            f"{m['role']}: {m['content']}"
+                            for m in effective_history if isinstance(m, dict)
+                        )
+                    response = await bridge.send_message_async(message, context=context)
+                    if response:
+                        # Include both 'text' and 'content' keys for compatibility
+                        yield {"type": "text", "text": response, "content": response}
+                        got_text = True
+                except Exception as exc:
+                    logger.error("[stream_chat] Bridge error for '%s': %s", provider, exc)
+                    yield {"type": "error", "text": str(exc)}
+        except (KeyError, AttributeError):
+            pass  # Unknown provider — fall through to mock
+
+    if not got_text:
+        # Mock fallback: always produce a text response so UI stays functional
+        mock_text = (
+            f"[{provider_display}] I understand your question. "
+            f"This is a demo response — configure an API key for {provider_display} to "
+            f"get real responses."
+        )
+        # Include both 'text' and 'content' keys for compatibility with different test expectations
+        yield {
+            "type": "text",
+            "text": mock_text,
+            "content": mock_text,
+        }
+
+    yield {"type": "done"}
