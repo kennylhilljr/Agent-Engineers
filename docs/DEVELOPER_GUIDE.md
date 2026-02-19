@@ -55,7 +55,7 @@ ARCADE_GATEWAY_SLUG=your_gateway_slug
 ARCADE_USER_ID=your_email@example.com
 
 # Model Selection (Optional)
-ORCHESTRATOR_MODEL=haiku  # haiku, sonnet, or opus
+ORCHESTRATOR_MODEL=sonnet  # haiku, sonnet, or opus (default: sonnet)
 CODING_AGENT_MODEL=sonnet
 LINEAR_AGENT_MODEL=haiku
 GITHUB_AGENT_MODEL=haiku
