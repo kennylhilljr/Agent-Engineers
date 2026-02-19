@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Team Settings - Agent Dashboard</title>
+  <style>
+    /* =============================================
+       CSS RESET & BASE
+       ============================================= */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-primary:    #0f172a;
+      --bg-secondary:  #1e293b;
+      --bg-tertiary:   #334155;
+      --text-primary:  #f1f5f9;
+      --text-secondary:#cbd5e1;
+      --text-muted:    #94a3b8;
+      --border-color:  #475569;
+      --accent-blue:   #3b82f6;
+      --accent-blue-lt:#60a5fa;
+      --accent-green:  #10b981;
+      --accent-yellow: #f59e0b;
+      --accent-red:    #ef4444;
+      --accent-purple: #a855f7;
+      --shadow:        rgba(0,0,0,0.35);
+      --radius:        0.5rem;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* =============================================
+       LAYOUT
+       ============================================= */
+    .page-header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .page-header a.back-link {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.875rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: color 0.15s;
+    }
+    .page-header a.back-link:hover { color: var(--accent-blue-lt); }
+
+    .page-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--accent-blue-lt);
+    }
+
+    .page-subtitle {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .main-content {
+      max-width: 1100px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      gap: 2rem;
+    }
+
+    /* =============================================
+       SIDEBAR NAV
+       ============================================= */
+    .settings-nav {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 0.75rem 0;
+      height: fit-content;
+    }
+
+    .nav-section-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      padding: 0.5rem 1rem 0.25rem;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.55rem 1rem;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .nav-item:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+    .nav-item.active {
+      background: rgba(59,130,246,0.15);
+      color: var(--accent-blue-lt);
+      border-left: 3px solid var(--accent-blue);
+    }
+    .nav-item .icon { width: 18px; text-align: center; }
+
+    /* =============================================
+       PANEL & CARD
+       ============================================= */
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    .card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .card-description {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    /* =============================================
+       BUTTONS
+       ============================================= */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.45rem 1rem;
+      border-radius: 0.35rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s, background 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:active { transform: scale(0.98); }
+
+    .btn-primary { background: var(--accent-blue); color: #fff; }
+    .btn-danger  { background: var(--accent-red);  color: #fff; }
+    .btn-ghost   {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+    }
+    .btn-ghost:hover { background: var(--bg-tertiary); }
+    .btn-sm { padding: 0.3rem 0.7rem; font-size: 0.8rem; }
+
+    /* =============================================
+       ROLE BADGES
+       ============================================= */
+    .role-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .role-badge.owner  { background: rgba(168,85,247,0.2); color: var(--accent-purple); }
+    .role-badge.admin  { background: rgba(245,158,11,0.2);  color: var(--accent-yellow); }
+    .role-badge.member { background: rgba(59,130,246,0.2);  color: var(--accent-blue-lt); }
+    .role-badge.viewer { background: rgba(148,163,184,0.2); color: var(--text-muted); }
+
+    /* =============================================
+       MEMBER TABLE
+       ============================================= */
+    .member-table { width: 100%; border-collapse: collapse; }
+
+    .member-table th {
+      text-align: left;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .member-table td {
+      padding: 0.75rem;
+      border-bottom: 1px solid rgba(71,85,105,0.4);
+      vertical-align: middle;
+    }
+
+    .member-table tr:last-child td { border-bottom: none; }
+    .member-table tr:hover td { background: rgba(51,65,85,0.3); }
+
+    .member-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--bg-tertiary);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 0.875rem;
+      color: var(--text-primary);
+      flex-shrink: 0;
+    }
+
+    .member-info { display: flex; align-items: center; gap: 0.75rem; }
+    .member-name { font-size: 0.9rem; font-weight: 500; }
+    .member-email { font-size: 0.8rem; color: var(--text-muted); }
+
+    .action-cell { display: flex; gap: 0.4rem; justify-content: flex-end; }
+
+    /* =============================================
+       INVITE SECTION
+       ============================================= */
+    .invite-form {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 0.75rem;
+      align-items: end;
+    }
+
+    @media (max-width: 640px) {
+      .invite-form { grid-template-columns: 1fr; }
+    }
+
+    .form-group { display: flex; flex-direction: column; gap: 0.35rem; }
+    .form-label { font-size: 0.8rem; color: var(--text-secondary); font-weight: 500; }
+
+    .form-control {
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 0.35rem;
+      color: var(--text-primary);
+      padding: 0.5rem 0.75rem;
+      font-size: 0.875rem;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .form-control:focus { border-color: var(--accent-blue); }
+
+    select.form-control option { background: var(--bg-secondary); }
+
+    /* =============================================
+       INVITE LINK
+       ============================================= */
+    .link-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 0.35rem;
+      padding: 0.5rem 0.75rem;
+    }
+    .link-row input {
+      flex: 1;
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    /* =============================================
+       ROLE MATRIX TABLE
+       ============================================= */
+    .matrix-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    .matrix-table th {
+      padding: 0.6rem 0.8rem;
+      text-align: center;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-color);
+    }
+    .matrix-table th:first-child { text-align: left; }
+    .matrix-table td {
+      padding: 0.5rem 0.8rem;
+      border-bottom: 1px solid rgba(71,85,105,0.3);
+      color: var(--text-secondary);
+    }
+    .matrix-table td:first-child { font-weight: 500; color: var(--text-primary); }
+    .matrix-table td:not(:first-child) { text-align: center; }
+    .check { color: var(--accent-green); font-size: 1rem; }
+    .cross  { color: var(--accent-red);   font-size: 0.9rem; opacity: 0.5; }
+
+    /* =============================================
+       TOAST / NOTIFICATION
+       ============================================= */
+    #toast-container {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      z-index: 9999;
+    }
+    .toast {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 0.75rem 1rem;
+      font-size: 0.875rem;
+      color: var(--text-primary);
+      max-width: 340px;
+      box-shadow: 0 4px 12px var(--shadow);
+      animation: slideIn 0.2s ease;
+    }
+    .toast.success { border-left: 4px solid var(--accent-green); }
+    .toast.error   { border-left: 4px solid var(--accent-red); }
+    @keyframes slideIn { from { opacity:0; transform:translateY(1rem); } to { opacity:1; transform:translateY(0); } }
+
+    /* =============================================
+       MODAL
+       ============================================= */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 1.75rem;
+      max-width: 440px;
+      width: 90%;
+      box-shadow: 0 8px 32px var(--shadow);
+    }
+    .modal-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .modal-body  { color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.5rem; }
+    .modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; }
+
+    /* =============================================
+       AUDIT LOG
+       ============================================= */
+    .audit-entry {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid rgba(71,85,105,0.3);
+    }
+    .audit-entry:last-child { border-bottom: none; }
+    .audit-icon {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: var(--bg-tertiary);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      font-size: 0.8rem;
+    }
+    .audit-text { flex: 1; }
+    .audit-action { font-size: 0.875rem; font-weight: 500; }
+    .audit-meta { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.1rem; }
+    .audit-time { font-size: 0.78rem; color: var(--text-muted); white-space: nowrap; }
+
+    /* =============================================
+       EMPTY STATE
+       ============================================= */
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--text-muted);
+    }
+    .empty-state .empty-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+    .empty-state p { font-size: 0.9rem; }
+
+    /* =============================================
+       PENDING INVITES
+       ============================================= */
+    .invite-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid rgba(71,85,105,0.3);
+    }
+    .invite-row:last-child { border-bottom: none; }
+    .invite-info { font-size: 0.875rem; }
+    .invite-target { font-weight: 500; }
+    .invite-meta { font-size: 0.78rem; color: var(--text-muted); }
+  </style>
+</head>
+<body>
+
+<!-- ============================
+     HEADER
+     ============================ -->
+<header class="page-header">
+  <div>
+    <div class="page-title">Settings</div>
+    <div class="page-subtitle">Manage your organization settings</div>
+  </div>
+  <a class="back-link" href="/">&#8592; Back to Dashboard</a>
+</header>
+
+<!-- ============================
+     MAIN LAYOUT
+     ============================ -->
+<div class="main-content">
+
+  <!-- Sidebar nav -->
+  <nav class="settings-nav" aria-label="Settings navigation">
+    <div class="nav-section-label">Organization</div>
+    <a class="nav-item" href="#" onclick="showPanel('general')">
+      <span class="icon">&#9881;</span> General
+    </a>
+    <a class="nav-item active" href="#" onclick="showPanel('team')" id="nav-team">
+      <span class="icon">&#128101;</span> Team
+    </a>
+    <a class="nav-item" href="#" onclick="showPanel('audit')">
+      <span class="icon">&#128203;</span> Audit Log
+    </a>
+    <div class="nav-section-label" style="margin-top:0.75rem;">Access</div>
+    <a class="nav-item" href="#" onclick="showPanel('sso')">
+      <span class="icon">&#128274;</span> SSO / SAML
+    </a>
+    <a class="nav-item" href="#" onclick="showPanel('billing')">
+      <span class="icon">&#128179;</span> Billing
+    </a>
+  </nav>
+
+  <!-- Content panels -->
+  <div>
+
+    <!-- ========================
+         GENERAL (placeholder)
+         ======================== -->
+    <div class="panel" id="panel-general">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">General Settings</div>
+            <div class="card-description">Organization name, timezone, and preferences.</div>
+          </div>
+        </div>
+        <p style="color:var(--text-muted);font-size:0.9rem;">General settings panel – coming soon.</p>
+      </div>
+    </div>
+
+    <!-- ========================
+         TEAM MANAGEMENT
+         ======================== -->
+    <div class="panel active" id="panel-team">
+
+      <!-- Invite new member -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Invite Team Members</div>
+            <div class="card-description">
+              Owner and Admin can invite members. Admin cannot assign Owner role.
+            </div>
+          </div>
+        </div>
+
+        <form class="invite-form" onsubmit="sendInvite(event)">
+          <div class="form-group">
+            <label class="form-label" for="invite-email">Email address (optional for link-only)</label>
+            <input class="form-control" id="invite-email" type="email"
+                   placeholder="colleague@company.com" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="invite-role">Role</label>
+            <select class="form-control" id="invite-role">
+              <option value="viewer">Viewer</option>
+              <option value="member" selected>Member</option>
+              <option value="admin">Admin</option>
+              <option value="owner">Owner</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">&nbsp;</label>
+            <button type="submit" class="btn btn-primary">
+              &#43; Send Invite
+            </button>
+          </div>
+        </form>
+
+        <!-- Shareable invite link -->
+        <div style="margin-top:1.25rem;">
+          <div class="form-label" style="margin-bottom:0.5rem;">Shareable invite link</div>
+          <div class="link-row">
+            <input id="invite-link-display" readonly
+                   value="Click 'Generate Link' to create a shareable invite" />
+            <button class="btn btn-ghost btn-sm" onclick="generateLink()">Generate Link</button>
+            <button class="btn btn-ghost btn-sm" onclick="copyLink()">Copy</button>
+          </div>
+          <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.4rem;">
+            Link role: <select id="link-role" style="background:var(--bg-primary);border:1px solid var(--border-color);color:var(--text-secondary);border-radius:0.25rem;padding:0.15rem 0.4rem;font-size:0.78rem;">
+              <option value="viewer">Viewer</option>
+              <option value="member" selected>Member</option>
+              <option value="admin">Admin</option>
+            </select>
+            &nbsp; Expires in 7 days
+          </div>
+        </div>
+      </div>
+
+      <!-- Members table -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Team Members</div>
+            <div class="card-description" id="member-count-label">Loading...</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="loadMembers()">&#8635; Refresh</button>
+        </div>
+
+        <div id="members-container">
+          <div class="empty-state">
+            <div class="empty-icon">&#128101;</div>
+            <p>Loading team members&hellip;</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pending invitations -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Pending Invitations</div>
+            <div class="card-description">Invitations awaiting acceptance.</div>
+          </div>
+        </div>
+        <div id="invites-container">
+          <div class="empty-state">
+            <div class="empty-icon">&#9993;</div>
+            <p>No pending invitations.</p>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /panel-team -->
+
+    <!-- ========================
+         AUDIT LOG
+         ======================== -->
+    <div class="panel" id="panel-audit">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Audit Log</div>
+            <div class="card-description">
+              All role changes and membership events. Visible to Admin and Owner.
+            </div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="loadAudit()">&#8635; Refresh</button>
+        </div>
+        <div id="audit-container">
+          <div class="empty-state">
+            <div class="empty-icon">&#128203;</div>
+            <p>No audit events recorded yet.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================
+         ROLE MATRIX
+         ======================== -->
+    <div class="panel" id="panel-sso">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Role Permissions Reference</div>
+            <div class="card-description">What each role can do in the organization.</div>
+          </div>
+        </div>
+        <table class="matrix-table">
+          <thead>
+            <tr>
+              <th>Permission</th>
+              <th><span class="role-badge owner">Owner</span></th>
+              <th><span class="role-badge admin">Admin</span></th>
+              <th><span class="role-badge member">Member</span></th>
+              <th><span class="role-badge viewer">Viewer</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>View Dashboard &amp; Reports</td><td><span class="check">&#10003;</span></td><td><span class="check">&#10003;</span></td><td><span class="check">&#10003;</span></td><td><span class="check">&#10003;</span></td></tr>
+            <tr><td>Run Agents</td><td><span class="check">&#10003;</span></td><td><span class="check">&#10003;</span></td><td><span class="check">&#10003;</span></td><td><span class="cross">&#10007;</span></td></tr>
+            <tr><td>Create / Edit Projects</td><td><span class="check">&#10003;</span></td><td><span class="check">&#10003;</span></td><td><span class="check">&#10003;</span></td><td><span class="cross">&#10007;</span></td></tr>
+            <tr><td>Delete Projects</td><td><span class="check">&#10003;</span></td><td><span class="check">&#10003;</span></td><td><span class="cross">&#10007;</span></td><td><span class="cross">&#10007;</span></td></tr>
+            <tr><td>Invite Members</td><td><span class="check">&#10003;</span></td><td><span class="check">&#10003;</span></td><td><span class="cross">&#10007;</span></td><td><span class="cross">&#10007;</span></td></tr>
+            <tr><td>Change Member Roles</td><td><span class="check">&#10003;</span></td><td><span class="check">&#10003;</span></td><td><span class="cross">&#10007;</span></td><td><span class="cross">&#10007;</span></td></tr>
+            <tr><td>Manage Integrations</td><td><span class="check">&#10003;</span></td><td><span class="check">&#10003;</span></td><td><span class="cross">&#10007;</span></td><td><span class="cross">&#10007;</span></td></tr>
+            <tr><td>Billing Management</td><td><span class="check">&#10003;</span></td><td><span class="cross">&#10007;</span></td><td><span class="cross">&#10007;</span></td><td><span class="cross">&#10007;</span></td></tr>
+            <tr><td>Delete Organization</td><td><span class="check">&#10003;</span></td><td><span class="cross">&#10007;</span></td><td><span class="cross">&#10007;</span></td><td><span class="cross">&#10007;</span></td></tr>
+            <tr><td>Transfer Ownership</td><td><span class="check">&#10003;</span></td><td><span class="cross">&#10007;</span></td><td><span class="cross">&#10007;</span></td><td><span class="cross">&#10007;</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Billing placeholder -->
+    <div class="panel" id="panel-billing">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Billing</div></div>
+        <p style="color:var(--text-muted);font-size:0.9rem;">Billing settings – visible to Owner only.</p>
+      </div>
+    </div>
+
+  </div><!-- /content area -->
+</div><!-- /main-content -->
+
+<!-- ============================
+     CONFIRM MODAL
+     ============================ -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Confirm Action</div>
+    <div class="modal-body" id="modal-body">Are you sure?</div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-danger" id="modal-confirm-btn" onclick="confirmAction()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================
+     TOAST
+     ============================ -->
+<div id="toast-container"></div>
+
+<!-- ============================
+     SCRIPTS
+     ============================ -->
+<script>
+// ── Config ────────────────────────────────────────────────────────
+const API_BASE = '';
+// Simulate caller context via localStorage (set these in the browser console
+// for testing, or they will be provided by a real auth session).
+function getCtx() {
+  return {
+    userId:  localStorage.getItem('team_user_id')  || 'demo-owner-001',
+    role:    localStorage.getItem('team_role')      || 'owner',
+    orgId:   localStorage.getItem('team_org_id')   || 'demo-org-001',
+  };
+}
+
+function apiHeaders() {
+  const ctx = getCtx();
+  return {
+    'Content-Type': 'application/json',
+    'X-User-Id':   ctx.userId,
+    'X-User-Role': ctx.role,
+    'X-Org-Id':    ctx.orgId,
+  };
+}
+
+// ── Navigation ────────────────────────────────────────────────────
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const panel = document.getElementById('panel-' + name);
+  if (panel) panel.classList.add('active');
+  const navItem = document.getElementById('nav-' + name);
+  if (navItem) navItem.classList.add('active');
+
+  if (name === 'team')  { loadMembers(); }
+  if (name === 'audit') { loadAudit(); }
+}
+
+// ── Toast ─────────────────────────────────────────────────────────
+function toast(message, type = 'success') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = message;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+// ── Members ───────────────────────────────────────────────────────
+async function loadMembers() {
+  const ctx = getCtx();
+  try {
+    const res = await fetch(`${API_BASE}/api/team/members?org_id=${ctx.orgId}`, {
+      headers: apiHeaders(),
+    });
+    const data = await res.json();
+
+    const container = document.getElementById('members-container');
+    const label = document.getElementById('member-count-label');
+
+    if (!res.ok) {
+      container.innerHTML = `<div class="empty-state"><p>${data.error || 'Error loading members'}</p></div>`;
+      return;
+    }
+
+    const members = data.members || [];
+    label.textContent = `${members.length} member${members.length !== 1 ? 's' : ''}`;
+
+    if (members.length === 0) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">&#128101;</div><p>No members yet. Invite your first team member above.</p></div>`;
+      return;
+    }
+
+    container.innerHTML = renderMemberTable(members, ctx);
+  } catch (e) {
+    document.getElementById('members-container').innerHTML =
+      `<div class="empty-state"><p>Failed to load members: ${e.message}</p></div>`;
+  }
+}
+
+function roleBadge(role) {
+  const labels = { owner: 'Owner', admin: 'Admin', member: 'Member', viewer: 'Viewer' };
+  return `<span class="role-badge ${role}">${labels[role] || role}</span>`;
+}
+
+function initials(name) {
+  return (name || '?').split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
+}
+
+function renderMemberTable(members, ctx) {
+  const canManage = ctx.role === 'owner' || ctx.role === 'admin';
+  const rows = members.map(m => {
+    const isSelf = m.user_id === ctx.userId;
+    const actions = canManage && !isSelf
+      ? `<select class="form-control" style="width:auto;padding:0.25rem 0.5rem;font-size:0.8rem;"
+                onchange="changeRole('${m.user_id}', this.value)" title="Change role">
+           ${['owner','admin','member','viewer'].map(r =>
+             `<option value="${r}" ${m.role===r?'selected':''}>${r.charAt(0).toUpperCase()+r.slice(1)}</option>`
+           ).join('')}
+         </select>
+         <button class="btn btn-danger btn-sm" onclick="confirmRemove('${m.user_id}','${m.display_name}')">Remove</button>`
+      : '<span style="color:var(--text-muted);font-size:0.8rem;">' + (isSelf ? 'You' : '') + '</span>';
+
+    return `<tr>
+      <td>
+        <div class="member-info">
+          <div class="member-avatar">${initials(m.display_name)}</div>
+          <div>
+            <div class="member-name">${m.display_name}</div>
+            <div class="member-email">${m.email}</div>
+          </div>
+        </div>
+      </td>
+      <td>${roleBadge(m.role)}</td>
+      <td style="color:var(--text-muted);font-size:0.8rem;">${m.sso_provisioned ? 'SSO' : 'Email'}</td>
+      <td><div class="action-cell">${actions}</div></td>
+    </tr>`;
+  }).join('');
+
+  return `<table class="member-table">
+    <thead><tr>
+      <th>Member</th><th>Role</th><th>Source</th><th style="text-align:right;">Actions</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+// ── Role change ───────────────────────────────────────────────────
+async function changeRole(userId, newRole) {
+  const ctx = getCtx();
+  try {
+    const res = await fetch(`${API_BASE}/api/team/members/${userId}/role`, {
+      method: 'PUT',
+      headers: apiHeaders(),
+      body: JSON.stringify({ role: newRole }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      toast(`Role updated to ${newRole}`);
+      loadMembers();
+    } else {
+      toast(data.error || 'Failed to update role', 'error');
+      loadMembers(); // reset select state
+    }
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+// ── Remove member ─────────────────────────────────────────────────
+let _pendingRemoveId = null;
+function confirmRemove(userId, displayName) {
+  _pendingRemoveId = userId;
+  document.getElementById('modal-title').textContent = 'Remove Member';
+  document.getElementById('modal-body').textContent =
+    `Remove "${displayName}" from the organization? This action cannot be undone.`;
+  document.getElementById('modal-confirm-btn').textContent = 'Remove';
+  document.getElementById('confirm-modal').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('confirm-modal').classList.remove('open');
+  _pendingRemoveId = null;
+}
+async function confirmAction() {
+  if (!_pendingRemoveId) return closeModal();
+  const ctx = getCtx();
+  try {
+    const res = await fetch(`${API_BASE}/api/team/members/${_pendingRemoveId}`, {
+      method: 'DELETE',
+      headers: apiHeaders(),
+    });
+    const data = await res.json();
+    if (res.ok) { toast('Member removed'); loadMembers(); }
+    else { toast(data.error || 'Failed to remove member', 'error'); }
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+  closeModal();
+}
+
+// ── Send invite ───────────────────────────────────────────────────
+async function sendInvite(e) {
+  e.preventDefault();
+  const email = document.getElementById('invite-email').value.trim();
+  const role  = document.getElementById('invite-role').value;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/team/invite`, {
+      method: 'POST',
+      headers: apiHeaders(),
+      body: JSON.stringify({ email: email || undefined, role }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      toast(`Invitation created${email ? ' for ' + email : ''}`);
+      document.getElementById('invite-email').value = '';
+      // Show invite link
+      const token = data.invite?.token;
+      if (token) {
+        document.getElementById('invite-link-display').value =
+          `${location.origin}/api/team/invite/${token}/accept`;
+      }
+    } else {
+      toast(data.error || 'Failed to create invitation', 'error');
+    }
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+// ── Generate shareable link ───────────────────────────────────────
+async function generateLink() {
+  const role = document.getElementById('link-role').value;
+  try {
+    const res = await fetch(`${API_BASE}/api/team/invite`, {
+      method: 'POST',
+      headers: apiHeaders(),
+      body: JSON.stringify({ role }),  // no email = shareable link
+    });
+    const data = await res.json();
+    if (res.ok) {
+      const token = data.invite?.token;
+      document.getElementById('invite-link-display').value =
+        `${location.origin}/api/team/invite/${token}/accept`;
+      toast('Shareable link generated');
+    } else {
+      toast(data.error || 'Failed to generate link', 'error');
+    }
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+function copyLink() {
+  const val = document.getElementById('invite-link-display').value;
+  navigator.clipboard.writeText(val).then(() => toast('Link copied to clipboard'));
+}
+
+// ── Audit log ─────────────────────────────────────────────────────
+const AUDIT_ICONS = {
+  role_changed: '&#128260;',
+  member_invited: '&#9993;',
+  invite_accepted: '&#10003;',
+  member_removed: '&#128465;',
+  project_role_set: '&#127760;',
+};
+
+async function loadAudit() {
+  const ctx = getCtx();
+  try {
+    const res = await fetch(`${API_BASE}/api/team/audit?limit=50`, {
+      headers: apiHeaders(),
+    });
+    const data = await res.json();
+    const container = document.getElementById('audit-container');
+    if (!res.ok) {
+      container.innerHTML = `<div class="empty-state"><p>${data.error || 'Error loading audit log'}</p></div>`;
+      return;
+    }
+    const events = data.events || [];
+    if (events.length === 0) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">&#128203;</div><p>No audit events recorded yet.</p></div>`;
+      return;
+    }
+    container.innerHTML = events.map(renderAuditEntry).join('');
+  } catch(e) {
+    document.getElementById('audit-container').innerHTML =
+      `<div class="empty-state"><p>Error: ${e.message}</p></div>`;
+  }
+}
+
+function renderAuditEntry(ev) {
+  const icon = AUDIT_ICONS[ev.event_type] || '&#8226;';
+  const timeStr = new Date(ev.timestamp).toLocaleString();
+  let description = ev.event_type.replace(/_/g, ' ');
+  if (ev.event_type === 'role_changed' && ev.details) {
+    description = `Role changed: ${ev.details.old_role} &rarr; ${ev.details.new_role}`;
+  }
+  return `<div class="audit-entry">
+    <div class="audit-icon">${icon}</div>
+    <div class="audit-text">
+      <div class="audit-action">${description}</div>
+      <div class="audit-meta">Actor: ${ev.actor_user_id}${ev.target_user_id ? ' &bull; Target: ' + ev.target_user_id : ''}</div>
+    </div>
+    <div class="audit-time">${timeStr}</div>
+  </div>`;
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+(function init() {
+  // Seed demo data if store is empty (dev convenience)
+  loadMembers();
+})();
+</script>
+</body>
+</html>
