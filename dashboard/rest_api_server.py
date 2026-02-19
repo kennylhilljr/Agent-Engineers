@@ -128,6 +128,22 @@ _oauth_states: Dict[str, str] = {}
 # from agents.definitions import DEFAULT_MODELS, AGENT_DEFINITIONS
 
 
+# AI-252: SDK Agent Registry — in-memory store, lazy-initialised
+_sdk_registry: Optional[Any] = None
+
+
+def _get_sdk_registry() -> Any:
+    """Return the module-level AgentRegistry singleton (lazy init)."""
+    global _sdk_registry  # noqa: PLW0603
+    if _sdk_registry is None:
+        try:
+            from sdk.registry import AgentRegistry
+            _sdk_registry = AgentRegistry()
+        except ImportError:
+            return None
+    return _sdk_registry
+
+
 # Agent state tracking (in-memory for pause/resume)
 _agent_states: Dict[str, str] = {}  # agent_name -> "running" | "paused" | "idle"
 _requirements_cache: Dict[str, str] = {}  # ticket_key -> requirement text (legacy simple cache)
@@ -697,6 +713,14 @@ class RESTAPIServer:
         self.app.router.add_route('OPTIONS', '/api/integrations/gitlab/callback', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/integrations/gitlab/config', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/integrations/gitlab/pipeline', self.handle_options)
+
+        # AI-252: SDK Agent Registry endpoints
+        self.app.router.add_get('/api/registry/agents', self.registry_list_agents)
+        self.app.router.add_post('/api/registry/agents', self.registry_register_agent)
+        self.app.router.add_get('/api/registry/agents/{name}', self.registry_get_agent)
+        self.app.router.add_delete('/api/registry/agents/{name}', self.registry_unregister_agent)
+        self.app.router.add_route('OPTIONS', '/api/registry/agents', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/registry/agents/{name}', self.handle_options)
 
         # OPTIONS for CORS preflight
         for route in ['/api/metrics', '/api/agents', '/api/sessions', '/api/providers',
@@ -6248,6 +6272,104 @@ async function showForgotPassword() {{
         summary["project_id"] = project_id
         summary["mr_iid"] = mr_iid
         return web.json_response(summary)
+
+    # -----------------------------------------------------------------------
+    # AI-252: SDK Agent Registry endpoints
+    # -----------------------------------------------------------------------
+
+    async def registry_list_agents(self, request: Request) -> Response:
+        """GET /api/registry/agents?org_id=X — list agents in the registry.
+
+        Query parameters:
+            org_id (optional): filter to a specific organisation (plus public).
+        """
+        registry = _get_sdk_registry()
+        if registry is None:
+            return web.json_response(
+                {"error": "SDK not available — ensure the sdk package is installed"},
+                status=503,
+            )
+
+        org_id = request.rel_url.query.get("org_id") or None
+        agents = registry.list_agents(org_id=org_id)
+        return web.json_response({
+            "agents": [a.to_dict() for a in agents],
+            "count": len(agents),
+        })
+
+    async def registry_register_agent(self, request: Request) -> Response:
+        """POST /api/registry/agents — register a new agent.
+
+        Body: AgentDefinition as JSON dict.
+        """
+        registry = _get_sdk_registry()
+        if registry is None:
+            return web.json_response(
+                {"error": "SDK not available — ensure the sdk package is installed"},
+                status=503,
+            )
+
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON body"}, status=400)
+
+        try:
+            from sdk.agent_definition import AgentDefinition as SDKAgentDefinition
+            agent = SDKAgentDefinition.from_dict(data)
+        except (TypeError, KeyError) as exc:
+            return web.json_response(
+                {"error": f"Invalid agent definition: {exc}"}, status=400
+            )
+
+        errors = agent.validate()
+        if errors:
+            return web.json_response(
+                {"error": "Validation failed", "details": errors}, status=422
+            )
+
+        org_id = data.get("org_id") or None
+        registry.register(agent, org_id=org_id)
+
+        return web.json_response(
+            {"status": "registered", "agent": agent.to_dict()}, status=201
+        )
+
+    async def registry_get_agent(self, request: Request) -> Response:
+        """GET /api/registry/agents/{name}?org_id=X — get an agent by name."""
+        registry = _get_sdk_registry()
+        if registry is None:
+            return web.json_response(
+                {"error": "SDK not available — ensure the sdk package is installed"},
+                status=503,
+            )
+
+        name = request.match_info["name"]
+        org_id = request.rel_url.query.get("org_id") or None
+
+        try:
+            agent = registry.get(name, org_id=org_id)
+        except KeyError:
+            return web.json_response(
+                {"error": f"Agent {name!r} not found"}, status=404
+            )
+
+        return web.json_response(agent.to_dict())
+
+    async def registry_unregister_agent(self, request: Request) -> Response:
+        """DELETE /api/registry/agents/{name}?org_id=X — unregister an agent."""
+        registry = _get_sdk_registry()
+        if registry is None:
+            return web.json_response(
+                {"error": "SDK not available — ensure the sdk package is installed"},
+                status=503,
+            )
+
+        name = request.match_info["name"]
+        org_id = request.rel_url.query.get("org_id") or None
+
+        registry.unregister(name, org_id=org_id)
+        return web.json_response({"status": "unregistered", "name": name})
 
 
 def main():
