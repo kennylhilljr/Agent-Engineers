@@ -57,6 +57,7 @@ DEFAULT_MODELS: Final[dict[str, ModelOption]] = {
     "product_manager": "sonnet",
     "designer": "haiku",
     "jira": "haiku",
+    "gitlab": "haiku",
 }
 
 
@@ -125,6 +126,7 @@ AGENT_GIT_IDENTITIES: Final[dict[str, GitIdentity]] = {
     ),
     "designer": GitIdentity("Designer Agent", "designer-agent@claude-agents.dev"),
     "jira": GitIdentity("Jira Agent", "jira-agent@claude-agents.dev"),
+    "gitlab": GitIdentity("GitLab Agent", "gitlab-agent@claude-agents.dev"),
 }
 
 
@@ -185,6 +187,11 @@ def _get_jira_agent_tools() -> list[str]:
     except (ImportError, AttributeError):
         # Jira MCP tools not yet configured — fall back to file ops only
         return FILE_TOOLS + ["Bash"]
+
+
+def _get_gitlab_agent_tools() -> list[str]:
+    """Tools for GitLab integration agent — GitHub MCP (for git ops) + file ops + bash."""
+    return get_github_tools() + FILE_TOOLS + ["Bash"]
 
 
 def create_agent_definitions() -> dict[str, AgentDefinition]:
@@ -347,6 +354,19 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
             tools=_get_jira_agent_tools(),
             model=_get_model("jira"),
         ),
+        "gitlab": AgentDefinition(
+            description=(
+                "GitLab integration agent for branch, MR, and CI/CD pipeline management. "
+                "Creates feature branches, commits via GitLab API, opens Merge Requests "
+                "with description and labels, assigns reviewers, gates merges on pipeline "
+                "status, and surfaces CI/CD results in the Agent Dashboard. Enables "
+                "enterprise GitLab customers to use Agent-Engineers without migrating "
+                "to GitHub."
+            ),
+            prompt=_prompt("github", "github_agent_prompt"),  # Reuse github prompt as base
+            tools=_get_gitlab_agent_tools(),
+            model=_get_model("gitlab"),
+        ),
     }
 
 
@@ -394,6 +414,7 @@ OPENROUTER_DEV_AGENT = AGENT_DEFINITIONS["openrouter_dev"]
 PRODUCT_MANAGER_AGENT = AGENT_DEFINITIONS["product_manager"]
 DESIGNER_AGENT = AGENT_DEFINITIONS["designer"]
 JIRA_AGENT = AGENT_DEFINITIONS["jira"]
+GITLAB_AGENT = AGENT_DEFINITIONS["gitlab"]
 
 
 def create_agent_definitions_with_routing(
@@ -489,6 +510,7 @@ __all__ = [
     "GEMINI_AGENT",
     "GITHUB_AGENT",
     "GROQ_AGENT",
+    "GITLAB_AGENT",
     "JIRA_AGENT",
     "KIMI_AGENT",
     "LINEAR_AGENT",
