@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Audit Log - Agent Dashboard</title>
+  <style>
+    /* =============================================
+       CSS RESET & BASE
+       ============================================= */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-primary:    #0f172a;
+      --bg-secondary:  #1e293b;
+      --bg-tertiary:   #334155;
+      --text-primary:  #f1f5f9;
+      --text-secondary:#cbd5e1;
+      --text-muted:    #94a3b8;
+      --border-color:  #475569;
+      --accent-blue:   #3b82f6;
+      --accent-blue-lt:#60a5fa;
+      --accent-green:  #10b981;
+      --accent-yellow: #f59e0b;
+      --accent-red:    #ef4444;
+      --accent-purple: #a855f7;
+      --accent-orange: #f97316;
+      --shadow:        rgba(0,0,0,0.35);
+      --radius:        0.5rem;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+
+    /* =============================================
+       LAYOUT
+       ============================================= */
+    .page-wrapper {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* Sidebar nav */
+    .sidebar {
+      width: 240px;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border-color);
+      padding: 1.5rem 0;
+      flex-shrink: 0;
+    }
+
+    .sidebar-brand {
+      padding: 0 1.5rem 1.5rem;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--accent-blue-lt);
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 1rem;
+    }
+
+    .sidebar-nav a {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.6rem 1.5rem;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.875rem;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .sidebar-nav a:hover,
+    .sidebar-nav a.active {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+
+    .sidebar-nav a.active {
+      border-left: 3px solid var(--accent-blue);
+      padding-left: calc(1.5rem - 3px);
+    }
+
+    /* Main content */
+    .main-content {
+      flex: 1;
+      padding: 2rem;
+      overflow-x: hidden;
+    }
+
+    .page-header {
+      margin-bottom: 2rem;
+    }
+
+    .page-header h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 0.25rem;
+    }
+
+    .page-header p {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+
+    /* =============================================
+       CARDS
+       ============================================= */
+    .card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* =============================================
+       FILTERS
+       ============================================= */
+    .filters-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.375rem;
+    }
+
+    .filter-group label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .filter-group input,
+    .filter-group select {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 0.375rem;
+      color: var(--text-primary);
+      font-size: 0.875rem;
+      padding: 0.5rem 0.75rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .filter-group input:focus,
+    .filter-group select:focus {
+      border-color: var(--accent-blue);
+    }
+
+    .filter-group input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .filter-group select option {
+      background: var(--bg-tertiary);
+    }
+
+    .filter-actions {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    /* =============================================
+       BUTTONS
+       ============================================= */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 0.375rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-primary {
+      background: var(--accent-blue);
+      color: #fff;
+    }
+    .btn-primary:hover { background: #2563eb; }
+
+    .btn-secondary {
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-color);
+    }
+    .btn-secondary:hover { color: var(--text-primary); background: #475569; }
+
+    .btn-success {
+      background: var(--accent-green);
+      color: #fff;
+    }
+    .btn-success:hover { background: #059669; }
+
+    .btn-warning {
+      background: var(--accent-yellow);
+      color: #000;
+    }
+    .btn-warning:hover { background: #d97706; }
+
+    .btn-sm {
+      padding: 0.375rem 0.75rem;
+      font-size: 0.8125rem;
+    }
+
+    /* =============================================
+       STATS ROW
+       ============================================= */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .stat-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1;
+      margin-bottom: 0.25rem;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* =============================================
+       TABLE
+       ============================================= */
+    .table-wrapper {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+
+    thead th {
+      text-align: left;
+      padding: 0.75rem 1rem;
+      border-bottom: 2px solid var(--border-color);
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border-color);
+      transition: background 0.1s;
+    }
+
+    tbody tr:hover {
+      background: var(--bg-tertiary);
+    }
+
+    tbody td {
+      padding: 0.75rem 1rem;
+      color: var(--text-secondary);
+      vertical-align: top;
+    }
+
+    tbody td:first-child {
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* =============================================
+       EVENT TYPE BADGES
+       ============================================= */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .badge-auth    { background: #1d4ed8; color: #bfdbfe; }
+    .badge-team    { background: #15803d; color: #bbf7d0; }
+    .badge-agent   { background: #7c3aed; color: #e9d5ff; }
+    .badge-billing { background: #b45309; color: #fef3c7; }
+    .badge-unknown { background: var(--bg-tertiary); color: var(--text-muted); }
+
+    /* =============================================
+       PAGINATION
+       ============================================= */
+    .pagination {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-top: 1.25rem;
+      flex-wrap: wrap;
+    }
+
+    .pagination-info {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      flex: 1;
+    }
+
+    /* =============================================
+       LOADING & EMPTY STATES
+       ============================================= */
+    .loading-row td,
+    .empty-row td {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--text-muted);
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 1.5rem;
+      height: 1.5rem;
+      border: 3px solid var(--bg-tertiary);
+      border-top-color: var(--accent-blue);
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+      vertical-align: middle;
+      margin-right: 0.5rem;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* =============================================
+       DETAILS POPOVER
+       ============================================= */
+    .details-cell {
+      max-width: 260px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      cursor: pointer;
+      color: var(--accent-blue-lt);
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 0.75rem;
+    }
+
+    .details-cell:hover { text-decoration: underline; }
+
+    /* =============================================
+       TOAST NOTIFICATIONS
+       ============================================= */
+    #toast-container {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      z-index: 1000;
+    }
+
+    .toast {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 0.75rem 1rem;
+      min-width: 260px;
+      font-size: 0.875rem;
+      color: var(--text-primary);
+      animation: slide-in 0.25s ease;
+    }
+
+    .toast.success { border-left: 4px solid var(--accent-green); }
+    .toast.error   { border-left: 4px solid var(--accent-red); }
+
+    @keyframes slide-in {
+      from { transform: translateX(100%); opacity: 0; }
+      to   { transform: translateX(0);    opacity: 1; }
+    }
+
+    /* =============================================
+       RESPONSIVE
+       ============================================= */
+    @media (max-width: 768px) {
+      .sidebar { display: none; }
+      .main-content { padding: 1rem; }
+      .filters-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="page-wrapper">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">Agent Dashboard</div>
+    <nav class="sidebar-nav">
+      <a href="/">Overview</a>
+      <a href="/settings/team">Team Settings</a>
+      <a href="/settings/audit-log" class="active">Audit Log</a>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <main class="main-content">
+
+    <!-- Page Header -->
+    <div class="page-header">
+      <h1>Audit Log</h1>
+      <p>Immutable trail of all significant user, agent, billing, and authentication events. Required for SOC 2 Type I compliance.</p>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-total">—</div>
+        <div class="stat-label">Total Events</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-auth">—</div>
+        <div class="stat-label">Auth Events</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-team">—</div>
+        <div class="stat-label">Team Events</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-agent">—</div>
+        <div class="stat-label">Agent Events</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-billing">—</div>
+        <div class="stat-label">Billing Events</div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card">
+      <div class="card-title">Filters</div>
+      <div class="filters-grid">
+        <div class="filter-group">
+          <label for="filter-org">Organisation ID</label>
+          <input id="filter-org" type="text" placeholder="org_..." />
+        </div>
+        <div class="filter-group">
+          <label for="filter-actor">Actor User ID</label>
+          <input id="filter-actor" type="text" placeholder="user_..." />
+        </div>
+        <div class="filter-group">
+          <label for="filter-event-type">Event Type</label>
+          <select id="filter-event-type">
+            <option value="">All event types</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="filter-resource">Resource ID</label>
+          <input id="filter-resource" type="text" placeholder="Any resource..." />
+        </div>
+        <div class="filter-group">
+          <label for="filter-since">Since (UTC)</label>
+          <input id="filter-since" type="datetime-local" />
+        </div>
+        <div class="filter-group">
+          <label for="filter-until">Until (UTC)</label>
+          <input id="filter-until" type="datetime-local" />
+        </div>
+      </div>
+      <div class="filter-actions">
+        <button class="btn btn-primary" onclick="applyFilters()">Apply Filters</button>
+        <button class="btn btn-secondary" onclick="resetFilters()">Reset</button>
+        <span style="flex:1"></span>
+        <!-- Export buttons -->
+        <button class="btn btn-success btn-sm" onclick="exportData('csv')">Export CSV</button>
+        <button class="btn btn-warning btn-sm" onclick="exportData('json')">Export JSON</button>
+      </div>
+    </div>
+
+    <!-- Audit Log Table -->
+    <div class="card">
+      <div class="card-title" style="justify-content: space-between;">
+        <span>Audit Entries</span>
+        <span id="result-count" style="font-size:0.875rem; font-weight:400; color:var(--text-muted);"></span>
+      </div>
+      <div class="table-wrapper">
+        <table id="audit-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Event Type</th>
+              <th>Actor</th>
+              <th>Resource</th>
+              <th>Details</th>
+              <th>Entry ID</th>
+            </tr>
+          </thead>
+          <tbody id="audit-tbody">
+            <tr class="loading-row">
+              <td colspan="6">
+                <span class="spinner"></span> Loading audit log…
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div class="pagination">
+        <span class="pagination-info" id="pagination-info"></span>
+        <button id="btn-prev" class="btn btn-secondary btn-sm" onclick="prevPage()" disabled>Previous</button>
+        <button id="btn-next" class="btn btn-secondary btn-sm" onclick="nextPage()" disabled>Next</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<script>
+/* =============================================
+   STATE
+   ============================================= */
+let state = {
+  entries: [],
+  cursor: null,
+  cursorStack: [],   // stack of cursors for "previous" navigation
+  hasMore: false,
+  pageNum: 1,
+  totalLoaded: 0,
+  filters: {},
+  eventTypeOptions: [],
+};
+
+/* =============================================
+   INIT
+   ============================================= */
+document.addEventListener('DOMContentLoaded', () => {
+  // Event delegation for details-cell clicks — avoids inline onclick XSS
+  document.getElementById('audit-tbody').addEventListener('click', (event) => {
+    const cell = event.target.closest('[data-entry-index]');
+    if (!cell) return;
+    const idx = parseInt(cell.getAttribute('data-entry-index'), 10);
+    const entry = _entryMap.get(idx);
+    if (entry) showDetails(entry);
+  });
+
+  loadEventTypes().then(() => {
+    loadEntries();
+  });
+});
+
+/* =============================================
+   API HELPERS
+   ============================================= */
+async function apiFetch(path) {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+/* =============================================
+   LOAD EVENT TYPES (populate select)
+   ============================================= */
+async function loadEventTypes() {
+  try {
+    const data = await apiFetch('/api/audit-log/event-types');
+    state.eventTypeOptions = data.event_types || [];
+    const sel = document.getElementById('filter-event-type');
+    // Add category groups
+    const categories = data.categories || {};
+    for (const [cat, types] of Object.entries(categories)) {
+      const grp = document.createElement('optgroup');
+      grp.label = cat.charAt(0).toUpperCase() + cat.slice(1);
+      types.sort().forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        grp.appendChild(opt);
+      });
+      sel.appendChild(grp);
+    }
+  } catch (e) {
+    console.warn('Could not load event types:', e);
+  }
+}
+
+/* =============================================
+   BUILD QUERY STRING FROM FILTERS
+   ============================================= */
+function buildQuery(extraCursor) {
+  const params = new URLSearchParams();
+  const f = state.filters;
+  if (f.org_id)      params.set('org_id',      f.org_id);
+  if (f.actor_id)    params.set('actor_id',     f.actor_id);
+  if (f.event_type)  params.set('event_type',   f.event_type);
+  if (f.resource_id) params.set('resource_id',  f.resource_id);
+  if (f.since)       params.set('since',        f.since);
+  if (f.until)       params.set('until',        f.until);
+  params.set('limit', '50');
+  if (extraCursor)   params.set('cursor',       extraCursor);
+  return params.toString();
+}
+
+/* =============================================
+   LOAD ENTRIES
+   ============================================= */
+async function loadEntries(cursor) {
+  setTableLoading(true);
+  try {
+    const qs = buildQuery(cursor);
+    const data = await apiFetch(`/api/audit-log?${qs}`);
+    state.entries  = data.entries  || [];
+    state.cursor   = data.cursor   || null;
+    state.hasMore  = data.has_more || false;
+    renderTable();
+    renderPagination();
+    updateStats(data);
+  } catch (e) {
+    showToast('Failed to load audit log: ' + e.message, 'error');
+    setTableLoading(false);
+  }
+}
+
+/* =============================================
+   RENDER TABLE
+   ============================================= */
+// Map from data-entry-index → entry object (populated during renderTable)
+const _entryMap = new Map();
+
+function renderTable() {
+  const tbody = document.getElementById('audit-tbody');
+  const countEl = document.getElementById('result-count');
+
+  // Clear old click listeners by removing and recreating tbody contents
+  _entryMap.clear();
+
+  if (!state.entries.length) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="6">No audit events found matching the current filters.</td></tr>`;
+    countEl.textContent = '0 entries';
+    return;
+  }
+
+  countEl.textContent = `${state.entries.length} entries on this page`;
+
+  tbody.innerHTML = state.entries.map((entry, idx) => {
+    const ts = formatTimestamp(entry.timestamp);
+    const badge = eventTypeBadge(entry.event_type);
+    const details = JSON.stringify(entry.details);
+    const shortId = entry.entry_id.split('-')[0];
+    _entryMap.set(idx, entry);
+    // Use data-entry-index instead of inline onclick to avoid XSS via JSON injection
+    return `<tr>
+      <td>${ts}</td>
+      <td>${badge}</td>
+      <td><code style="font-size:0.75rem;color:var(--accent-blue-lt)">${esc(entry.actor_id)}</code></td>
+      <td><code style="font-size:0.75rem">${esc(entry.resource_id || '—')}</code></td>
+      <td class="details-cell" title="${esc(details)}" data-entry-index="${idx}">${esc(details)}</td>
+      <td><code style="font-size:0.72rem;color:var(--text-muted)">${esc(shortId)}…</code></td>
+    </tr>`;
+  }).join('');
+}
+
+
+/* =============================================
+   STATS UPDATE
+   ============================================= */
+function updateStats(data) {
+  // Count by category from current page
+  const counts = { auth: 0, team: 0, agent: 0, billing: 0 };
+  (data.entries || []).forEach(e => {
+    const cat = e.event_type.split('.')[0];
+    if (cat in counts) counts[cat]++;
+  });
+  document.getElementById('stat-total').textContent   = data.count ?? '—';
+  document.getElementById('stat-auth').textContent    = counts.auth;
+  document.getElementById('stat-team').textContent    = counts.team;
+  document.getElementById('stat-agent').textContent   = counts.agent;
+  document.getElementById('stat-billing').textContent = counts.billing;
+}
+
+/* =============================================
+   PAGINATION
+   ============================================= */
+function renderPagination() {
+  const info   = document.getElementById('pagination-info');
+  const btnPrev = document.getElementById('btn-prev');
+  const btnNext = document.getElementById('btn-next');
+
+  info.textContent = `Page ${state.pageNum}`;
+  btnPrev.disabled = state.pageNum <= 1;
+  btnNext.disabled = !state.hasMore;
+}
+
+function prevPage() {
+  if (state.pageNum <= 1) return;
+  state.cursorStack.pop();  // remove current page cursor
+  const prevCursor = state.cursorStack.length > 0
+    ? state.cursorStack[state.cursorStack.length - 1]
+    : null;
+  state.pageNum--;
+  loadEntries(prevCursor);
+}
+
+function nextPage() {
+  if (!state.hasMore || !state.cursor) return;
+  state.cursorStack.push(state.cursor);
+  state.pageNum++;
+  loadEntries(state.cursor);
+}
+
+/* =============================================
+   FILTERS
+   ============================================= */
+function applyFilters() {
+  state.filters = {
+    org_id:      document.getElementById('filter-org').value.trim()        || null,
+    actor_id:    document.getElementById('filter-actor').value.trim()      || null,
+    event_type:  document.getElementById('filter-event-type').value        || null,
+    resource_id: document.getElementById('filter-resource').value.trim()   || null,
+    since:       toIso(document.getElementById('filter-since').value)      || null,
+    until:       toIso(document.getElementById('filter-until').value)      || null,
+  };
+  state.cursor = null;
+  state.cursorStack = [];
+  state.pageNum = 1;
+  loadEntries();
+}
+
+function resetFilters() {
+  document.getElementById('filter-org').value        = '';
+  document.getElementById('filter-actor').value      = '';
+  document.getElementById('filter-event-type').value = '';
+  document.getElementById('filter-resource').value   = '';
+  document.getElementById('filter-since').value      = '';
+  document.getElementById('filter-until').value      = '';
+  state.filters = {};
+  state.cursor = null;
+  state.cursorStack = [];
+  state.pageNum = 1;
+  loadEntries();
+}
+
+/* =============================================
+   EXPORT
+   ============================================= */
+function exportData(format) {
+  const qs = buildQuery();
+  const url = `/api/audit-log/export/${format}?${qs}`;
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  showToast(`Exporting as ${format.toUpperCase()}…`, 'success');
+}
+
+/* =============================================
+   DETAIL POPOVER
+   ============================================= */
+function showDetails(entry) {
+  const json = JSON.stringify(entry, null, 2);
+  const win = window.open('', '_blank', 'width=600,height=500,scrollbars=yes');
+  if (!win) return; // popup blocked
+  // Use DOM manipulation instead of document.write to avoid XSS
+  win.document.open();
+  win.document.close();
+  win.document.title = `Audit Entry: ${entry.entry_id}`;
+  const style = win.document.createElement('style');
+  style.textContent = 'body{margin:0;background:#0f172a;} pre{font-family:monospace;padding:1rem;color:#f1f5f9;font-size:13px;white-space:pre-wrap;}';
+  win.document.head.appendChild(style);
+  const pre = win.document.createElement('pre');
+  pre.textContent = json;  // textContent is XSS-safe — no HTML parsing
+  win.document.body.appendChild(pre);
+}
+
+/* =============================================
+   UTILITIES
+   ============================================= */
+function formatTimestamp(iso) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString('en-US', { hour12: false, timeZone: 'UTC' }) + ' UTC';
+  } catch { return iso; }
+}
+
+function eventTypeBadge(eventType) {
+  const cat = (eventType || '').split('.')[0];
+  const classMap = { auth: 'badge-auth', team: 'badge-team', agent: 'badge-agent', billing: 'badge-billing' };
+  const cls = classMap[cat] || 'badge-unknown';
+  return `<span class="badge ${cls}">${esc(eventType)}</span>`;
+}
+
+function toIso(localValue) {
+  if (!localValue) return null;
+  // datetime-local gives "YYYY-MM-DDTHH:MM" — append Z for UTC
+  return localValue + ':00Z';
+}
+
+function esc(str) {
+  if (typeof str !== 'string') str = String(str);
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function setTableLoading(loading) {
+  if (loading) {
+    document.getElementById('audit-tbody').innerHTML = `
+      <tr class="loading-row"><td colspan="6"><span class="spinner"></span> Loading…</td></tr>`;
+  }
+}
+
+function showToast(message, type = 'success') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 3500);
+}
+</script>
+</body>
+</html>

@@ -124,6 +124,14 @@ except ImportError:
     _BILLING_ROUTES_AVAILABLE = False
     logger.warning("billing routes not found — pricing endpoints disabled")
 
+# AI-246: Audit Log for Compliance
+try:
+    from audit.routes import register_audit_routes
+    _AUDIT_AVAILABLE = True
+except ImportError:
+    _AUDIT_AVAILABLE = False
+    logger.warning("audit module not found — audit log disabled")
+
 
 def _collect_event(event_type: str, properties: Optional[dict] = None) -> None:
     """Fire-and-forget telemetry event collection.
@@ -757,6 +765,10 @@ class DashboardServer:
         # AI-247: GA Launch - Pricing Tier Activation & Enforcement
         if _BILLING_ROUTES_AVAILABLE:
             register_billing_routes(self.app)
+
+        # AI-246: Audit Log for Compliance
+        if _AUDIT_AVAILABLE:
+            register_audit_routes(self.app)
 
     async def handle_options(self, request: Request) -> Response:
         """Handle CORS preflight OPTIONS requests."""
