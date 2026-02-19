@@ -58,6 +58,7 @@ DEFAULT_MODELS: Final[dict[str, ModelOption]] = {
     "designer": "haiku",
     "jira": "haiku",
     "gitlab": "haiku",
+    "knowledge_base": "haiku",
 }
 
 
@@ -127,6 +128,7 @@ AGENT_GIT_IDENTITIES: Final[dict[str, GitIdentity]] = {
     "designer": GitIdentity("Designer Agent", "designer-agent@claude-agents.dev"),
     "jira": GitIdentity("Jira Agent", "jira-agent@claude-agents.dev"),
     "gitlab": GitIdentity("GitLab Agent", "gitlab-agent@claude-agents.dev"),
+    "knowledge_base": GitIdentity("Knowledge Base Agent", "knowledge-base-agent@claude-agents.dev"),
 }
 
 
@@ -367,6 +369,24 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
             tools=_get_gitlab_agent_tools(),
             model=_get_model("gitlab"),
         ),
+        "knowledge_base": AgentDefinition(
+            description=(
+                "Knowledge Base Agent for RAG-based project context retrieval. "
+                "Indexes codebase documentation, PR history, and architecture docs, "
+                "then answers contextual queries using retrieval-augmented generation. "
+                "Called by Coding Agent and PR Reviewer Agent for historical context. "
+                "Available for Team tier and above."
+            ),
+            prompt=(
+                "You are the Knowledge Base Agent. You maintain a searchable index of "
+                "project documentation, PR history, and architecture decisions. "
+                "When asked a question, retrieve the most relevant chunks and synthesise "
+                "a concise, accurate answer grounded in project-specific context. "
+                "Always cite your sources."
+            ),
+            tools=FILE_TOOLS + ["Bash"],
+            model=_get_model("knowledge_base"),
+        ),
     }
 
 
@@ -415,6 +435,7 @@ PRODUCT_MANAGER_AGENT = AGENT_DEFINITIONS["product_manager"]
 DESIGNER_AGENT = AGENT_DEFINITIONS["designer"]
 JIRA_AGENT = AGENT_DEFINITIONS["jira"]
 GITLAB_AGENT = AGENT_DEFINITIONS["gitlab"]
+KNOWLEDGE_BASE_AGENT = AGENT_DEFINITIONS["knowledge_base"]
 
 
 def create_agent_definitions_with_routing(
