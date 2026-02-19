@@ -460,6 +460,8 @@ class RESTAPIServer:
         # Sessions and providers
         self.app.router.add_get('/api/sessions', self.get_sessions)
         self.app.router.add_get('/api/sessions/{session_id}/cost', self.get_session_cost)
+        # AI-255: Routing metadata endpoint
+        self.app.router.add_get('/api/sessions/{session_id}/routing', self.get_session_routing)
         self.app.router.add_get('/api/providers', self.get_providers)
         self.app.router.add_get('/api/providers/status', self.get_provider_status)
 
@@ -862,6 +864,54 @@ class RESTAPIServer:
             'cost_by_model': {k: round(v, 6) for k, v in cost_by_model.items()},
             'event_count': len(session_events),
             'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+
+    async def get_session_routing(self, request: Request) -> Response:
+        """GET /api/sessions/{session_id}/routing - Routing decisions for a session.
+
+        Returns the agent routing decisions that were logged for the given
+        session, including agent_selected, routing_reason,
+        alternatives_considered, complexity_score, and model_tier.
+
+        This endpoint supports the "routing reason visible in dashboard session
+        detail" acceptance criterion of AI-255.
+
+        Path params:
+            session_id: The session identifier to look up.
+
+        Returns:
+            200 OK with routing decision list, or 404 if session not found.
+        """
+        session_id = request.match_info['session_id']
+
+        try:
+            from agents.routing_metadata import get_routing_history_raw
+            routing_records = get_routing_history_raw(session_id)
+        except ImportError:
+            routing_records = []
+
+        # Also check whether the session exists in the metrics store so we can
+        # return a proper 404 when the session is completely unknown.
+        state = self.store.load()
+        session_events = [
+            ev for ev in state.get('events', [])
+            if ev.get('session_id') == session_id
+        ]
+        session_known = bool(session_events) or any(
+            s.get('session_id') == session_id for s in state.get('sessions', [])
+        ) or bool(routing_records)
+
+        if not session_known:
+            return web.json_response(
+                {'error': 'Session not found', 'session_id': session_id},
+                status=404
+            )
+
+        return web.json_response({
+            'session_id': session_id,
+            'routing_decisions': routing_records,
+            'total_decisions': len(routing_records),
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
         })
 
     async def get_providers(self, request: Request) -> Response:
