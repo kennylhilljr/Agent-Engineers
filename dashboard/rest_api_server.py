@@ -308,6 +308,10 @@ def create_auth_middleware():
         if request.path == "/api/health":
             return await handler(request)
 
+        # AI-250: Jira inbound webhook uses its own signature auth
+        if request.path == "/api/webhooks/jira":
+            return await handler(request)
+
         # AI-222: Auth endpoints are always open (they handle their own auth)
         if request.path.startswith("/auth/"):
             return await handler(request)
@@ -663,6 +667,18 @@ class RESTAPIServer:
         self.app.router.add_route('OPTIONS', '/api/analytics/model-performance', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/analytics/sprint-velocity', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/analytics/export', self.handle_options)
+
+        # AI-250: Jira Integration endpoints
+        self.app.router.add_post('/api/webhooks/jira', self.jira_webhook)
+        self.app.router.add_get('/api/integrations/jira/status', self.jira_get_status)
+        self.app.router.add_post('/api/integrations/jira/connect', self.jira_connect)
+        self.app.router.add_get('/api/integrations/jira/callback', self.jira_callback)
+        self.app.router.add_post('/api/integrations/jira/config', self.jira_save_config)
+        self.app.router.add_route('OPTIONS', '/api/webhooks/jira', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/integrations/jira/status', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/integrations/jira/connect', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/integrations/jira/callback', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/integrations/jira/config', self.handle_options)
 
         # OPTIONS for CORS preflight
         for route in ['/api/metrics', '/api/agents', '/api/sessions', '/api/providers',
@@ -5618,6 +5634,272 @@ async function showForgotPassword() {{
         exporter = _AnalyticsExporter()
         report = exporter.export_monthly_report(org_id, month=month)
         return web.json_response(report)
+
+    # ------------------------------------------------------------------
+    # AI-250: Jira Integration endpoints
+    # ------------------------------------------------------------------
+
+    def _get_jira_sync_engine(self):
+        """Lazy-load the JiraSyncEngine singleton."""
+        try:
+            from integrations.jira.sync import JiraSyncEngine
+            return JiraSyncEngine()
+        except ImportError:
+            return None
+
+    def _get_jira_oauth_handler(self):
+        """Lazy-load the JiraOAuthHandler singleton."""
+        try:
+            from integrations.jira.oauth import JiraOAuthHandler
+            return JiraOAuthHandler()
+        except ImportError:
+            return None
+
+    async def jira_webhook(self, request: Request) -> Response:
+        """POST /api/webhooks/jira — receive incoming Jira webhook events.
+
+        Validates the ``X-Jira-Signature`` header against the stored
+        webhook secret for the organisation, then routes the event to
+        :meth:`JiraSyncEngine.handle_webhook_event`.
+
+        Returns:
+            200 OK with result dict on success.
+            401 Unauthorized if the signature is invalid.
+            400 Bad Request if the payload cannot be parsed.
+        """
+        import hashlib
+        import hmac as _hmac
+
+        raw_body = await request.read()
+
+        # Signature validation
+        signature_header = request.headers.get("X-Jira-Signature", "")
+        # Extract org_id from query or body to look up the webhook secret
+        org_id = request.rel_url.query.get("org_id", "")
+        webhook_secret = ""
+        if org_id:
+            try:
+                from integrations.jira.config import load_config
+                cfg = load_config(org_id)
+                if cfg:
+                    webhook_secret = cfg.webhook_secret
+            except ImportError:
+                pass
+
+        if webhook_secret and signature_header:
+            expected_sig = "sha256=" + _hmac.new(
+                webhook_secret.encode("utf-8"),
+                raw_body,
+                hashlib.sha256,
+            ).hexdigest()
+            if not _hmac.compare_digest(expected_sig, signature_header):
+                return web.json_response(
+                    {"error": "Invalid webhook signature"}, status=401
+                )
+        elif webhook_secret and not signature_header:
+            # Secret configured but no signature provided → reject
+            return web.json_response(
+                {"error": "Missing X-Jira-Signature header"}, status=401
+            )
+
+        # Parse payload
+        try:
+            event = await request.json()
+        except Exception:
+            return web.json_response(
+                {"error": "Invalid JSON payload"}, status=400
+            )
+
+        engine = self._get_jira_sync_engine()
+        if engine is None:
+            return web.json_response(
+                {"error": "Jira integration module unavailable"}, status=503
+            )
+
+        result = engine.handle_webhook_event(event)
+        return web.json_response(result, status=200)
+
+    async def jira_get_status(self, request: Request) -> Response:
+        """GET /api/integrations/jira/status?org_id=X — get Jira connection status.
+
+        Returns:
+            200 OK with connection status dict.
+        """
+        org_id = request.rel_url.query.get("org_id", "")
+        if not org_id:
+            return web.json_response(
+                {"error": "org_id query parameter is required"}, status=400
+            )
+
+        try:
+            from integrations.jira.config import load_config
+            cfg = load_config(org_id)
+        except ImportError:
+            return web.json_response(
+                {"error": "Jira integration module unavailable"}, status=503
+            )
+
+        if cfg is None:
+            return web.json_response(
+                {
+                    "org_id": org_id,
+                    "connected": False,
+                    "enabled": False,
+                    "jira_base_url": "",
+                    "project_count": 0,
+                }
+            )
+
+        return web.json_response(
+            {
+                "org_id": org_id,
+                "connected": bool(cfg.jira_base_url),
+                "enabled": cfg.enabled,
+                "jira_base_url": cfg.jira_base_url,
+                "project_count": len(cfg.project_mappings),
+            }
+        )
+
+    async def jira_connect(self, request: Request) -> Response:
+        """POST /api/integrations/jira/connect — initiate Atlassian OAuth 2.0 flow.
+
+        Request body (JSON):
+            org_id (str, required): Agent-Engineers organisation ID.
+            redirect_uri (str, required): OAuth callback URI.
+
+        Returns:
+            200 OK with ``auth_url`` field.
+            400 Bad Request on missing fields.
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON body"}, status=400)
+
+        org_id = body.get("org_id", "")
+        redirect_uri = body.get("redirect_uri", "")
+        if not org_id:
+            return web.json_response(
+                {"error": "org_id is required"}, status=400
+            )
+        if not redirect_uri:
+            return web.json_response(
+                {"error": "redirect_uri is required"}, status=400
+            )
+
+        handler = self._get_jira_oauth_handler()
+        if handler is None:
+            return web.json_response(
+                {"error": "Jira OAuth module unavailable"}, status=503
+            )
+
+        auth_url = handler.get_authorization_url(org_id, redirect_uri)
+        return web.json_response({"auth_url": auth_url, "org_id": org_id})
+
+    async def jira_callback(self, request: Request) -> Response:
+        """GET /api/integrations/jira/callback?code=X&state=X — OAuth callback.
+
+        Exchanges the authorization code for access/refresh tokens and
+        persists the integration config for the organisation.
+
+        Returns:
+            200 OK with token metadata on success.
+            400 Bad Request on missing/invalid parameters.
+        """
+        code = request.rel_url.query.get("code", "")
+        state = request.rel_url.query.get("state", "")
+        redirect_uri = request.rel_url.query.get("redirect_uri", "")
+
+        if not code or not state:
+            return web.json_response(
+                {"error": "code and state parameters are required"}, status=400
+            )
+
+        handler = self._get_jira_oauth_handler()
+        if handler is None:
+            return web.json_response(
+                {"error": "Jira OAuth module unavailable"}, status=503
+            )
+
+        try:
+            state_data = handler.validate_state(state)
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
+
+        org_id: str = state_data["org_id"]
+        tokens = handler.exchange_code_for_token(code, redirect_uri)
+
+        # Persist a basic config for this org
+        try:
+            from integrations.jira.config import (
+                JiraIntegrationConfig,
+                load_config,
+                save_config,
+            )
+            existing = load_config(org_id)
+            if existing is None:
+                cfg = JiraIntegrationConfig(org_id=org_id, enabled=True)
+            else:
+                existing.enabled = True
+                cfg = existing
+            save_config(cfg)
+        except ImportError:
+            pass
+
+        return web.json_response(
+            {
+                "org_id": org_id,
+                "token_type": tokens.get("token_type"),
+                "expires_in": tokens.get("expires_in"),
+                "scope": tokens.get("scope"),
+                "connected": True,
+            }
+        )
+
+    async def jira_save_config(self, request: Request) -> Response:
+        """POST /api/integrations/jira/config — save project and field mappings.
+
+        Request body (JSON) fields:
+            org_id (str, required)
+            jira_base_url (str, optional)
+            project_mappings (list, optional)
+            field_mappings (dict, optional)
+            enabled (bool, optional)
+            webhook_secret (str, optional)
+
+        Returns:
+            200 OK with saved config (without webhook_secret).
+            400 Bad Request on validation errors.
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON body"}, status=400)
+
+        try:
+            from integrations.jira.config import (
+                JiraIntegrationConfig,
+                load_config,
+                save_config,
+            )
+        except ImportError:
+            return web.json_response(
+                {"error": "Jira integration module unavailable"}, status=503
+            )
+
+        org_id = body.get("org_id", "")
+        if not org_id:
+            return web.json_response({"error": "org_id is required"}, status=400)
+
+        try:
+            cfg = JiraIntegrationConfig.load_from_dict(body)
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
+
+        save_config(cfg)
+        result = cfg.to_dict()
+        result.pop("webhook_secret", None)  # never return secret in response
+        return web.json_response(result)
 
 
 def main():
