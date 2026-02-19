@@ -41,6 +41,9 @@ ALL_AGENT_NAMES: list[str] = [
     "groq",
     "kimi",
     "windsurf",
+    "openrouter_dev",
+    "product_manager",
+    "designer",
 ]
 
 

@@ -351,3 +351,69 @@ def get_chat_history(limit: int = 100) -> List[Dict]:
 def clear_chat_history() -> None:
     """Clear the in-memory chat history (for testing)."""
     _chat_history.clear()
+
+
+async def stream_chat_response(
+    message: str,
+    provider: str = "claude",
+    model: str = "sonnet-4.5",
+    conversation_history: Optional[List[Dict]] = None,
+):
+    """Async generator that yields SSE-compatible chunks for a chat message.
+
+    This wraps ChatRouter.handle_message() and streams the result back
+    in a format compatible with Server-Sent Events.
+
+    Args:
+        message: Raw user message text
+        provider: AI provider name (default "claude")
+        model: Model identifier (informational; routing uses provider name)
+        conversation_history: Optional prior messages for context
+
+    Yields:
+        Dict chunks with 'type' and 'content' fields for SSE streaming.
+    """
+    router = ChatRouter()
+    message_id = str(uuid.uuid4())
+
+    yield {
+        "type": "start",
+        "message_id": message_id,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+    }
+
+    try:
+        result = await router.handle_message(
+            message=message,
+            provider=provider,
+            message_id=message_id,
+        )
+
+        response_text = result.get("response", "")
+        routing = result.get("routing", {})
+
+        yield {
+            "type": "content",
+            "content": response_text,
+            "routing": {
+                "intent_type": routing.get("intent_type", "unknown"),
+                "handler": routing.get("handler", "unknown"),
+                "agent": routing.get("agent"),
+            },
+            "provider": provider,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        }
+
+    except Exception as exc:
+        logger.error("[stream_chat_response] Error: %s", exc)
+        yield {
+            "type": "error",
+            "content": f"Error processing message: {exc}",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        }
+
+    yield {
+        "type": "done",
+        "message_id": message_id,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+    }

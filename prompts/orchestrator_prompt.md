@@ -38,6 +38,9 @@ Use the Task tool to delegate to these specialized agents:
 | `groq` | haiku | Ultra-fast cross-validation (Llama 3.3 70B, Mixtral) via Groq LPU |
 | `kimi` | haiku | Ultra-long context (2M tokens), bilingual Chinese/English (Moonshot AI) |
 | `windsurf` | haiku | Parallel coding via Windsurf IDE headless, cross-IDE validation |
+| `openrouter_dev` | sonnet | Parallel coding via OpenRouter (DeepSeek, Llama, Gemma). Has full Playwright tools. |
+| `product_manager` | sonnet | Backlog grooming, sprint planning, agent performance analysis, feature review |
+| `designer` | haiku | UI/UX design specs, CSS implementations, accessibility audits ([DESIGN] issues) |
 
 ---
 
@@ -99,9 +102,17 @@ Before marking ANY issue Done:
 #### First Run (no .linear_project.json)
 1. Linear agent: Create project, issues, META issue
 2. GitHub agent: Init repo, check GITHUB_REPO env var, push if configured
-3. (Optional) Start first feature with full verification flow
+3. **Product Manager agent: Initial backlog prioritization** — pass full issue list for RICE scoring and dependency ordering
+4. (Optional) Start first feature with full verification flow
 
 #### Continuation (.linear_project.json exists)
+
+**Product Manager Trigger Rules (MANDATORY):**
+- **Session start:** If `tickets_completed` >= 5 since last PM review, delegate to `product_manager` for backlog re-prioritization before picking next ticket
+- **No clear next ticket:** When all remaining tickets are blocked or ambiguous, delegate to `product_manager` for sprint planning
+- **Every 3rd ticket completed:** Delegate to `product_manager` for a lightweight feature quality review of the last 3 completed tickets
+- **[DESIGN]-prefixed tickets:** Route to `product_manager` first for spec, then `designer` for implementation
+
 Follow the continuation task steps. Key flow per ticket:
 
 ```
@@ -149,6 +160,11 @@ Follow the continuation task steps. Key flow per ticket:
 | Bilingual Chinese/English tasks | `kimi` | Content + language instructions |
 | Parallel coding / cross-IDE validation | `windsurf` | Task description + workspace path |
 | Alternative implementation for comparison | `windsurf` | Same spec as primary coding agent |
+| Parallel coding via OpenRouter models | `openrouter_dev` | Task description + workspace path |
+| Backlog grooming / sprint planning | `product_manager` | `.linear_project.json` + backlog summary |
+| Feature quality review | `product_manager` | Completed issue + PR evidence |
+| Agent performance analysis | `product_manager` | Session metrics + error patterns |
+| UI/UX design specs, CSS, accessibility | `designer` | Issue context + design requirements |
 
 ---
 
@@ -262,12 +278,29 @@ Tell the coding agent to keep the project directory clean. Only application code
 
 ---
 
+### Product Manager State Tracking
+
+Track PM activity in `.linear_project.json` using these fields:
+- `last_pm_review_at`: ISO timestamp of last PM delegation
+- `tickets_since_pm_review`: Counter, increment after each ticket completion, reset to 0 after PM review
+
+When delegating to `product_manager`, pass:
+1. Current `.linear_project.json` contents
+2. Summary of completed tickets since last review
+3. Any blocked/ambiguous tickets
+4. Session metrics (if available from dashboard)
+
+The PM agent returns structured recommendations — act on them by updating ticket priorities in Linear and adjusting your work order.
+
+---
+
 ### Project Complete Detection
 
 After getting status, check: `done == total_issues` from `.linear_project.json`.
 When complete:
-1. `ops` agent: META comment + final PR + Slack notification
-2. Output: `PROJECT_COMPLETE: All features implemented and verified.`
+1. **Product Manager agent: Final sprint retrospective** — pass all completed tickets for quality review
+2. `ops` agent: META comment + final PR + Slack notification
+3. Output: `PROJECT_COMPLETE: All features implemented and verified.`
 
 ---
 

@@ -194,11 +194,12 @@ _DEFAULT_MODELS = {
     "windsurf": "haiku",
 }
 
-# The 13 canonical panel agents (excludes orchestrator)
+# The 16 canonical panel agents (excludes orchestrator)
 _PANEL_AGENT_NAMES = [
     "linear", "coding", "github", "slack", "pr_reviewer",
     "ops", "coding_fast", "pr_reviewer_fast", "chatgpt",
     "gemini", "groq", "kimi", "windsurf",
+    "openrouter_dev", "product_manager", "designer",
 ]
 
 # Valid statuses for the status panel
@@ -572,6 +573,7 @@ class DashboardServer:
     def _setup_routes(self):
         """Register HTTP routes and WebSocket endpoint."""
         self.app.router.add_get('/', self.serve_dashboard)
+        self.app.router.add_get('/architecture', self.serve_architecture)
         self.app.router.add_get('/health', self.health_check)
         self.app.router.add_get('/api/metrics', self.get_metrics)
         # AI-79: Agent Status Panel endpoint - must be registered BEFORE /{agent_name}
@@ -775,7 +777,17 @@ class DashboardServer:
         return web.Response(status=204)
 
     async def serve_dashboard(self, request: Request) -> Response:
-        """Serve the dashboard HTML page at the root URL."""
+        """Serve the main dashboard (index.html) at the root URL."""
+        html_path = Path(__file__).parent / 'index.html'
+        if html_path.exists():
+            return web.Response(
+                text=html_path.read_text(),
+                content_type='text/html',
+            )
+        raise web.HTTPNotFound(text='index.html not found')
+
+    async def serve_architecture(self, request: Request) -> Response:
+        """Serve the architecture view (dashboard.html) at /architecture."""
         html_path = Path(__file__).parent / 'dashboard.html'
         if html_path.exists():
             return web.Response(
