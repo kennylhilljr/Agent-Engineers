@@ -93,8 +93,12 @@ class AgentExecutor:
                 async for chunk in self._execute_list(params):
                     yield chunk
 
+            elif action == "query" and agent == "github":
+                async for chunk in self._execute_github_query(params):
+                    yield chunk
+
             else:
-                yield f"Unknown action: '{action}'. Supported: status, start, pause, resume."
+                yield f"Unknown action: '{action}'. Supported: status, start, pause, resume, query."
 
         except asyncio.CancelledError:
             yield "[Bridge] Request was cancelled."
@@ -295,6 +299,126 @@ class AgentExecutor:
                     return issue
 
                 return None
+
+    async def _execute_github_query(self, params: dict) -> AsyncIterator[str]:
+        """Execute a GitHub query using the gh CLI or GitHub API.
+
+        Args:
+            params: Must contain 'query' key with the user's original message
+
+        Yields:
+            Formatted GitHub response
+        """
+        query = params.get("query", "")
+        repo = os.environ.get("GITHUB_REPO", "")
+
+        if not repo:
+            yield (
+                "**GitHub query received** but `GITHUB_REPO` is not configured.\n\n"
+                "Set the `GITHUB_REPO` environment variable (e.g. `owner/repo`) "
+                "to enable GitHub integration."
+            )
+            return
+
+        yield f"Querying GitHub ({repo})...\n\n"
+
+        lower_q = query.lower()
+
+        try:
+            if any(kw in lower_q for kw in ["pr", "pull request"]):
+                # Determine state filter
+                if "merged" in lower_q:
+                    state = "merged"
+                elif "closed" in lower_q:
+                    state = "closed"
+                else:
+                    state = "open"
+                result = await self._gh_list_prs(repo, state)
+                yield result
+            elif "branch" in lower_q:
+                result = await self._gh_list_branches(repo)
+                yield result
+            elif "commit" in lower_q:
+                result = await self._gh_list_commits(repo)
+                yield result
+            else:
+                yield (
+                    f"GitHub query routed but could not determine specific action.\n"
+                    f"Supported: list PRs, list branches, list commits.\n"
+                    f"Your query: {query}"
+                )
+        except Exception as e:
+            logger.error(f"GitHub query error: {e}")
+            yield f"Error querying GitHub: {str(e)}"
+
+    async def _gh_list_prs(self, repo: str, state: str = "open") -> str:
+        """List pull requests via gh CLI."""
+        proc = await asyncio.create_subprocess_exec(
+            "gh", "pr", "list", "--repo", repo, "--state", state, "--limit", "10",
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+
+        if proc.returncode != 0:
+            err = stderr.decode().strip()
+            return f"GitHub CLI error: {err}"
+
+        output = stdout.decode().strip()
+        if not output:
+            return f"No {state} pull requests found in {repo}."
+
+        lines = output.split("\n")
+        formatted = [f"**{state.capitalize()} Pull Requests** ({repo}):\n"]
+        for line in lines:
+            parts = line.split("\t")
+            if len(parts) >= 2:
+                formatted.append(f"- #{parts[0]} {parts[1]}")
+            else:
+                formatted.append(f"- {line}")
+        return "\n".join(formatted)
+
+    async def _gh_list_branches(self, repo: str) -> str:
+        """List branches via gh CLI."""
+        proc = await asyncio.create_subprocess_exec(
+            "gh", "api", f"repos/{repo}/branches", "--jq", ".[].name",
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+
+        if proc.returncode != 0:
+            return f"GitHub CLI error: {stderr.decode().strip()}"
+
+        output = stdout.decode().strip()
+        if not output:
+            return f"No branches found in {repo}."
+
+        branches = output.split("\n")[:20]
+        formatted = [f"**Branches** ({repo}, showing {len(branches)}):\n"]
+        for b in branches:
+            formatted.append(f"- `{b}`")
+        return "\n".join(formatted)
+
+    async def _gh_list_commits(self, repo: str) -> str:
+        """List recent commits via gh CLI."""
+        proc = await asyncio.create_subprocess_exec(
+            "gh", "api", f"repos/{repo}/commits",
+            "--jq", ".[:10][] | .sha[:7] + \" \" + (.commit.message | split(\"\\n\")[0])",
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+
+        if proc.returncode != 0:
+            return f"GitHub CLI error: {stderr.decode().strip()}"
+
+        output = stdout.decode().strip()
+        if not output:
+            return f"No recent commits found in {repo}."
+
+        lines = output.split("\n")
+        formatted = [f"**Recent Commits** ({repo}):\n"]
+        for line in lines:
+            formatted.append(f"- `{line}`")
+        return "\n".join(formatted)
 
     def _format_issue_status(self, issue: dict) -> str:
         """Format a Linear issue as a readable status message.

@@ -115,6 +115,15 @@ RESUME_PATTERNS = [
     ),
 ]
 
+# GitHub query patterns — route to the github agent
+GITHUB_PATTERNS = [
+    re.compile(r"(?:list|show|what|get)\s+(?:are\s+)?(?:the\s+)?(?:all\s+)?(?:open\s+)?(?:PRs?|pull\s*requests?)", re.IGNORECASE),
+    re.compile(r"(?:open|merged|closed)\s+(?:PRs?|pull\s*requests?)", re.IGNORECASE),
+    re.compile(r"(?:list|show|what|get)\s+(?:are\s+)?(?:the\s+)?(?:all\s+)?(?:branches|commits|releases|tags)", re.IGNORECASE),
+    re.compile(r"(?:PR|pull\s*request)\s*#?\d+", re.IGNORECASE),
+    re.compile(r"(?:merge|review|approve|close)\s+(?:PR|pull\s*request)", re.IGNORECASE),
+]
+
 # List/query patterns that can be answered without agent action
 QUERY_PATTERNS = [
     re.compile(r"(?:list|show)\s+(?:all\s+)?(?:open\s+)?(?:issues?|tickets?)", re.IGNORECASE),
@@ -232,7 +241,19 @@ def parse_intent(message: str) -> ParsedIntent:
                 original_message=message
             )
 
-    # 6. Check for general query patterns
+    # 6. Check for GitHub query patterns (route to github agent)
+    for pattern in GITHUB_PATTERNS:
+        match = pattern.search(msg)
+        if match:
+            return ParsedIntent(
+                intent_type="agent_action",
+                agent="github",
+                action="query",
+                params={"query": msg},
+                original_message=message
+            )
+
+    # 7. Check for general query patterns
     for pattern in QUERY_PATTERNS:
         if pattern.search(msg):
             return ParsedIntent(
@@ -243,7 +264,7 @@ def parse_intent(message: str) -> ParsedIntent:
                 original_message=message
             )
 
-    # 7. Default to conversation
+    # 8. Default to conversation
     return ParsedIntent(
         intent_type="conversation",
         agent=None,
