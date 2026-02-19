@@ -459,6 +459,7 @@ class RESTAPIServer:
 
         # Sessions and providers
         self.app.router.add_get('/api/sessions', self.get_sessions)
+        self.app.router.add_get('/api/sessions/{session_id}/cost', self.get_session_cost)
         self.app.router.add_get('/api/providers', self.get_providers)
         self.app.router.add_get('/api/providers/status', self.get_provider_status)
 
@@ -792,6 +793,84 @@ class RESTAPIServer:
             'sessions': sessions,
             'total_sessions': len(state['sessions']),
             'returned_sessions': len(sessions),
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        })
+
+    async def get_session_cost(self, request: Request) -> Response:
+        """GET /api/sessions/{session_id}/cost - Cost breakdown for a single agent session.
+
+        Returns per-model-tier cost tracking data for the given session,
+        including the total cost, remaining budget, alert status, and a
+        breakdown by model tier (haiku / sonnet / opus).  This endpoint
+        supports the "cost per run visible in agent session detail view"
+        acceptance criterion of AI-254.
+
+        Path params:
+            session_id: The session identifier to look up.
+
+        Query params:
+            cap_usd: Override the cost cap for this response (default: org cap
+                     from AGENT_COST_CAP_USD env var or $5.00).
+
+        Returns:
+            200 OK with cost summary dict, or 404 if session not found.
+        """
+        session_id = request.match_info['session_id']
+        state = self.store.load()
+
+        # Collect all events that belong to this session
+        session_events = [
+            ev for ev in state.get('events', [])
+            if ev.get('session_id') == session_id
+        ]
+
+        if not session_events and not any(
+            s.get('session_id') == session_id for s in state.get('sessions', [])
+        ):
+            return web.json_response(
+                {'error': 'Session not found', 'session_id': session_id},
+                status=404
+            )
+
+        # Determine cost cap
+        try:
+            cap_usd = float(request.query.get('cap_usd', '0') or '0')
+        except (ValueError, TypeError):
+            cap_usd = 0.0
+
+        if cap_usd <= 0:
+            # Fall back to env-var / default cap
+            try:
+                from agents.model_routing import get_cost_cap_for_org
+                cap_usd = get_cost_cap_for_org()
+            except ImportError:
+                cap_usd = 5.00
+
+        # Build per-model-tier cost breakdown from event records
+        cost_by_model: Dict[str, float] = {}
+        total_cost = 0.0
+
+        for ev in session_events:
+            model = ev.get('model_used', 'unknown') or 'unknown'
+            cost = float(ev.get('estimated_cost_usd') or 0.0)
+            cost_by_model[model] = cost_by_model.get(model, 0.0) + cost
+            total_cost += cost
+
+        alert_threshold = cap_usd * 0.80
+        alert_fired = total_cost >= alert_threshold
+        is_within_cap = total_cost < cap_usd
+        remaining_budget = max(0.0, cap_usd - total_cost)
+
+        return web.json_response({
+            'session_id': session_id,
+            'total_cost_usd': round(total_cost, 6),
+            'cap_usd': cap_usd,
+            'remaining_budget_usd': round(remaining_budget, 6),
+            'alert_threshold_usd': round(alert_threshold, 6),
+            'alert_fired': alert_fired,
+            'is_within_cap': is_within_cap,
+            'cost_by_model': {k: round(v, 6) for k, v in cost_by_model.items()},
+            'event_count': len(session_events),
             'timestamp': datetime.utcnow().isoformat() + 'Z'
         })
 
