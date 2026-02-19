@@ -20,7 +20,8 @@ from teams.models import (
     AuditLog,
     AuditEvent,
     TeamError,
-    PermissionError,
+    TeamPermissionError,
+    PermissionError,  # backward-compatibility alias
     InvitationError,
     get_team_store,
     get_audit_log,
@@ -45,7 +46,8 @@ __all__ = [
     "AuditLog",
     "AuditEvent",
     "TeamError",
-    "PermissionError",
+    "TeamPermissionError",
+    "PermissionError",  # backward-compatibility alias
     "InvitationError",
     "get_team_store",
     "get_audit_log",

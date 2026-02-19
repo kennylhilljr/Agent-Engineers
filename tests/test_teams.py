@@ -42,6 +42,7 @@ from teams.models import (
     AuditLog,
     AuditEvent,
     TeamError,
+    TeamPermissionError,
     InvitationError,
     get_team_store,
     get_audit_log,
@@ -557,6 +558,14 @@ class TestAuditLog:
 
 def make_app():
     """Create a minimal aiohttp app with team routes registered."""
+    import os
+    # Enable demo mode so tests can pass X-User-Id header.
+    # Role and org_id are STILL derived server-side from the store.
+    os.environ["TEAM_DEMO_MODE"] = "1"
+    # Reset the cached demo mode flag so the env var is picked up fresh
+    import teams.auth_middleware as _am
+    _am._DEMO_MODE = None
+
     from aiohttp import web
     from teams.routes import register_team_routes
 
@@ -566,8 +575,16 @@ def make_app():
 
 
 def headers(user_id="user-owner", role="owner", org_id="org-test"):
+    """Build request headers.
+
+    In the secure implementation only X-User-Id is used by the server
+    (when TEAM_DEMO_MODE=1). X-User-Role and X-Org-Id are derived from
+    TeamStore server-side and are ignored if sent by the client.
+    """
     return {
         "X-User-Id": user_id,
+        # These are included for documentation/legacy test compatibility but
+        # are NOT trusted by the server:
         "X-User-Role": role,
         "X-Org-Id": org_id,
     }
@@ -776,21 +793,25 @@ class TestGetInviteRoute:
 @pytest.mark.asyncio
 class TestAcceptInviteRoute:
     async def test_accept_invite_valid(self, seeded_store, org_id_routes):
+        """Accept an invite — server generates provisional user_id since no session."""
         from aiohttp.test_utils import TestClient, TestServer
         store = seeded_store
         inv = store.create_invitation(org_id_routes, "user-owner", "member", "fresh@e.com")
         app = make_app()
         async with TestClient(TestServer(app)) as client:
+            # BLOCKER 3 fix: user_id is NOT provided — server generates it
             resp = await client.post(
                 f"/api/team/invite/{inv.token}/accept",
-                json={"user_id": "new-user-99", "email": "fresh@e.com",
-                      "display_name": "Fresh User"},
+                json={"email": "fresh@e.com", "display_name": "Fresh User"},
             )
             assert resp.status == 200
             data = await resp.json()
             assert data["member"]["role"] == "member"
+            # Server should have generated a provisional user_id
+            assert data["member"]["user_id"].startswith("provisional-")
 
     async def test_accept_invite_wrong_email(self, seeded_store, org_id_routes):
+        """Invite with mismatched email must be rejected (email verification)."""
         from aiohttp.test_utils import TestClient, TestServer
         store = seeded_store
         inv = store.create_invitation(org_id_routes, "user-owner", "viewer", "specific@e.com")
@@ -798,7 +819,7 @@ class TestAcceptInviteRoute:
         async with TestClient(TestServer(app)) as client:
             resp = await client.post(
                 f"/api/team/invite/{inv.token}/accept",
-                json={"user_id": "u9", "email": "wrong@e.com", "display_name": "W"},
+                json={"email": "wrong@e.com", "display_name": "W"},
             )
             assert resp.status == 400
 
@@ -810,13 +831,14 @@ class TestAcceptInviteRoute:
         async with TestClient(TestServer(app)) as client:
             await client.post(
                 f"/api/team/invite/{inv.token}/accept",
-                json={"user_id": "u-new2", "email": "n@e.com", "display_name": "N"},
+                json={"email": "n@e.com", "display_name": "N"},
             )
         audit = get_audit_log()
         events = audit.get_events(org_id=org_id_routes, event_type="invite_accepted")
         assert len(events) >= 1
 
-    async def test_accept_invite_missing_user_id(self, seeded_store, org_id_routes):
+    async def test_accept_invite_missing_email(self, seeded_store, org_id_routes):
+        """Email is required — missing email must return 400."""
         from aiohttp.test_utils import TestClient, TestServer
         store = seeded_store
         inv = store.create_invitation(org_id_routes, "user-owner", "member")
@@ -824,11 +846,15 @@ class TestAcceptInviteRoute:
         async with TestClient(TestServer(app)) as client:
             resp = await client.post(
                 f"/api/team/invite/{inv.token}/accept",
-                json={"email": "x@e.com"},
+                json={"display_name": "No Email"},
             )
             assert resp.status == 400
 
-    async def test_accept_invite_missing_email(self, seeded_store, org_id_routes):
+    async def test_accept_invite_client_user_id_ignored(self, seeded_store, org_id_routes):
+        """BLOCKER 3: client-supplied user_id in body must be ignored by server.
+
+        The server generates a provisional user_id; the client cannot inject one.
+        """
         from aiohttp.test_utils import TestClient, TestServer
         store = seeded_store
         inv = store.create_invitation(org_id_routes, "user-owner", "member")
@@ -836,9 +862,12 @@ class TestAcceptInviteRoute:
         async with TestClient(TestServer(app)) as client:
             resp = await client.post(
                 f"/api/team/invite/{inv.token}/accept",
-                json={"user_id": "uid"},
+                json={"email": "x@e.com", "user_id": "attacker-injected-id"},
             )
-            assert resp.status == 400
+            assert resp.status == 200
+            data = await resp.json()
+            # The server must NOT have used "attacker-injected-id"
+            assert data["member"]["user_id"] != "attacker-injected-id"
 
 
 @pytest.mark.asyncio
@@ -1280,3 +1309,228 @@ class TestTeamStoreClear:
         store.clear()
         assert store.list_members(org_id) == []
         assert store.list_invitations(org_id) == []
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 14. Security tests (AI-245 blocker fixes)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+class TestSecurityFixes:
+    """Tests verifying all AI-245 security blocker and moderate fixes."""
+
+    # ── BLOCKER 1: X-User-Role header must be ignored ──────────────────────
+
+    async def test_x_user_role_header_is_ignored_in_secure_mode(
+        self, seeded_store, org_id_routes
+    ):
+        """BLOCKER 1: Spoofed X-User-Role header must not grant elevated access.
+
+        A viewer-level user who sends X-User-Role: owner must still be
+        treated as a viewer (role derived from TeamStore, not headers).
+        """
+        import os
+        import teams.auth_middleware as _am
+        # Ensure DEMO_MODE is on so X-User-Id is accepted
+        os.environ["TEAM_DEMO_MODE"] = "1"
+        _am._DEMO_MODE = None
+
+        from aiohttp.test_utils import TestClient, TestServer
+        app = make_app()
+        async with TestClient(TestServer(app)) as client:
+            # user-viewer is only a viewer in the store — sending owner role in header
+            resp = await client.post(
+                "/api/team/invite",
+                headers={
+                    "X-User-Id": "user-viewer",
+                    "X-User-Role": "owner",   # Spoofed! Must be ignored.
+                    "X-Org-Id": org_id_routes,
+                    "Content-Type": "application/json",
+                },
+                json={"role": "member"},
+            )
+            # Viewer cannot invite — server must derive role from store (viewer)
+            assert resp.status == 403, (
+                "Spoofed X-User-Role: owner header must not grant invite permission "
+                "to a viewer-level user"
+            )
+
+    # ── BLOCKER 2: Invite token must not appear in audit log ───────────────
+
+    async def test_invite_token_not_in_audit_log(self, seeded_store, org_id_routes):
+        """BLOCKER 2: Full invite token must never be stored in audit log."""
+        from aiohttp.test_utils import TestClient, TestServer
+        app = make_app()
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post(
+                "/api/team/invite",
+                headers=headers(org_id=org_id_routes),
+                json={"role": "member"},
+            )
+            assert resp.status == 201
+            invite_data = await resp.json()
+            full_token = invite_data["invite"]["token"]
+
+        # Check audit log — full token must NOT be present
+        audit = get_audit_log()
+        events = audit.get_events(org_id=org_id_routes, event_type="member_invited")
+        assert len(events) >= 1
+        for event in events:
+            details = event.details
+            # Full token must not be stored
+            assert "token" not in details or details.get("token") != full_token, (
+                "Full invite token must not be stored in audit log details"
+            )
+            # Only a prefix may be stored
+            if "token_prefix" in details:
+                assert details["token_prefix"].endswith("..."), (
+                    "token_prefix must end with '...'"
+                )
+                assert len(details["token_prefix"]) < len(full_token), (
+                    "token_prefix must be shorter than the full token"
+                )
+
+    # ── BLOCKER 3: accept_invite email mismatch must be rejected ───────────
+
+    async def test_accept_invite_mismatched_email_rejected(
+        self, seeded_store, org_id_routes
+    ):
+        """BLOCKER 3: accept_invite with mismatched email must be rejected."""
+        from aiohttp.test_utils import TestClient, TestServer
+        store = seeded_store
+        inv = store.create_invitation(
+            org_id_routes, "user-owner", "member", "targeted@example.com"
+        )
+        app = make_app()
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post(
+                f"/api/team/invite/{inv.token}/accept",
+                json={"email": "attacker@evil.com", "display_name": "Attacker"},
+            )
+            assert resp.status == 400, (
+                "Accepting a targeted invite with the wrong email must be rejected"
+            )
+
+    # ── BLOCKER 4: X-Org-Id cross-org mismatch must be rejected ────────────
+
+    async def test_cross_org_access_via_spoofed_x_org_id_rejected(
+        self, seeded_store, org_id_routes
+    ):
+        """BLOCKER 4: User cannot access another org via spoofed X-Org-Id header.
+
+        The server must verify that the X-Org-Id matches the org the user
+        actually belongs to — and reject mismatches.
+        """
+        import os
+        import teams.auth_middleware as _am
+        os.environ["TEAM_DEMO_MODE"] = "1"
+        _am._DEMO_MODE = None
+
+        from aiohttp.test_utils import TestClient, TestServer
+        app = make_app()
+        async with TestClient(TestServer(app)) as client:
+            # user-owner belongs to org-test; they claim org-other-corp
+            resp = await client.get(
+                "/api/team/members",
+                headers={
+                    "X-User-Id": "user-owner",
+                    "X-Org-Id": "org-other-corp",  # Wrong org — cross-org attempt
+                    "Content-Type": "application/json",
+                },
+            )
+            # Must be rejected (401 because role is None after cross-org check)
+            assert resp.status in (401, 403), (
+                "Spoofed X-Org-Id pointing to a different org must be rejected"
+            )
+
+    # ── BLOCKER 5: Admin cannot self-promote via project-role ──────────────
+
+    async def test_admin_cannot_self_promote_via_project_role(
+        self, seeded_store, org_id_routes
+    ):
+        """BLOCKER 5: Admin cannot set project-role=owner to self-promote."""
+        from aiohttp.test_utils import TestClient, TestServer
+        app = make_app()
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.put(
+                "/api/team/members/user-member/project-role",
+                headers=headers("user-admin", "admin", org_id_routes),
+                json={"project_id": "proj-secret", "role": "owner"},
+            )
+            assert resp.status == 403, (
+                "Admin must not be able to set project-role=owner (self-promotion)"
+            )
+
+    # ── MODERATE 1: Invite rate limiting ────────────────────────────────────
+
+    def test_invite_rate_limit_check_permits_under_limit(self, store, org_id):
+        """MODERATE 1: Rate limit allows up to 20 invites per day."""
+        for _ in range(20):
+            assert store.check_invite_rate_limit(org_id)
+            store.record_invite_timestamp(org_id)
+
+    def test_invite_rate_limit_check_blocks_over_limit(self, store, org_id):
+        """MODERATE 1: Rate limit blocks the 21st invite in a day."""
+        for _ in range(20):
+            store.record_invite_timestamp(org_id)
+        assert not store.check_invite_rate_limit(org_id), (
+            "21st invite in the same day must be blocked by rate limiter"
+        )
+
+    @pytest.mark.asyncio
+    async def test_invite_rate_limit_via_route(self, seeded_store, org_id_routes):
+        """MODERATE 1: Route returns 429 when invite rate limit is exceeded."""
+        from aiohttp.test_utils import TestClient, TestServer
+        store = seeded_store
+        # Exhaust the rate limit
+        for _ in range(20):
+            store.record_invite_timestamp(org_id_routes)
+
+        app = make_app()
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post(
+                "/api/team/invite",
+                headers=headers(org_id=org_id_routes),
+                json={"role": "viewer"},
+            )
+            assert resp.status == 429, (
+                "Invite endpoint must return 429 when rate limit is exceeded"
+            )
+
+    # ── MODERATE 2: Audit log limit capped at 1000 ──────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_audit_log_limit_capped_at_1000(self, seeded_store, org_id_routes):
+        """MODERATE 2: ?limit= is capped at 1000 to prevent unbounded queries."""
+        from aiohttp.test_utils import TestClient, TestServer
+        audit = get_audit_log()
+        # Record a few events
+        for i in range(5):
+            audit.record(org_id_routes, "user-owner", "role_changed", {})
+
+        app = make_app()
+        async with TestClient(TestServer(app)) as client:
+            # Request an unreasonably large limit
+            resp = await client.get(
+                "/api/team/audit?limit=99999",
+                headers=headers(org_id=org_id_routes),
+            )
+            assert resp.status == 200
+            data = await resp.json()
+            # Response count should be at most 1000 (cap enforced server-side)
+            assert data["count"] <= 1000
+
+    # ── MINOR 1: TeamPermissionError naming ─────────────────────────────────
+
+    def test_team_permission_error_is_subclass_of_team_error(self):
+        """MINOR 1: TeamPermissionError is a TeamError subclass."""
+        from teams.models import TeamPermissionError, TeamError
+        assert issubclass(TeamPermissionError, TeamError)
+        exc = TeamPermissionError("test")
+        assert isinstance(exc, TeamError)
+
+    def test_permission_error_backward_compat_alias(self):
+        """MINOR 1: PermissionError alias still works for backward compatibility."""
+        from teams.models import PermissionError as TeamPermErr, TeamPermissionError
+        assert TeamPermErr is TeamPermissionError

@@ -677,23 +677,13 @@
 <script>
 // ── Config ────────────────────────────────────────────────────────
 const API_BASE = '';
-// Simulate caller context via localStorage (set these in the browser console
-// for testing, or they will be provided by a real auth session).
-function getCtx() {
-  return {
-    userId:  localStorage.getItem('team_user_id')  || 'demo-owner-001',
-    role:    localStorage.getItem('team_role')      || 'owner',
-    orgId:   localStorage.getItem('team_org_id')   || 'demo-org-001',
-  };
-}
 
+// Security: Role, org_id, and user_id are derived server-side from the
+// session cookie. We do NOT send X-User-Role or X-Org-Id headers.
+// The server authenticates all requests via the session cookie.
 function apiHeaders() {
-  const ctx = getCtx();
   return {
     'Content-Type': 'application/json',
-    'X-User-Id':   ctx.userId,
-    'X-User-Role': ctx.role,
-    'X-Org-Id':    ctx.orgId,
   };
 }
 
@@ -721,9 +711,8 @@ function toast(message, type = 'success') {
 
 // ── Members ───────────────────────────────────────────────────────
 async function loadMembers() {
-  const ctx = getCtx();
   try {
-    const res = await fetch(`${API_BASE}/api/team/members?org_id=${ctx.orgId}`, {
+    const res = await fetch(`${API_BASE}/api/team/members`, {
       headers: apiHeaders(),
     });
     const data = await res.json();
@@ -732,7 +721,13 @@ async function loadMembers() {
     const label = document.getElementById('member-count-label');
 
     if (!res.ok) {
-      container.innerHTML = `<div class="empty-state"><p>${data.error || 'Error loading members'}</p></div>`;
+      const errEl = document.createElement('div');
+      errEl.className = 'empty-state';
+      const p = document.createElement('p');
+      p.textContent = data.error || 'Error loading members';
+      errEl.appendChild(p);
+      container.innerHTML = '';
+      container.appendChild(errEl);
       return;
     }
 
@@ -740,62 +735,137 @@ async function loadMembers() {
     label.textContent = `${members.length} member${members.length !== 1 ? 's' : ''}`;
 
     if (members.length === 0) {
-      container.innerHTML = `<div class="empty-state"><div class="empty-icon">&#128101;</div><p>No members yet. Invite your first team member above.</p></div>`;
+      const emptyEl = document.createElement('div');
+      emptyEl.className = 'empty-state';
+      emptyEl.innerHTML = '<div class="empty-icon">&#128101;</div>';
+      const p = document.createElement('p');
+      p.textContent = 'No members yet. Invite your first team member above.';
+      emptyEl.appendChild(p);
+      container.innerHTML = '';
+      container.appendChild(emptyEl);
       return;
     }
 
-    container.innerHTML = renderMemberTable(members, ctx);
+    container.innerHTML = '';
+    container.appendChild(renderMemberTable(members, data));
   } catch (e) {
-    document.getElementById('members-container').innerHTML =
-      `<div class="empty-state"><p>Failed to load members: ${e.message}</p></div>`;
+    const container = document.getElementById('members-container');
+    const errEl = document.createElement('div');
+    errEl.className = 'empty-state';
+    const p = document.createElement('p');
+    p.textContent = 'Failed to load members: ' + e.message;
+    errEl.appendChild(p);
+    container.innerHTML = '';
+    container.appendChild(errEl);
   }
 }
 
 function roleBadge(role) {
   const labels = { owner: 'Owner', admin: 'Admin', member: 'Member', viewer: 'Viewer' };
-  return `<span class="role-badge ${role}">${labels[role] || role}</span>`;
+  const span = document.createElement('span');
+  span.className = 'role-badge ' + role;
+  span.textContent = labels[role] || role;
+  return span;
 }
 
 function initials(name) {
   return (name || '?').split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
 }
 
-function renderMemberTable(members, ctx) {
-  const canManage = ctx.role === 'owner' || ctx.role === 'admin';
-  const rows = members.map(m => {
-    const isSelf = m.user_id === ctx.userId;
-    const actions = canManage && !isSelf
-      ? `<select class="form-control" style="width:auto;padding:0.25rem 0.5rem;font-size:0.8rem;"
-                onchange="changeRole('${m.user_id}', this.value)" title="Change role">
-           ${['owner','admin','member','viewer'].map(r =>
-             `<option value="${r}" ${m.role===r?'selected':''}>${r.charAt(0).toUpperCase()+r.slice(1)}</option>`
-           ).join('')}
-         </select>
-         <button class="btn btn-danger btn-sm" onclick="confirmRemove('${m.user_id}','${m.display_name}')">Remove</button>`
-      : '<span style="color:var(--text-muted);font-size:0.8rem;">' + (isSelf ? 'You' : '') + '</span>';
+function renderMemberTable(members, responseData) {
+  // org-level role comes from the server response (trusted), not from localStorage
+  const myUserId = responseData.current_user_id || null;
 
-    return `<tr>
-      <td>
-        <div class="member-info">
-          <div class="member-avatar">${initials(m.display_name)}</div>
-          <div>
-            <div class="member-name">${m.display_name}</div>
-            <div class="member-email">${m.email}</div>
-          </div>
-        </div>
-      </td>
-      <td>${roleBadge(m.role)}</td>
-      <td style="color:var(--text-muted);font-size:0.8rem;">${m.sso_provisioned ? 'SSO' : 'Email'}</td>
-      <td><div class="action-cell">${actions}</div></td>
-    </tr>`;
-  }).join('');
+  const table = document.createElement('table');
+  table.className = 'member-table';
 
-  return `<table class="member-table">
-    <thead><tr>
-      <th>Member</th><th>Role</th><th>Source</th><th style="text-align:right;">Actions</th>
-    </tr></thead>
-    <tbody>${rows}</tbody>
-  </table>`;
+  const thead = document.createElement('thead');
+  thead.innerHTML = '<tr><th>Member</th><th>Role</th><th>Source</th><th style="text-align:right;">Actions</th></tr>';
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+
+  members.forEach(m => {
+    const tr = document.createElement('tr');
+
+    // Member info cell
+    const tdInfo = document.createElement('td');
+    const memberInfo = document.createElement('div');
+    memberInfo.className = 'member-info';
+
+    const avatar = document.createElement('div');
+    avatar.className = 'member-avatar';
+    avatar.textContent = initials(m.display_name);
+
+    const nameBlock = document.createElement('div');
+    const nameEl = document.createElement('div');
+    nameEl.className = 'member-name';
+    nameEl.textContent = m.display_name;  // XSS fix: textContent not innerHTML
+    const emailEl = document.createElement('div');
+    emailEl.className = 'member-email';
+    emailEl.textContent = m.email;  // XSS fix: textContent not innerHTML
+
+    nameBlock.appendChild(nameEl);
+    nameBlock.appendChild(emailEl);
+    memberInfo.appendChild(avatar);
+    memberInfo.appendChild(nameBlock);
+    tdInfo.appendChild(memberInfo);
+    tr.appendChild(tdInfo);
+
+    // Role badge cell
+    const tdRole = document.createElement('td');
+    tdRole.appendChild(roleBadge(m.role));
+    tr.appendChild(tdRole);
+
+    // Source cell
+    const tdSource = document.createElement('td');
+    tdSource.style.color = 'var(--text-muted)';
+    tdSource.style.fontSize = '0.8rem';
+    tdSource.textContent = m.sso_provisioned ? 'SSO' : 'Email';
+    tr.appendChild(tdSource);
+
+    // Actions cell
+    const tdActions = document.createElement('td');
+    const actionCell = document.createElement('div');
+    actionCell.className = 'action-cell';
+    const isSelf = myUserId && m.user_id === myUserId;
+
+    if (!isSelf) {
+      // Role selector — server enforces permissions; UI renders based on response
+      const select = document.createElement('select');
+      select.className = 'form-control';
+      select.style.cssText = 'width:auto;padding:0.25rem 0.5rem;font-size:0.8rem;';
+      select.title = 'Change role';
+      ['owner','admin','member','viewer'].forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r;
+        opt.textContent = r.charAt(0).toUpperCase() + r.slice(1);
+        if (m.role === r) opt.selected = true;
+        select.appendChild(opt);
+      });
+      const userId = m.user_id;
+      select.addEventListener('change', () => changeRole(userId, select.value));
+      actionCell.appendChild(select);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'btn btn-danger btn-sm';
+      removeBtn.textContent = 'Remove';
+      removeBtn.addEventListener('click', () => confirmRemove(userId, m.display_name));
+      actionCell.appendChild(removeBtn);
+    } else {
+      const selfLabel = document.createElement('span');
+      selfLabel.style.cssText = 'color:var(--text-muted);font-size:0.8rem;';
+      selfLabel.textContent = 'You';
+      actionCell.appendChild(selfLabel);
+    }
+
+    tdActions.appendChild(actionCell);
+    tr.appendChild(tdActions);
+    tbody.appendChild(tr);
+  });
+
+  table.appendChild(tbody);
+  return table;
 }
 
 // ── Role change ───────────────────────────────────────────────────
@@ -825,8 +895,15 @@ let _pendingRemoveId = null;
 function confirmRemove(userId, displayName) {
   _pendingRemoveId = userId;
   document.getElementById('modal-title').textContent = 'Remove Member';
-  document.getElementById('modal-body').textContent =
-    `Remove "${displayName}" from the organization? This action cannot be undone.`;
+  // XSS fix: build message with textContent rather than template literal injection
+  const body = document.getElementById('modal-body');
+  body.textContent = '';
+  const msg = document.createTextNode('Remove "');
+  const name = document.createTextNode(displayName);
+  const rest = document.createTextNode('" from the organization? This action cannot be undone.');
+  body.appendChild(msg);
+  body.appendChild(name);
+  body.appendChild(rest);
   document.getElementById('modal-confirm-btn').textContent = 'Remove';
   document.getElementById('confirm-modal').classList.add('open');
 }
@@ -913,7 +990,6 @@ const AUDIT_ICONS = {
 };
 
 async function loadAudit() {
-  const ctx = getCtx();
   try {
     const res = await fetch(`${API_BASE}/api/team/audit?limit=50`, {
       headers: apiHeaders(),
@@ -921,41 +997,85 @@ async function loadAudit() {
     const data = await res.json();
     const container = document.getElementById('audit-container');
     if (!res.ok) {
-      container.innerHTML = `<div class="empty-state"><p>${data.error || 'Error loading audit log'}</p></div>`;
+      const errEl = document.createElement('div');
+      errEl.className = 'empty-state';
+      const p = document.createElement('p');
+      p.textContent = data.error || 'Error loading audit log';
+      errEl.appendChild(p);
+      container.innerHTML = '';
+      container.appendChild(errEl);
       return;
     }
     const events = data.events || [];
     if (events.length === 0) {
-      container.innerHTML = `<div class="empty-state"><div class="empty-icon">&#128203;</div><p>No audit events recorded yet.</p></div>`;
+      container.innerHTML = '<div class="empty-state"><div class="empty-icon">&#128203;</div></div>';
+      const p = document.createElement('p');
+      p.textContent = 'No audit events recorded yet.';
+      container.querySelector('.empty-state').appendChild(p);
       return;
     }
-    container.innerHTML = events.map(renderAuditEntry).join('');
+    container.innerHTML = '';
+    events.forEach(ev => container.appendChild(renderAuditEntry(ev)));
   } catch(e) {
-    document.getElementById('audit-container').innerHTML =
-      `<div class="empty-state"><p>Error: ${e.message}</p></div>`;
+    const container = document.getElementById('audit-container');
+    const errEl = document.createElement('div');
+    errEl.className = 'empty-state';
+    const p = document.createElement('p');
+    p.textContent = 'Error: ' + e.message;
+    errEl.appendChild(p);
+    container.innerHTML = '';
+    container.appendChild(errEl);
   }
 }
 
 function renderAuditEntry(ev) {
-  const icon = AUDIT_ICONS[ev.event_type] || '&#8226;';
-  const timeStr = new Date(ev.timestamp).toLocaleString();
-  let description = ev.event_type.replace(/_/g, ' ');
+  // XSS fix: use DOM construction instead of innerHTML for user-supplied data
+  const entry = document.createElement('div');
+  entry.className = 'audit-entry';
+
+  const iconEl = document.createElement('div');
+  iconEl.className = 'audit-icon';
+  iconEl.innerHTML = AUDIT_ICONS[ev.event_type] || '&#8226;';
+
+  const textEl = document.createElement('div');
+  textEl.className = 'audit-text';
+
+  const actionEl = document.createElement('div');
+  actionEl.className = 'audit-action';
   if (ev.event_type === 'role_changed' && ev.details) {
-    description = `Role changed: ${ev.details.old_role} &rarr; ${ev.details.new_role}`;
+    // Safe: old_role/new_role come from server RBAC enum — still use textContent
+    actionEl.textContent = 'Role changed: ' + (ev.details.old_role || '') + ' -> ' + (ev.details.new_role || '');
+  } else {
+    actionEl.textContent = ev.event_type.replace(/_/g, ' ');
   }
-  return `<div class="audit-entry">
-    <div class="audit-icon">${icon}</div>
-    <div class="audit-text">
-      <div class="audit-action">${description}</div>
-      <div class="audit-meta">Actor: ${ev.actor_user_id}${ev.target_user_id ? ' &bull; Target: ' + ev.target_user_id : ''}</div>
-    </div>
-    <div class="audit-time">${timeStr}</div>
-  </div>`;
+
+  const metaEl = document.createElement('div');
+  metaEl.className = 'audit-meta';
+  // Use textContent for actor/target IDs (user-controlled values)
+  let metaText = 'Actor: ' + (ev.actor_user_id || '');
+  if (ev.target_user_id) {
+    metaText += ' \u2022 Target: ' + ev.target_user_id;
+  }
+  metaEl.textContent = metaText;
+
+  textEl.appendChild(actionEl);
+  textEl.appendChild(metaEl);
+
+  const timeEl = document.createElement('div');
+  timeEl.className = 'audit-time';
+  timeEl.textContent = new Date(ev.timestamp).toLocaleString();
+
+  entry.appendChild(iconEl);
+  entry.appendChild(textEl);
+  entry.appendChild(timeEl);
+  return entry;
 }
+
+// ── Navigation (override to remove getCtx references) ─────────────
+// (showPanel already defined above — no ctx needed)
 
 // ── Init ──────────────────────────────────────────────────────────
 (function init() {
-  // Seed demo data if store is empty (dev convenience)
   loadMembers();
 })();
 </script>

@@ -44,8 +44,12 @@ class TeamError(Exception):
     """Base exception for team management errors."""
 
 
-class PermissionError(TeamError):
+class TeamPermissionError(TeamError):
     """Raised when a user lacks the required role or permission."""
+
+
+# Backward-compatibility alias — use TeamPermissionError in new code
+PermissionError = TeamPermissionError
 
 
 class InvitationError(TeamError):
@@ -234,6 +238,10 @@ class TeamStore:
     Key lookups:
         _members[org_id][user_id] -> TeamMember
         _invitations[token]       -> Invitation
+
+    # TODO(production): Replace with PostgreSQL-backed store. The current
+    # in-memory implementation loses all data on process restart and does not
+    # support horizontal scaling. See TECHNICAL_DEBT.md for details.
     """
 
     def __init__(self) -> None:
@@ -241,6 +249,8 @@ class TeamStore:
         self._members: Dict[str, Dict[str, TeamMember]] = {}
         # token -> Invitation
         self._invitations: Dict[str, Invitation] = {}
+        # org_id -> list of invite creation timestamps (for rate limiting)
+        self._invite_timestamps: Dict[str, list] = {}
 
     # ------------------------------------------------------------------
     # Member management
@@ -354,6 +364,40 @@ class TeamStore:
             1 for m in self.list_members(org_id)
             if m.role == Role.OWNER.value
         )
+
+    # ------------------------------------------------------------------
+    # Invitation management
+    # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # Invite rate limiting
+    # ------------------------------------------------------------------
+
+    _INVITE_RATE_LIMIT = 20          # max invites
+    _INVITE_RATE_WINDOW_SECONDS = 86400  # per day (24 hours)
+
+    def check_invite_rate_limit(self, org_id: str) -> bool:
+        """Return True if the org is within the invite rate limit.
+
+        Allows at most 20 invitations per org per 24-hour window.
+        Returns False if the limit has been exceeded.
+        """
+        now = datetime.now(timezone.utc).timestamp()
+        window_start = now - self._INVITE_RATE_WINDOW_SECONDS
+
+        timestamps = self._invite_timestamps.get(org_id, [])
+        # Prune old entries
+        timestamps = [t for t in timestamps if t >= window_start]
+        self._invite_timestamps[org_id] = timestamps
+
+        return len(timestamps) < self._INVITE_RATE_LIMIT
+
+    def record_invite_timestamp(self, org_id: str) -> None:
+        """Record an invite creation timestamp for rate-limit tracking."""
+        now = datetime.now(timezone.utc).timestamp()
+        if org_id not in self._invite_timestamps:
+            self._invite_timestamps[org_id] = []
+        self._invite_timestamps[org_id].append(now)
 
     # ------------------------------------------------------------------
     # Invitation management
@@ -473,6 +517,7 @@ class TeamStore:
         """Clear all data (for testing)."""
         self._members.clear()
         self._invitations.clear()
+        self._invite_timestamps.clear()
 
 
 # ---------------------------------------------------------------------------

@@ -14,17 +14,16 @@ Endpoints:
     PUT    /api/team/members/{user_id}/project-role - Set per-project role override
 
 Authentication context:
-    These routes expect the caller to provide:
-      - X-User-Id header (or request['user']['user_id'])
-      - X-User-Role header (or request['user']['role'])
-      - X-Org-Id header (or ?org_id= query param)
+    All routes derive user_id, role, and org_id from the server-side session
+    via teams.auth_middleware.resolve_caller_context(). Client-supplied
+    X-User-Role and X-Org-Id headers are NEVER used as authoritative sources.
 
-    In a real deployment, these are injected by the session/JWT middleware.
-    For testing purposes, the headers are accepted directly.
+    Demo/dev mode: set TEAM_DEMO_MODE=1 to accept X-User-Id header for the
+    user_id (role and org_id are still derived server-side). Default: off.
 """
 
-import json
 import logging
+import uuid
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -33,7 +32,7 @@ from aiohttp import web
 from teams.models import (
     Role,
     TeamError,
-    PermissionError,
+    TeamPermissionError,
     InvitationError,
     get_team_store,
     get_audit_log,
@@ -44,32 +43,24 @@ from teams.rbac import (
     Permission,
     check_permission,
     can_manage_role,
-    get_request_role,
-    get_request_user_id,
-    get_request_org_id,
 )
+from teams.auth_middleware import resolve_caller_context
 
 logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Helper: extract caller context from request headers
+# Helper: extract caller context from request (server-side only)
 # ---------------------------------------------------------------------------
 
 
 def _get_caller_context(request: web.Request) -> Dict[str, Optional[str]]:
-    """Extract caller user_id, role, and org_id from request.
+    """Extract caller user_id, role, and org_id from the server-side session.
 
-    Priority order:
-    1. request dict (set by session/JWT middleware)
-    2. X-* headers (for testing / service-to-service)
-    3. Query parameters (for org_id only)
+    Role and org_id are ALWAYS derived from TeamStore — never from headers.
+    See teams.auth_middleware for the full security model.
     """
-    user_id = get_request_user_id(request) or request.headers.get("X-User-Id")
-    role = get_request_role(request) or request.headers.get("X-User-Role")
-    org_id = get_request_org_id(request) or request.headers.get("X-Org-Id")
-
-    return {"user_id": user_id, "role": role, "org_id": org_id}
+    return resolve_caller_context(request)
 
 
 def _require_context(request: web.Request):
@@ -78,15 +69,15 @@ def _require_context(request: web.Request):
 
     if not ctx["user_id"]:
         raise web.HTTPUnauthorized(
-            reason="Missing caller user_id (X-User-Id header or session)"
+            reason="Authentication required. No valid session found."
         )
     if not ctx["role"]:
         raise web.HTTPUnauthorized(
-            reason="Missing caller role (X-User-Role header or session)"
+            reason="User is not a member of any organization."
         )
     if not ctx["org_id"]:
         raise web.HTTPBadRequest(
-            reason="Missing org_id (X-Org-Id header or ?org_id= query param)"
+            reason="Could not determine organization for authenticated user."
         )
 
     return ctx
@@ -168,7 +159,7 @@ async def invite_member(request: web.Request) -> web.Response:
             400,
         )
 
-    # Enforce: Admin cannot promote to Owner
+    # Enforce: Admin cannot promote to Owner or Admin
     if not can_manage_role(role, invite_role):
         return _json_error(
             f"Role '{role}' cannot invite users with role '{invite_role}'",
@@ -179,6 +170,13 @@ async def invite_member(request: web.Request) -> web.Response:
 
     store = get_team_store()
     audit = get_audit_log()
+
+    # MODERATE 1: Rate limit — max 20 invites per org per day
+    if not store.check_invite_rate_limit(org_id):
+        return _json_error(
+            "Invitation rate limit exceeded. Maximum 20 invitations per organization per day.",
+            429,
+        )
 
     # Check if email already a member
     if email:
@@ -196,6 +194,10 @@ async def invite_member(request: web.Request) -> web.Response:
         email=email,
     )
 
+    # Record the invite timestamp for rate limiting
+    store.record_invite_timestamp(org_id)
+
+    # BLOCKER 2: Never store the full token in the audit log
     audit.record(
         org_id=org_id,
         actor_user_id=user_id,
@@ -204,7 +206,7 @@ async def invite_member(request: web.Request) -> web.Response:
             "invite_id": invite.invite_id,
             "email": email,
             "role": invite_role,
-            "token": invite.token,
+            "token_prefix": invite.token[:8] + "...",
         },
     )
 
@@ -252,10 +254,13 @@ async def get_invite(request: web.Request) -> web.Response:
 async def accept_invite(request: web.Request) -> web.Response:
     """POST /api/team/invite/{token}/accept - Accept an invitation.
 
+    BLOCKER 3 fix: user_id must come from the server session when available.
+    For new users (shareable link flow), email is required in the body and a
+    provisional user_id is generated server-side and linked at next login.
+
     Body (JSON):
-        user_id      (str) - Accepting user's ID
-        email        (str) - Accepting user's email
-        display_name (str) - Accepting user's display name
+        email        (str) - Accepting user's email (required)
+        display_name (str) - Accepting user's display name (optional)
     """
     token = request.match_info["token"]
 
@@ -264,14 +269,25 @@ async def accept_invite(request: web.Request) -> web.Response:
     except Exception:
         return _json_error("Invalid JSON body", 400)
 
-    user_id = body.get("user_id")
     email = body.get("email")
     display_name = body.get("display_name", email or "")
 
-    if not user_id:
-        return _json_error("Missing 'user_id' in body", 400)
     if not email:
         return _json_error("Missing 'email' in body", 400)
+
+    # Try to get user_id from server-side session
+    ctx = _get_caller_context(request)
+    user_id = ctx.get("user_id")
+
+    if not user_id:
+        # Shareable link flow for new/unauthenticated users:
+        # Generate a provisional user_id server-side. This must be linked to
+        # a real account at next login — client cannot inject their own user_id.
+        user_id = f"provisional-{uuid.uuid4().hex}"
+        logger.info(
+            "Provisional user_id generated for invite acceptance: token=%s email=%s",
+            token[:8] + "...", email,
+        )
 
     store = get_team_store()
     audit = get_audit_log()
@@ -474,7 +490,7 @@ async def get_audit_events(request: web.Request) -> web.Response:
     Required role: admin or owner.
 
     Query params:
-        limit      (int, default 100)
+        limit      (int, default 100, max 1000)
         event_type (str, optional) - filter by event type
     """
     try:
@@ -491,7 +507,8 @@ async def get_audit_events(request: web.Request) -> web.Response:
             your_role=role,
         )
 
-    limit = int(request.rel_url.query.get("limit", 100))
+    # MODERATE 2: Cap the limit to prevent unbounded queries
+    limit = min(int(request.rel_url.query.get("limit", 100)), 1000)
     event_type = request.rel_url.query.get("event_type")
 
     audit = get_audit_log()
@@ -545,6 +562,17 @@ async def update_project_role(request: web.Request) -> web.Response:
         return _json_error(
             f"Invalid role '{role}'. Must be one of: {sorted(VALID_ROLES)}",
             400,
+        )
+
+    # BLOCKER 5: Enforce role hierarchy for project-role overrides.
+    # Admin cannot self-promote to owner via project-role assignment.
+    if not can_manage_role(actor_role, role):
+        return _json_error(
+            f"Role '{actor_role}' cannot assign project role '{role}'. "
+            "Admin cannot set project roles above their own level.",
+            403,
+            your_role=actor_role,
+            requested_role=role,
         )
 
     store = get_team_store()
