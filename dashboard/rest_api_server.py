@@ -41,6 +41,26 @@ from aiohttp.web import Request, Response, middleware
 from dashboard.metrics_store import MetricsStore, ALL_AGENT_NAMES
 from exceptions import SecurityError
 
+# AI-248: Benchmark suite — lazy import so missing deps don't break the server
+try:
+    from benchmarks.runner import BenchmarkRunner, BenchmarkResult
+    from benchmarks.storage import BenchmarkStorage
+    from benchmarks.alerts import BenchmarkAlerter
+    _BENCHMARKS_AVAILABLE = True
+except ImportError:
+    _BENCHMARKS_AVAILABLE = False
+
+# Module-level benchmark storage singleton (in-memory, 90-day retention)
+_benchmark_storage: Optional[Any] = None
+
+
+def _get_benchmark_storage() -> Any:
+    """Return the module-level BenchmarkStorage singleton (lazy init)."""
+    global _benchmark_storage  # noqa: PLW0603
+    if _benchmark_storage is None and _BENCHMARKS_AVAILABLE:
+        _benchmark_storage = BenchmarkStorage(retention_days=90)
+    return _benchmark_storage
+
 # AI-222: User Authentication
 try:
     from dashboard.auth.user_store import UserStore
@@ -597,6 +617,12 @@ class RESTAPIServer:
         self.app.router.add_get('/scim/v2/Groups/{group_id}', self.scim_get_group)
         self.app.router.add_patch('/scim/v2/Groups/{group_id}', self.scim_patch_group)
         self.app.router.add_delete('/scim/v2/Groups/{group_id}', self.scim_delete_group)
+
+        # AI-248: Performance Benchmark endpoints
+        self.app.router.add_get('/api/benchmarks', self.get_benchmarks)
+        self.app.router.add_get('/api/benchmarks/regression-alerts', self.get_benchmark_regression_alerts)
+        self.app.router.add_route('OPTIONS', '/api/benchmarks', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/benchmarks/regression-alerts', self.handle_options)
 
         # OPTIONS for CORS preflight
         for route in ['/api/metrics', '/api/agents', '/api/sessions', '/api/providers',
@@ -5265,6 +5291,91 @@ async function showForgotPassword() {{
             return web.json_response(_sso_scim_handler.build_error_response(e), status=e.status)
         except Exception as e:
             return web.json_response({"error": str(e)}, status=500)
+
+
+    # ------------------------------------------------------------------
+    # AI-248: Performance Benchmark endpoints
+    # ------------------------------------------------------------------
+
+    async def get_benchmarks(self, request: Request) -> Response:
+        """GET /api/benchmarks - Return the last 30 benchmark results.
+
+        Query parameters:
+            agent_type (str, optional): Filter by agent type.
+            limit (int, optional): Max results to return (default 30, max 100).
+
+        Returns:
+            200 OK with list of benchmark results ordered newest first.
+            503 if the benchmark module is unavailable.
+        """
+        if not _BENCHMARKS_AVAILABLE:
+            return web.json_response(
+                {"error": "Benchmark module not available"},
+                status=503,
+            )
+
+        storage = _get_benchmark_storage()
+        if storage is None:
+            return web.json_response({"error": "Benchmark storage unavailable"}, status=503)
+
+        agent_type = request.rel_url.query.get("agent_type")
+        try:
+            limit = min(int(request.rel_url.query.get("limit", "30")), 100)
+        except ValueError:
+            limit = 30
+
+        results = storage.get_results(agent_type=agent_type, limit=limit)
+        return web.json_response({
+            "benchmarks": [r.to_dict() for r in results],
+            "count": len(results),
+        })
+
+    async def get_benchmark_regression_alerts(self, request: Request) -> Response:
+        """GET /api/benchmarks/regression-alerts - Return active regression alerts.
+
+        Examines the most recent benchmark result per agent type and returns
+        any runs where regression_detected is True.
+
+        Returns:
+            200 OK with list of alert objects.
+            503 if the benchmark module is unavailable.
+        """
+        if not _BENCHMARKS_AVAILABLE:
+            return web.json_response(
+                {"error": "Benchmark module not available"},
+                status=503,
+            )
+
+        storage = _get_benchmark_storage()
+        if storage is None:
+            return web.json_response({"error": "Benchmark storage unavailable"}, status=503)
+
+        # Get the latest run across all agent types
+        all_results = storage.get_results(limit=100)
+
+        # Deduplicate to one result per agent type (already newest-first)
+        seen_agents: set = set()
+        alerts = []
+        for result in all_results:
+            if result.agent_type in seen_agents:
+                continue
+            seen_agents.add(result.agent_type)
+            if result.regression_detected:
+                alerts.append({
+                    "run_id": result.run_id,
+                    "agent_type": result.agent_type,
+                    "timestamp": result.timestamp,
+                    "p95_latency": result.speed.p95_latency,
+                    "message": (
+                        f"p95 latency regression detected for agent '{result.agent_type}' "
+                        f"(p95={result.speed.p95_latency:.3f}s)"
+                    ),
+                })
+
+        return web.json_response({
+            "alerts": alerts,
+            "count": len(alerts),
+        })
 
 
 def main():
