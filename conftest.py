@@ -92,11 +92,47 @@ if _worktree_config_path.exists() and "dashboard.config" not in sys.modules:
     except Exception:
         pass
 
-# 4d. Load dashboard.auth from the worktree (AI-176 / REQ-TECH-011) — before server
-_worktree_auth_path = _WORKTREE_ROOT / "dashboard" / "auth.py"
-if _worktree_auth_path.exists() and "dashboard.auth" not in sys.modules:
+# 4d. Load dashboard.auth from the worktree (AI-176 / REQ-TECH-011 + AI-222) — before server
+# AI-222: dashboard.auth is now a package (directory).  Load the package __init__ first,
+# then register the sub-modules so that imports like
+#   from dashboard.auth.user_store import UserStore
+# resolve to the worktree's files rather than the parent project's auth.py.
+_worktree_auth_pkg = _WORKTREE_ROOT / "dashboard" / "auth"
+_worktree_auth_init = _worktree_auth_pkg / "__init__.py"
+_worktree_auth_py = _WORKTREE_ROOT / "dashboard" / "auth.py"
+
+if _worktree_auth_init.exists():
+    # New package layout (AI-222)
     try:
-        _load_module_from_file("dashboard.auth", _worktree_auth_path)
+        import types as _types
+        # Register the auth package in sys.modules so sub-module imports work
+        if "dashboard.auth" not in sys.modules:
+            _auth_pkg = _types.ModuleType("dashboard.auth")
+            _auth_pkg.__path__ = [str(_worktree_auth_pkg)]
+            _auth_pkg.__package__ = "dashboard.auth"
+            _auth_pkg.__file__ = str(_worktree_auth_init)
+            sys.modules["dashboard.auth"] = _auth_pkg
+            spec = importlib.util.spec_from_file_location(
+                "dashboard.auth", _worktree_auth_init,
+                submodule_search_locations=[str(_worktree_auth_pkg)]
+            )
+            spec.loader.exec_module(_auth_pkg)
+        # Register sub-modules
+        for _auth_sub in ["user_store", "session_manager", "oauth_handler"]:
+            _auth_sub_key = f"dashboard.auth.{_auth_sub}"
+            if _auth_sub_key not in sys.modules:
+                _auth_sub_path = _worktree_auth_pkg / f"{_auth_sub}.py"
+                if _auth_sub_path.exists():
+                    try:
+                        _load_module_from_file(_auth_sub_key, _auth_sub_path)
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+elif _worktree_auth_py.exists() and "dashboard.auth" not in sys.modules:
+    # Legacy single-file layout (AI-176)
+    try:
+        _load_module_from_file("dashboard.auth", _worktree_auth_py)
     except Exception:
         pass
 
@@ -137,6 +173,38 @@ _worktree_compat_path = _WORKTREE_ROOT / "dashboard" / "compat.py"
 if _worktree_compat_path.exists() and "dashboard.compat" not in sys.modules:
     try:
         _load_module_from_file("dashboard.compat", _worktree_compat_path)
+    except Exception:
+        pass
+
+# 4j. Load dashboard.rate_limiter from the worktree (AI-224) — before server
+_worktree_rate_limiter_path = _WORKTREE_ROOT / "dashboard" / "rate_limiter.py"
+if _worktree_rate_limiter_path.exists() and "dashboard.rate_limiter" not in sys.modules:
+    try:
+        _load_module_from_file("dashboard.rate_limiter", _worktree_rate_limiter_path)
+    except Exception:
+        pass
+
+# 4k. Load dashboard.usage_meter from the worktree (AI-224) — before server
+_worktree_usage_meter_path = _WORKTREE_ROOT / "dashboard" / "usage_meter.py"
+if _worktree_usage_meter_path.exists() and "dashboard.usage_meter" not in sys.modules:
+    try:
+        _load_module_from_file("dashboard.usage_meter", _worktree_usage_meter_path)
+    except Exception:
+        pass
+
+# 4l. Load dashboard.webhooks from the worktree (AI-229 / Webhook Support) — before server
+_worktree_webhooks_path = _WORKTREE_ROOT / "dashboard" / "webhooks.py"
+if _worktree_webhooks_path.exists() and "dashboard.webhooks" not in sys.modules:
+    try:
+        _load_module_from_file("dashboard.webhooks", _worktree_webhooks_path)
+    except Exception:
+        pass
+
+# 4m. Load dashboard.free_tier from the worktree (AI-220 / Free Tier) — before server
+_worktree_free_tier_path = _WORKTREE_ROOT / "dashboard" / "free_tier.py"
+if _worktree_free_tier_path.exists() and "dashboard.free_tier" not in sys.modules:
+    try:
+        _load_module_from_file("dashboard.free_tier", _worktree_free_tier_path)
     except Exception:
         pass
 

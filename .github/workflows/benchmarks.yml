@@ -1,0 +1,91 @@
+name: Performance Benchmarks (AI-248)
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: benchmarks-${{ github.ref }}
+  cancel-in-progress: false  # Never cancel a benchmark run mid-flight
+
+jobs:
+  benchmark:
+    name: Run Performance Benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    permissions:
+      pull-requests: write  # Required to post PR comments
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for ticket-to-PR time calculation
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run benchmark suite
+        id: benchmark
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BENCHMARK_PR_NUMBER: ${{ github.event.pull_request.number }}
+          BENCHMARK_COMMIT_SHA: ${{ github.sha }}
+          BENCHMARK_AGENT_TYPE: engineer
+        run: |
+          python scripts/run_benchmarks.py \
+            --agent-type "${BENCHMARK_AGENT_TYPE}" \
+            --commit-sha "${BENCHMARK_COMMIT_SHA}" \
+            --output-json /tmp/benchmark_result.json
+          echo "benchmark_json=$(cat /tmp/benchmark_result.json | tr -d '\n')" >> "$GITHUB_OUTPUT"
+
+      - name: Upload benchmark artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ github.sha }}
+          path: /tmp/benchmark_result.json
+          retention-days: 90
+
+      - name: Find associated PR and post comment
+        if: success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Find the PR associated with this commit
+          PR_NUMBER=$(gh pr list --state merged --search "${{ github.sha }}" \
+            --json number --jq '.[0].number' 2>/dev/null || echo "")
+
+          if [ -n "$PR_NUMBER" ]; then
+            echo "Posting benchmark comment to PR #${PR_NUMBER}"
+            python scripts/run_benchmarks.py \
+              --post-comment \
+              --pr-number "${PR_NUMBER}" \
+              --result-json /tmp/benchmark_result.json
+          else
+            echo "No merged PR found for commit ${{ github.sha }}; skipping comment"
+          fi
+
+      - name: Check regression alerts
+        run: |
+          python -c "
+          import json, sys
+          with open('/tmp/benchmark_result.json') as f:
+              result = json.load(f)
+          if result.get('regression_detected'):
+              print('::warning::Benchmark regression detected! p95 latency regressed >20% vs rolling 7-day average.')
+              sys.exit(1)
+          print('No regression detected.')
+          "

@@ -31,6 +31,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from bridges.base_bridge import BaseBridge, BridgeResponse
 from exceptions import BridgeError, SecurityError
 
 
@@ -275,12 +276,33 @@ class GenAISDKClient:
         session.add_message("model", full_content)
 
 
-class GeminiBridge:
+class GeminiBridge(BaseBridge):
     """Unified bridge for Gemini access."""
+
+    @property
+    def provider_name(self) -> str:
+        return "gemini"
 
     def __init__(self, auth_type: GeminiAuthType, client):
         self.auth_type = auth_type
         self._client = client
+
+    async def send_task(self, task: str, **kwargs) -> BridgeResponse:
+        """Send a task to the Gemini API and return a BridgeResponse."""
+        session = self.create_session(
+            model=kwargs.get("model"),
+            system_prompt=kwargs.get("system_prompt"),
+        )
+        response = self._client.send_message(session, task)
+        tokens_used = None
+        if response.usage:
+            tokens_used = response.usage.get("total_tokens")
+        return BridgeResponse(
+            content=response.content,
+            model=response.model,
+            provider=self.provider_name,
+            tokens_used=tokens_used,
+        )
 
     @classmethod
     def from_env(cls) -> "GeminiBridge":

@@ -31,6 +31,7 @@ Use the Task tool to delegate to these specialized agents:
 | `coding` | sonnet | Complex feature implementation, testing, Playwright verification |
 | `coding_fast` | haiku | Simple changes: copy, CSS, config, tests, docs, renames |
 | `github` | haiku | Git commits, branches, pull requests (per story) |
+| `qa` | sonnet | Dedicated test writing, coverage audits, regression suites, flaky test fixes |
 | `pr_reviewer` | sonnet | Full PR review for high-risk changes (backend, auth, >5 files) |
 | `pr_reviewer_fast` | haiku | Quick PR review for low-risk changes (frontend, <=3 files, additive) |
 | `chatgpt` | haiku | Cross-validate code, second opinions (GPT-4o, o1, o3-mini) |
@@ -38,6 +39,9 @@ Use the Task tool to delegate to these specialized agents:
 | `groq` | haiku | Ultra-fast cross-validation (Llama 3.3 70B, Mixtral) via Groq LPU |
 | `kimi` | haiku | Ultra-long context (2M tokens), bilingual Chinese/English (Moonshot AI) |
 | `windsurf` | haiku | Parallel coding via Windsurf IDE headless, cross-IDE validation |
+| `openrouter_dev` | sonnet | Parallel coding via OpenRouter (DeepSeek, Llama, Gemma). Has full Playwright tools. |
+| `product_manager` | sonnet | Backlog grooming, sprint planning, agent performance analysis, feature review |
+| `designer` | haiku | UI/UX design specs, CSS implementations, accessibility audits ([DESIGN] issues) |
 
 ---
 
@@ -99,21 +103,36 @@ Before marking ANY issue Done:
 #### First Run (no .linear_project.json)
 1. Linear agent: Create project, issues, META issue
 2. GitHub agent: Init repo, check GITHUB_REPO env var, push if configured
-3. (Optional) Start first feature with full verification flow
+3. **Product Manager agent: Initial backlog prioritization** — pass full issue list for RICE scoring and dependency ordering
+4. (Optional) Start first feature with full verification flow
 
 #### Continuation (.linear_project.json exists)
+
+**Product Manager Trigger Rules (MANDATORY):**
+- **Session start:** If `tickets_completed` >= 5 since last PM review, delegate to `product_manager` for backlog re-prioritization before picking next ticket
+- **No clear next ticket:** When all remaining tickets are blocked or ambiguous, delegate to `product_manager` for sprint planning
+- **Every 3rd ticket completed:** Delegate to `product_manager` for a lightweight feature quality review of the last 3 completed tickets
+- **[DESIGN]-prefixed tickets:** Route to `product_manager` first for spec, then `designer` for implementation
+
 Follow the continuation task steps. Key flow per ticket:
 
 ```
 1. ops: ":construction: Starting" + transition to In Progress  (1 delegation)
-2. coding/coding_fast: Implement + test + screenshot            (1 delegation)
-3. github: Commit + PR                                          (1 delegation)
-4. ops: Transition to Review + ":mag: PR ready"                 (1 delegation)
-5. pr_reviewer/pr_reviewer_fast: Review → APPROVED/CHANGES_REQ  (1 delegation)
-6. ops: Transition to Done + ":white_check_mark: Completed"     (1 delegation)
+2. coding/coding_fast: Implement + screenshot                   (1 delegation)
+3. qa: Write tests + run coverage + report gaps                 (1 delegation, optional — see below)
+4. github: Commit + PR                                          (1 delegation)
+5. ops: Transition to Review + ":mag: PR ready"                 (1 delegation)
+6. pr_reviewer/pr_reviewer_fast: Review → APPROVED/CHANGES_REQ  (1 delegation)
+7. ops: Transition to Done + ":white_check_mark: Completed"     (1 delegation)
 ```
 
-**6 delegations per ticket** (down from 9-11 in the old sequential model).
+**QA agent step (step 3) is triggered when:**
+- The feature touches >3 files or critical paths (auth, payments, data)
+- The coding agent reports <80% coverage on new code
+- The orchestrator explicitly requests a coverage audit
+- Skip QA step for simple changes (copy, CSS, config) handled by `coding_fast`
+
+**6-7 delegations per ticket** depending on QA step inclusion.
 
 ---
 
@@ -144,11 +163,92 @@ Follow the continuation task steps. Key flow per ticket:
 | Git commit + PR | `github` | Files, issue key, branch |
 | Low-risk PR review | `pr_reviewer_fast` | PR number, files, test steps |
 | High-risk PR review | `pr_reviewer` | PR number, files, test steps |
+| Write/improve test suite | `qa` | Feature context, files changed, coverage gaps |
+| Coverage audit | `qa` | Project directory, coverage targets |
+| Fix flaky/failing tests | `qa` | Test names, error output, source files |
+| Regression test suite | `qa` | Changed files, core user flows |
 | Verification test | `coding` | Run init.sh, test features |
 | Ultra-long context analysis (>100K tokens) | `kimi` | Full codebase/doc + task |
 | Bilingual Chinese/English tasks | `kimi` | Content + language instructions |
 | Parallel coding / cross-IDE validation | `windsurf` | Task description + workspace path |
 | Alternative implementation for comparison | `windsurf` | Same spec as primary coding agent |
+| Parallel coding via OpenRouter models | `openrouter_dev` | Task description + workspace path |
+| Backlog grooming / sprint planning | `product_manager` | `.linear_project.json` + backlog summary |
+| Feature quality review | `product_manager` | Completed issue + PR evidence |
+| Agent performance analysis | `product_manager` | Session metrics + error patterns |
+| UI/UX design specs, CSS, accessibility | `designer` | Issue context + design requirements |
+
+---
+
+### Routing Rationale (AI-255)
+
+Every agent assignment MUST be accompanied by an explicit routing rationale.
+Before delegating, state:
+
+1. **Agent selected** — which agent and why
+2. **Alternatives considered** — which agents were evaluated but rejected and why
+3. **Complexity score** — your estimated 1–10 complexity for the task
+4. **Model tier** — haiku / sonnet / opus and the trigger that selected it
+5. **Fallback plan** — which agent to use if the preferred one is unavailable
+
+**Example routing statement (include this before every Task delegation):**
+```
+Routing decision:
+  agent_selected: coding
+  routing_reason: task contains 'refactor', files_changed > 3
+  alternatives_considered: [coding_fast — rejected: complexity keywords present]
+  complexity_score: 7
+  model_tier: sonnet
+  fallback: coding_fast
+```
+
+#### Explicit Routing Rules by Agent Type Pair
+
+**coding_fast vs coding:**
+- Use `coding_fast` when: <= 3 files, no complexity keywords, < 4000 estimated tokens, < 3 modules
+- Use `coding` when: > 3 files OR any of these keywords in task: implement, refactor, architecture,
+  redesign, migration, integration, performance, database, schema, security, auth, billing
+- Complexity keywords always override file count
+
+**pr_reviewer_fast vs pr_reviewer:**
+- Use `pr_reviewer_fast` when: <= 200 lines changed, <= 3 files, no sensitive directories, frontend-only
+- Use `pr_reviewer` when: > 200 lines changed OR any file in auth/, billing/, security/, core/, architecture/
+  OR any migration file OR > 3 files with >50% change ratio
+- Label `review:opus` escalates to Opus model tier
+
+**qa vs coding (for test work):**
+- Use `qa` when: primary goal is writing tests, improving coverage, fixing flaky tests, or running a coverage audit
+- Use `coding` when: implementing a feature that includes tests as part of the implementation
+- Use `qa` after `coding` when: coding agent's coverage is below 80%, or the feature is in a critical path
+- Use `qa` for regression suites after refactors or large-scale changes
+
+**chatgpt vs gemini vs groq vs kimi:**
+- `groq`: speed-critical validation, context < 32K tokens, fastest responses
+- `gemini`: research, Google ecosystem, large docs, context up to 1M tokens
+- `kimi`: context > 100K tokens, bilingual Chinese/English, context up to 2M tokens
+- `chatgpt`: default for code review, second opinions, logic cross-validation
+- Always prefer `kimi` for entire-codebase analysis; `groq` for quick sanity checks
+
+**Opus escalation (coding/pr_reviewer only):**
+- `coding` → Opus: keywords refactor/architecture/redesign/migration in description, OR complexity > 8, OR 5+ modules
+- `pr_reviewer` → Opus: diff > 500 lines, OR sensitive directory, OR migration file, OR label `review:opus`
+
+#### Fallback Logic
+
+When preferred agent is unavailable (API key missing, 5xx error, rate limit):
+- `coding` → fall back to `coding_fast`
+- `pr_reviewer` → fall back to `pr_reviewer_fast`
+- `kimi` → fall back to `gemini`, then `chatgpt`
+- `gemini` → fall back to `chatgpt`, then `kimi`
+- `groq` → fall back to `chatgpt`
+- `chatgpt` → fall back to `gemini`, then `groq`
+
+Always log the fallback in your routing statement:
+```
+  routing_reason: Fallback from kimi (unavailable) — using gemini for large-context analysis
+```
+
+See `docs/AGENT_ROUTING.md` for the full decision tree reference.
 
 ---
 
@@ -196,12 +296,29 @@ Tell the coding agent to keep the project directory clean. Only application code
 
 ---
 
+### Product Manager State Tracking
+
+Track PM activity in `.linear_project.json` using these fields:
+- `last_pm_review_at`: ISO timestamp of last PM delegation
+- `tickets_since_pm_review`: Counter, increment after each ticket completion, reset to 0 after PM review
+
+When delegating to `product_manager`, pass:
+1. Current `.linear_project.json` contents
+2. Summary of completed tickets since last review
+3. Any blocked/ambiguous tickets
+4. Session metrics (if available from dashboard)
+
+The PM agent returns structured recommendations — act on them by updating ticket priorities in Linear and adjusting your work order.
+
+---
+
 ### Project Complete Detection
 
 After getting status, check: `done == total_issues` from `.linear_project.json`.
 When complete:
-1. `ops` agent: META comment + final PR + Slack notification
-2. Output: `PROJECT_COMPLETE: All features implemented and verified.`
+1. **Product Manager agent: Final sprint retrospective** — pass all completed tickets for quality review
+2. `ops` agent: META comment + final PR + Slack notification
+3. Output: `PROJECT_COMPLETE: All features implemented and verified.`
 
 ---
 
