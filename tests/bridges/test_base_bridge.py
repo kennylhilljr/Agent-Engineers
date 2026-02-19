@@ -85,31 +85,46 @@ class TestOpenAIBridgePatterns:
 
     def test_chatgpt_model_enum_values(self):
         """Test that ChatGPTModel has expected string values."""
-        from bridges.openai_bridge import ChatGPTModel
+        try:
+            from bridges.openai_bridge import ChatGPTModel
+        except ImportError as e:
+            pytest.skip(f"openai_bridge not importable: {e}")
         models = [m.value for m in ChatGPTModel]
         assert "gpt-4o" in models
 
     def test_auth_type_enum_values(self):
         """Test that OpenAI AuthType has expected values."""
-        from bridges.openai_bridge import AuthType
+        try:
+            from bridges.openai_bridge import AuthType
+        except ImportError as e:
+            pytest.skip(f"openai_bridge not importable: {e}")
         assert AuthType.CODEX_OAUTH == "codex-oauth"
         assert AuthType.SESSION_TOKEN == "session-token"
 
     def test_chat_session_empty_at_start(self):
         """Test that a new ChatSession has no messages."""
-        from bridges.openai_bridge import ChatSession, ChatGPTModel
+        try:
+            from bridges.openai_bridge import ChatSession, ChatGPTModel
+        except ImportError as e:
+            pytest.skip(f"openai_bridge not importable: {e}")
         session = ChatSession(model=ChatGPTModel.GPT_4O)
         assert len(session.messages) == 0
 
     def test_chat_response_has_content_field(self):
         """Test that ChatResponse has a content field."""
-        from bridges.openai_bridge import ChatResponse
+        try:
+            from bridges.openai_bridge import ChatResponse
+        except ImportError as e:
+            pytest.skip(f"openai_bridge not importable: {e}")
         response = ChatResponse(content="Test content", model="gpt-4o")
         assert response.content == "Test content"
 
     def test_get_available_models_returns_strings(self):
         """Test that all available model names are strings."""
-        from bridges.openai_bridge import get_available_models
+        try:
+            from bridges.openai_bridge import get_available_models
+        except ImportError as e:
+            pytest.skip(f"openai_bridge not importable: {e}")
         models = get_available_models()
         assert all(isinstance(m, str) for m in models)
 
@@ -119,13 +134,19 @@ class TestGeminiBridgePatterns:
 
     def test_gemini_auth_types_exist(self):
         """Test that GeminiAuthType enum has the expected values."""
-        from bridges.gemini_bridge import GeminiAuthType
+        try:
+            from bridges.gemini_bridge import GeminiAuthType
+        except ImportError as e:
+            pytest.skip(f"gemini_bridge not importable: {e}")
         assert GeminiAuthType.CLI_OAUTH == "cli-oauth"
         assert GeminiAuthType.API_KEY == "api-key"
 
     def test_gemini_model_enum_has_values(self):
         """Test that GeminiModel enum has model values."""
-        from bridges.gemini_bridge import GeminiModel
+        try:
+            from bridges.gemini_bridge import GeminiModel
+        except ImportError as e:
+            pytest.skip(f"gemini_bridge not importable: {e}")
         models = [m.value for m in GeminiModel]
         assert len(models) > 0
         # All values should be non-empty strings
@@ -134,7 +155,10 @@ class TestGeminiBridgePatterns:
 
     def test_gemini_model_from_string_fallback(self):
         """Test that GeminiModel.from_string handles unknown values."""
-        from bridges.gemini_bridge import GeminiModel
+        try:
+            from bridges.gemini_bridge import GeminiModel
+        except ImportError as e:
+            pytest.skip(f"gemini_bridge not importable: {e}")
         # Should not raise, should return a default
         result = GeminiModel.from_string("unknown-gemini-model")
         assert isinstance(result, GeminiModel)

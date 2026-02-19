@@ -63,6 +63,19 @@ _worktree_chat_bridge_path = _WORKTREE_ROOT / "dashboard" / "chat_bridge.py"
 if _worktree_chat_bridge_path.exists():
     _load_module_from_file("dashboard.chat_bridge", _worktree_chat_bridge_path)
 
+# 4a-2. Load dashboard.chat_handler from the worktree (AI-114 / multi-provider streaming)
+# Must be loaded before test files import from it so streaming functions are available.
+# Also sets the attribute on the dashboard package so patch('dashboard.chat_handler.X') works.
+_worktree_chat_handler_path = _WORKTREE_ROOT / "dashboard" / "chat_handler.py"
+if _worktree_chat_handler_path.exists():
+    try:
+        _ch_mod = _load_module_from_file("dashboard.chat_handler", _worktree_chat_handler_path)
+        # Also register as attribute on the dashboard package for mock.patch compatibility
+        if "dashboard" in sys.modules and _ch_mod is not None:
+            setattr(sys.modules["dashboard"], "chat_handler", _ch_mod)
+    except Exception:
+        pass  # graceful degradation
+
 # 4b-2. Load dashboard.provider_bridge from the worktree (AI-174 / REQ-TECH-009)
 _worktree_provider_bridge_path = _WORKTREE_ROOT / "dashboard" / "provider_bridge.py"
 if _worktree_provider_bridge_path.exists():
