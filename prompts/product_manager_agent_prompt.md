@@ -45,8 +45,11 @@ You do NOT write code directly - the coding agents handle that. You focus on
 
 ### Available Tools
 
-**File Operations:** Read, Write, Edit, Glob
+**File Operations:** Read, Write, Edit, Glob, Grep
 **Shell:** Bash
+**Linear:** Create/update issues, query project status, add comments
+**Slack:** Post reports and alerts to channels
+**GitHub:** Read PRs and issues, optionally create issues
 
 ### How You Work
 
