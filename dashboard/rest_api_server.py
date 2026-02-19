@@ -128,6 +128,44 @@ _oauth_states: Dict[str, str] = {}
 # from agents.definitions import DEFAULT_MODELS, AGENT_DEFINITIONS
 
 
+# AI-253: Knowledge Base Agent (RAG) — lazy imports
+try:
+    from knowledge_base.agent import KnowledgeBaseAgent as _KnowledgeBaseAgent, KB_TIERS as _KB_TIERS
+    from knowledge_base.embeddings import EmbeddingProvider as _EmbeddingProvider
+    from knowledge_base.vector_store import VectorStore as _VectorStore
+    from knowledge_base.indexer import DocumentIndexer as _DocumentIndexer
+    from knowledge_base.chunker import ChunkingStrategy as _ChunkingStrategy
+    from knowledge_base.webhook_handler import KBWebhookHandler as _KBWebhookHandler
+    _KB_AVAILABLE = True
+except ImportError:
+    _KB_AVAILABLE = False
+
+# Module-level singletons for knowledge base (lazy init)
+_kb_vector_store: Optional[Any] = None
+_kb_embedder: Optional[Any] = None
+_kb_agent: Optional[Any] = None
+_kb_indexer: Optional[Any] = None
+_kb_webhook_handler: Optional[Any] = None
+
+
+def _get_kb_components():
+    """Return (agent, indexer, webhook_handler) singletons (lazy init).
+
+    Returns None tuple if knowledge_base module is unavailable.
+    """
+    global _kb_vector_store, _kb_embedder, _kb_agent, _kb_indexer, _kb_webhook_handler  # noqa: PLW0603
+    if not _KB_AVAILABLE:
+        return None, None, None
+    if _kb_vector_store is None:
+        _kb_vector_store = _VectorStore()
+        _kb_embedder = _EmbeddingProvider(provider="mock")
+        chunker = _ChunkingStrategy()
+        _kb_agent = _KnowledgeBaseAgent(_kb_vector_store, _kb_embedder, tier="team")
+        _kb_indexer = _DocumentIndexer(_kb_vector_store, chunker, _kb_embedder)
+        _kb_webhook_handler = _KBWebhookHandler()
+    return _kb_agent, _kb_indexer, _kb_webhook_handler
+
+
 # AI-252: SDK Agent Registry — in-memory store, lazy-initialised
 _sdk_registry: Optional[Any] = None
 
@@ -721,6 +759,16 @@ class RESTAPIServer:
         self.app.router.add_delete('/api/registry/agents/{name}', self.registry_unregister_agent)
         self.app.router.add_route('OPTIONS', '/api/registry/agents', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/registry/agents/{name}', self.handle_options)
+
+        # AI-253: Knowledge Base Agent (RAG) endpoints (Team tier+)
+        self.app.router.add_post('/api/knowledge-base/query', self.kb_query)
+        self.app.router.add_post('/api/knowledge-base/index', self.kb_index)
+        self.app.router.add_get('/api/knowledge-base/stats', self.kb_stats)
+        self.app.router.add_post('/api/knowledge-base/reindex', self.kb_reindex)
+        self.app.router.add_route('OPTIONS', '/api/knowledge-base/query', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/knowledge-base/index', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/knowledge-base/stats', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/knowledge-base/reindex', self.handle_options)
 
         # OPTIONS for CORS preflight
         for route in ['/api/metrics', '/api/agents', '/api/sessions', '/api/providers',
@@ -6370,6 +6418,237 @@ async function showForgotPassword() {{
 
         registry.unregister(name, org_id=org_id)
         return web.json_response({"status": "unregistered", "name": name})
+
+
+    # ------------------------------------------------------------------ #
+    # AI-253: Knowledge Base (RAG) endpoints
+    # ------------------------------------------------------------------ #
+
+    def _check_kb_tier(self, request) -> Optional[Any]:
+        """Return None if KB access is allowed, or a 403 Response.
+
+        Reads ``tier`` from the request query parameters or JSON body.
+        Available for team, organization, fleet, and enterprise tiers.
+        """
+        if not _KB_AVAILABLE:
+            return web.json_response(
+                {"error": "Knowledge Base module not available"}, status=503
+            )
+        tier = request.rel_url.query.get("tier", "")
+        if not tier:
+            return None  # Defer tier check to body parsing in handlers
+        agent, _, _ = _get_kb_components()
+        if agent is None or not agent.is_available_for_tier(tier):
+            return web.json_response(
+                {
+                    "error": "Forbidden",
+                    "message": (
+                        "Knowledge Base requires a Team, Organization, Fleet, "
+                        "or Enterprise tier subscription."
+                    ),
+                    "tier_provided": tier,
+                    "kb_tiers": _KB_TIERS if _KB_AVAILABLE else [],
+                },
+                status=403,
+            )
+        return None
+
+    async def kb_query(self, request: Request) -> Response:
+        """POST /api/knowledge-base/query — query the Knowledge Base.
+
+        Body: {question: str, project_id: str, top_k: int (default 5), tier: str}
+
+        Returns:
+            200 with {chunks, sources, query_time_ms}
+            400 if required fields missing
+            403 if tier is not team/organization/fleet/enterprise
+            503 if KB module unavailable
+        """
+        if not _KB_AVAILABLE:
+            return web.json_response(
+                {"error": "Knowledge Base module not available"}, status=503
+            )
+
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON body"}, status=400)
+
+        tier = data.get("tier", request.rel_url.query.get("tier", ""))
+        agent, _, _ = _get_kb_components()
+        if agent is None:
+            return web.json_response(
+                {"error": "Knowledge Base module not available"}, status=503
+            )
+        if tier and not agent.is_available_for_tier(tier):
+            return web.json_response(
+                {
+                    "error": "Forbidden",
+                    "message": (
+                        "Knowledge Base requires a Team, Organization, Fleet, "
+                        "or Enterprise tier subscription."
+                    ),
+                    "tier_provided": tier,
+                    "kb_tiers": _KB_TIERS,
+                },
+                status=403,
+            )
+
+        question = data.get("question", "").strip()
+        project_id = data.get("project_id", "").strip()
+        if not question or not project_id:
+            return web.json_response(
+                {"error": "Both 'question' and 'project_id' are required"}, status=400
+            )
+
+        try:
+            top_k = int(data.get("top_k", 5))
+        except (TypeError, ValueError):
+            top_k = 5
+
+        result = agent.query(question, project_id, top_k=top_k)
+        return web.json_response(result)
+
+    async def kb_index(self, request: Request) -> Response:
+        """POST /api/knowledge-base/index — index content into the KB.
+
+        Body: {project_id: str, source_type: str, content: str,
+               doc_id: str, tier: str}
+
+        Returns:
+            200 with {doc_id, chunks_indexed}
+            400 if required fields missing
+            403 if tier insufficient
+        """
+        if not _KB_AVAILABLE:
+            return web.json_response(
+                {"error": "Knowledge Base module not available"}, status=503
+            )
+
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON body"}, status=400)
+
+        tier = data.get("tier", request.rel_url.query.get("tier", ""))
+        _, indexer, _ = _get_kb_components()
+        if indexer is None:
+            return web.json_response(
+                {"error": "Knowledge Base module not available"}, status=503
+            )
+
+        agent, _, _ = _get_kb_components()
+        if tier and agent is not None and not agent.is_available_for_tier(tier):
+            return web.json_response(
+                {
+                    "error": "Forbidden",
+                    "message": "Knowledge Base requires Team tier or above.",
+                    "tier_provided": tier,
+                    "kb_tiers": _KB_TIERS,
+                },
+                status=403,
+            )
+
+        project_id = data.get("project_id", "").strip()
+        content = data.get("content", "").strip()
+        doc_id = data.get("doc_id", "").strip()
+        if not project_id or not content or not doc_id:
+            return web.json_response(
+                {"error": "'project_id', 'content', and 'doc_id' are required"},
+                status=400,
+            )
+
+        source_type = data.get("source_type", "text")
+        metadata = {"source_type": source_type}
+        n = indexer.index_text(project_id, content, doc_id, metadata=metadata)
+        return web.json_response({"doc_id": doc_id, "chunks_indexed": n})
+
+    async def kb_stats(self, request: Request) -> Response:
+        """GET /api/knowledge-base/stats?project_id=X&tier=Y — index stats.
+
+        Returns:
+            200 with VectorStore stats
+            400 if project_id missing
+            403 if tier insufficient
+        """
+        if not _KB_AVAILABLE:
+            return web.json_response(
+                {"error": "Knowledge Base module not available"}, status=503
+            )
+
+        project_id = request.rel_url.query.get("project_id", "").strip()
+        tier = request.rel_url.query.get("tier", "")
+
+        if not project_id:
+            return web.json_response(
+                {"error": "'project_id' query parameter is required"}, status=400
+            )
+
+        agent, _, _ = _get_kb_components()
+        if agent is None:
+            return web.json_response(
+                {"error": "Knowledge Base module not available"}, status=503
+            )
+        if tier and not agent.is_available_for_tier(tier):
+            return web.json_response(
+                {
+                    "error": "Forbidden",
+                    "message": "Knowledge Base requires Team tier or above.",
+                    "tier_provided": tier,
+                    "kb_tiers": _KB_TIERS,
+                },
+                status=403,
+            )
+
+        stats = agent.vector_store.get_stats(project_id)
+        return web.json_response(stats)
+
+    async def kb_reindex(self, request: Request) -> Response:
+        """POST /api/knowledge-base/reindex — trigger full reindex.
+
+        Body: {project_id: str, sources: list[str] (optional), tier: str}
+
+        Returns:
+            200 with reindex stats
+            400 if project_id missing
+            403 if tier insufficient
+        """
+        if not _KB_AVAILABLE:
+            return web.json_response(
+                {"error": "Knowledge Base module not available"}, status=503
+            )
+
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON body"}, status=400)
+
+        tier = data.get("tier", request.rel_url.query.get("tier", ""))
+        agent, indexer, _ = _get_kb_components()
+        if agent is None or indexer is None:
+            return web.json_response(
+                {"error": "Knowledge Base module not available"}, status=503
+            )
+        if tier and not agent.is_available_for_tier(tier):
+            return web.json_response(
+                {
+                    "error": "Forbidden",
+                    "message": "Knowledge Base requires Team tier or above.",
+                    "tier_provided": tier,
+                    "kb_tiers": _KB_TIERS,
+                },
+                status=403,
+            )
+
+        project_id = data.get("project_id", "").strip()
+        if not project_id:
+            return web.json_response(
+                {"error": "'project_id' is required"}, status=400
+            )
+
+        sources = data.get("sources", [])
+        result = indexer.reindex_all(project_id, sources)
+        return web.json_response(result)
 
 
 def main():
