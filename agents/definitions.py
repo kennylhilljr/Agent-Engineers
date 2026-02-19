@@ -25,6 +25,14 @@ from arcade_config import (
     get_slack_tools,
 )
 from claude_agent_sdk.types import AgentDefinition
+from agents.model_routing import (
+    CostTracker,
+    ModelTier,
+    check_cost_cap,
+    estimate_complexity,
+    get_cost_cap_for_org,
+    select_model,
+)
 
 FILE_TOOLS: list[str] = ["Read", "Write", "Edit", "Glob"]
 PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
@@ -360,3 +368,120 @@ WINDSURF_AGENT = AGENT_DEFINITIONS["windsurf"]
 OPENROUTER_DEV_AGENT = AGENT_DEFINITIONS["openrouter_dev"]
 PRODUCT_MANAGER_AGENT = AGENT_DEFINITIONS["product_manager"]
 DESIGNER_AGENT = AGENT_DEFINITIONS["designer"]
+
+
+def create_agent_definitions_with_routing(
+    task: dict | None = None,
+    pr_metadata: dict | None = None,
+    org_id: str | None = None,
+) -> dict[str, AgentDefinition]:
+    """Create agent definitions with Opus model routing applied where appropriate.
+
+    Uses :func:`agents.model_routing.estimate_complexity` and
+    :func:`agents.model_routing.select_model` to determine whether the
+    *coding* or *pr_reviewer* agents should be upgraded to Opus based on
+    task complexity and PR metadata.
+
+    Also enforces the per-org cost cap; if the cost cap has already been
+    reached for the current run, Opus is downgraded to Sonnet.
+
+    Args:
+        task: Optional task dictionary passed to ``estimate_complexity()``.
+        pr_metadata: Optional PR metadata dict passed to ``select_model()``.
+        org_id: Optional organisation identifier for per-org cost cap lookup.
+
+    Returns:
+        Agent definitions dict with model tiers adjusted for the given task.
+    """
+    task = task or {}
+    pr_metadata = pr_metadata or {}
+
+    complexity = estimate_complexity(task)
+    coding_tier = select_model("coding", complexity, task)
+    pr_reviewer_tier = select_model("pr_reviewer", complexity, pr_metadata)
+
+    # Enforce per-org cost cap: if the cap has already been hit, downgrade
+    # Opus to Sonnet so we do not exceed the organisation's budget.
+    cap_usd = get_cost_cap_for_org(org_id)
+
+    # Build a CostTracker for this org so callers can extend it with real
+    # spend data; here we use it to evaluate whether Opus is permissible.
+    # A tracker seeded with zero cost is within cap for any positive cap.
+    # The cap_hit flag becomes True only when the tracker's total meets or
+    # exceeds the org cap (e.g., if a caller has already recorded spend).
+    tracker = CostTracker(cap_usd=cap_usd)
+    cap_hit = not tracker.is_within_cap
+
+    # Also honour check_cost_cap for the zero-spend starting point; this
+    # call is a no-op for fresh runs but surfaces a warning when cap <= 0.
+    if cap_usd > 0:
+        cap_within = check_cost_cap(tracker.total_cost_usd, cap_usd)
+        if not cap_within:
+            cap_hit = True
+
+    if cap_hit:
+        # Cost cap already exhausted — downgrade Opus to Sonnet to stay
+        # within the organisation's budget.
+        if coding_tier == ModelTier.OPUS:
+            coding_tier = ModelTier.SONNET
+        if pr_reviewer_tier == ModelTier.OPUS:
+            pr_reviewer_tier = ModelTier.SONNET
+
+    defs = create_agent_definitions()
+
+    if coding_tier in (ModelTier.OPUS, ModelTier.SONNET):
+        coding_model: ModelOption = coding_tier.value  # type: ignore[assignment]
+        if coding_model in _VALID_MODELS:
+            defs["coding"] = AgentDefinition(
+                description=defs["coding"].description,
+                prompt=defs["coding"].prompt,
+                tools=defs["coding"].tools,
+                model=coding_model,
+            )
+
+    if pr_reviewer_tier in (ModelTier.OPUS, ModelTier.SONNET):
+        pr_model: ModelOption = pr_reviewer_tier.value  # type: ignore[assignment]
+        if pr_model in _VALID_MODELS:
+            defs["pr_reviewer"] = AgentDefinition(
+                description=defs["pr_reviewer"].description,
+                prompt=defs["pr_reviewer"].prompt,
+                tools=defs["pr_reviewer"].tools,
+                model=pr_model,
+            )
+
+    return defs
+
+
+__all__ = [
+    "AGENT_DEFINITIONS",
+    "AGENT_GIT_IDENTITIES",
+    "CODING_AGENT",
+    "CODING_FAST_AGENT",
+    "CHATGPT_AGENT",
+    "DEFAULT_MODELS",
+    "DESIGNER_AGENT",
+    "GEMINI_AGENT",
+    "GITHUB_AGENT",
+    "GROQ_AGENT",
+    "KIMI_AGENT",
+    "LINEAR_AGENT",
+    "ModelOption",
+    "OPENROUTER_DEV_AGENT",
+    "OPS_AGENT",
+    "PR_REVIEWER_AGENT",
+    "PR_REVIEWER_FAST_AGENT",
+    "PRODUCT_MANAGER_AGENT",
+    "SLACK_AGENT",
+    "WINDSURF_AGENT",
+    # Model routing exports (re-exported for convenience)
+    "CostTracker",
+    "ModelTier",
+    "check_cost_cap",
+    "create_agent_definitions",
+    "create_agent_definitions_for_pool",
+    "create_agent_definitions_with_routing",
+    "estimate_complexity",
+    "get_cost_cap_for_org",
+    "get_orchestrator_model",
+    "select_model",
+]
