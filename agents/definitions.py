@@ -61,6 +61,7 @@ DEFAULT_MODELS: Final[dict[str, ModelOption]] = {
     "gitlab": "haiku",
     "knowledge_base": "haiku",
     "qa": "sonnet",
+    "security_reviewer": "sonnet",
 }
 
 
@@ -132,6 +133,9 @@ AGENT_GIT_IDENTITIES: Final[dict[str, GitIdentity]] = {
     "gitlab": GitIdentity("GitLab Agent", "gitlab-agent@claude-agents.dev"),
     "knowledge_base": GitIdentity("Knowledge Base Agent", "knowledge-base-agent@claude-agents.dev"),
     "qa": GitIdentity("QA Agent", "qa-agent@claude-agents.dev"),
+    "security_reviewer": GitIdentity(
+        "Security Reviewer Agent", "security-reviewer-agent@claude-agents.dev"
+    ),
 }
 
 
@@ -355,7 +359,7 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
                 "back to Jira. Enables enterprise Jira customers to use "
                 "Agent-Engineers without migrating to Linear."
             ),
-            prompt=_prompt("linear", "linear_agent_prompt"),  # Reuse linear prompt as base
+            prompt=_prompt("jira", "jira_agent_prompt"),
             tools=_get_jira_agent_tools(),
             model=_get_model("jira"),
         ),
@@ -368,7 +372,7 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
                 "enterprise GitLab customers to use Agent-Engineers without migrating "
                 "to GitHub."
             ),
-            prompt=_prompt("github", "github_agent_prompt"),  # Reuse github prompt as base
+            prompt=_prompt("gitlab", "gitlab_agent_prompt"),
             tools=_get_gitlab_agent_tools(),
             model=_get_model("gitlab"),
         ),
@@ -380,15 +384,22 @@ def create_agent_definitions() -> dict[str, AgentDefinition]:
                 "Called by Coding Agent and PR Reviewer Agent for historical context. "
                 "Available for Team tier and above."
             ),
-            prompt=(
-                "You are the Knowledge Base Agent. You maintain a searchable index of "
-                "project documentation, PR history, and architecture decisions. "
-                "When asked a question, retrieve the most relevant chunks and synthesise "
-                "a concise, accurate answer grounded in project-specific context. "
-                "Always cite your sources."
-            ),
-            tools=FILE_TOOLS + ["Bash"],
+            prompt=_prompt("knowledge_base", "knowledge_base_agent_prompt"),
+            tools=FILE_TOOLS + ["Bash", "Grep"],
             model=_get_model("knowledge_base"),
+        ),
+        "security_reviewer": AgentDefinition(
+            description=(
+                "Security-focused PR reviewer. Reviews PRs touching authentication, "
+                "billing, RBAC, audit trails, SSO, OAuth, tokens, passwords, and "
+                "encryption. Applies OWASP Top 10, Stripe security best practices, "
+                "and GDPR/data privacy patterns. Use instead of pr_reviewer when "
+                "the PR touches: auth/, billing/, rbac/, permissions/, audit/, "
+                "sso/, oauth/, tokens/, passwords/, encryption/."
+            ),
+            prompt=_prompt("security_reviewer", "security_reviewer_agent_prompt"),
+            tools=_get_pr_reviewer_tools(),
+            model=_get_model("security_reviewer"),
         ),
         "qa": AgentDefinition(
             description=(
@@ -452,6 +463,7 @@ JIRA_AGENT = AGENT_DEFINITIONS["jira"]
 GITLAB_AGENT = AGENT_DEFINITIONS["gitlab"]
 KNOWLEDGE_BASE_AGENT = AGENT_DEFINITIONS["knowledge_base"]
 QA_AGENT = AGENT_DEFINITIONS["qa"]
+SECURITY_REVIEWER_AGENT = AGENT_DEFINITIONS["security_reviewer"]
 
 
 def create_agent_definitions_with_routing(

@@ -34,6 +34,7 @@ Use the Task tool to delegate to these specialized agents:
 | `qa` | sonnet | Dedicated test writing, coverage audits, regression suites, flaky test fixes |
 | `pr_reviewer` | sonnet | Full PR review for high-risk changes (backend, auth, >5 files) |
 | `pr_reviewer_fast` | haiku | Quick PR review for low-risk changes (frontend, <=3 files, additive) |
+| `security_reviewer` | sonnet | Security-focused PR review for auth, billing, RBAC, SSO, tokens, encryption |
 | `chatgpt` | haiku | Cross-validate code, second opinions (GPT-4o, o1, o3-mini) |
 | `gemini` | haiku | Research, Google ecosystem, large-context analysis (1M tokens) |
 | `groq` | haiku | Ultra-fast cross-validation (Llama 3.3 70B, Mixtral) via Groq LPU |
@@ -163,6 +164,7 @@ Follow the continuation task steps. Key flow per ticket:
 | Git commit + PR | `github` | Files, issue key, branch |
 | Low-risk PR review | `pr_reviewer_fast` | PR number, files, test steps |
 | High-risk PR review | `pr_reviewer` | PR number, files, test steps |
+| Security-sensitive PR review | `security_reviewer` | PR number, files, test steps — use when PR touches auth/, billing/, rbac/, permissions/, audit/, sso/, oauth/, tokens/, passwords/, encryption/ |
 | Write/improve test suite | `qa` | Feature context, files changed, coverage gaps |
 | Coverage audit | `qa` | Project directory, coverage targets |
 | Fix flaky/failing tests | `qa` | Test names, error output, source files |
@@ -210,10 +212,13 @@ Routing decision:
   redesign, migration, integration, performance, database, schema, security, auth, billing
 - Complexity keywords always override file count
 
-**pr_reviewer_fast vs pr_reviewer:**
+**pr_reviewer_fast vs pr_reviewer vs security_reviewer:**
 - Use `pr_reviewer_fast` when: <= 200 lines changed, <= 3 files, no sensitive directories, frontend-only
 - Use `pr_reviewer` when: > 200 lines changed OR any file in auth/, billing/, security/, core/, architecture/
   OR any migration file OR > 3 files with >50% change ratio
+- **Use `security_reviewer` when**: PR touches ANY of: `auth/`, `billing/`, `rbac/`, `permissions/`, `audit/`,
+  `sso/`, `oauth/`, `tokens/`, `passwords/`, `encryption/` — security_reviewer takes precedence over pr_reviewer
+  for these paths
 - Label `review:opus` escalates to Opus model tier
 
 **qa vs coding (for test work):**
@@ -237,6 +242,7 @@ Routing decision:
 
 When preferred agent is unavailable (API key missing, 5xx error, rate limit):
 - `coding` → fall back to `coding_fast`
+- `security_reviewer` → fall back to `pr_reviewer` (with a note to pay extra attention to security)
 - `pr_reviewer` → fall back to `pr_reviewer_fast`
 - `kimi` → fall back to `gemini`, then `chatgpt`
 - `gemini` → fall back to `chatgpt`, then `kimi`
