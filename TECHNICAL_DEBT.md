@@ -160,6 +160,41 @@ are clean with no deferred work markers.
 
 ---
 
+## AI-245 — Team Management RBAC In-Memory Store (TD-002)
+
+### TD-002 — TeamStore in-memory persistence
+
+| Field       | Value |
+|-------------|-------|
+| **File**    | `teams/models.py` — `TeamStore` class |
+| **Comment** | `# TODO(production): Replace with PostgreSQL-backed store` |
+| **Priority**| High |
+| **Status**  | **DEFERRED** — in-memory only for current release |
+
+**Context:**
+
+The `TeamStore` class in `teams/models.py` uses Python dicts as its backing
+store. This means all team membership and invitation data is lost on process
+restart and cannot be shared across multiple server instances.
+
+**Required production changes:**
+
+1. Replace `TeamStore` with a PostgreSQL-backed implementation using an ORM
+   (SQLAlchemy or asyncpg). Tables needed: `team_members`, `invitations`,
+   `audit_events`, `invite_rate_limits`.
+2. Add a DB migration script.
+3. Update `get_team_store()` singleton to return the DB-backed implementation
+   based on an environment variable (e.g., `DATABASE_URL`).
+4. Index `team_members` on `(user_id, is_active)` for fast cross-org lookup
+   (currently `_find_member_by_user_id` scans all orgs).
+
+**Risk if not addressed:**
+- All team memberships are lost on server restart.
+- Rate-limit counters reset on restart (MODERATE 1 fix temporarily bypassed).
+- Cannot support multiple server replicas (horizontal scaling).
+
+---
+
 ## Changelog
 
 | Date       | Change |
@@ -167,3 +202,4 @@ are clean with no deferred work markers.
 | 2026-02-17 | Initial audit (AI-202). Found 1 active TODO. Replaced TODO marker with detailed explanatory comment. Added TD-001 entry. |
 | 2026-02-18 | AI-191 audit of dashboard/ directory. Zero TODO/FIXME/HACK comments found. Dashboard module is clean. |
 | 2026-02-18 | AI-231 resolves TD-001. Implemented `extract_ticket_key()` and `TICKET_KEY_PATTERN` in `agent.py`. Added 23 unit/integration tests in `tests/test_agent.py`. Dashboard now shows active ticket key for standalone sessions within 10 s of agent emitting `PROJECT_TICKET: <KEY>`. |
+| 2026-02-18 | AI-245 adds TD-002. TeamStore in-memory store documented as requiring PostgreSQL replacement before production use. |
