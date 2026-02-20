@@ -13,19 +13,27 @@
   "tickets_since_pm_review": 3,
   "last_pm_review_at": null,
   "status_summary": {
-    "done": 193,
+    "done": 4,
     "in_progress": 0,
     "todo": 0,
-    "backlog": 3,
-    "duplicate": 85,
+    "backlog": 4,
+    "duplicate": 171,
     "mvp_complete": true,
     "all_complete": true,
-    "last_updated": "2026-02-20T15:47:39.248437+00:00Z"
+    "last_updated": "2026-02-20T16:00:00.000000+00:00Z"
   },
   "deduplication_results": {
-    "duplicates_found": 0,
-    "duplicates_removed": 0,
-    "archived_issues": []
+    "duplicates_found": 1,
+    "duplicates_removed": 1,
+    "archived_issues": [
+      {
+        "duplicate_key": "AI-243",
+        "keeper_key": "AI-229",
+        "title": "Webhook Support for CI/CD Pipeline Integration",
+        "duplicate_created_at": "2026-02-18T07:03:01.364Z",
+        "keeper_created_at": "2026-02-18T06:57:17.662Z"
+      }
+    ]
   },
   "description": "Web dashboard for multi-agent system with AI chat, real-time monitoring, agent controls, and reasoning transparency",
   "sessions": {
