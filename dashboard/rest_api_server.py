@@ -770,6 +770,14 @@ class RESTAPIServer:
         self.app.router.add_route('OPTIONS', '/api/knowledge-base/stats', self.handle_options)
         self.app.router.add_route('OPTIONS', '/api/knowledge-base/reindex', self.handle_options)
 
+        # AI-263: Acceleration Feature endpoints
+        self.app.router.add_post('/api/acceleration/enable', self.enable_acceleration)
+        self.app.router.add_post('/api/acceleration/disable', self.disable_acceleration)
+        self.app.router.add_get('/api/acceleration/status', self.get_acceleration_status)
+        self.app.router.add_route('OPTIONS', '/api/acceleration/enable', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/acceleration/disable', self.handle_options)
+        self.app.router.add_route('OPTIONS', '/api/acceleration/status', self.handle_options)
+
         # OPTIONS for CORS preflight
         for route in ['/api/metrics', '/api/agents', '/api/sessions', '/api/providers',
                       '/api/chat', '/api/decisions', '/api/agents/status',
@@ -6649,6 +6657,139 @@ async function showForgotPassword() {{
         sources = data.get("sources", [])
         result = indexer.reindex_all(project_id, sources)
         return web.json_response(result)
+
+    # ========================================================================
+    # AI-263: Acceleration Feature Endpoints
+    # ========================================================================
+
+    async def enable_acceleration(self, request: Request) -> Response:
+        """POST /api/acceleration/enable - Enable task acceleration.
+
+        Body: {
+            factor: float (1.0-10.0, required),
+            mode: str ("enabled" or "batch", optional, default: "enabled")
+        }
+
+        Returns:
+            200 with acceleration status
+            400 if factor is invalid or missing
+        """
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON body"}, status=400)
+
+        factor = data.get("factor")
+        if factor is None:
+            return web.json_response(
+                {"error": "Missing required field: 'factor'"},
+                status=400
+            )
+
+        try:
+            factor = float(factor)
+        except (TypeError, ValueError):
+            return web.json_response(
+                {"error": "'factor' must be a number between 1.0 and 10.0"},
+                status=400
+            )
+
+        if factor < 1.0 or factor > 10.0:
+            return web.json_response(
+                {"error": "'factor' must be between 1.0 and 10.0"},
+                status=400
+            )
+
+        # Get mode (default to ENABLED)
+        mode_str = data.get("mode", "enabled")
+        try:
+            from agents.orchestrator import AccelerationMode, get_concurrency_manager
+            if mode_str == "batch":
+                mode = AccelerationMode.BATCH
+            else:
+                mode = AccelerationMode.ENABLED
+        except ImportError:
+            return web.json_response(
+                {"error": "Acceleration feature not available"},
+                status=503
+            )
+
+        # Enable acceleration
+        try:
+            manager = get_concurrency_manager()
+            result = await manager.enable_acceleration(factor=factor, mode=mode)
+
+            # Broadcast status update via WebSocket if available
+            if hasattr(self, '_ws_server') and self._ws_server:
+                await self._ws_server.broadcast_metrics_update({
+                    "acceleration_enabled": True,
+                    "acceleration_factor": factor,
+                    "acceleration_mode": mode.value
+                })
+
+            return web.json_response(result)
+        except Exception as e:
+            return web.json_response(
+                {"error": f"Failed to enable acceleration: {str(e)}"},
+                status=500
+            )
+
+    async def disable_acceleration(self, request: Request) -> Response:
+        """POST /api/acceleration/disable - Disable task acceleration.
+
+        Returns:
+            200 with acceleration status
+        """
+        try:
+            from agents.orchestrator import get_concurrency_manager
+        except ImportError:
+            return web.json_response(
+                {"error": "Acceleration feature not available"},
+                status=503
+            )
+
+        try:
+            manager = get_concurrency_manager()
+            result = await manager.disable_acceleration()
+
+            # Broadcast status update via WebSocket if available
+            if hasattr(self, '_ws_server') and self._ws_server:
+                await self._ws_server.broadcast_metrics_update({
+                    "acceleration_enabled": False,
+                    "acceleration_factor": 1.0,
+                    "acceleration_mode": "disabled"
+                })
+
+            return web.json_response(result)
+        except Exception as e:
+            return web.json_response(
+                {"error": f"Failed to disable acceleration: {str(e)}"},
+                status=500
+            )
+
+    async def get_acceleration_status(self, request: Request) -> Response:
+        """GET /api/acceleration/status - Get current acceleration status.
+
+        Returns:
+            200 with acceleration status and metrics
+        """
+        try:
+            from agents.orchestrator import get_concurrency_manager
+        except ImportError:
+            return web.json_response(
+                {"error": "Acceleration feature not available"},
+                status=503
+            )
+
+        try:
+            manager = get_concurrency_manager()
+            status = manager.get_status()
+            return web.json_response(status)
+        except Exception as e:
+            return web.json_response(
+                {"error": f"Failed to get acceleration status: {str(e)}"},
+                status=500
+            )
 
 
 def main():

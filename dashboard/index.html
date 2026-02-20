@@ -1900,6 +1900,194 @@
         .global-control-btn.resume-all-btn:hover {
             background: rgba(16, 185, 129, 0.35);
         }
+        .global-control-btn.accelerate-btn {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.5);
+            color: #3b82f6;
+        }
+        .global-control-btn.accelerate-btn:hover {
+            background: rgba(59, 130, 246, 0.35);
+        }
+        .global-control-btn.accelerate-btn.active {
+            background: rgba(59, 130, 246, 0.4);
+            border-color: #3b82f6;
+            box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+        }
+
+        /* AI-263: Acceleration Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .modal {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--accent-blue-light);
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .modal-close:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+        .modal-body {
+            margin-bottom: 20px;
+        }
+        .modal-section {
+            margin-bottom: 16px;
+        }
+        .modal-label {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        .modal-slider-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .modal-slider {
+            flex: 1;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--bg-tertiary);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        .modal-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            cursor: pointer;
+            border: 2px solid var(--bg-primary);
+        }
+        .modal-slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            cursor: pointer;
+            border: 2px solid var(--bg-primary);
+        }
+        .modal-slider-value {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--accent-blue-light);
+            min-width: 50px;
+            text-align: right;
+        }
+        .modal-info {
+            background: var(--bg-tertiary);
+            border-left: 3px solid var(--accent-blue);
+            padding: 12px;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+        .modal-metrics {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .modal-metric {
+            background: var(--bg-tertiary);
+            padding: 12px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .modal-metric-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .modal-metric-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-top: 4px;
+        }
+        .modal-footer {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        .modal-btn {
+            padding: 8px 16px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .modal-btn-primary {
+            background: var(--accent-blue);
+            color: white;
+        }
+        .modal-btn-primary:hover {
+            background: var(--accent-blue-light);
+        }
+        .modal-btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+        .modal-btn-secondary:hover {
+            background: var(--border-color);
+        }
+        .modal-btn-danger {
+            background: var(--accent-red);
+            color: white;
+        }
+        .modal-btn-danger:hover {
+            background: #dc2626;
+        }
 
         /* Requirements View Panel (AI-154) */
         .requirements-panel {
@@ -2130,6 +2318,7 @@
             <div class="global-control-buttons" id="global-control-buttons">
                 <button class="global-control-btn pause-all-btn" id="pause-all-btn" title="Pause all agents">Pause All</button>
                 <button class="global-control-btn resume-all-btn" id="resume-all-btn" title="Resume all agents" style="display:none">Resume All</button>
+                <button class="global-control-btn accelerate-btn" id="accelerate-btn" title="Configure task acceleration">Accelerate</button>
             </div>
             <div class="header-stats" id="global-metrics-bar" aria-label="Global Dashboard Metrics">
                 <div class="stat-item">
@@ -2363,6 +2552,57 @@
                     <button class="req-editor-btn save-btn" id="req-confirm-yes-btn">Resume Agent</button>
                     <button class="req-editor-btn discard-btn" id="req-confirm-no-btn">Cancel</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI-263: Acceleration Modal -->
+    <div class="modal-overlay" id="acceleration-modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">Task Acceleration</h2>
+                <button class="modal-close" id="acceleration-modal-close" aria-label="Close modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-section">
+                    <label class="modal-label" for="acceleration-slider">Acceleration Factor</label>
+                    <div class="modal-slider-container">
+                        <input type="range" min="1.0" max="10.0" step="0.5" value="2.0" class="modal-slider" id="acceleration-slider">
+                        <span class="modal-slider-value" id="acceleration-value">2.0x</span>
+                    </div>
+                </div>
+                <div class="modal-section">
+                    <div class="modal-info">
+                        Acceleration enables parallel task processing to speed up agent workflows.
+                        Higher factors allow more concurrent tasks but may increase resource usage.
+                    </div>
+                </div>
+                <div class="modal-section">
+                    <label class="modal-label">Current Metrics</label>
+                    <div class="modal-metrics">
+                        <div class="modal-metric">
+                            <div class="modal-metric-label">Active Tasks</div>
+                            <div class="modal-metric-value" id="accel-active-tasks">0</div>
+                        </div>
+                        <div class="modal-metric">
+                            <div class="modal-metric-label">Queue Size</div>
+                            <div class="modal-metric-value" id="accel-queue-size">0</div>
+                        </div>
+                        <div class="modal-metric">
+                            <div class="modal-metric-label">Completed</div>
+                            <div class="modal-metric-value" id="accel-completed-tasks">0</div>
+                        </div>
+                        <div class="modal-metric">
+                            <div class="modal-metric-label">Avg Duration</div>
+                            <div class="modal-metric-value" id="accel-avg-duration">0.0s</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-secondary" id="acceleration-cancel">Cancel</button>
+                <button class="modal-btn modal-btn-danger" id="acceleration-disable" style="display:none;">Disable</button>
+                <button class="modal-btn modal-btn-primary" id="acceleration-enable">Enable</button>
             </div>
         </div>
     </div>
@@ -4852,6 +5092,151 @@
             } catch (e) { /* ignore */ }
         }
 
+        // ========================================
+        // AI-263: ACCELERATION FEATURE
+        // ========================================
+        let accelerationState = {
+            enabled: false,
+            factor: 2.0,
+            mode: 'enabled',
+            metrics: {
+                active_tasks: 0,
+                completed_tasks: 0,
+                queue_size: 0,
+                avg_task_duration: 0.0
+            }
+        };
+
+        function openAccelerationModal() {
+            const modal = document.getElementById('acceleration-modal-overlay');
+            const slider = document.getElementById('acceleration-slider');
+            const valueDisplay = document.getElementById('acceleration-value');
+            const enableBtn = document.getElementById('acceleration-enable');
+            const disableBtn = document.getElementById('acceleration-disable');
+
+            // Set current values
+            slider.value = accelerationState.factor;
+            valueDisplay.textContent = accelerationState.factor.toFixed(1) + 'x';
+
+            // Show/hide buttons based on current state
+            if (accelerationState.enabled) {
+                enableBtn.style.display = 'none';
+                disableBtn.style.display = 'block';
+            } else {
+                enableBtn.style.display = 'block';
+                disableBtn.style.display = 'none';
+            }
+
+            // Update metrics display
+            updateAccelerationMetrics();
+
+            modal.classList.add('active');
+        }
+
+        function closeAccelerationModal() {
+            document.getElementById('acceleration-modal-overlay').classList.remove('active');
+        }
+
+        function updateAccelerationMetrics() {
+            document.getElementById('accel-active-tasks').textContent = accelerationState.metrics.active_tasks;
+            document.getElementById('accel-queue-size').textContent = accelerationState.metrics.queue_size;
+            document.getElementById('accel-completed-tasks').textContent = accelerationState.metrics.completed_tasks;
+            document.getElementById('accel-avg-duration').textContent = accelerationState.metrics.avg_task_duration.toFixed(2) + 's';
+        }
+
+        async function enableAcceleration() {
+            const factor = parseFloat(document.getElementById('acceleration-slider').value);
+
+            try {
+                const response = await fetch('/api/acceleration/enable', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ factor: factor, mode: 'enabled' })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    accelerationState.enabled = true;
+                    accelerationState.factor = factor;
+                    accelerationState.mode = data.mode || 'enabled';
+
+                    // Update button appearance
+                    const btn = document.getElementById('accelerate-btn');
+                    btn.classList.add('active');
+                    btn.textContent = `Accelerate (${factor.toFixed(1)}x)`;
+
+                    closeAccelerationModal();
+
+                    // Show success message in activity feed
+                    addActivity('system', `Acceleration enabled at ${factor.toFixed(1)}x`, 'info');
+                } else {
+                    const error = await response.json();
+                    console.error('Failed to enable acceleration:', error);
+                    alert('Failed to enable acceleration: ' + (error.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error enabling acceleration:', error);
+                alert('Error enabling acceleration: ' + error.message);
+            }
+        }
+
+        async function disableAcceleration() {
+            try {
+                const response = await fetch('/api/acceleration/disable', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (response.ok) {
+                    accelerationState.enabled = false;
+                    accelerationState.factor = 1.0;
+                    accelerationState.mode = 'disabled';
+
+                    // Update button appearance
+                    const btn = document.getElementById('accelerate-btn');
+                    btn.classList.remove('active');
+                    btn.textContent = 'Accelerate';
+
+                    closeAccelerationModal();
+
+                    // Show success message in activity feed
+                    addActivity('system', 'Acceleration disabled', 'info');
+                } else {
+                    const error = await response.json();
+                    console.error('Failed to disable acceleration:', error);
+                    alert('Failed to disable acceleration: ' + (error.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error disabling acceleration:', error);
+                alert('Error disabling acceleration: ' + error.message);
+            }
+        }
+
+        async function fetchAccelerationStatus() {
+            try {
+                const response = await fetch('/api/acceleration/status');
+                if (response.ok) {
+                    const data = await response.json();
+                    accelerationState.enabled = data.enabled;
+                    accelerationState.factor = data.acceleration_factor;
+                    accelerationState.mode = data.mode;
+                    accelerationState.metrics = data.metrics || accelerationState.metrics;
+
+                    // Update button appearance
+                    const btn = document.getElementById('accelerate-btn');
+                    if (data.enabled) {
+                        btn.classList.add('active');
+                        btn.textContent = `Accelerate (${data.acceleration_factor.toFixed(1)}x)`;
+                    } else {
+                        btn.classList.remove('active');
+                        btn.textContent = 'Accelerate';
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching acceleration status:', error);
+            }
+        }
+
         function init() {
             // Initialize state
             state.agents = [...mockAgents];
@@ -4916,6 +5301,27 @@
             // Global Pause All / Resume All controls (AI-153)
             document.getElementById('pause-all-btn').addEventListener('click', pauseAll);
             document.getElementById('resume-all-btn').addEventListener('click', resumeAll);
+
+            // AI-263: Acceleration modal controls
+            document.getElementById('accelerate-btn').addEventListener('click', openAccelerationModal);
+            document.getElementById('acceleration-modal-close').addEventListener('click', closeAccelerationModal);
+            document.getElementById('acceleration-cancel').addEventListener('click', closeAccelerationModal);
+            document.getElementById('acceleration-enable').addEventListener('click', enableAcceleration);
+            document.getElementById('acceleration-disable').addEventListener('click', disableAcceleration);
+
+            // Acceleration slider value update
+            document.getElementById('acceleration-slider').addEventListener('input', function(e) {
+                const value = parseFloat(e.target.value);
+                document.getElementById('acceleration-value').textContent = value.toFixed(1) + 'x';
+            });
+
+            // Close modal on overlay click
+            document.getElementById('acceleration-modal-overlay').addEventListener('click', function(e) {
+                if (e.target === this) closeAccelerationModal();
+            });
+
+            // Fetch initial acceleration status
+            fetchAccelerationStatus();
 
             // Load global metrics from /api/metrics
             loadGlobalMetrics();
