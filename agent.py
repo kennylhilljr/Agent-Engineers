@@ -374,7 +374,13 @@ async def run_autonomous_agent(
                     prompt,
                     project_dir,
                     agent_name="orchestrator" if is_first_run else "coding",
-                    ticket_key=None  # TODO: extract from Linear context
+                    # ticket_key extraction in standalone agent loop
+                    # In the standalone main loop, the loop invokes the agent using MCP tools to
+                    # discover and pick up Linear tickets dynamically each session — it does not
+                    # receive a pre-assigned ticket key. Extracting the ticket key would require
+                    # either a Linear API call or parsing response text. This is deferred to a
+                    # future standalone-loop improvement issue. See TECHNICAL_DEBT.md TD-001.
+                    ticket_key=None
                 )
         except ConnectionError as e:
             print(f"\nFailed to connect to Claude SDK: {e}")
