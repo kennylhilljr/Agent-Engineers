@@ -1,0 +1,99 @@
+AI-210: Monitoring & Observability — Test Results
+==================================================
+
+Run date: 2026-02-17
+Python: 3.9.6
+pytest: 8.4.2
+Platform: darwin
+
+Command:
+  cd /Users/bkh223/Documents/GitHub/agent-engineers
+  python -m pytest tests/test_monitoring_observability.py -v --tb=short
+
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+cachedir: .pytest_cache
+rootdir: /Users/bkh223/Documents/GitHub/agent-engineers
+configfile: pyproject.toml
+plugins: asyncio-1.2.0, cov-7.0.0
+
+collected 57 items
+
+tests/test_monitoring_observability.py::TestStructuredFormatter::test_format_returns_valid_json PASSED [  1%]
+tests/test_monitoring_observability.py::TestStructuredFormatter::test_format_contains_timestamp PASSED [  3%]
+tests/test_monitoring_observability.py::TestStructuredFormatter::test_format_timestamp_is_utc PASSED [  5%]
+tests/test_monitoring_observability.py::TestStructuredFormatter::test_format_contains_level PASSED [  7%]
+tests/test_monitoring_observability.py::TestStructuredFormatter::test_format_contains_logger_name PASSED [  8%]
+tests/test_monitoring_observability.py::TestStructuredFormatter::test_format_contains_message PASSED [ 10%]
+tests/test_monitoring_observability.py::TestStructuredFormatter::test_format_contains_module PASSED [ 12%]
+tests/test_monitoring_observability.py::TestStructuredFormatter::test_format_contains_function PASSED [ 14%]
+tests/test_monitoring_observability.py::TestStructuredFormatter::test_format_contains_line PASSED [ 15%]
+tests/test_monitoring_observability.py::TestStructuredFormatter::test_format_includes_extra_fields PASSED [ 17%]
+tests/test_monitoring_observability.py::TestStructuredFormatter::test_format_no_extra_field_absent PASSED [ 19%]
+tests/test_monitoring_observability.py::TestStructuredFormatter::test_format_exception_info_included PASSED [ 21%]
+tests/test_monitoring_observability.py::TestStructuredFormatter::test_format_no_exception_field_when_none PASSED [ 22%]
+tests/test_monitoring_observability.py::TestStructuredFormatter::test_format_different_log_levels PASSED [ 24%]
+tests/test_monitoring_observability.py::TestStructuredFormatter::test_format_message_with_args PASSED [ 26%]
+tests/test_monitoring_observability.py::TestGetStructuredLogger::test_returns_logger_instance PASSED [ 28%]
+tests/test_monitoring_observability.py::TestGetStructuredLogger::test_logger_has_correct_name PASSED [ 29%]
+tests/test_monitoring_observability.py::TestGetStructuredLogger::test_logger_default_level_is_info PASSED [ 31%]
+tests/test_monitoring_observability.py::TestGetStructuredLogger::test_logger_custom_level PASSED [ 33%]
+tests/test_monitoring_observability.py::TestGetStructuredLogger::test_logger_has_handler PASSED [ 35%]
+tests/test_monitoring_observability.py::TestGetStructuredLogger::test_logger_handler_uses_structured_formatter PASSED [ 36%]
+tests/test_monitoring_observability.py::TestGetStructuredLogger::test_logger_outputs_json_on_info PASSED [ 38%]
+tests/test_monitoring_observability.py::TestGetStructuredLogger::test_logger_no_duplicate_handlers PASSED [ 40%]
+tests/test_monitoring_observability.py::TestMetricsCollector::test_increment_default_amount PASSED [ 42%]
+tests/test_monitoring_observability.py::TestMetricsCollector::test_increment_custom_amount PASSED [ 43%]
+tests/test_monitoring_observability.py::TestMetricsCollector::test_increment_accumulates PASSED [ 45%]
+tests/test_monitoring_observability.py::TestMetricsCollector::test_increment_multiple_counters PASSED [ 47%]
+tests/test_monitoring_observability.py::TestMetricsCollector::test_gauge_sets_value PASSED [ 49%]
+tests/test_monitoring_observability.py::TestMetricsCollector::test_gauge_overwrites_previous_value PASSED [ 50%]
+tests/test_monitoring_observability.py::TestMetricsCollector::test_gauge_multiple_keys PASSED [ 52%]
+tests/test_monitoring_observability.py::TestMetricsCollector::test_record_timing_stores_value PASSED [ 54%]
+tests/test_monitoring_observability.py::TestMetricsCollector::test_record_timing_multiple_values PASSED [ 56%]
+tests/test_monitoring_observability.py::TestMetricsCollector::test_timer_context_manager_records_timing PASSED [ 57%]
+tests/test_monitoring_observability.py::TestMetricsCollector::test_timer_context_manager_multiple_uses PASSED [ 59%]
+tests/test_monitoring_observability.py::TestMetricsCollector::test_get_stats_calculates_mean PASSED [ 61%]
+tests/test_monitoring_observability.py::TestMetricsCollector::test_get_stats_calculates_min_max PASSED [ 63%]
+tests/test_monitoring_observability.py::TestMetricsCollector::test_get_stats_calculates_total PASSED [ 64%]
+tests/test_monitoring_observability.py::TestMetricsCollector::test_get_stats_empty PASSED [ 66%]
+tests/test_monitoring_observability.py::TestMetricsCollector::test_reset_clears_all_metrics PASSED [ 68%]
+tests/test_monitoring_observability.py::TestMetricsCollector::test_reset_allows_reuse PASSED [ 70%]
+tests/test_monitoring_observability.py::TestHealthChecker::test_register_stores_check PASSED [ 71%]
+tests/test_monitoring_observability.py::TestHealthChecker::test_check_all_empty_returns_healthy PASSED [ 73%]
+tests/test_monitoring_observability.py::TestHealthChecker::test_check_all_passing_check_returns_healthy PASSED [ 75%]
+tests/test_monitoring_observability.py::TestHealthChecker::test_check_all_includes_check_results PASSED [ 77%]
+tests/test_monitoring_observability.py::TestHealthChecker::test_check_all_failing_check_returns_degraded PASSED [ 78%]
+tests/test_monitoring_observability.py::TestHealthChecker::test_check_all_failing_check_includes_error PASSED [ 80%]
+tests/test_monitoring_observability.py::TestHealthChecker::test_check_all_mixed_checks_returns_degraded PASSED [ 82%]
+tests/test_monitoring_observability.py::TestHealthChecker::test_check_all_contains_timestamp PASSED [ 84%]
+tests/test_monitoring_observability.py::TestHealthChecker::test_check_all_timestamp_is_utc PASSED [ 85%]
+tests/test_monitoring_observability.py::TestHealthChecker::test_check_all_check_returning_none_defaults_to_ok PASSED [ 87%]
+tests/test_monitoring_observability.py::TestHealthChecker::test_register_multiple_checks PASSED [ 89%]
+tests/test_monitoring_observability.py::TestHealthChecker::test_check_all_result_contains_checks_key PASSED [ 91%]
+tests/test_monitoring_observability.py::TestGlobalSingletons::test_get_metrics_returns_metrics_collector PASSED [ 92%]
+tests/test_monitoring_observability.py::TestGlobalSingletons::test_get_metrics_returns_same_instance PASSED [ 94%]
+tests/test_monitoring_observability.py::TestGlobalSingletons::test_get_health_checker_returns_health_checker PASSED [ 96%]
+tests/test_monitoring_observability.py::TestGlobalSingletons::test_get_health_checker_returns_same_instance PASSED [ 98%]
+tests/test_monitoring_observability.py::TestGlobalSingletons::test_global_metrics_persists_state PASSED [100%]
+
+============================== 57 passed in 0.16s ==============================
+
+Summary
+-------
+Total tests   : 57
+Passed        : 57
+Failed        : 0
+Errors        : 0
+
+Files created
+-------------
+- /Users/bkh223/Documents/GitHub/agent-engineers/structured_logging.py
+- /Users/bkh223/Documents/GitHub/agent-engineers/tests/test_monitoring_observability.py
+
+Pre-existing monitoring (not modified)
+---------------------------------------
+- /Users/bkh223/Documents/GitHub/agent-engineers/dashboard/logging_config.py
+  JSONFormatter with console/file/rotating-file handlers, correlation IDs
+- /Users/bkh223/Documents/GitHub/agent-engineers/daemon/control_plane.py
+  GET /health endpoint returning {"status": "ok"} (line 144)

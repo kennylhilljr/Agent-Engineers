@@ -27,7 +27,7 @@ from security import (
 )
 
 
-def test_hook(command: str, should_block: bool) -> bool:
+def _run_hook_test(command: str, should_block: bool) -> bool:
     """Test a single command against the security hook."""
     # Create a minimal PreToolUseHookInput for testing
     input_data = cast(
@@ -294,7 +294,7 @@ def main() -> int:
     ]
 
     for cmd in dangerous:
-        if test_hook(cmd, should_block=True):
+        if _run_hook_test(cmd, should_block=True):
             passed += 1
         else:
             failed += 1
@@ -370,7 +370,7 @@ def main() -> int:
     ]
 
     for cmd in safe:
-        if test_hook(cmd, should_block=False):
+        if _run_hook_test(cmd, should_block=False):
             passed += 1
         else:
             failed += 1

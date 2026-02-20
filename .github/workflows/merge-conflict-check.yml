@@ -1,0 +1,290 @@
+name: Merge Conflict Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  check-conflicts:
+    name: Check PR merge conflicts
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check open PRs for merge conflicts
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pulls } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            });
+
+            const conflicting = [];
+            for (const pr of pulls) {
+              const { data: detail } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+              });
+
+              if (detail.mergeable === null) {
+                await new Promise(r => setTimeout(r, 5000));
+                const { data: retry } = await github.rest.pulls.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                });
+                if (retry.mergeable === false) {
+                  conflicting.push(retry);
+                }
+              } else if (detail.mergeable === false) {
+                conflicting.push(detail);
+              }
+            }
+
+            if (conflicting.length > 0) {
+              const prList = conflicting
+                .map(pr => `- #${pr.number}: **${pr.title}** (\`${pr.head.ref}\`)`)
+                .join('\n');
+
+              core.warning(
+                `${conflicting.length} open PR(s) now have merge conflicts after this push to main:\n${prList}`
+              );
+
+              for (const pr of conflicting) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  body: [
+                    '⚠️ **Merge Conflict Detected**',
+                    '',
+                    `This PR now has merge conflicts after [recent changes to \`main\`](${context.payload.compare}).`,
+                    '',
+                    'Please rebase or merge `main` into this branch to resolve:',
+                    '```bash',
+                    `git checkout ${pr.head.ref}`,
+                    'git merge origin/main',
+                    '# resolve any conflicts, then:',
+                    'git push',
+                    '```',
+                  ].join('\n'),
+                });
+              }
+            } else {
+              core.info('All open PRs merge cleanly with main.');
+            }
+
+  validate-pr-base:
+    name: Validate PR targets main
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Block PRs that target non-main branches
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const baseBranch = context.payload.pull_request.base.ref;
+            const prNumber = context.payload.pull_request.number;
+            const headBranch = context.payload.pull_request.head.ref;
+
+            if (baseBranch !== 'main') {
+              const message = [
+                '🚫 **PR Base Branch Violation**',
+                '',
+                `This PR targets \`${baseBranch}\` instead of \`main\`.`,
+                '',
+                'PRs must target `main` directly. Stacking PRs on feature branches',
+                'causes merge conflicts and orphaned branches when the base branch',
+                'is merged or deleted.',
+                '',
+                '**To fix this**, change the base branch to `main`:',
+                '1. Click **Edit** at the top-right of this PR',
+                '2. Change the base branch dropdown to `main`',
+                '3. Resolve any conflicts with `main`',
+                '',
+                'Or rebase from the CLI:',
+                '```bash',
+                `git checkout ${headBranch}`,
+                'git rebase origin/main',
+                'git push --force-with-lease',
+                '```',
+              ].join('\n');
+
+              // Check if we already posted this warning to avoid duplicates
+              const { data: comments } = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+              });
+
+              const alreadyWarned = comments.some(c =>
+                c.body.includes('PR Base Branch Violation')
+              );
+
+              if (!alreadyWarned) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  body: message,
+                });
+              }
+
+              core.setFailed(
+                `PR #${prNumber} targets '${baseBranch}' instead of 'main'. ` +
+                'All PRs must target main to prevent cascading merge conflicts.'
+              );
+            } else {
+              core.info(`PR #${prNumber} correctly targets 'main'.`);
+            }
+
+  check-branch-freshness:
+    name: Check branch freshness
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check how far behind main the branch is
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { execSync } = require('child_process');
+            const prNumber = context.payload.pull_request.number;
+            const headBranch = context.payload.pull_request.head.ref;
+
+            // Count commits on main that are not in this branch
+            execSync('git fetch origin main', { encoding: 'utf8' });
+            const behindCount = execSync(
+              'git rev-list --count HEAD..origin/main',
+              { encoding: 'utf8' }
+            ).trim();
+            const behind = parseInt(behindCount, 10);
+
+            // Check if branches share a common ancestor
+            try {
+              execSync('git merge-base HEAD origin/main', { encoding: 'utf8' });
+            } catch {
+              const message = [
+                '🚫 **Disconnected Branch History**',
+                '',
+                'This branch shares no common ancestor with `main`.',
+                'This typically happens when a branch was created from a',
+                'force-pushed or rebased history.',
+                '',
+                'This PR cannot be merged cleanly. Please recreate the branch from `main`:',
+                '```bash',
+                'git checkout main && git pull',
+                `git checkout -b ${headBranch}-rebased`,
+                `git cherry-pick <your-commits>`,
+                '```',
+              ].join('\n');
+
+              const { data: comments } = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+              });
+
+              if (!comments.some(c => c.body.includes('Disconnected Branch History'))) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  body: message,
+                });
+              }
+
+              core.setFailed(
+                `PR #${prNumber} has disconnected history from main and cannot be merged.`
+              );
+              return;
+            }
+
+            const STALE_THRESHOLD = 30;
+
+            if (behind > STALE_THRESHOLD) {
+              const message = [
+                '⚠️ **Stale Branch Warning**',
+                '',
+                `This branch is **${behind} commits behind \`main\`**.`,
+                `(Threshold: ${STALE_THRESHOLD} commits)`,
+                '',
+                'Branches that fall too far behind `main` are likely to have',
+                'merge conflicts and may be working against outdated code.',
+                '',
+                'Please rebase or merge `main` into this branch:',
+                '```bash',
+                `git checkout ${headBranch}`,
+                'git merge origin/main',
+                'git push',
+                '```',
+              ].join('\n');
+
+              const { data: comments } = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+              });
+
+              if (!comments.some(c =>
+                c.body.includes('Stale Branch Warning') &&
+                c.body.includes(`${behind} commits behind`)
+              )) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  body: message,
+                });
+              }
+
+              core.setFailed(
+                `PR #${prNumber} is ${behind} commits behind main (threshold: ${STALE_THRESHOLD}).`
+              );
+            } else if (behind > 0) {
+              core.warning(
+                `PR #${prNumber} is ${behind} commits behind main. Consider rebasing.`
+              );
+            } else {
+              core.info(`PR #${prNumber} is up to date with main.`);
+            }
+
+  check-pr-mergeable:
+    name: Verify PR is mergeable
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Attempt trial merge
+        run: |
+          git fetch origin main
+          if ! git merge-tree $(git merge-base origin/main HEAD) origin/main HEAD | grep -q '<<<<<<'; then
+            echo "✅ No merge conflicts detected"
+          else
+            echo "❌ Merge conflicts detected with main"
+            echo ""
+            echo "Conflicting sections:"
+            git merge-tree $(git merge-base origin/main HEAD) origin/main HEAD | grep -A 3 '<<<<<<' || true
+            echo ""
+            echo "Please rebase or merge main into this branch."
+            exit 1
+          fi

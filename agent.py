@@ -6,6 +6,7 @@ Core agent interaction functions for running autonomous coding sessions.
 """
 
 import asyncio
+import re
 import sys
 import traceback
 from pathlib import Path
@@ -64,6 +65,38 @@ SESSION_COMPLETE: SessionStatus = "complete"
 
 # Completion signal that orchestrator outputs when all features are done
 COMPLETION_SIGNAL = "PROJECT_COMPLETE:"
+
+# Pattern for extracting ticket key from session response text.
+# Agents emit "PROJECT_TICKET: <KEY>" (e.g. "PROJECT_TICKET: AI-123") to indicate
+# which Linear ticket they are working on in the current session.
+TICKET_KEY_PATTERN = re.compile(r"PROJECT_TICKET:\s*([A-Z]+-\d+)")
+
+
+def extract_ticket_key(text: str) -> str | None:
+    """Extract the first Linear ticket key from session response text.
+
+    Scans ``text`` for the pattern ``PROJECT_TICKET: <KEY>`` (e.g.
+    ``PROJECT_TICKET: AI-123``) and returns the first match found.
+    Returns ``None`` when the pattern is absent or ``text`` is empty,
+    so callers can fall back gracefully without raising exceptions.
+
+    Args:
+        text: Raw response text produced by the agent session.
+
+    Returns:
+        The first ticket key string (e.g. ``"AI-123"``), or ``None`` if the
+        pattern is not found.
+
+    Examples:
+        >>> extract_ticket_key("Working on PROJECT_TICKET: AI-42 now.")
+        'AI-42'
+        >>> extract_ticket_key("No ticket here.")
+        None
+    """
+    if not text:
+        return None
+    match = TICKET_KEY_PATTERN.search(text)
+    return match.group(1) if match else None
 
 
 class SessionResult(NamedTuple):
@@ -178,13 +211,28 @@ async def run_agent_session(
 
         print("\n" + "-" * 70 + "\n")
 
+        # Extract ticket key from response text if not already known.
+        # Agents in the standalone loop emit "PROJECT_TICKET: <KEY>" to indicate
+        # which Linear ticket they picked up dynamically via MCP tools.
+        extracted_key = extract_ticket_key(response_text)
+        effective_ticket_key = ticket_key or extracted_key
+
+        # Broadcast updated ticket key when discovered from response text so the
+        # dashboard active-requirement panel shows the correct ticket within 10 s.
+        if extracted_key and not ticket_key:
+            await broadcast_agent_status(
+                agent_name=agent_name,
+                status="running",
+                metadata={"ticket_key": extracted_key}
+            )
+
         # Check for project completion signal from orchestrator
         if COMPLETION_SIGNAL in response_text:
             # Broadcast completion
             await broadcast_agent_status(
                 agent_name=agent_name,
                 status="idle",
-                metadata={"completion": True, "ticket_key": ticket_key} if ticket_key else {"completion": True}
+                metadata={"completion": True, "ticket_key": effective_ticket_key} if effective_ticket_key else {"completion": True}
             )
             return SessionResult(status=SESSION_COMPLETE, response=response_text)
 
@@ -192,7 +240,7 @@ async def run_agent_session(
         await broadcast_agent_status(
             agent_name=agent_name,
             status="idle",
-            metadata={"ticket_key": ticket_key} if ticket_key else {}
+            metadata={"ticket_key": effective_ticket_key} if effective_ticket_key else {}
         )
         return SessionResult(status=SESSION_CONTINUE, response=response_text)
 
@@ -374,12 +422,10 @@ async def run_autonomous_agent(
                     prompt,
                     project_dir,
                     agent_name="orchestrator" if is_first_run else "coding",
-                    # ticket_key extraction in standalone agent loop
-                    # In the standalone main loop, the loop invokes the agent using MCP tools to
-                    # discover and pick up Linear tickets dynamically each session — it does not
-                    # receive a pre-assigned ticket key. Extracting the ticket key would require
-                    # either a Linear API call or parsing response text. This is deferred to a
-                    # future standalone-loop improvement issue. See TECHNICAL_DEBT.md TD-001.
+                    # ticket_key starts as None; run_agent_session will extract it
+                    # from "PROJECT_TICKET: <KEY>" emitted in the response text
+                    # and broadcast an updated status to the dashboard automatically.
+                    # See TECHNICAL_DEBT.md TD-001 (resolved AI-231 2026-02-18).
                     ticket_key=None
                 )
         except ConnectionError as e:

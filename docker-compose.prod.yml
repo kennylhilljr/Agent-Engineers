@@ -1,0 +1,68 @@
+version: '3.9'
+
+# Production overrides for docker-compose.yml
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  dashboard:
+    image: ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      target: production
+      cache_from:
+        - ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - SECRET_KEY=${SECRET_KEY}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - PORT=8080
+    ports:
+      - "8080:8080"
+    volumes: []
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 30s
+        order: start-first
+        failure_action: rollback
+      rollback_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    logging:
+      driver: "awslogs"
+      options:
+        awslogs-group: "/ecs/agent-dashboard"
+        awslogs-region: "${AWS_REGION:-us-east-1}"
+        awslogs-stream-prefix: "dashboard"
+    networks:
+      - app-network
+
+  postgres:
+    deploy:
+      replicas: 0  # Use RDS in production
+
+  redis:
+    deploy:
+      replicas: 0  # Use ElastiCache in production
+
+networks:
+  app-network:
+    external: true
+    name: agent-dashboard-prod
