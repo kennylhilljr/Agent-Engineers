@@ -1307,6 +1307,26 @@
             font-family: monospace;
             font-size: 0.78rem;
         }
+        /* Ticket link styles for AI-261 */
+        .ticket-link {
+            color: var(--accent-blue-light);
+            text-decoration: none;
+            font-weight: 600;
+            border-bottom: 2px solid var(--accent-blue-light);
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        .ticket-link:hover {
+            color: #ffffff;
+            background-color: rgba(96, 165, 250, 0.15);
+            border-bottom-color: #ffffff;
+            border-radius: 2px;
+            padding: 0 2px;
+        }
+        .ticket-link:visited {
+            color: #a78bfa;
+            border-bottom-color: #a78bfa;
+        }
         .activity-item-model {
             font-size: 0.72rem;
             color: var(--text-muted);
@@ -2795,7 +2815,7 @@
                 let activeTaskHtml = '';
                 if (status === 'running' && agent.active_task) {
                     const task = agent.active_task;
-                    const ticketKey = escapeHtml(task.ticket_key || '');
+                    const ticketKey = linkifyTicketKey(task.ticket_key || '');
                     const ticketTitle = escapeHtml(task.title || 'Working...');
                     const taskDesc = escapeHtml(task.description || '');
                     const tokens = formatCount(task.tokens || 0);
@@ -3252,6 +3272,23 @@
         window.formatCount = formatCount;
         window.formatCost = formatCost;
         window.formatElapsed = formatElapsed;
+
+        /**
+         * Convert ticket keys (e.g., AI-262) in text to clickable hyperlinks to Linear issues.
+         * @param {string} text - Text possibly containing ticket keys like "AI-123"
+         * @returns {string} HTML string with ticket keys wrapped in anchor tags
+         */
+        function linkifyTicketKey(text) {
+            if (!text) return '';
+            // Pattern matches ticket keys like AI-123, AI-1, etc.
+            const ticketPattern = /([A-Z]+-\d+)/g;
+            return text.replace(ticketPattern, function(match) {
+                return `<a href="https://linear.app/ai-cli-macz/issue/${match}" class="ticket-link" target="_blank" title="Open ${match} in Linear">${escapeHtml(match)}</a>`;
+            });
+        }
+
+        // Expose for testing
+        window.linkifyTicketKey = linkifyTicketKey;
 
         /**
          * Update all active task timers. Called every second.
@@ -4260,7 +4297,7 @@
             const statusClass = event.status || 'success';
             const statusIconMap = { success: '✓', error: '✗', timeout: '⏱', blocked: '⊘' };
             const statusIcon = statusIconMap[statusClass] || '○';
-            const ticketKey = escapeHtml(event.ticket_key || '—');
+            const ticketKey = linkifyTicketKey(event.ticket_key || '—');
             const model = escapeHtml(event.model_used || '');
             const tokens = event.total_tokens ? formatCount(event.total_tokens) : '—';
             let timeStr = '—';
