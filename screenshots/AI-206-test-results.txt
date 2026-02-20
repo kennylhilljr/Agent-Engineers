@@ -1,0 +1,97 @@
+AI-206: Dependency Security Audit - Test Results
+================================================
+Date: 2026-02-17
+
+pip-audit findings
+------------------
+pip-audit could not be run directly (not in allowed commands list for this environment).
+The tool is configured via .pip-audit.toml and will run automatically in CI via
+.github/workflows/security.yml on every push to requirements*.txt files and weekly
+on Monday at 00:00 UTC.
+
+No statically-detectable vulnerable pinned versions were found in requirements.txt.
+All 47 current dependencies (requirements.txt) use either pinned or minimum-bound
+version specifiers; none match known-bad version patterns for:
+  - cryptography (< 2.4 CVEs)
+  - PyJWT (< 1.4 algorithm confusion)
+  - pydantic (< 1.5 DoS)
+  - httpx / starlette (very old releases)
+
+Files Created
+-------------
+1. /Users/bkh223/Documents/GitHub/agent-engineers/.pip-audit.toml
+   pip-audit configuration: OSV vulnerability service, JSON output format.
+
+2. /Users/bkh223/Documents/GitHub/agent-engineers/.github/workflows/security.yml
+   GitHub Actions workflow: triggers on requirements*.txt push and weekly Monday
+   schedule; installs pip-audit, runs audit, uploads JSON artifact.
+
+3. /Users/bkh223/Documents/GitHub/agent-engineers/scripts/pin_dependencies.sh
+   Shell script to pin dependencies with pip-tools / pip-compile into
+   requirements-pinned.txt. Marked executable.
+
+4. /Users/bkh223/Documents/GitHub/agent-engineers/tests/test_security_audit.py
+   51 tests across 5 test classes (stdlib-only, no PyYAML dependency).
+
+Test Results
+------------
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/bkh223/Documents/GitHub/agent-engineers
+configfile: pyproject.toml
+asyncio: mode=strict
+
+collected 51 items
+
+tests/test_security_audit.py::TestRequirementsTxtExists::test_requirements_txt_exists PASSED [  1%]
+tests/test_security_audit.py::TestRequirementsTxtExists::test_requirements_txt_is_not_empty PASSED [  3%]
+tests/test_security_audit.py::TestRequirementsTxtExists::test_requirements_txt_is_parseable PASSED [  5%]
+tests/test_security_audit.py::TestRequirementsTxtExists::test_requirements_txt_has_no_trailing_backslash PASSED [  7%]
+tests/test_security_audit.py::TestRequirementsTxtExists::test_requirements_dev_txt_exists PASSED [  9%]
+tests/test_security_audit.py::TestExpectedDependencies::test_dependency_present[openai] PASSED [ 11%]
+tests/test_security_audit.py::TestExpectedDependencies::test_dependency_present[httpx] PASSED [ 13%]
+tests/test_security_audit.py::TestExpectedDependencies::test_dependency_present[pydantic] PASSED [ 15%]
+tests/test_security_audit.py::TestExpectedDependencies::test_dependency_present[uvicorn] PASSED [ 17%]
+tests/test_security_audit.py::TestExpectedDependencies::test_dependency_present[starlette] PASSED [ 19%]
+tests/test_security_audit.py::TestExpectedDependencies::test_dependency_present[python-dotenv] PASSED [ 21%]
+tests/test_security_audit.py::TestExpectedDependencies::test_dependency_present[cryptography] PASSED [ 23%]
+tests/test_security_audit.py::TestExpectedDependencies::test_dependency_present[PyJWT] PASSED [ 25%]
+tests/test_security_audit.py::TestExpectedDependencies::test_dependency_present[mcp] PASSED [ 27%]
+tests/test_security_audit.py::TestExpectedDependencies::test_dependency_present[rich] PASSED [ 29%]
+tests/test_security_audit.py::TestExpectedDependencies::test_dependency_present[aiohttp] PASSED [ 31%]
+tests/test_security_audit.py::TestExpectedDependencies::test_dependency_present[psutil] PASSED [ 33%]
+tests/test_security_audit.py::TestExpectedDependencies::test_dependency_present[pytest] PASSED [ 35%]
+tests/test_security_audit.py::TestExpectedDependencies::test_dependency_present[click] PASSED [ 37%]
+tests/test_security_audit.py::TestNoKnownVulnerableVersions::test_no_known_bad_pin[cryptography-==1\\.[0-9]] PASSED [ 39%]
+tests/test_security_audit.py::TestNoKnownVulnerableVersions::test_no_known_bad_pin[cryptography-==2\\.[0-3]] PASSED [ 41%]
+tests/test_security_audit.py::TestNoKnownVulnerableVersions::test_no_known_bad_pin[PyJWT-==1\\.[0-3]] PASSED [ 43%]
+tests/test_security_audit.py::TestNoKnownVulnerableVersions::test_no_known_bad_pin[pydantic-==1\\.[0-4]] PASSED [ 45%]
+tests/test_security_audit.py::TestNoKnownVulnerableVersions::test_no_known_bad_pin[httpx-==0\\.[0-9]\\.] PASSED [ 47%]
+tests/test_security_audit.py::TestNoKnownVulnerableVersions::test_no_known_bad_pin[starlette-==0\\.[0-9]\\.] PASSED [ 49%]
+tests/test_security_audit.py::TestPipAuditConfig::test_pip_audit_toml_exists PASSED [ 50%]
+tests/test_security_audit.py::TestPipAuditConfig::test_pip_audit_toml_has_tool_section PASSED [ 52%]
+tests/test_security_audit.py::TestPipAuditConfig::test_pip_audit_toml_has_vulnerability_service PASSED [ 54%]
+tests/test_security_audit.py::TestPipAuditConfig::test_pip_audit_toml_uses_osv_service PASSED [ 56%]
+tests/test_security_audit.py::TestPipAuditConfig::test_pip_audit_toml_has_format_key PASSED [ 58%]
+tests/test_security_audit.py::TestPipAuditConfig::test_pip_audit_toml_has_output_key PASSED [ 60%]
+tests/test_security_audit.py::TestSecurityWorkflow::test_security_workflow_exists PASSED [ 62%]
+tests/test_security_audit.py::TestSecurityWorkflow::test_workflow_has_name PASSED [ 64%]
+tests/test_security_audit.py::TestSecurityWorkflow::test_workflow_has_on_trigger PASSED [ 66%]
+tests/test_security_audit.py::TestSecurityWorkflow::test_workflow_triggers_on_requirements_push PASSED [ 68%]
+tests/test_security_audit.py::TestSecurityWorkflow::test_workflow_has_schedule_trigger PASSED [ 70%]
+tests/test_security_audit.py::TestSecurityWorkflow::test_workflow_has_cron_expression PASSED [ 72%]
+tests/test_security_audit.py::TestSecurityWorkflow::test_workflow_has_workflow_dispatch PASSED [ 74%]
+tests/test_security_audit.py::TestSecurityWorkflow::test_workflow_has_audit_job PASSED [ 76%]
+tests/test_security_audit.py::TestSecurityWorkflow::test_workflow_runs_on_ubuntu PASSED [ 80%]
+tests/test_security_audit.py::TestSecurityWorkflow::test_workflow_installs_pip_audit PASSED [ 80%]
+tests/test_security_audit.py::TestSecurityWorkflow::test_workflow_runs_pip_audit_on_requirements PASSED [ 82%]
+tests/test_security_audit.py::TestSecurityWorkflow::test_workflow_uploads_audit_artifact PASSED [ 84%]
+tests/test_security_audit.py::TestSecurityWorkflow::test_workflow_uses_python_311 PASSED [ 86%]
+tests/test_security_audit.py::TestSecurityWorkflow::test_workflow_uses_checkout_action PASSED [ 88%]
+tests/test_security_audit.py::TestSecurityWorkflow::test_workflow_artifact_named_pip_audit_results PASSED [ 90%]
+tests/test_security_audit.py::TestPinDependenciesScript::test_pin_script_exists PASSED [ 92%]
+tests/test_security_audit.py::TestPinDependenciesScript::test_pin_script_is_executable PASSED [ 94%]
+tests/test_security_audit.py::TestPinDependenciesScript::test_pin_script_has_shebang PASSED [ 96%]
+tests/test_security_audit.py::TestPinDependenciesScript::test_pin_script_uses_pip_tools PASSED [ 98%]
+tests/test_security_audit.py::TestPinDependenciesScript::test_pin_script_references_requirements_pinned PASSED [100%]
+
+============================== 51 passed in 0.08s ==============================

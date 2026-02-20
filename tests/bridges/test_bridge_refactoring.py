@@ -11,7 +11,6 @@ Covers:
 """
 
 import pytest
-import asyncio
 from dataclasses import fields
 from typing import Optional
 
@@ -248,28 +247,25 @@ class TestProviderName:
 class TestSendTask:
     """Tests for the send_task abstract method."""
 
-    def test_send_task_returns_bridge_response(self):
+    @pytest.mark.asyncio
+    async def test_send_task_returns_bridge_response(self):
         """send_task returns a BridgeResponse instance."""
         bridge = MinimalBridge()
-        response = asyncio.get_event_loop().run_until_complete(
-            bridge.send_task("do something")
-        )
+        response = await bridge.send_task("do something")
         assert isinstance(response, BridgeResponse)
 
-    def test_send_task_content_reflects_task(self):
+    @pytest.mark.asyncio
+    async def test_send_task_content_reflects_task(self):
         """MinimalBridge echoes the task in the response content."""
         bridge = MinimalBridge()
-        response = asyncio.get_event_loop().run_until_complete(
-            bridge.send_task("hello world")
-        )
+        response = await bridge.send_task("hello world")
         assert "hello world" in response.content
 
-    def test_send_task_failure_bridge(self):
+    @pytest.mark.asyncio
+    async def test_send_task_failure_bridge(self):
         """AnotherBridge returns a failed BridgeResponse."""
         bridge = AnotherBridge()
-        response = asyncio.get_event_loop().run_until_complete(
-            bridge.send_task("anything")
-        )
+        response = await bridge.send_task("anything")
         assert response.success is False
         assert response.error == "simulated failure"
 

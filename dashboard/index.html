@@ -37,8 +37,8 @@
             background: var(--bg-primary);
             color: var(--text-primary);
             line-height: 1.6;
-            min-height: 100vh;
-            overflow-x: hidden;
+            height: 100vh;
+            overflow: hidden;
         }
 
         /* ========================================
@@ -47,7 +47,8 @@
         .dashboard-container {
             display: flex;
             flex-direction: column;
-            min-height: 100vh;
+            height: 100vh;
+            overflow: hidden;
         }
 
         /* Header */
@@ -116,6 +117,7 @@
             display: flex;
             flex-direction: column;
             background: var(--bg-primary);
+            overflow: hidden;
         }
 
         /* ========================================
@@ -905,6 +907,36 @@
             font-weight: 600;
         }
 
+        /* PM Task Launcher */
+        .pm-launcher { padding: 16px; }
+        .pm-launcher select, .pm-launcher textarea, .pm-launcher button {
+            width: 100%; margin-bottom: 8px; padding: 8px 12px;
+            border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.05); color: #e2e8f0;
+            font-family: inherit; font-size: 13px;
+        }
+        .pm-launcher textarea { min-height: 60px; resize: vertical; display: none; }
+        .pm-launcher textarea.visible { display: block; }
+        .pm-launcher .pm-btn-row { display: flex; gap: 8px; }
+        .pm-launcher .pm-btn-row button { flex: 1; cursor: pointer; font-weight: 600; }
+        .pm-btn-run { background: rgba(168,85,247,0.25) !important; border-color: rgba(168,85,247,0.4) !important; }
+        .pm-btn-run:hover { background: rgba(168,85,247,0.4) !important; }
+        .pm-btn-stop { background: rgba(239,68,68,0.25) !important; border-color: rgba(239,68,68,0.4) !important; }
+        .pm-status-badge {
+            display: inline-block; padding: 2px 8px; border-radius: 10px;
+            font-size: 11px; font-weight: 600; margin-left: 8px;
+        }
+        .pm-status-idle { background: rgba(100,116,139,0.2); color: #94a3b8; }
+        .pm-status-running { background: rgba(34,197,94,0.2); color: #22c55e; }
+        .pm-log-viewer {
+            max-height: 200px; overflow-y: auto; padding: 8px;
+            background: rgba(0,0,0,0.3); border-radius: 6px;
+            font-family: 'SF Mono', monospace; font-size: 11px;
+            color: #94a3b8; white-space: pre-wrap; margin-top: 8px;
+            display: none;
+        }
+        .pm-log-viewer.visible { display: block; }
+
         /* Enhanced Agent Status Panel */
         .agent-details {
             display: flex;
@@ -1274,6 +1306,26 @@
             color: var(--accent-blue-light);
             font-family: monospace;
             font-size: 0.78rem;
+        }
+        /* Ticket link styles for AI-261 */
+        .ticket-link {
+            color: var(--accent-blue-light);
+            text-decoration: none;
+            font-weight: 600;
+            border-bottom: 2px solid var(--accent-blue-light);
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        .ticket-link:hover {
+            color: #ffffff;
+            background-color: rgba(96, 165, 250, 0.15);
+            border-bottom-color: #ffffff;
+            border-radius: 2px;
+            padding: 0 2px;
+        }
+        .ticket-link:visited {
+            color: #a78bfa;
+            border-bottom-color: #a78bfa;
         }
         .activity-item-model {
             font-size: 0.72rem;
@@ -1868,6 +1920,194 @@
         .global-control-btn.resume-all-btn:hover {
             background: rgba(16, 185, 129, 0.35);
         }
+        .global-control-btn.accelerate-btn {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.5);
+            color: #3b82f6;
+        }
+        .global-control-btn.accelerate-btn:hover {
+            background: rgba(59, 130, 246, 0.35);
+        }
+        .global-control-btn.accelerate-btn.active {
+            background: rgba(59, 130, 246, 0.4);
+            border-color: #3b82f6;
+            box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+        }
+
+        /* AI-263: Acceleration Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .modal {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--accent-blue-light);
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .modal-close:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+        .modal-body {
+            margin-bottom: 20px;
+        }
+        .modal-section {
+            margin-bottom: 16px;
+        }
+        .modal-label {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        .modal-slider-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .modal-slider {
+            flex: 1;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--bg-tertiary);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        .modal-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            cursor: pointer;
+            border: 2px solid var(--bg-primary);
+        }
+        .modal-slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            cursor: pointer;
+            border: 2px solid var(--bg-primary);
+        }
+        .modal-slider-value {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--accent-blue-light);
+            min-width: 50px;
+            text-align: right;
+        }
+        .modal-info {
+            background: var(--bg-tertiary);
+            border-left: 3px solid var(--accent-blue);
+            padding: 12px;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+        .modal-metrics {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .modal-metric {
+            background: var(--bg-tertiary);
+            padding: 12px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .modal-metric-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .modal-metric-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-top: 4px;
+        }
+        .modal-footer {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        .modal-btn {
+            padding: 8px 16px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .modal-btn-primary {
+            background: var(--accent-blue);
+            color: white;
+        }
+        .modal-btn-primary:hover {
+            background: var(--accent-blue-light);
+        }
+        .modal-btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+        .modal-btn-secondary:hover {
+            background: var(--border-color);
+        }
+        .modal-btn-danger {
+            background: var(--accent-red);
+            color: white;
+        }
+        .modal-btn-danger:hover {
+            background: #dc2626;
+        }
 
         /* Requirements View Panel (AI-154) */
         .requirements-panel {
@@ -2098,6 +2338,7 @@
             <div class="global-control-buttons" id="global-control-buttons">
                 <button class="global-control-btn pause-all-btn" id="pause-all-btn" title="Pause all agents">Pause All</button>
                 <button class="global-control-btn resume-all-btn" id="resume-all-btn" title="Resume all agents" style="display:none">Resume All</button>
+                <button class="global-control-btn accelerate-btn" id="accelerate-btn" title="Configure task acceleration">Accelerate</button>
             </div>
             <div class="header-stats" id="global-metrics-bar" aria-label="Global Dashboard Metrics">
                 <div class="stat-item">
@@ -2142,6 +2383,32 @@
                     <h2 class="panel-section-title">Agent Status</h2>
                     <div class="agent-list" id="agent-list">
                         <!-- Agent items will be populated by JavaScript -->
+                    </div>
+                </section>
+
+                <!-- PM Task Launcher -->
+                <section class="panel-section">
+                    <h2 class="panel-section-title">PM Task Launcher <span id="pm-status-badge" class="pm-status-badge pm-status-idle">idle</span></h2>
+                    <div class="pm-launcher">
+                        <select id="pm-task-select" onchange="togglePMCustom()">
+                            <option value="full-review">Full Project Review</option>
+                            <option value="backlog-review">Backlog Grooming</option>
+                            <option value="sprint-planning">Sprint Planning</option>
+                            <option value="prompt-review">Prompt Audit</option>
+                            <option value="agent-analysis">Agent Analysis</option>
+                            <option value="custom">Custom Task...</option>
+                        </select>
+                        <textarea id="pm-custom-prompt" placeholder="Describe the custom PM task..."></textarea>
+                        <select id="pm-model-select">
+                            <option value="sonnet">Sonnet</option>
+                            <option value="haiku">Haiku</option>
+                            <option value="opus">Opus</option>
+                        </select>
+                        <div class="pm-btn-row">
+                            <button class="pm-btn-run" onclick="runPMTask()">Run Task</button>
+                            <button class="pm-btn-stop" onclick="stopPMTask()">Stop</button>
+                        </div>
+                        <div id="pm-log-viewer" class="pm-log-viewer"></div>
                     </div>
                 </section>
 
@@ -2309,6 +2576,57 @@
         </div>
     </div>
 
+    <!-- AI-263: Acceleration Modal -->
+    <div class="modal-overlay" id="acceleration-modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">Task Acceleration</h2>
+                <button class="modal-close" id="acceleration-modal-close" aria-label="Close modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-section">
+                    <label class="modal-label" for="acceleration-slider">Acceleration Factor</label>
+                    <div class="modal-slider-container">
+                        <input type="range" min="1.0" max="10.0" step="0.5" value="2.0" class="modal-slider" id="acceleration-slider">
+                        <span class="modal-slider-value" id="acceleration-value">2.0x</span>
+                    </div>
+                </div>
+                <div class="modal-section">
+                    <div class="modal-info">
+                        Acceleration enables parallel task processing to speed up agent workflows.
+                        Higher factors allow more concurrent tasks but may increase resource usage.
+                    </div>
+                </div>
+                <div class="modal-section">
+                    <label class="modal-label">Current Metrics</label>
+                    <div class="modal-metrics">
+                        <div class="modal-metric">
+                            <div class="modal-metric-label">Active Tasks</div>
+                            <div class="modal-metric-value" id="accel-active-tasks">0</div>
+                        </div>
+                        <div class="modal-metric">
+                            <div class="modal-metric-label">Queue Size</div>
+                            <div class="modal-metric-value" id="accel-queue-size">0</div>
+                        </div>
+                        <div class="modal-metric">
+                            <div class="modal-metric-label">Completed</div>
+                            <div class="modal-metric-value" id="accel-completed-tasks">0</div>
+                        </div>
+                        <div class="modal-metric">
+                            <div class="modal-metric-label">Avg Duration</div>
+                            <div class="modal-metric-value" id="accel-avg-duration">0.0s</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-secondary" id="acceleration-cancel">Cancel</button>
+                <button class="modal-btn modal-btn-danger" id="acceleration-disable" style="display:none;">Disable</button>
+                <button class="modal-btn modal-btn-primary" id="acceleration-enable">Enable</button>
+            </div>
+        </div>
+    </div>
+
     <!-- JavaScript -->
     <script>
         // ========================================
@@ -2386,6 +2704,9 @@
             { id: 'groq',            name: 'Groq',            model: 'haiku',  status: 'idle', description: 'Ultra-fast Llama 3.3 70B via Groq LPU.', invocations: 0, level: 1 },
             { id: 'kimi',            name: 'KIMI',            model: 'haiku',  status: 'idle', description: 'Moonshot AI with 2M token context.', invocations: 0, level: 1 },
             { id: 'windsurf',        name: 'Windsurf',        model: 'haiku',  status: 'idle', description: 'Windsurf IDE for parallel coding tasks.', invocations: 0, level: 1 },
+            { id: 'openrouter_dev', name: 'OpenRouter Dev', model: 'haiku',  status: 'idle', description: 'Multi-model access via OpenRouter (200+ models).', invocations: 0, level: 1 },
+            { id: 'product_manager',name: 'Product Manager',model: 'sonnet', status: 'idle', description: 'Backlog grooming, sprint planning, cross-agent coordination.', invocations: 0, level: 1 },
+            { id: 'designer',       name: 'Designer',       model: 'haiku',  status: 'idle', description: 'UI/UX design, CSS, design systems, accessibility.', invocations: 0, level: 1 },
         ];
 
         // ========================================
@@ -2494,7 +2815,7 @@
                 let activeTaskHtml = '';
                 if (status === 'running' && agent.active_task) {
                     const task = agent.active_task;
-                    const ticketKey = escapeHtml(task.ticket_key || '');
+                    const ticketKey = linkifyTicketKey(task.ticket_key || '');
                     const ticketTitle = escapeHtml(task.title || 'Working...');
                     const taskDesc = escapeHtml(task.description || '');
                     const tokens = formatCount(task.tokens || 0);
@@ -2951,6 +3272,23 @@
         window.formatCount = formatCount;
         window.formatCost = formatCost;
         window.formatElapsed = formatElapsed;
+
+        /**
+         * Convert ticket keys (e.g., AI-262) in text to clickable hyperlinks to Linear issues.
+         * @param {string} text - Text possibly containing ticket keys like "AI-123"
+         * @returns {string} HTML string with ticket keys wrapped in anchor tags
+         */
+        function linkifyTicketKey(text) {
+            if (!text) return '';
+            // Pattern matches ticket keys like AI-123, AI-1, etc.
+            const ticketPattern = /([A-Z]+-\d+)/g;
+            return text.replace(ticketPattern, function(match) {
+                return `<a href="https://linear.app/ai-cli-macz/issue/${match}" class="ticket-link" target="_blank" title="Open ${match} in Linear">${escapeHtml(match)}</a>`;
+            });
+        }
+
+        // Expose for testing
+        window.linkifyTicketKey = linkifyTicketKey;
 
         /**
          * Update all active task timers. Called every second.
@@ -3492,42 +3830,96 @@
          * Pauses all agents simultaneously. Sets globalPaused flag, marks all
          * non-idle agents as paused, shows the banner, and updates the header buttons.
          */
-        function pauseAll() {
-            window.globalPaused = true;
-            state.agents.forEach(function(agent) {
-                const id = agent.id || agent.name;
-                window.pausedAgents.add(id);
-                agent.status = 'paused';
-            });
+        /**
+         * Apply the system-paused visual state: show/hide banner and toggle buttons.
+         * @param {boolean} paused
+         */
+        function applySystemPausedState(paused) {
+            window.globalPaused = paused;
             const banner = document.getElementById('global-pause-banner');
-            if (banner) banner.classList.add('visible');
+            if (banner) {
+                if (paused) {
+                    banner.classList.add('visible');
+                } else {
+                    banner.classList.remove('visible');
+                }
+            }
             const pauseBtn = document.getElementById('pause-all-btn');
             const resumeBtn = document.getElementById('resume-all-btn');
-            if (pauseBtn) pauseBtn.style.display = 'none';
-            if (resumeBtn) resumeBtn.style.display = '';
-            addSystemMessage('All agents paused — system is idle');
-            window.renderAgents();
+            if (pauseBtn) pauseBtn.style.display = paused ? 'none' : '';
+            if (resumeBtn) resumeBtn.style.display = paused ? '' : 'none';
+        }
+        window.applySystemPausedState = applySystemPausedState;
+
+        /**
+         * Fetch system-status from backend and sync banner state on page load (AI-89).
+         */
+        async function fetchSystemStatus() {
+            try {
+                const resp = await fetch('/api/agents/system-status');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                applySystemPausedState(data.system_paused);
+            } catch (err) {
+                console.warn('[AI-89] fetchSystemStatus failed:', err);
+            }
+        }
+        window.fetchSystemStatus = fetchSystemStatus;
+
+        /**
+         * Pauses all agents simultaneously via backend API (AI-89).
+         * Sets _system_paused on server, adds feed event, shows banner.
+         */
+        async function pauseAll() {
+            const pauseBtn = document.getElementById('pause-all-btn');
+            if (pauseBtn) { pauseBtn.disabled = true; }
+            try {
+                const resp = await fetch('/api/agents/pause-all', { method: 'POST' });
+                if (resp.ok) {
+                    applySystemPausedState(true);
+                    state.agents.forEach(function(agent) {
+                        const id = agent.id || agent.name;
+                        window.pausedAgents.add(id);
+                        agent.status = 'paused';
+                    });
+                    addSystemMessage('All agents paused — system is idle');
+                    window.renderAgents();
+                } else {
+                    console.error('[AI-89] pause-all failed:', resp.status);
+                }
+            } catch (err) {
+                console.error('[AI-89] pause-all error:', err);
+            } finally {
+                if (pauseBtn) { pauseBtn.disabled = false; }
+            }
         }
         window.pauseAll = pauseAll;
 
         /**
-         * Resumes all paused agents. Clears globalPaused flag, restores all agents
-         * to idle, hides the banner, and updates the header buttons.
+         * Resumes all paused agents via backend API (AI-89).
+         * Clears _system_paused on server, adds feed event, hides banner.
          */
-        function resumeAll() {
-            window.globalPaused = false;
-            window.pausedAgents.clear();
-            state.agents.forEach(function(agent) {
-                agent.status = 'idle';
-            });
-            const banner = document.getElementById('global-pause-banner');
-            if (banner) banner.classList.remove('visible');
-            const pauseBtn = document.getElementById('pause-all-btn');
+        async function resumeAll() {
             const resumeBtn = document.getElementById('resume-all-btn');
-            if (pauseBtn) pauseBtn.style.display = '';
-            if (resumeBtn) resumeBtn.style.display = 'none';
-            addSystemMessage('All agents resumed');
-            window.renderAgents();
+            if (resumeBtn) { resumeBtn.disabled = true; }
+            try {
+                const resp = await fetch('/api/agents/resume-all', { method: 'POST' });
+                if (resp.ok) {
+                    applySystemPausedState(false);
+                    window.pausedAgents.clear();
+                    state.agents.forEach(function(agent) {
+                        agent.status = 'idle';
+                    });
+                    addSystemMessage('All agents resumed');
+                    window.renderAgents();
+                } else {
+                    console.error('[AI-89] resume-all failed:', resp.status);
+                }
+            } catch (err) {
+                console.error('[AI-89] resume-all error:', err);
+            } finally {
+                if (resumeBtn) { resumeBtn.disabled = false; }
+            }
         }
         window.resumeAll = resumeAll;
 
@@ -3905,7 +4297,7 @@
             const statusClass = event.status || 'success';
             const statusIconMap = { success: '✓', error: '✗', timeout: '⏱', blocked: '⊘' };
             const statusIcon = statusIconMap[statusClass] || '○';
-            const ticketKey = escapeHtml(event.ticket_key || '—');
+            const ticketKey = linkifyTicketKey(event.ticket_key || '—');
             const model = escapeHtml(event.model_used || '');
             const tokens = event.total_tokens ? formatCount(event.total_tokens) : '—';
             let timeStr = '—';
@@ -4671,6 +5063,217 @@
         window.loadCharts = loadCharts;
 
         // ========================================
+        // ── PM Task Launcher Functions ──────────────────────────────────
+        let _pmPollTimer = null;
+
+        function togglePMCustom() {
+            const sel = document.getElementById('pm-task-select');
+            const ta = document.getElementById('pm-custom-prompt');
+            if (ta) ta.classList.toggle('visible', sel.value === 'custom');
+        }
+
+        function updatePMBadge(running) {
+            const badge = document.getElementById('pm-status-badge');
+            if (!badge) return;
+            badge.textContent = running ? 'running' : 'idle';
+            badge.className = 'pm-status-badge ' + (running ? 'pm-status-running' : 'pm-status-idle');
+        }
+
+        async function runPMTask() {
+            const task = document.getElementById('pm-task-select').value;
+            const model = document.getElementById('pm-model-select').value;
+            const custom = document.getElementById('pm-custom-prompt').value;
+            try {
+                const resp = await fetch('/api/pm/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task, model, custom_prompt: custom }),
+                });
+                const data = await resp.json();
+                if (data.error) { alert(data.error); return; }
+                updatePMBadge(true);
+                startPMPoll();
+                const log = document.getElementById('pm-log-viewer');
+                if (log) { log.classList.add('visible'); log.textContent = 'Task started...\n'; }
+            } catch (e) { console.error('PM run error:', e); }
+        }
+
+        async function stopPMTask() {
+            try {
+                await fetch('/api/pm/stop', { method: 'POST' });
+                updatePMBadge(false);
+                stopPMPoll();
+            } catch (e) { console.error('PM stop error:', e); }
+        }
+
+        function startPMPoll() {
+            stopPMPoll();
+            _pmPollTimer = setInterval(checkPMStatus, 3000);
+        }
+        function stopPMPoll() {
+            if (_pmPollTimer) { clearInterval(_pmPollTimer); _pmPollTimer = null; }
+        }
+
+        async function checkPMStatus() {
+            try {
+                const resp = await fetch('/api/pm/status');
+                const data = await resp.json();
+                updatePMBadge(data.running);
+                const log = document.getElementById('pm-log-viewer');
+                if (log && data.log_tail) {
+                    log.classList.add('visible');
+                    log.textContent = data.log_tail;
+                    log.scrollTop = log.scrollHeight;
+                }
+                if (!data.running) stopPMPoll();
+            } catch (e) { /* ignore */ }
+        }
+
+        // ========================================
+        // AI-263: ACCELERATION FEATURE
+        // ========================================
+        let accelerationState = {
+            enabled: false,
+            factor: 2.0,
+            mode: 'enabled',
+            metrics: {
+                active_tasks: 0,
+                completed_tasks: 0,
+                queue_size: 0,
+                avg_task_duration: 0.0
+            }
+        };
+
+        function openAccelerationModal() {
+            const modal = document.getElementById('acceleration-modal-overlay');
+            const slider = document.getElementById('acceleration-slider');
+            const valueDisplay = document.getElementById('acceleration-value');
+            const enableBtn = document.getElementById('acceleration-enable');
+            const disableBtn = document.getElementById('acceleration-disable');
+
+            // Set current values
+            slider.value = accelerationState.factor;
+            valueDisplay.textContent = accelerationState.factor.toFixed(1) + 'x';
+
+            // Show/hide buttons based on current state
+            if (accelerationState.enabled) {
+                enableBtn.style.display = 'none';
+                disableBtn.style.display = 'block';
+            } else {
+                enableBtn.style.display = 'block';
+                disableBtn.style.display = 'none';
+            }
+
+            // Update metrics display
+            updateAccelerationMetrics();
+
+            modal.classList.add('active');
+        }
+
+        function closeAccelerationModal() {
+            document.getElementById('acceleration-modal-overlay').classList.remove('active');
+        }
+
+        function updateAccelerationMetrics() {
+            document.getElementById('accel-active-tasks').textContent = accelerationState.metrics.active_tasks;
+            document.getElementById('accel-queue-size').textContent = accelerationState.metrics.queue_size;
+            document.getElementById('accel-completed-tasks').textContent = accelerationState.metrics.completed_tasks;
+            document.getElementById('accel-avg-duration').textContent = accelerationState.metrics.avg_task_duration.toFixed(2) + 's';
+        }
+
+        async function enableAcceleration() {
+            const factor = parseFloat(document.getElementById('acceleration-slider').value);
+
+            try {
+                const response = await fetch('/api/acceleration/enable', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ factor: factor, mode: 'enabled' })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    accelerationState.enabled = true;
+                    accelerationState.factor = factor;
+                    accelerationState.mode = data.mode || 'enabled';
+
+                    // Update button appearance
+                    const btn = document.getElementById('accelerate-btn');
+                    btn.classList.add('active');
+                    btn.textContent = `Accelerate (${factor.toFixed(1)}x)`;
+
+                    closeAccelerationModal();
+
+                    // Show success message in activity feed
+                    addActivity('system', `Acceleration enabled at ${factor.toFixed(1)}x`, 'info');
+                } else {
+                    const error = await response.json();
+                    console.error('Failed to enable acceleration:', error);
+                    alert('Failed to enable acceleration: ' + (error.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error enabling acceleration:', error);
+                alert('Error enabling acceleration: ' + error.message);
+            }
+        }
+
+        async function disableAcceleration() {
+            try {
+                const response = await fetch('/api/acceleration/disable', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (response.ok) {
+                    accelerationState.enabled = false;
+                    accelerationState.factor = 1.0;
+                    accelerationState.mode = 'disabled';
+
+                    // Update button appearance
+                    const btn = document.getElementById('accelerate-btn');
+                    btn.classList.remove('active');
+                    btn.textContent = 'Accelerate';
+
+                    closeAccelerationModal();
+
+                    // Show success message in activity feed
+                    addActivity('system', 'Acceleration disabled', 'info');
+                } else {
+                    const error = await response.json();
+                    console.error('Failed to disable acceleration:', error);
+                    alert('Failed to disable acceleration: ' + (error.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error disabling acceleration:', error);
+                alert('Error disabling acceleration: ' + error.message);
+            }
+        }
+
+        async function fetchAccelerationStatus() {
+            try {
+                const response = await fetch('/api/acceleration/status');
+                if (response.ok) {
+                    const data = await response.json();
+                    accelerationState.enabled = data.enabled;
+                    accelerationState.factor = data.acceleration_factor;
+                    accelerationState.mode = data.mode;
+                    accelerationState.metrics = data.metrics || accelerationState.metrics;
+
+                    // Update button appearance
+                    const btn = document.getElementById('accelerate-btn');
+                    if (data.enabled) {
+                        btn.classList.add('active');
+                        btn.textContent = `Accelerate (${data.acceleration_factor.toFixed(1)}x)`;
+                    } else {
+                        btn.classList.remove('active');
+                        btn.textContent = 'Accelerate';
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching acceleration status:', error);
+            }
+        }
+
         function init() {
             // Initialize state
             state.agents = [...mockAgents];
@@ -4736,6 +5339,27 @@
             document.getElementById('pause-all-btn').addEventListener('click', pauseAll);
             document.getElementById('resume-all-btn').addEventListener('click', resumeAll);
 
+            // AI-263: Acceleration modal controls
+            document.getElementById('accelerate-btn').addEventListener('click', openAccelerationModal);
+            document.getElementById('acceleration-modal-close').addEventListener('click', closeAccelerationModal);
+            document.getElementById('acceleration-cancel').addEventListener('click', closeAccelerationModal);
+            document.getElementById('acceleration-enable').addEventListener('click', enableAcceleration);
+            document.getElementById('acceleration-disable').addEventListener('click', disableAcceleration);
+
+            // Acceleration slider value update
+            document.getElementById('acceleration-slider').addEventListener('input', function(e) {
+                const value = parseFloat(e.target.value);
+                document.getElementById('acceleration-value').textContent = value.toFixed(1) + 'x';
+            });
+
+            // Close modal on overlay click
+            document.getElementById('acceleration-modal-overlay').addEventListener('click', function(e) {
+                if (e.target === this) closeAccelerationModal();
+            });
+
+            // Fetch initial acceleration status
+            fetchAccelerationStatus();
+
             // Load global metrics from /api/metrics
             loadGlobalMetrics();
 
@@ -4773,6 +5397,10 @@
                                 const msg = JSON.parse(event.data);
                                 if (msg.type === 'agent_event' || msg.type === 'activity') {
                                     addLiveActivityEvent(msg.data || msg);
+                                } else if (msg.type === 'system_status_change') {
+                                    // AI-89: Global pause/resume state changed
+                                    console.log('[AI-89] system_status_change:', msg);
+                                    applySystemPausedState(msg.system_paused);
                                 }
                             } catch(e) { /* ignore parse errors */ }
                         };
@@ -4787,6 +5415,9 @@
                     connect();
                 }
             })();
+
+            // AI-89: Load system-paused state on startup (banner + buttons)
+            fetchSystemStatus();
 
             console.log('Agent Dashboard initialized successfully');
             console.log('- Provider switcher with 6 providers');

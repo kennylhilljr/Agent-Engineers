@@ -38,6 +38,18 @@ class BaseBridge(ABC):
         """Return authentication information for this provider."""
         ...
 
+    def create_session(self, **kwargs) -> Any:
+        """Create and return a new session for the provider.
+
+        Subclasses that support session-based interaction must override this
+        method.  The default implementation raises NotImplementedError so that
+        bridges which need it are reminded to implement it, without forcing
+        every minimal test-only subclass to provide a stub.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not implement create_session()"
+        )
+
     def validate_response(self, response: BridgeResponse) -> bool:
         """Validate a bridge response. Can be overridden."""
         return response.success and bool(response.content)

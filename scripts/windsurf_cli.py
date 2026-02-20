@@ -72,7 +72,7 @@ def run_task(bridge: WindsurfBridge, args: argparse.Namespace) -> None:
     print("Submitting task...")
     print("-" * 50)
 
-    response = bridge.send_task(session, task)
+    response = bridge.dispatch_task(session, task)
 
     if response.exit_code == 0:
         print(f"\nResult:\n{response.content}")
@@ -117,7 +117,7 @@ def interactive_mode(bridge: WindsurfBridge, args: argparse.Namespace) -> None:
             continue
 
         print("Running...", flush=True)
-        response = bridge.send_task(session, task)
+        response = bridge.dispatch_task(session, task)
         if response.exit_code == 0:
             print(f"\nResult:\n{response.content}")
         else:

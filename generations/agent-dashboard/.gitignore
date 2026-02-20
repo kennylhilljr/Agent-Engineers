@@ -1,81 +1,50 @@
-# Python cache files
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
+# Agent-generated output directories
+generations/
 
-# Virtual environments
-venv/
-env/
-ENV/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# IDE and editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-Thumbs.db
-*.iml
-.project
-.pydevproject
-.settings/
-*.sublime-project
-*.sublime-workspace
-
-# Agent metrics and state files
-.agent_metrics.json
-.linear_project.json
-.linear_project_state.json
-
-# Environment files
-.env
-.env.local
-.env.*.local
-
-# Logs
-*.log
+# Log files
 logs/
 
-# IDE temporary files
-*.tmp
-*.bak
-.cache/
+# Environment and dependencies
+.env
+.env.tmp
+venv
+venv_linux
+node_modules/
+__pycache__/
+*.pyc
 
-# OS specific
+# IDE and system files
 .DS_Store
-.AppleDouble
-.LSOverride
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
+api-key
+.ruff_cache/
+.playwright-mcp
+.jira_tokens.json
 
-# Testing
-.pytest_cache/
+# Test evidence
+screenshots/
+
+# Agent metrics
+.agent_metrics.json
+
+# Worktrees
+.worktrees/
+
+# Auto-generated agent reports (root-level litter)
+AI-*_*.txt
+AI-*_*.md
+SETUP_REPORT_*.md
+FINAL_SETUP_REPORT.md
+FINAL_VERIFICATION.txt
+LINEAR_*.md
+LINEAR_*.txt
+SETUP_SUMMARY.txt
+ALL_ISSUES_CHECKLIST.txt
+
+# PM task output
+.pm_task_output.log
+
+# Agent metrics locking
+.agent_metrics.lock
+
+# Coverage
 .coverage
-htmlcov/
-
-# Build and distribution
-build/
-dist/
-*.tar.gz

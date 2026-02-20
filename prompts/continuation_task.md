@@ -42,6 +42,35 @@ Delegate to the `linear` agent:
 2. Output: `PROJECT_COMPLETE: All features implemented and verified.`
 3. Session will end.
 
+### Step 2b: Product Manager Review (CONDITIONAL)
+
+**Check whether to trigger PM review:**
+- Read `tickets_since_pm_review` from `.linear_project.json` (default 0 if missing)
+- **TRIGGER PM if ANY of the following are true:**
+  - `tickets_since_pm_review` >= 5 (every 5th completed ticket)
+  - `last_pm_review_at` is missing (first session with PM enabled)
+  - All remaining tickets are blocked or have unclear requirements
+  - Any remaining ticket has a `[DESIGN]` prefix
+
+**If PM review triggers:**
+Delegate to `product_manager` agent:
+"Review the current project state and provide recommendations:
+
+- Project state: [contents of .linear_project.json]
+- Completed since last review: [list of done tickets since last PM review]
+- Remaining tickets: [all Todo tickets with full details from Step 2]
+- Blocked tickets: [any tickets with unclear/ambiguous requirements]
+
+Provide: backlog re-prioritization, quality review of recent completions, and sprint plan for next batch."
+
+After PM returns:
+1. Update `.linear_project.json`: set `last_pm_review_at` to current ISO timestamp, reset `tickets_since_pm_review` to 0
+2. If PM recommends re-ordering tickets, update your work queue accordingly
+3. If PM identifies [DESIGN]-prefixed tickets, delegate those to `designer` agent before coding
+4. If PM flags quality issues, create fix tickets via `ops` agent
+
+**If PM review SKIPPED:** Proceed to Step 3.
+
 ### Step 3: CONDITIONAL Verification Test
 
 **Check whether to run verification:**
@@ -195,7 +224,7 @@ The pr_reviewer agent will return one of:
       - Known limitations (if any)
    2. Send Slack notification: ':white_check_mark: Completed: [TITLE] ([KEY]) — PR merged, Tests: [pass/fail count]'
    Return: confirmation of all operations."
-3. Update `.linear_project.json`: increment `tickets_since_verification`
+3. Update `.linear_project.json`: increment `tickets_since_verification` and `tickets_since_pm_review`
 
 **If CHANGES_REQUESTED:**
 1. Delegate to `ops` agent:
@@ -220,7 +249,7 @@ The pr_reviewer agent will return one of:
 
 2. **If all_complete is true:** Go to Project Complete (output `PROJECT_COMPLETE:`).
 
-3. **If there are remaining Todo issues:** Go back to **Step 3** (Conditional Verification) with the new issue and continue the full workflow (Steps 3 → 5 → 6 → 7 → 8 → 9 → 10 → 10b).
+3. **If there are remaining Todo issues:** Go back to **Step 2b** (PM Review check) then **Step 3** (Conditional Verification) with the new issue and continue the full workflow (Steps 2b → 3 → 5 → 6 → 7 → 8 → 9 → 10 → 10b).
 
 **PIPELINE OPTIMIZATION (Proposal 7):** When you have multiple remaining tickets and the coding agent is available, you can start coding the next ticket WHILE the PR reviewer is reviewing the current one. Issue both delegations in parallel:
 - `pr_reviewer` reviewing PR for Ticket A

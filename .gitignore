@@ -26,5 +26,32 @@ screenshots/
 # Agent metrics
 .agent_metrics.json
 
+# AI-225: Multi-project config (local file, not committed)
+.agent_projects.json
+
 # Worktrees
 .worktrees/
+
+# Auto-generated agent reports (root-level litter)
+AI-*_*.txt
+AI-*_*.md
+SETUP_REPORT_*.md
+FINAL_SETUP_REPORT.md
+FINAL_VERIFICATION.txt
+LINEAR_*.md
+LINEAR_*.txt
+SETUP_SUMMARY.txt
+ALL_ISSUES_CHECKLIST.txt
+
+# PM task output
+.pm_task_output.log
+
+# Agent metrics locking
+.agent_metrics.lock
+
+# Coverage
+.coverage
+
+# AI-227: Telemetry event storage (local JSONL — not committed)
+.telemetry_events.jsonl
+.telemetry_optout

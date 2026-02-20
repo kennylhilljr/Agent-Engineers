@@ -61,15 +61,31 @@ class TestProviderStatusDetection:
             assert os.getenv('MOONSHOT_API_KEY') == 'test-key'
 
 
+def _make_unavailable_registry():
+    """Helper: create a mock registry whose bridge is always unavailable."""
+    mock_bridge = MagicMock()
+    mock_bridge.is_available.return_value = False
+    mock_registry = MagicMock()
+    mock_registry.get.return_value = mock_bridge
+    return mock_registry
+
+
 class TestGeminiIntegration:
     """Test Gemini bridge integration."""
 
     @pytest.mark.asyncio
     async def test_gemini_streaming_without_bridge(self):
-        """Test Gemini streaming falls back gracefully without bridge."""
-        chunks = []
-        async for chunk in stream_gemini_response('Hello', '2.5-flash'):
-            chunks.append(chunk)
+        """Test Gemini streaming falls back gracefully without bridge.
+
+        Simulates an environment where the Gemini bridge has no API key
+        by mocking the bridge registry to return an unavailable bridge.
+        """
+        mock_registry = _make_unavailable_registry()
+
+        with patch('dashboard.chat_handler._provider_bridge_registry', mock_registry):
+            chunks = []
+            async for chunk in stream_gemini_response('Hello', '2.5-flash'):
+                chunks.append(chunk)
 
         # Should have error and done chunks
         assert len(chunks) >= 2
@@ -81,13 +97,15 @@ class TestGeminiIntegration:
 
     @pytest.mark.asyncio
     async def test_gemini_route_in_chat_response_without_key(self):
-        """Test Gemini routing falls back to mock without API key."""
-        with patch.dict(os.environ, {}, clear=True):
+        """Test Gemini routing falls back gracefully when bridge is unavailable."""
+        mock_registry = _make_unavailable_registry()
+
+        with patch('dashboard.chat_handler._provider_bridge_registry', mock_registry):
             chunks = []
             async for chunk in stream_chat_response('Hello', 'gemini', '2.5-flash'):
                 chunks.append(chunk)
 
-            # Should complete with mock response
+            # Should complete (with mock fallback since bridge is unavailable)
             assert len(chunks) > 0
             assert chunks[-1]['type'] == 'done'
 
@@ -97,10 +115,17 @@ class TestGroqIntegration:
 
     @pytest.mark.asyncio
     async def test_groq_streaming_without_bridge(self):
-        """Test Groq streaming falls back gracefully without bridge."""
-        chunks = []
-        async for chunk in stream_groq_response('Hello', 'llama-3.3-70b'):
-            chunks.append(chunk)
+        """Test Groq streaming falls back gracefully without bridge.
+
+        Simulates an environment where the Groq bridge has no API key
+        by mocking the bridge registry to return an unavailable bridge.
+        """
+        mock_registry = _make_unavailable_registry()
+
+        with patch('dashboard.chat_handler._provider_bridge_registry', mock_registry):
+            chunks = []
+            async for chunk in stream_groq_response('Hello', 'llama-3.3-70b'):
+                chunks.append(chunk)
 
         # Should have error and done chunks
         assert len(chunks) >= 2
@@ -112,8 +137,10 @@ class TestGroqIntegration:
 
     @pytest.mark.asyncio
     async def test_groq_route_in_chat_response_without_key(self):
-        """Test Groq routing falls back to mock without API key."""
-        with patch.dict(os.environ, {}, clear=True):
+        """Test Groq routing falls back gracefully when bridge is unavailable."""
+        mock_registry = _make_unavailable_registry()
+
+        with patch('dashboard.chat_handler._provider_bridge_registry', mock_registry):
             chunks = []
             async for chunk in stream_chat_response('Hello', 'groq', 'llama-3.3-70b'):
                 chunks.append(chunk)
@@ -128,10 +155,17 @@ class TestKimiIntegration:
 
     @pytest.mark.asyncio
     async def test_kimi_streaming_without_bridge(self):
-        """Test KIMI streaming falls back gracefully without bridge."""
-        chunks = []
-        async for chunk in stream_kimi_response('Hello', 'moonshot-v1'):
-            chunks.append(chunk)
+        """Test KIMI streaming falls back gracefully without bridge.
+
+        Simulates an environment where the KIMI bridge has no API key
+        by mocking the bridge registry to return an unavailable bridge.
+        """
+        mock_registry = _make_unavailable_registry()
+
+        with patch('dashboard.chat_handler._provider_bridge_registry', mock_registry):
+            chunks = []
+            async for chunk in stream_kimi_response('Hello', 'moonshot-v1'):
+                chunks.append(chunk)
 
         # Should have error and done chunks
         assert len(chunks) >= 2
@@ -143,8 +177,10 @@ class TestKimiIntegration:
 
     @pytest.mark.asyncio
     async def test_kimi_route_in_chat_response_without_key(self):
-        """Test KIMI routing falls back to mock without API key."""
-        with patch.dict(os.environ, {}, clear=True):
+        """Test KIMI routing falls back gracefully when bridge is unavailable."""
+        mock_registry = _make_unavailable_registry()
+
+        with patch('dashboard.chat_handler._provider_bridge_registry', mock_registry):
             chunks = []
             async for chunk in stream_chat_response('Hello', 'kimi', 'moonshot-v1'):
                 chunks.append(chunk)
@@ -165,8 +201,9 @@ class TestProviderHotSwap:
             {'role': 'assistant', 'content': 'Hi there!'}
         ]
 
-        # Test with Claude (mock fallback)
-        with patch.dict(os.environ, {}, clear=True):
+        mock_registry = _make_unavailable_registry()
+
+        with patch('dashboard.chat_handler._provider_bridge_registry', mock_registry):
             chunks_claude = []
             async for chunk in stream_chat_response(
                 'How are you?',
@@ -198,7 +235,9 @@ class TestProviderHotSwap:
         providers = ['claude', 'openai', 'gemini', 'groq', 'kimi', 'windsurf']
         message = 'Test message'
 
-        with patch.dict(os.environ, {}, clear=True):
+        mock_registry = _make_unavailable_registry()
+
+        with patch('dashboard.chat_handler._provider_bridge_registry', mock_registry):
             for provider in providers:
                 chunks = []
                 async for chunk in stream_chat_response(message, provider, 'default'):
@@ -208,9 +247,11 @@ class TestProviderHotSwap:
                 assert len(chunks) > 0
                 assert chunks[-1]['type'] == 'done'
 
-                # Should have text response
+                # Should have text response (mock fallback always produces text)
                 text_chunks = [c for c in chunks if c['type'] == 'text']
-                assert len(text_chunks) > 0
+                assert len(text_chunks) > 0, (
+                    f"Provider '{provider}' returned no text chunks: {chunks}"
+                )
 
 
 class TestModelSync:
