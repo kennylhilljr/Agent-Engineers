@@ -764,6 +764,37 @@ class WebSocketServer:
         message = ControlAckMessage(command, agent_name, status, message_text)
         return await self.broadcast(message)
 
+    async def broadcast_acceleration_status(
+        self,
+        enabled: bool,
+        factor: float,
+        mode: str,
+        metrics: Optional[dict[str, Any]] = None
+    ) -> int:
+        """Broadcast acceleration status update.
+
+        Args:
+            enabled: Whether acceleration is enabled
+            factor: Current acceleration factor (1.0-10.0)
+            mode: Acceleration mode ("disabled", "enabled", "batch")
+            metrics: Optional acceleration metrics
+
+        Returns:
+            Number of clients that received the message
+        """
+        # Create a metrics update with acceleration data
+        acceleration_data = {
+            "acceleration_enabled": enabled,
+            "acceleration_factor": factor,
+            "acceleration_mode": mode,
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+        if metrics:
+            acceleration_data["acceleration_metrics"] = metrics
+
+        message = MetricsUpdateMessage(acceleration_data, "acceleration_status")
+        return await self.broadcast(message)
+
     # ========================================================================
     # Server Statistics and Monitoring
     # ========================================================================
