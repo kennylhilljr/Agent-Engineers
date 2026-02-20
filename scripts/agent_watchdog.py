@@ -21,6 +21,8 @@ import signal
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal, NamedTuple, TypedDict
@@ -43,6 +45,11 @@ DEFAULT_COMMIT_THRESHOLD: int = 3600  # 60 minutes
 DEFAULT_MAX_RESTARTS: int = 3
 SIGTERM_TIMEOUT: int = 10
 MAX_BACKOFF_SECONDS: float = 600.0
+
+# Daemon-specific constants (AI-264 fix)
+DAEMON_CONTROL_PORT: int = int(os.environ.get("DAEMON_CONTROL_PORT", "9100"))
+DAEMON_HEALTH_TIMEOUT: int = 5  # seconds before declaring control plane dead
+DAEMON_SCRIPT: str = "scripts/daemon_v2.py"
 
 # ---------------------------------------------------------------------------
 # Data structures
@@ -179,6 +186,108 @@ class AgentWatchdog:
                 except ValueError:
                     continue
         return None
+
+    # ------------------------------------------------------------------
+    # Daemon v2 monitoring (AI-264)
+    # ------------------------------------------------------------------
+
+    def find_daemon_pid(self, project_dir: Path) -> int | None:
+        """Find PID of the daemon_v2 process monitoring *project_dir*."""
+        project_name = project_dir.name
+        try:
+            result = subprocess.run(
+                ["ps", "-eo", "pid,command"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        except (subprocess.TimeoutExpired, OSError):
+            return None
+
+        for line in result.stdout.strip().splitlines():
+            line = line.strip()
+            if DAEMON_SCRIPT not in line:
+                continue
+            if project_name not in line:
+                continue
+            if "agent_watchdog" in line or "grep" in line:
+                continue
+            parts = line.split(None, 1)
+            if parts:
+                try:
+                    return int(parts[0])
+                except ValueError:
+                    continue
+        return None
+
+    def check_daemon_http_health(self, port: int = DAEMON_CONTROL_PORT) -> bool:
+        """Return True if the daemon control plane is responding on *port*."""
+        url = f"http://127.0.0.1:{port}/health"
+        try:
+            with urllib.request.urlopen(url, timeout=DAEMON_HEALTH_TIMEOUT) as resp:
+                return resp.status == 200
+        except (urllib.error.URLError, OSError, TimeoutError):
+            return False
+
+    def restart_daemon(self, project_dir: Path, reason: str) -> int | None:
+        """Kill stalled daemon (if any) and start a new daemon_v2 process."""
+        key = f"daemon:{project_dir}"
+        tag = project_dir.name
+
+        if not self._can_restart(key):
+            self.logger.warning(
+                f"[{tag}] daemon: Max restarts ({self.config.max_restarts_per_hour}/hr) "
+                f"exceeded — refusing restart"
+            )
+            return None
+
+        backoff = self._get_backoff_delay(key)
+        if backoff > 0:
+            self.logger.info(f"[{tag}] daemon: Backoff delay: {backoff:.0f}s")
+            if not self.config.dry_run:
+                time.sleep(backoff)
+
+        # Kill existing daemon if still alive
+        existing_pid = self.find_daemon_pid(project_dir)
+        if existing_pid is not None:
+            self.logger.warning(f"[{tag}] daemon: Killing stale PID {existing_pid}")
+            if not self.config.dry_run:
+                self.kill_process(existing_pid)
+
+        cmd = self._build_daemon_command(project_dir)
+        self.logger.info(f"[{tag}] daemon: Restarting: {' '.join(cmd)}")
+
+        if self.config.dry_run:
+            self.logger.info(f"[{tag}] daemon: [DRY RUN] Would restart — skipping")
+            return None
+
+        daemon_log_path = self.config.log_file.parent / f"daemon_{tag}.log"
+        daemon_log = open(daemon_log_path, "a")  # noqa: SIM115
+
+        process = subprocess.Popen(
+            cmd,
+            stdout=daemon_log,
+            stderr=subprocess.STDOUT,
+            cwd=str(REPO_ROOT),
+            start_new_session=True,
+        )
+
+        self._restart_history.setdefault(key, []).append(
+            RestartRecord(
+                timestamp=datetime.now(UTC),
+                pid=process.pid,
+                project_dir=str(project_dir),
+                reason=reason,
+            )
+        )
+
+        self.logger.info(f"[{tag}] daemon: Restarted with PID {process.pid}")
+        return process.pid
+
+    def _build_daemon_command(self, project_dir: Path) -> list[str]:
+        venv_python = REPO_ROOT / "venv" / "bin" / "python"
+        daemon_script = REPO_ROOT / "scripts" / "daemon_v2.py"
+        return [str(venv_python), str(daemon_script), "--project-dir", project_dir.name]
 
     # ------------------------------------------------------------------
     # Health checks
@@ -440,9 +549,42 @@ class AgentWatchdog:
     # ------------------------------------------------------------------
 
     def run_check_cycle(self) -> list[AgentHealthReport]:
-        """Run one health-check pass over all monitored projects."""
+        """Run one health-check pass over all monitored projects.
+
+        Also checks daemon_v2 health via control plane HTTP endpoint (AI-264).
+        """
         reports: list[AgentHealthReport] = []
 
+        # --- AI-264: Daemon v2 health check ---
+        for project_dir in self.config.project_dirs:
+            tag = project_dir.name
+            daemon_pid = self.find_daemon_pid(project_dir)
+            daemon_http_ok = self.check_daemon_http_health()
+
+            if daemon_pid is None or not daemon_http_ok:
+                if daemon_pid is None:
+                    reason = "daemon_v2 process not found"
+                else:
+                    reason = f"daemon_v2 PID {daemon_pid} alive but control plane not responding"
+                self.logger.warning(f"[{tag}] DAEMON DEAD: {reason} — restarting")
+                new_pid = self.restart_daemon(project_dir, reason)
+                reports.append(
+                    AgentHealthReport(
+                        pid=daemon_pid or 0,
+                        project_dir=str(project_dir),
+                        is_alive=False,
+                        cpu_percent=0.0,
+                        last_cpu_active=datetime.now(UTC).isoformat(),
+                        last_git_commit=None,
+                        has_children=False,
+                        status="dead",
+                        reason=f"daemon: {reason}",
+                    )
+                )
+            else:
+                self.logger.info(f"[{tag}] daemon_v2 PID={daemon_pid} healthy (control plane OK)")
+
+        # --- Agent process health check ---
         for project_dir in self.config.project_dirs:
             tag = project_dir.name
             pid = self.find_agent_pid(project_dir)
