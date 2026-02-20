@@ -147,12 +147,138 @@ class ChatInterface {
         this.addMessage(text, 'user');
         this.input.value = '';
 
-        // Simulate AI response
+        // Get provider selection from the dropdown (AI-262 fix)
+        const providerSelector = document.getElementById('ai-provider-selector');
+        const provider = providerSelector ? providerSelector.value : 'claude';
+
+        // Call the real /api/chat SSE endpoint (AI-262 fix: replace fake generateAIResponse)
         this.showLoadingIndicator();
-        setTimeout(() => {
+        this._streamChatResponse(text, provider);
+    }
+
+    async _streamChatResponse(text, provider) {
+        // Build conversation history for context
+        const conversationHistory = this.messages
+            .filter(m => m.sender !== 'system')
+            .slice(-10)
+            .map(m => ({ role: m.sender === 'user' ? 'user' : 'assistant', content: m.text }));
+
+        let aiText = '';
+        let aiBubble = null;
+
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: text,
+                    provider: provider,
+                    conversation_history: conversationHistory
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
             this.removeLoadingIndicator();
-            this.addMessage(this.generateAIResponse(text), 'ai');
-        }, 800);
+
+            const contentType = response.headers.get('content-type') || '';
+
+            if (contentType.includes('text/event-stream')) {
+                // Parse SSE stream
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // keep incomplete line
+
+                    for (const line of lines) {
+                        if (!line.startsWith('data: ')) continue;
+                        const rawData = line.slice(6).trim();
+                        if (!rawData || rawData === '[DONE]') continue;
+
+                        let chunk;
+                        try { chunk = JSON.parse(rawData); } catch { continue; }
+
+                        if (chunk.type === 'text' && chunk.content) {
+                            aiText += chunk.content;
+                            if (!aiBubble) {
+                                // Create the AI message bubble for streaming
+                                aiBubble = this._createStreamingBubble();
+                            }
+                            this._updateStreamingBubble(aiBubble, aiText);
+                            this.scrollToBottom();
+                        } else if (chunk.type === 'done') {
+                            break;
+                        } else if (chunk.type === 'error') {
+                            throw new Error(chunk.message || 'Stream error');
+                        }
+                    }
+                }
+            } else {
+                // JSON fallback response
+                const json = await response.json();
+                aiText = json.response || json.message || JSON.stringify(json);
+            }
+
+            // Save final AI message to history
+            if (aiText) {
+                const message = {
+                    id: Date.now(),
+                    text: aiText,
+                    sender: 'ai',
+                    timestamp: new Date(),
+                    type: 'message'
+                };
+                this.messages.push(message);
+                this.history.saveMessages(this.messages);
+                if (!aiBubble) {
+                    // Non-streaming: render via normal path
+                    this.renderMessage(message);
+                }
+            } else {
+                this.addMessage(
+                    'Configure an API key in Settings to get real AI responses.',
+                    'ai'
+                );
+            }
+
+        } catch (err) {
+            console.error('[ChatInterface] _streamChatResponse error:', err);
+            this.removeLoadingIndicator();
+            this.addMessage(
+                `Unable to reach AI provider: ${err.message}. Configure an API key in Settings.`,
+                'ai'
+            );
+        }
+
+        this.scrollToBottom();
+    }
+
+    _createStreamingBubble() {
+        const div = document.createElement('div');
+        div.className = 'chat-message ai';
+        div.setAttribute('data-testid', 'chat-message-ai');
+
+        const content = document.createElement('div');
+        content.className = 'chat-message-content';
+        content.setAttribute('data-streaming', 'true');
+
+        div.appendChild(content);
+        this.messagesContainer.appendChild(div);
+        this.scrollToBottom();
+        return { div, content };
+    }
+
+    _updateStreamingBubble(bubble, text) {
+        bubble.content.textContent = text;
     }
 
     addMessage(text, sender, type = 'message') {

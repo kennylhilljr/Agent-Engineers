@@ -2589,7 +2589,8 @@
         .chat-container {
             display: flex;
             flex-direction: column;
-            height: 500px;
+            min-height: 500px;
+            max-height: calc(100vh - 200px);
             gap: 16px;
         }
 
@@ -2603,6 +2604,8 @@
             background: rgba(15, 23, 42, 0.3);
             border-radius: 8px;
             border: 1px solid rgba(148, 163, 184, 0.1);
+            min-height: 300px;
+            max-height: calc(100vh - 350px);
         }
 
         .chat-messages::-webkit-scrollbar {
@@ -5636,8 +5639,8 @@
 
             /* Chat interface: full width */
             .chat-container {
-                height: calc(100vh - 160px);
                 min-height: 300px;
+                max-height: calc(100vh - 160px);
             }
         }
 
