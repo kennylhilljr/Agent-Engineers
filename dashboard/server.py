@@ -497,33 +497,51 @@ class DashboardServer:
         raise web.HTTPNotFound(text='dashboard.html not found')
 
     async def serve_dashboard_file(self, request: Request) -> Response:
-        """Serve HTML/JS files from the dashboard directory."""
+        """Serve HTML/JS files from the dashboard directory with security hardening.
+
+        Security features:
+        - Path traversal prevention using directory containment validation
+        - File extension whitelist to prevent serving sensitive files
+        - Absolute path resolution to prevent symlink attacks
+        """
         filename = request.match_info['filename']
 
-        # Security: prevent directory traversal
-        if '..' in filename or filename.startswith('/'):
+        # Security: prevent directory traversal - initial check
+        if '..' in filename or filename.startswith('/') or filename.startswith('\\'):
             raise web.HTTPNotFound(text='Invalid filename')
 
-        # Determine file path
-        file_path = Path(__file__).parent / filename
+        # Resolve paths and validate directory containment
+        dashboard_dir = Path(__file__).parent.resolve()
+        file_path = (dashboard_dir / filename).resolve()
 
-        # Check if file exists
+        # CRITICAL: Verify resolved path is within dashboard directory
+        try:
+            file_path.relative_to(dashboard_dir)
+        except ValueError:
+            raise web.HTTPForbidden(text='Access denied')
+
+        # Whitelist of allowed file extensions
+        ALLOWED_EXTENSIONS = {'.html', '.js', '.css', '.json'}
+        file_ext = Path(filename).suffix.lower()
+
+        if file_ext not in ALLOWED_EXTENSIONS:
+            raise web.HTTPForbidden(text='File type not allowed')
+
         if not file_path.exists() or not file_path.is_file():
             raise web.HTTPNotFound(text=f'{filename} not found')
 
         # Determine content type
-        content_type = 'text/html'
-        if filename.endswith('.js'):
-            content_type = 'application/javascript'
-        elif filename.endswith('.css'):
-            content_type = 'text/css'
-        elif filename.endswith('.json'):
-            content_type = 'application/json'
+        CONTENT_TYPES = {
+            '.html': 'text/html',
+            '.js': 'application/javascript',
+            '.css': 'text/css',
+            '.json': 'application/json',
+        }
+        content_type = CONTENT_TYPES.get(file_ext, 'text/plain')
 
-        return web.Response(
-            text=file_path.read_text(),
-            content_type=content_type,
-        )
+        # Read and serve file
+        content = file_path.read_text(encoding='utf-8')
+        return web.Response(text=content, content_type=content_type)
 
     async def health_check(self, request: Request) -> Response:
         """Health check endpoint.
