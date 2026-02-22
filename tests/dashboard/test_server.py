@@ -268,6 +268,69 @@ class TestDashboardServerUnit(AioHTTPTestCase):
             assert len(content) > 0
             assert "html" in content.lower()
 
+    async def test_dashboard_static_files_root(self):
+        """Test 10a: Verify /dashboard/ returns directory listing or index.html (AI-278)."""
+        resp = await self.client.request("GET", "/dashboard/")
+        # Should return 200 OK (either directory listing or index.html)
+        assert resp.status == 200
+        content = await resp.text()
+        assert len(content) > 0
+
+    async def test_dashboard_index_html(self):
+        """Test 10b: Verify /dashboard/index.html returns 200 OK (AI-278)."""
+        resp = await self.client.request("GET", "/dashboard/index.html")
+        assert resp.status == 200
+        assert resp.content_type == "text/html"
+        content = await resp.text()
+        assert len(content) > 0
+        assert "html" in content.lower()
+
+    async def test_dashboard_monitoring_html(self):
+        """Test 10c: Verify /dashboard/monitoring.html returns 200 OK (AI-278)."""
+        resp = await self.client.request("GET", "/dashboard/monitoring.html")
+        assert resp.status == 200
+        assert resp.content_type == "text/html"
+        content = await resp.text()
+        assert len(content) > 0
+        assert "html" in content.lower()
+
+    async def test_dashboard_dashboard_html(self):
+        """Test 10d: Verify /dashboard/dashboard.html returns 200 OK (AI-278)."""
+        resp = await self.client.request("GET", "/dashboard/dashboard.html")
+        assert resp.status == 200
+        assert resp.content_type == "text/html"
+        content = await resp.text()
+        assert len(content) > 0
+
+    async def test_dashboard_pricing_html(self):
+        """Test 10e: Verify /dashboard/pricing.html returns 200 OK (AI-278)."""
+        resp = await self.client.request("GET", "/dashboard/pricing.html")
+        assert resp.status == 200
+        assert resp.content_type == "text/html"
+        content = await resp.text()
+        assert len(content) > 0
+
+    async def test_dashboard_team_html(self):
+        """Test 10f: Verify /dashboard/team.html returns 200 OK (AI-278)."""
+        resp = await self.client.request("GET", "/dashboard/team.html")
+        assert resp.status == 200
+        assert resp.content_type == "text/html"
+        content = await resp.text()
+        assert len(content) > 0
+
+    async def test_dashboard_audit_log_html(self):
+        """Test 10g: Verify /dashboard/audit_log.html returns 200 OK (AI-278)."""
+        resp = await self.client.request("GET", "/dashboard/audit_log.html")
+        assert resp.status == 200
+        assert resp.content_type == "text/html"
+        content = await resp.text()
+        assert len(content) > 0
+
+    async def test_dashboard_nonexistent_file(self):
+        """Test 10h: Verify /dashboard/nonexistent.html returns 404 (AI-278)."""
+        resp = await self.client.request("GET", "/dashboard/nonexistent.html")
+        assert resp.status == 404
+
     async def test_error_handling_invalid_json(self):
         """Test 11: Verify error handling for corrupted metrics file."""
         # Write invalid JSON to metrics file

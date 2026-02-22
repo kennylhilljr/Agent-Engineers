@@ -572,6 +572,10 @@ class DashboardServer:
 
     def _setup_routes(self):
         """Register HTTP routes and WebSocket endpoint."""
+        # AI-278: Static file serving for /dashboard/* paths
+        self.app.router.add_static('/dashboard', Path(__file__).parent,
+                                    show_index=True, follow_symlinks=True)
+
         self.app.router.add_get('/', self.serve_dashboard)
         self.app.router.add_get('/architecture', self.serve_architecture)
         self.app.router.add_get('/health', self.health_check)
