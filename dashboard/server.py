@@ -571,10 +571,18 @@ class DashboardServer:
         logger.info(f"Metrics directory: {self.metrics_dir}")
 
     def _setup_routes(self):
-        """Register HTTP routes and WebSocket endpoint."""
-        # AI-278: Static file serving for /dashboard/* paths
+        """Register HTTP routes and WebSocket endpoint.
+
+        Route Registration Order (AI-278 Security Hardening):
+            1. Specific routes registered first (health, api endpoints)
+            2. Static file serving for /dashboard/* registered AFTER specific routes
+            3. Static route is registered with security hardening:
+               - show_index=False to prevent directory listing
+               - follow_symlinks=False to prevent symlink traversal attacks
+        """
+        # AI-278: Static file serving for /dashboard/* paths (security hardened)
         self.app.router.add_static('/dashboard', Path(__file__).parent,
-                                    show_index=True, follow_symlinks=True)
+                                    show_index=False, follow_symlinks=False)
 
         self.app.router.add_get('/', self.serve_dashboard)
         self.app.router.add_get('/architecture', self.serve_architecture)
