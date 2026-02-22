@@ -351,3 +351,108 @@ def get_chat_history(limit: int = 100) -> List[Dict]:
 def clear_chat_history() -> None:
     """Clear the in-memory chat history (for testing)."""
     _chat_history.clear()
+
+
+async def stream_chat_response(
+    message: str,
+    provider: str = "claude",
+    model: Optional[str] = None,
+    history: Optional[List[Dict]] = None,
+    conversation_history: Optional[List[Dict]] = None,
+) -> Any:
+    """Stream a chat response, routing to the specified AI provider with mock fallback.
+
+    Unlike the provider-specific streaming functions, this function always
+    produces at least one text chunk — falling back to a mock response if the
+    provider bridge is unavailable.  This supports hot-swap UX where the UI
+    stays functional regardless of API key configuration.
+
+    Yields dicts with 'type' key ('text', 'error', 'done', 'token').
+    Text chunks include both 'text' and 'content' keys for compatibility.
+
+    Args:
+        message: User message text
+        provider: AI provider name (claude, openai, gemini, groq, kimi, windsurf)
+        model: Model identifier (optional)
+        history: Optional conversation history list of {'role', 'content'} dicts
+        conversation_history: Alias for history parameter
+    """
+    # Accept either parameter name
+    effective_history = history or conversation_history
+
+    registry = _get_provider_bridge_registry()
+    provider_display = provider.capitalize()
+
+    got_text = False
+
+    if registry is not None:
+        try:
+            bridge = registry.get(provider)
+            if bridge.is_available():
+                try:
+                    context = None
+                    if effective_history:
+                        context = "\n".join(
+                            f"{m.get('role', m.get('sender', 'user'))}: {m.get('content', m.get('text', ''))}"
+                            for m in effective_history[-10:] if isinstance(m, dict)
+                        )
+                    response = await bridge.send_message_async(message, context=context)
+                    if response:
+                        # Stream response word by word for better UX
+                        words = response.split()
+                        chunk_size = 5  # words per chunk
+
+                        for i in range(0, len(words), chunk_size):
+                            chunk = " ".join(words[i:i + chunk_size]) + " "
+                            # Yield token chunks for streaming
+                            yield {
+                                "type": "token",
+                                "text": chunk,
+                                "content": chunk,
+                                "timestamp": datetime.utcnow().isoformat() + "Z",
+                                "provider": provider,
+                                "model": model or "default",
+                            }
+                            await asyncio.sleep(0.05)  # Simulate streaming delay
+
+                        # Final text chunk with complete response
+                        yield {
+                            "type": "text",
+                            "text": response,
+                            "content": response,
+                            "timestamp": datetime.utcnow().isoformat() + "Z",
+                            "provider": provider,
+                            "model": model or "default",
+                        }
+                        got_text = True
+                except Exception as exc:
+                    logger.error("[stream_chat] Bridge error for '%s': %s", provider, exc)
+                    yield {
+                        "type": "error",
+                        "text": str(exc),
+                        "content": str(exc),
+                        "timestamp": datetime.utcnow().isoformat() + "Z",
+                    }
+        except (KeyError, AttributeError):
+            pass  # Unknown provider — fall through to mock
+
+    if not got_text:
+        # Mock fallback: always produce a text response so UI stays functional
+        mock_text = (
+            f"Configure an API key for {provider_display} in Settings to get real responses. "
+            f"This is a demo response to keep the UI functional."
+        )
+        # Include both 'text' and 'content' keys for compatibility with different test expectations
+        yield {
+            "type": "text",
+            "text": mock_text,
+            "content": mock_text,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "provider": provider,
+            "model": model or "default",
+        }
+
+    yield {
+        "type": "done",
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+    }

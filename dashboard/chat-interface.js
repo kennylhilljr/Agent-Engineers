@@ -139,7 +139,7 @@ class ChatInterface {
         }
     }
 
-    sendMessage() {
+    async sendMessage() {
         const text = this.input.value.trim();
         if (!text) return;
 
@@ -147,12 +147,109 @@ class ChatInterface {
         this.addMessage(text, 'user');
         this.input.value = '';
 
-        // Simulate AI response
+        // Get selected provider
+        const providerSelect = document.getElementById('ai-provider-selector');
+        const provider = providerSelect ? providerSelect.value : 'claude';
+
+        // Show loading indicator
         this.showLoadingIndicator();
-        setTimeout(() => {
+
+        try {
+            // Call REST API for streaming response
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: text,
+                    provider: provider,
+                    conversation_history: this.messages.slice(-10), // Last 10 messages
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            // Handle Server-Sent Events stream
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let accumulatedText = '';
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                // Decode chunk
+                buffer += decoder.decode(value, { stream: true });
+
+                // Process complete SSE messages (ending with \n\n)
+                const messages = buffer.split('\n\n');
+                buffer = messages.pop(); // Keep incomplete message in buffer
+
+                for (const msg of messages) {
+                    if (!msg.trim()) continue;
+
+                    // Parse SSE message (format: "data: {json}")
+                    const dataMatch = msg.match(/^data: (.+)$/m);
+                    if (!dataMatch) continue;
+
+                    try {
+                        const chunk = JSON.parse(dataMatch[1]);
+
+                        if (chunk.type === 'token') {
+                            // Streaming token - accumulate and show partial text
+                            const text = chunk.content || chunk.text || '';
+                            accumulatedText += text;
+                            this.updateLoadingWithPartialText(accumulatedText);
+                        } else if (chunk.type === 'text') {
+                            // Full text response - show complete message
+                            const text = chunk.content || chunk.text || '';
+                            this.removeLoadingIndicator();
+                            this.addMessage(text, 'ai');
+                            accumulatedText = '';
+                        } else if (chunk.type === 'done') {
+                            // Stream complete
+                            if (accumulatedText) {
+                                this.removeLoadingIndicator();
+                                this.addMessage(accumulatedText, 'ai');
+                                accumulatedText = '';
+                            } else if (chunk.content || chunk.text) {
+                                this.removeLoadingIndicator();
+                                this.addMessage(chunk.content || chunk.text, 'ai');
+                            } else {
+                                // Just remove loading indicator if message already shown
+                                this.removeLoadingIndicator();
+                            }
+                        } else if (chunk.type === 'error') {
+                            // Show error message
+                            this.removeLoadingIndicator();
+                            const errorText = chunk.content || chunk.text || 'Unknown error';
+                            this.addMessage(`Error: ${errorText}`, 'ai', 'error');
+                            accumulatedText = '';
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse SSE chunk:', e, dataMatch[1]);
+                    }
+                }
+            }
+
+            // If we still have accumulated text, show it
+            if (accumulatedText) {
+                this.removeLoadingIndicator();
+                this.addMessage(accumulatedText, 'ai');
+            }
+
+        } catch (error) {
+            console.error('Error sending message:', error);
             this.removeLoadingIndicator();
-            this.addMessage(this.generateAIResponse(text), 'ai');
-        }, 800);
+
+            // Fallback to mock response if API fails
+            const fallbackMsg = 'Configure an API key in Settings to get real responses. (API connection failed)';
+            this.addMessage(fallbackMsg, 'ai', 'error');
+        }
     }
 
     addMessage(text, sender, type = 'message') {
@@ -404,6 +501,17 @@ class ChatInterface {
         const loading = document.getElementById('chat-loading');
         if (loading) {
             loading.remove();
+        }
+    }
+
+    updateLoadingWithPartialText(text) {
+        const loading = document.getElementById('chat-loading');
+        if (loading) {
+            // Replace loading dots with partial text
+            const content = loading.querySelector('.chat-message-content');
+            if (content) {
+                content.innerHTML = `<div class="chat-partial-text">${this.escapeHtml(text)}<span class="cursor-blink">|</span></div>`;
+            }
         }
     }
 

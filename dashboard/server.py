@@ -392,6 +392,7 @@ class DashboardServer:
     def _setup_routes(self):
         """Register HTTP routes and WebSocket endpoint."""
         self.app.router.add_get('/', self.serve_dashboard)
+        self.app.router.add_get('/dashboard/{filename}', self.serve_dashboard_file)
         self.app.router.add_get('/health', self.health_check)
         self.app.router.add_get('/api/metrics', self.get_metrics)
         self.app.router.add_get('/api/agents/{agent_name}', self.get_agent)
@@ -494,6 +495,35 @@ class DashboardServer:
                 content_type='text/html',
             )
         raise web.HTTPNotFound(text='dashboard.html not found')
+
+    async def serve_dashboard_file(self, request: Request) -> Response:
+        """Serve HTML/JS files from the dashboard directory."""
+        filename = request.match_info['filename']
+
+        # Security: prevent directory traversal
+        if '..' in filename or filename.startswith('/'):
+            raise web.HTTPNotFound(text='Invalid filename')
+
+        # Determine file path
+        file_path = Path(__file__).parent / filename
+
+        # Check if file exists
+        if not file_path.exists() or not file_path.is_file():
+            raise web.HTTPNotFound(text=f'{filename} not found')
+
+        # Determine content type
+        content_type = 'text/html'
+        if filename.endswith('.js'):
+            content_type = 'application/javascript'
+        elif filename.endswith('.css'):
+            content_type = 'text/css'
+        elif filename.endswith('.json'):
+            content_type = 'application/json'
+
+        return web.Response(
+            text=file_path.read_text(),
+            content_type=content_type,
+        )
 
     async def health_check(self, request: Request) -> Response:
         """Health check endpoint.

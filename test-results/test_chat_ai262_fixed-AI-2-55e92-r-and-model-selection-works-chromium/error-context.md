@@ -1,0 +1,42 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - heading "Chat Interface Test" [level=1] [ref=e4]
+    - paragraph [ref=e5]: "AI-68: Conversational Interface - Message Thread"
+  - generic [ref=e6]:
+    - heading "Chat Interface" [level=2] [ref=e8]:
+      - img [ref=e9]
+      - text: Chat Interface
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - generic [ref=e14]: "AI Provider:"
+        - combobox "Select AI Provider" [ref=e15] [cursor=pointer]:
+          - option "Claude (Haiku 4.5, Sonnet 4.5, Opus 4.6)"
+          - option "ChatGPT (GPT-4o, o1, o3-mini, o4-mini)" [selected]
+          - option "Gemini (2.5 Flash, 2.5 Pro, 2.0 Flash)"
+          - option "Groq (Llama 3.3 70B, Mixtral 8x7B)"
+          - option "KIMI (Moonshot 2M context)"
+          - option "Windsurf (Cascade)"
+        - generic [ref=e16]: ChatGPT
+      - generic [ref=e17]:
+        - generic [ref=e18]: "Model:"
+        - combobox "Select AI Model" [ref=e19] [cursor=pointer]:
+          - option "GPT-4o" [selected]
+          - option "o1"
+          - option "o3-mini"
+          - option "o4-mini"
+        - generic [ref=e20]: GPT-4o
+      - generic [ref=e21]:
+        - generic [ref=e23]:
+          - generic [ref=e24]: Test with ChatGPT
+          - generic [ref=e25]: 11:14 PM
+        - generic [ref=e27]:
+          - generic [ref=e28]: Sure, I'm here to help. What would you like to test or discuss?
+          - generic [ref=e29]: 11:14 PM
+      - generic [ref=e31]:
+        - textbox "Type a message... (e.g., 'What's my status?')" [ref=e32]
+        - button "Send message" [active] [ref=e33] [cursor=pointer]:
+          - img [ref=e34]
+```
