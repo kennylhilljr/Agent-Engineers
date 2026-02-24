@@ -6,8 +6,8 @@ on:
       - '**'
 
 concurrency:
-  group: deploy-staging
-  cancel-in-progress: false
+  group: deploy-staging-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   AWS_REGION: us-east-1
