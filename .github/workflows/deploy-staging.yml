@@ -111,8 +111,10 @@ jobs:
 
       - name: Notify on success
         if: success()
-        run: echo "Staging deployment successful! Image: ${{ needs.build-and-push.outputs.image }}"
+        run: |
+          echo "Staging deployment successful"
 
       - name: Notify on failure
         if: failure()
-        run: echo "Staging deployment FAILED! Check logs."
+        run: |
+          echo "Staging deployment FAILED. Check logs."
