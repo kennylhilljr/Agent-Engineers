@@ -20,6 +20,7 @@ jobs:
   build-and-push:
     name: Build & Push to ECR
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
     timeout-minutes: 20
     outputs:
       image: ${{ steps.build-image.outputs.image }}
