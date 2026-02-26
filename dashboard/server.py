@@ -770,6 +770,7 @@ class DashboardServer:
         # AI-246: Audit Log for Compliance
         if _AUDIT_AVAILABLE:
             register_audit_routes(self.app)
+
     async def handle_options(self, request: Request) -> Response:
         """Handle CORS preflight OPTIONS requests."""
         return web.Response(status=204)
