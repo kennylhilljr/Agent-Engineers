@@ -41,11 +41,20 @@ ALLOWED_MARKER_COUNT = 0
 def _collect_python_files(root: Path) -> list[Path]:
     """Collect all .py files under root, excluding known noise directories and this test file."""
     this_file = Path(__file__).resolve()
+    root_resolved = root.resolve()
     results: list[Path] = []
-    for path in root.rglob("*.py"):
-        # Skip excluded directories anywhere in the path
-        parts = set(path.parts)
-        if parts & EXCLUDED_DIRS:
+    for path in root_resolved.rglob("*.py"):
+        # Skip excluded directories using relative path parts only
+        # (avoids falsely excluding files when the project root itself
+        # contains an excluded directory name, e.g. "generations")
+        try:
+            rel_parts = set(path.relative_to(root_resolved).parts)
+        except ValueError:
+            rel_parts = set(path.parts)
+        if rel_parts & EXCLUDED_DIRS:
+            continue
+        # Skip node_modules (not in EXCLUDED_DIRS but should always be ignored)
+        if "node_modules" in rel_parts or ".worktrees" in rel_parts:
             continue
         # Skip this test file itself (it references the markers in strings/comments)
         if path.resolve() == this_file:
@@ -282,11 +291,26 @@ class TestFileScanSanity:
         )
 
     def test_generations_excluded(self):
-        """Files inside generations/ must not appear in the scanned list."""
+        """Files inside a nested generations/ subdirectory must not appear in the scan.
+
+        Note: The project itself may live inside a parent 'generations/' directory,
+        so we check relative paths (from PROJECT_ROOT) rather than absolute paths.
+        Only files under a 'generations/' *subdirectory within the project* should
+        be excluded.
+        """
         files = _collect_python_files(PROJECT_ROOT)
-        gen_files = [f for f in files if "generations" in f.parts]
+        root_resolved = PROJECT_ROOT.resolve()
+        gen_files = []
+        for f in files:
+            try:
+                rel_parts = f.relative_to(root_resolved).parts
+            except ValueError:
+                rel_parts = f.parts
+            if "generations" in rel_parts:
+                gen_files.append(f)
         assert len(gen_files) == 0, (
-            f"Found {len(gen_files)} generations/ files in scan — exclusion is broken."
+            f"Found {len(gen_files)} files inside a 'generations/' subdirectory — "
+            f"exclusion is broken: {gen_files[:3]}"
         )
 
 
