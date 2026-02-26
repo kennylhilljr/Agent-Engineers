@@ -132,7 +132,6 @@ except ImportError:
     _AUDIT_AVAILABLE = False
     logger.warning("audit module not found — audit log disabled")
 
-
 def _collect_event(event_type: str, properties: Optional[dict] = None) -> None:
     """Fire-and-forget telemetry event collection.
 
@@ -771,7 +770,6 @@ class DashboardServer:
         # AI-246: Audit Log for Compliance
         if _AUDIT_AVAILABLE:
             register_audit_routes(self.app)
-
     async def handle_options(self, request: Request) -> Response:
         """Handle CORS preflight OPTIONS requests."""
         return web.Response(status=204)
