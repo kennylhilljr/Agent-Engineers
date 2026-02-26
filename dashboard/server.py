@@ -132,7 +132,6 @@ except ImportError:
     _AUDIT_AVAILABLE = False
     logger.warning("audit module not found — audit log disabled")
 
-
 def _collect_event(event_type: str, properties: Optional[dict] = None) -> None:
     """Fire-and-forget telemetry event collection.
 

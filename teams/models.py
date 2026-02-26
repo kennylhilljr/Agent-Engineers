@@ -239,9 +239,9 @@ class TeamStore:
         _members[org_id][user_id] -> TeamMember
         _invitations[token]       -> Invitation
 
-    # TODO(production): Replace with PostgreSQL-backed store. The current
-    # in-memory implementation loses all data on process restart and does not
-    # support horizontal scaling. See TECHNICAL_DEBT.md for details.
+    Production note: This is an in-memory store that loses all data on process
+    restart and does not support horizontal scaling. A PostgreSQL-backed
+    implementation is tracked in TECHNICAL_DEBT.md (AI-115 / production-db-store).
     """
 
     def __init__(self) -> None:
