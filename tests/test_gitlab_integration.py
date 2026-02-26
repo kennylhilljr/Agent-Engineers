@@ -1847,10 +1847,7 @@ class TestGitLabAgentDefinition(unittest.TestCase):
         import ast
         import pathlib
 
-        definitions_path = pathlib.Path(
-            "/Users/bkh223/Documents/GitHub/agent-engineers/generations/"
-            "agent-dashboard/.worktrees/coding-0/agents/definitions.py"
-        )
+        definitions_path = pathlib.Path(__file__).resolve().parent.parent / "agents" / "definitions.py"
         source = definitions_path.read_text()
         self.assertIn('"gitlab"', source)
         self.assertIn("GITLAB_AGENT", source)

@@ -283,3 +283,19 @@ def get_coding_tools() -> list[str]:
         "mcp__playwright__browser_wait_for",
     ]
     return builtin_tools + playwright_tools
+
+
+def get_qa_tools() -> list[str]:
+    """Get tools for QA agent (file ops + Playwright + test runners)."""
+    builtin_tools = ["Read", "Write", "Edit", "Glob", "Grep", "Bash"]
+    playwright_tools = [
+        "mcp__playwright__browser_navigate",
+        "mcp__playwright__browser_take_screenshot",
+        "mcp__playwright__browser_click",
+        "mcp__playwright__browser_type",
+        "mcp__playwright__browser_select_option",
+        "mcp__playwright__browser_hover",
+        "mcp__playwright__browser_snapshot",
+        "mcp__playwright__browser_wait_for",
+    ]
+    return builtin_tools + playwright_tools
