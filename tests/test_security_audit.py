@@ -11,7 +11,7 @@ import stat
 import pytest
 
 # Base directory for the project
-BASE_DIR = "/Users/bkh223/Documents/GitHub/agent-engineers"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REQUIREMENTS_TXT = os.path.join(BASE_DIR, "requirements.txt")
 REQUIREMENTS_DEV_TXT = os.path.join(BASE_DIR, "requirements-dev.txt")
 PIP_AUDIT_TOML = os.path.join(BASE_DIR, ".pip-audit.toml")

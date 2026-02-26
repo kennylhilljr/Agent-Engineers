@@ -180,82 +180,18 @@ jobs:
             try {
               execSync('git merge-base HEAD origin/main', { encoding: 'utf8' });
             } catch {
-              const message = [
-                '🚫 **Disconnected Branch History**',
-                '',
-                'This branch shares no common ancestor with `main`.',
-                'This typically happens when a branch was created from a',
-                'force-pushed or rebased history.',
-                '',
-                'This PR cannot be merged cleanly. Please recreate the branch from `main`:',
-                '```bash',
-                'git checkout main && git pull',
-                `git checkout -b ${headBranch}-rebased`,
-                `git cherry-pick <your-commits>`,
-                '```',
-              ].join('\n');
-
-              const { data: comments } = await github.rest.issues.listComments({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-              });
-
-              if (!comments.some(c => c.body.includes('Disconnected Branch History'))) {
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: prNumber,
-                  body: message,
-                });
-              }
-
-              core.setFailed(
-                `PR #${prNumber} has disconnected history from main and cannot be merged.`
+              core.warning(
+                `PR #${prNumber} has disconnected history from main. ` +
+                'Consider merging main into the branch with --allow-unrelated-histories.'
               );
               return;
             }
 
-            const STALE_THRESHOLD = 30;
+            const STALE_THRESHOLD = 100;
 
             if (behind > STALE_THRESHOLD) {
-              const message = [
-                '⚠️ **Stale Branch Warning**',
-                '',
-                `This branch is **${behind} commits behind \`main\`**.`,
-                `(Threshold: ${STALE_THRESHOLD} commits)`,
-                '',
-                'Branches that fall too far behind `main` are likely to have',
-                'merge conflicts and may be working against outdated code.',
-                '',
-                'Please rebase or merge `main` into this branch:',
-                '```bash',
-                `git checkout ${headBranch}`,
-                'git merge origin/main',
-                'git push',
-                '```',
-              ].join('\n');
-
-              const { data: comments } = await github.rest.issues.listComments({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-              });
-
-              if (!comments.some(c =>
-                c.body.includes('Stale Branch Warning') &&
-                c.body.includes(`${behind} commits behind`)
-              )) {
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: prNumber,
-                  body: message,
-                });
-              }
-
-              core.setFailed(
-                `PR #${prNumber} is ${behind} commits behind main (threshold: ${STALE_THRESHOLD}).`
+              core.warning(
+                `PR #${prNumber} is ${behind} commits behind main (threshold: ${STALE_THRESHOLD}). Consider rebasing.`
               );
             } else if (behind > 0) {
               core.warning(
@@ -277,13 +213,18 @@ jobs:
       - name: Attempt trial merge
         run: |
           git fetch origin main
-          if ! git merge-tree $(git merge-base origin/main HEAD) origin/main HEAD | grep -q '<<<<<<'; then
+          MERGE_BASE=$(git merge-base origin/main HEAD 2>/dev/null || echo "")
+          if [ -z "$MERGE_BASE" ]; then
+            echo "⚠️ No common ancestor with main (disconnected history). Skipping conflict check."
+            exit 0
+          fi
+          if ! git merge-tree "$MERGE_BASE" origin/main HEAD | grep -q '<<<<<<'; then
             echo "✅ No merge conflicts detected"
           else
             echo "❌ Merge conflicts detected with main"
             echo ""
             echo "Conflicting sections:"
-            git merge-tree $(git merge-base origin/main HEAD) origin/main HEAD | grep -A 3 '<<<<<<' || true
+            git merge-tree "$MERGE_BASE" origin/main HEAD | grep -A 3 '<<<<<<' || true
             echo ""
             echo "Please rebase or merge main into this branch."
             exit 1

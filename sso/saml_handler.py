@@ -149,6 +149,7 @@ class SAMLHandler:
         relay_state = relay_state or secrets.token_urlsafe(16)
         issue_instant = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
+        force_authn_attr = ' ForceAuthn="true"' if force_authn else ""
         authn_request = (
             f'<samlp:AuthnRequest'
             f' xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"'
@@ -159,7 +160,7 @@ class SAMLHandler:
             f' Destination="{self.config.idp_sso_url}"'
             f' AssertionConsumerServiceURL="{self.config.sp_acs_url}"'
             f' ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"'
-            f'{" ForceAuthn=\"true\"" if force_authn else ""}'
+            f'{force_authn_attr}'
             f'>'
             f'<saml:Issuer>{self.config.sp_entity_id}</saml:Issuer>'
             f'<samlp:NameIDPolicy'

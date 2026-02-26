@@ -320,7 +320,10 @@ class TestHealthEndpoint(unittest.TestCase):
         self.assertIn("/api/health", self.content)
 
     def test_health_endpoint_returns_status_ok(self):
-        self.assertIn("'status': 'ok'", self.content) or self.assertIn('"status": "ok"', self.content)
+        self.assertTrue(
+            "'status': 'ok'" in self.content or '"status": "ok"' in self.content,
+            "Expected 'status': 'ok' or \"status\": \"ok\" in rest_api_server.py",
+        )
 
     def test_ready_endpoint_registered(self):
         self.assertIn("/ready", self.content)

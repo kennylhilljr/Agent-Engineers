@@ -13,6 +13,7 @@ jobs:
   benchmark:
     name: Run Performance Benchmarks
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
     timeout-minutes: 15
 
     permissions:

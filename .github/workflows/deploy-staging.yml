@@ -3,11 +3,11 @@ name: Deploy to Staging
 on:
   push:
     branches:
-      - main
+      - '**'
 
 concurrency:
-  group: deploy-staging
-  cancel-in-progress: false
+  group: deploy-staging-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   AWS_REGION: us-east-1
@@ -20,6 +20,7 @@ jobs:
   build-and-push:
     name: Build & Push to ECR
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
     timeout-minutes: 20
     outputs:
       image: ${{ steps.build-image.outputs.image }}
@@ -62,6 +63,7 @@ jobs:
   deploy-staging:
     name: Deploy to ECS Staging
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
     needs: build-and-push
     timeout-minutes: 15
     environment:
@@ -109,8 +111,10 @@ jobs:
 
       - name: Notify on success
         if: success()
-        run: echo "Staging deployment successful! Image: ${{ needs.build-and-push.outputs.image }}"
+        run: |
+          echo "Staging deployment successful"
 
       - name: Notify on failure
         if: failure()
-        run: echo "Staging deployment FAILED! Check logs."
+        run: |
+          echo "Staging deployment FAILED. Check logs."
