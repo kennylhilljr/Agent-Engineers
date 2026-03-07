@@ -1,0 +1,485 @@
+HomeSentinel — Home Network Monitor & Device Management Platform
+================================================================
+
+Application Specification for Autonomous Agent Build
+
+This document defines what the agent team should build from scratch in a brand new repository.
+The application is a greenfield project — no existing codebase to extend.
+
+---
+
+1. PROJECT OVERVIEW
+-------------------
+
+HomeSentinel is a web-based home network monitoring and device management application.
+It functions as a unified network operations center for the home, aggregating data from:
+
+- The local network layer (ARP/DHCP scanning) for device discovery
+- The TP-Link Deco mesh router API for router configuration and client management
+- The Amazon Alexa Smart Home API for smart device inventory and control
+
+The application produces a single, correlated view of every device on the network — from
+a Wi-Fi thermostat to a laptop to an Alexa-connected smart bulb.
+
+Target User: Technically-informed homeowner comfortable with network concepts (IP, MAC)
+but who should NOT be required to use a command-line interface.
+
+Target Hardware: Home LAN with TP-Link Deco Mesh Network, IPv4 only (v1.0).
+
+---
+
+2. TECHNOLOGY STACK
+-------------------
+
+| Tier            | Technology                                      |
+|-----------------|------------------------------------------------|
+| Frontend        | React + TypeScript + Tailwind CSS               |
+| Backend API     | Python FastAPI (async) OR Node.js Express        |
+| Database        | SQLite (local, single-user) or PostgreSQL        |
+| Deco Integration| HTTP REST (TP-Link cloud/local API)             |
+| Alexa Integration| AWS SDK / Alexa Smart Home Skill API v3         |
+| LAN Scanning    | nmap / arp-scan / DHCP lease parser             |
+| Transport       | HTTPS (self-signed cert acceptable for v1.0)    |
+
+---
+
+3. CORE DATA MODEL
+-------------------
+
+3.1 NetworkDevice (primary entity)
+
+| Field           | Type          | Description                                        |
+|-----------------|---------------|----------------------------------------------------|
+| device_id       | UUID          | Primary key                                        |
+| mac_address     | String(17)    | Canonical MAC, e.g. AA:BB:CC:DD:EE:FF              |
+| current_ip      | String(15)    | Most recently observed IPv4 address                 |
+| ip_history      | JSON Array    | All observed IPs with timestamps                    |
+| hostname        | String        | DNS-resolved hostname or null                       |
+| vendor          | String        | OUI-derived vendor/manufacturer name                |
+| friendly_name   | String        | User-assigned label                                 |
+| device_type     | Enum          | laptop / phone / smart_home / iot / unknown         |
+| group_ids       | Array[UUID]   | References to DeviceGroup records                   |
+| deco_node_mac   | String        | MAC of Deco node device connects through            |
+| alexa_device_id | String        | Linked Alexa device endpoint ID, if correlated      |
+| is_blocked      | Boolean       | Whether the device is blocked in Deco               |
+| first_seen      | Timestamp     | When the device was first discovered                |
+| last_seen       | Timestamp     | Last confirmed online timestamp                     |
+| notes           | Text          | Free-form user notes                                |
+
+3.2 DeviceGroup
+
+| Field      | Type   | Description          |
+|------------|--------|----------------------|
+| group_id   | UUID   | Primary key          |
+| name       | String | e.g. "Media Devices" |
+| color      | String | Display color        |
+
+3.3 DeviceEvent (historical log)
+
+| Field      | Type      | Description                          |
+|------------|-----------|--------------------------------------|
+| event_id   | UUID      | Primary key                          |
+| device_id  | UUID      | FK to NetworkDevice                  |
+| event_type | Enum      | connected / disconnected / blocked / unblocked |
+| timestamp  | Timestamp | When the event occurred              |
+| details    | JSON      | Additional context                   |
+
+---
+
+4. FUNCTIONAL REQUIREMENTS
+--------------------------
+
+4.1 Network Device Discovery & Monitoring
+
+REQ-NDM-01 [Critical]: Scan the LAN using ARP and DHCP lease data to discover all
+connected devices. All active devices must appear in the device list within 60 seconds
+of connecting to the network.
+
+REQ-NDM-02 [Critical]: Display device MAC address, current IP address, hostname (if
+resolvable), and first/last seen timestamps for every discovered device. Unknown fields
+display "N/A".
+
+REQ-NDM-03 [High]: Continuously poll the network at a configurable interval (default:
+60 seconds) and update device online/offline status. Device status changes within 2x
+the polling interval of the actual event.
+
+REQ-NDM-04 [High]: Detect and alert on newly discovered (unknown) devices connecting
+to the network. A notification is generated within one polling cycle when a previously
+unseen MAC address appears.
+
+REQ-NDM-05 [Medium]: Allow the user to assign a friendly name, device type, and notes
+to any device. User-assigned labels persist across sessions and are displayed on the
+device card.
+
+REQ-NDM-06 [Medium]: Maintain a historical event log of device connection/disconnection
+events, minimum 90-day retention. Event log is queryable by device, date range, and
+event type.
+
+REQ-NDM-07 [Low]: Support device grouping (e.g., "Media Devices", "Smart Home", "Work").
+Devices can be assigned to one or more groups; dashboard can filter by group.
+
+4.2 TP-Link Deco Integration
+
+REQ-DECO-01 [Critical]: Authenticate with the TP-Link Deco system using stored
+credentials (local or cloud account). Authentication succeeds; session is maintained
+and automatically refreshed on expiry.
+
+REQ-DECO-02 [Critical]: Read and display all Deco node status including firmware
+version, uptime, connected client count, and signal health. Node dashboard reflects
+live Deco API data refreshed on each polling cycle.
+
+REQ-DECO-03 [Critical]: Read the full connected client list from the Deco API and
+merge it with ARP/DHCP data. Deco-reported clients are correlated with locally-
+discovered devices by MAC address.
+
+REQ-DECO-04 [High]: Read and display current Wi-Fi SSID, band (2.4/5/6 GHz), and
+channel configuration. All active SSIDs and their band assignments are displayed
+accurately.
+
+REQ-DECO-05 [High]: Write Wi-Fi configuration changes (SSID name, password, band
+steering on/off) via the Deco API. Changes submitted through the UI are reflected in
+the Deco system within 30 seconds; errors are surfaced to the user.
+
+REQ-DECO-06 [High]: Read and display current QoS settings and per-device bandwidth
+allocation. QoS data is displayed per device with current priority and bandwidth limit.
+
+REQ-DECO-07 [High]: Write QoS settings — assign bandwidth priority (High/Normal/Low)
+or set a bandwidth cap per device. QoS changes are applied and confirmed via the Deco
+API response.
+
+REQ-DECO-08 [High]: Read and write device blocking status — block or unblock any
+client device from the network. Block/unblock action is applied within 10 seconds;
+blocked device loses connectivity.
+
+REQ-DECO-09 [Medium]: Read and display Deco parental control schedules. All configured
+schedules are shown with device assignment and time windows.
+
+REQ-DECO-10 [Medium]: Write parental control schedule changes — create, modify, or
+delete schedules. Schedule changes are persisted in the Deco system and immediately
+reflected in the UI.
+
+REQ-DECO-11 [Medium]: Read guest network configuration (SSID, password, isolation mode,
+client list). Guest network details are displayed separately from main network.
+
+REQ-DECO-12 [Low]: Trigger Deco firmware update check and display available updates.
+Available firmware versions are shown per node with a one-click update option.
+
+4.3 Amazon Alexa Integration
+
+REQ-ALEXA-01 [Critical]: Authenticate with the Amazon Alexa Smart Home API using
+OAuth 2.0 (Login with Amazon). OAuth flow completes; access token is securely stored
+and refreshed automatically.
+
+REQ-ALEXA-02 [Critical]: Retrieve and display the complete Alexa device inventory
+including device name, type, manufacturer, model, and capability list. All devices
+registered to the Alexa account appear in the Alexa device panel.
+
+REQ-ALEXA-03 [Critical]: Display real-time state for each Alexa device (on/off,
+brightness, color, temperature, lock state, etc.) where supported by the device
+capabilities. Device state is fetched and displayed; stale state (>5 min) is indicated
+visually.
+
+REQ-ALEXA-04 [High]: Send power commands (turn on / turn off) to Alexa-compatible
+smart devices. Command is dispatched via the Alexa API and device state updates within
+5 seconds.
+
+REQ-ALEXA-05 [High]: Control dimmable Alexa lights — set brightness level (0-100%).
+Brightness change is reflected in device state response.
+
+REQ-ALEXA-06 [High]: Control color-capable Alexa lights — set hue, saturation, and
+color temperature. Color state is updated and confirmed in the Alexa API response.
+
+REQ-ALEXA-07 [High]: Control Alexa-compatible smart plugs — on/off toggle. Plug state
+changes and is confirmed within 5 seconds.
+
+REQ-ALEXA-08 [Medium]: Display and control Alexa-compatible smart thermostats — read
+current temperature, setpoint; write target temperature and mode. Thermostat setpoint
+changes are accepted by the Alexa API.
+
+REQ-ALEXA-09 [Medium]: Display and control Alexa-compatible smart locks — read lock
+state; write lock/unlock command. Lock state change is confirmed; unlock action requires
+user PIN confirmation in the UI.
+
+REQ-ALEXA-10 [Medium]: Display Alexa routines registered to the account. Routine names
+and trigger types are listed in read-only view.
+
+REQ-ALEXA-11 [Low]: Trigger an Alexa routine by name from the HomeSentinel UI.
+Selected routine executes and the UI shows a confirmation status.
+
+REQ-ALEXA-12 [Low]: Display Alexa Echo device inventory (Echo, Echo Dot, Show, etc.)
+separately from smart home devices. Echo devices are listed with model, firmware, and
+online status where API-available.
+
+4.4 MAC Address / IP Address Correlation
+
+REQ-CORR-01 [Critical]: Maintain a unified device record that links MAC address,
+current IP, hostname, Deco-reported identity, Alexa device association (if applicable),
+and user-assigned friendly name. A single device card shows all correlated identifiers
+in one view.
+
+REQ-CORR-02 [Critical]: When the same MAC address is seen with multiple IP addresses
+over time (DHCP churn), retain the full IP history attached to that MAC record. IP
+history tab on a device card shows all previously observed IPs with timestamps.
+
+REQ-CORR-03 [High]: Allow the user to search for any device by MAC address, IP address,
+hostname, or friendly name. Search returns the matching device within 1 second; partial
+matches are supported.
+
+REQ-CORR-04 [High]: Perform OUI (Organizationally Unique Identifier) lookup on the
+MAC address to display manufacturer/vendor name. Vendor name is displayed on the device
+card using a bundled or API-sourced OUI database.
+
+REQ-CORR-05 [High]: Where possible, automatically associate an Alexa device with its
+corresponding network device by matching IP/MAC data reported by both sources.
+Auto-linked devices show a combined card with both network and Alexa attributes.
+
+REQ-CORR-06 [Medium]: Allow the user to manually link any Alexa device to any network
+device record. Manually linked devices are stored and survive app restarts.
+
+REQ-CORR-07 [Medium]: Display a correlation map / relationship view showing which Deco
+node each device is connected through. A visual topology or list view shows device ->
+Deco node relationships.
+
+REQ-CORR-08 [Low]: Export the full correlated device inventory as CSV or JSON. Exported
+file contains all device fields and downloads correctly in modern browsers.
+
+---
+
+5. NON-FUNCTIONAL REQUIREMENTS
+-------------------------------
+
+5.1 Performance
+
+- Dashboard initial load time shall be under 3 seconds on a LAN-resident host.
+- Device list refresh (polling result render) shall complete within 1 second of data receipt.
+- Alexa command dispatch to API acknowledgment shall complete within 3 seconds.
+- ARP scan of a /24 subnet shall complete within 30 seconds.
+
+5.2 Security
+
+- All API credentials (Deco, Alexa OAuth tokens) shall be stored encrypted at rest.
+- The application web interface shall be served over HTTPS, even on the local network
+  (self-signed cert acceptable for v1.0).
+- Alexa unlock commands shall require secondary confirmation (PIN or confirmation dialog).
+- No credentials shall be logged to application log files.
+- The application shall support an admin password to restrict access to the dashboard.
+
+5.3 Reliability & Availability
+
+- The application shall continue to display last-known device state if an upstream API
+  (Deco or Alexa) becomes temporarily unavailable, with a visible staleness indicator.
+- Polling failures shall be retried with exponential backoff, max 3 retries before
+  alerting the user.
+- The application shall survive a host reboot and automatically resume monitoring
+  without manual intervention.
+
+5.4 Usability
+
+- The UI shall be responsive and usable on desktop browsers (Chrome, Firefox, Edge)
+  and mobile browsers (iOS Safari, Android Chrome).
+- All destructive or write operations (block device, change Wi-Fi password, QoS override)
+  shall require explicit user confirmation.
+- Color coding shall not be the sole indicator of status (accessibility requirement —
+  icons and text labels must accompany color).
+
+5.5 Maintainability
+
+- Integration adapters for Deco and Alexa shall be modular and independently testable.
+- Configuration (polling intervals, credential storage path, port) shall be managed via
+  a single environment/config file.
+- The application shall emit structured logs suitable for debugging integration failures.
+
+---
+
+6. EXTERNAL INTERFACE REQUIREMENTS
+------------------------------------
+
+6.1 TP-Link Deco API
+
+| Attribute        | Detail                                                      |
+|------------------|-------------------------------------------------------------|
+| Protocol         | HTTPS REST (TP-Link cloud) or local LAN API endpoint        |
+| Authentication   | TP-Link account credentials -> session token                |
+| Library Candidate| tplink-smarthome-api (npm) or direct HTTP                   |
+| Key Endpoints    | /login, /client/list, /wireless, /qos, /parental_control, /block_client |
+| Rate Limiting    | Respect TP-Link rate limits; min 10s between write ops      |
+| Error Handling   | HTTP 4xx/5xx -> actionable error messages in UI             |
+
+6.2 Amazon Alexa Smart Home API
+
+| Attribute        | Detail                                                      |
+|------------------|-------------------------------------------------------------|
+| Protocol         | HTTPS REST — Alexa Smart Home Skill API v3                  |
+| Authentication   | OAuth 2.0 via Login with Amazon (LWA); alexa::smarthome scope |
+| Primary Endpoints| Alexa.Discovery, Alexa.PowerController, Alexa.BrightnessController, Alexa.ColorController, Alexa.ThermostatController, Alexa.LockController |
+| Directive Format | JSON payload per Alexa Smart Home API specification         |
+| Token Refresh    | LWA refresh token flow; tokens stored encrypted             |
+
+6.3 Local Network Interface
+
+| Attribute          | Detail                                                    |
+|--------------------|-----------------------------------------------------------|
+| ARP Scanning       | arp-scan or nmap -sn on local subnet(s)                   |
+| DHCP Lease Parsing | Parse /var/lib/dhcp/dhclient.leases or query Deco API     |
+| DNS Resolution     | Reverse DNS (PTR) lookup on discovered IPs                |
+| Required Privileges| ARP/nmap scan requires root or CAP_NET_RAW on Linux       |
+| Supported Subnet   | Single /24 subnet (v1.0)                                  |
+
+---
+
+7. USER INTERFACE STRUCTURE
+----------------------------
+
+The UI shall support both a power-user dashboard and simplified device views.
+
+7.1 Main Dashboard
+- Network status overview (total devices, online/offline counts, alerts)
+- Deco mesh node health indicators
+- Quick actions (scan now, view alerts)
+
+7.2 Device Manager
+- Sortable/filterable device list with all correlated fields
+- Device detail cards showing MAC, IP, hostname, vendor, friendly name, groups
+- IP history tab per device
+- Edit controls for friendly name, type, notes, groups
+- Block/unblock toggle per device
+- Search bar (MAC, IP, hostname, friendly name — partial match)
+
+7.3 Deco Control Panel
+- Deco node status cards (firmware, uptime, client count, signal health)
+- Wi-Fi configuration editor (SSID, password, band steering)
+- QoS settings editor per device
+- Parental control schedule manager
+- Guest network configuration viewer
+- Firmware update checker
+
+7.4 Alexa Control Panel
+- Alexa device inventory with state display
+- Power on/off controls for compatible devices
+- Brightness and color controls for lights
+- Thermostat controls (temperature, mode)
+- Lock controls (with PIN confirmation for unlock)
+- Routine list (read-only) with trigger button
+- Echo device inventory (separate section)
+
+7.5 Network Topology View
+- Visual map showing Deco nodes and connected devices
+- Device -> Deco node relationship lines
+- Online/offline status indicators
+
+7.6 Event Log & Alerts
+- Scrollable event log (connect/disconnect/block/unblock events)
+- Filters by device, date range, event type
+- New device alerts with dismiss/acknowledge
+
+---
+
+8. IMPLEMENTATION PHASES (BUILD ORDER)
+---------------------------------------
+
+Phase 1 — Foundation (v0.1 MVP)
+  - Project scaffolding (repository, package manager, linting, CI)
+  - LAN device discovery via ARP/DHCP scanning
+  - Basic device registry (SQLite) with MAC/IP correlation
+  - OUI vendor lookup
+  - Device dashboard with list view
+  - Device detail card with all fields
+  - Search functionality
+  - REQs covered: NDM-01 through NDM-07, CORR-01 through CORR-04, CORR-08
+
+Phase 2 — Deco Read-Only Integration (v0.3)
+  - Deco API authentication and session management
+  - Deco node status display
+  - Deco client list merge with ARP/DHCP data
+  - Wi-Fi configuration display (read-only)
+  - QoS display (read-only)
+  - Network topology view (device -> Deco node)
+  - REQs covered: DECO-01 through DECO-04, DECO-06, CORR-07
+
+Phase 3 — Deco Write Operations (v0.5)
+  - Wi-Fi configuration changes (SSID, password, band steering)
+  - QoS write (priority, bandwidth cap per device)
+  - Device block/unblock
+  - Parental control schedule read/write
+  - Guest network configuration display
+  - Firmware update checker
+  - REQs covered: DECO-05, DECO-07 through DECO-12
+
+Phase 4 — Alexa Read Integration (v0.7)
+  - Amazon OAuth 2.0 flow (Login with Amazon)
+  - Alexa device inventory retrieval and display
+  - Real-time device state display
+  - Auto-correlation of Alexa devices with network devices
+  - Manual device linking
+  - REQs covered: ALEXA-01 through ALEXA-03, CORR-05, CORR-06
+
+Phase 5 — Alexa Control (v1.0)
+  - Power on/off commands
+  - Brightness and color controls for lights
+  - Smart plug control
+  - Thermostat control
+  - Lock control (with PIN confirmation)
+  - Routine display and triggering
+  - Echo device inventory
+  - REQs covered: ALEXA-04 through ALEXA-12
+
+Phase 6 — Polish (v1.1)
+  - Alerts & notification system (new device, offline device)
+  - Historical reporting and event log UI
+  - CSV/JSON export
+  - Mobile UI refinement
+  - Performance optimization
+  - Admin password authentication
+
+---
+
+9. CONSTRAINTS & LIMITATIONS (v1.0)
+-------------------------------------
+
+- IPv6 device discovery is out of scope.
+- Multi-WAN or multi-router environments are out of scope; single Deco system only.
+- The Alexa integration requires an Amazon developer account and a registered Smart Home Skill.
+- TP-Link Deco API is partially reverse-engineered; functionality may vary across firmware
+  versions. The application must degrade gracefully when an API endpoint is unavailable.
+- Alexa device control is subject to Amazon API availability and Smart Home device integration
+  capability — not all third-party devices expose all capabilities.
+- Single /24 subnet support only; multi-subnet deferred to v2.0.
+
+---
+
+10. OPEN QUESTIONS
+-------------------
+
+1. TP-Link Deco API — cloud API vs local LAN API? Local avoids cloud dependency but is
+   undocumented and may break with firmware updates.
+2. Alexa Smart Home Skill — does the developer already have a registered Skill and Lambda
+   function, or does this need to be created from scratch?
+3. Hosting environment — Raspberry Pi, NAS, mini-PC, or container? Affects ARP scan
+   privilege requirements.
+4. Notification delivery — web UI only, or also email / SMS / Alexa announcement?
+5. Authentication — username/password login vs LAN-only binding?
+
+---
+
+11. REPOSITORY SETUP INSTRUCTIONS
+-----------------------------------
+
+This is a BRAND NEW REPOSITORY. The agent team should:
+
+1. Initialize a new git repository named "homesentinel"
+2. Set up the chosen backend framework (FastAPI or Express)
+3. Set up the React + TypeScript frontend with Tailwind CSS
+4. Configure SQLite as the default database
+5. Create a .env.example with all required configuration variables:
+   - DECO_USERNAME / DECO_PASSWORD (TP-Link credentials)
+   - DECO_HOST (local IP or "cloud" for cloud API)
+   - AMAZON_CLIENT_ID / AMAZON_CLIENT_SECRET (LWA OAuth)
+   - SCAN_INTERVAL (default: 60)
+   - SCAN_SUBNET (default: auto-detect)
+   - ADMIN_PASSWORD (optional)
+   - DB_PATH (default: ./data/homesentinel.db)
+   - PORT (default: 3000)
+   - HTTPS_CERT_PATH / HTTPS_KEY_PATH (for self-signed cert)
+6. Add a Dockerfile for containerized deployment
+7. Add a README.md with setup and usage instructions
+8. Configure linting (ESLint for frontend, Ruff for Python backend)
