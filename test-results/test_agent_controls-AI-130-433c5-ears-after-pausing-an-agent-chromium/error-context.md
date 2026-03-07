@@ -1,0 +1,377 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]: Agent Dashboard
+    - generic [ref=e5]:
+      - button "Pause All" [ref=e6] [cursor=pointer]
+      - button "Accelerate" [ref=e7] [cursor=pointer]
+    - generic "Global Dashboard Metrics" [ref=e8]:
+      - generic [ref=e9]:
+        - generic [ref=e10]: Session
+        - generic [ref=e11]: "1"
+      - generic [ref=e12]:
+        - generic [ref=e13]: Total Sessions
+        - generic [ref=e14]: "42"
+      - generic [ref=e15]:
+        - generic [ref=e16]: Total Tokens
+        - generic [ref=e17]:
+          - img [ref=e19]:
+            - generic [ref=e22]: ●
+          - generic [ref=e23]: 250.0K
+      - generic [ref=e24]:
+        - generic [ref=e25]: Total Cost
+        - generic [ref=e26]:
+          - img [ref=e28]:
+            - generic [ref=e31]: ●
+          - generic [ref=e32]: $12.50
+      - generic [ref=e33]:
+        - generic [ref=e34]: Uptime
+        - generic [ref=e35]: 1h 0m
+      - generic [ref=e36]:
+        - generic [ref=e37]: Provider
+        - generic [ref=e38]: Claude
+  - main [ref=e39]:
+    - complementary [ref=e40]:
+      - generic [ref=e41]:
+        - heading "Agent Status" [level=2] [ref=e42]
+        - generic [ref=e43]:
+          - generic [ref=e44] [cursor=pointer]:
+            - generic [ref=e45]:
+              - generic "idle" [ref=e46]
+              - generic [ref=e48]: linear
+            - generic [ref=e49]:
+              - 'generic "Model: haiku" [ref=e50]': haiku
+              - generic [ref=e51]: ○ idle
+          - generic [ref=e52] [cursor=pointer]:
+            - generic [ref=e53]:
+              - generic "idle" [ref=e54]
+              - generic [ref=e56]: coding
+            - generic [ref=e57]:
+              - 'generic "Model: haiku" [ref=e58]': haiku
+              - generic [ref=e59]: ○ idle
+          - generic [ref=e60] [cursor=pointer]:
+            - generic [ref=e61]:
+              - generic "idle" [ref=e62]
+              - generic [ref=e64]: github
+            - generic [ref=e65]:
+              - 'generic "Model: haiku" [ref=e66]': haiku
+              - generic [ref=e67]: ○ idle
+          - generic [ref=e68] [cursor=pointer]:
+            - generic [ref=e69]:
+              - generic "idle" [ref=e70]
+              - generic [ref=e72]: slack
+            - generic [ref=e73]:
+              - 'generic "Model: haiku" [ref=e74]': haiku
+              - generic [ref=e75]: ○ idle
+          - generic [ref=e76] [cursor=pointer]:
+            - generic [ref=e77]:
+              - generic "idle" [ref=e78]
+              - generic [ref=e80]: pr_reviewer
+            - generic [ref=e81]:
+              - 'generic "Model: haiku" [ref=e82]': haiku
+              - generic [ref=e83]: ○ idle
+          - generic [ref=e84] [cursor=pointer]:
+            - generic [ref=e85]:
+              - generic "idle" [ref=e86]
+              - generic [ref=e88]: ops
+            - generic [ref=e89]:
+              - 'generic "Model: haiku" [ref=e90]': haiku
+              - generic [ref=e91]: ○ idle
+          - generic [ref=e92] [cursor=pointer]:
+            - generic [ref=e93]:
+              - generic "idle" [ref=e94]
+              - generic [ref=e96]: coding_fast
+            - generic [ref=e97]:
+              - 'generic "Model: haiku" [ref=e98]': haiku
+              - generic [ref=e99]: ○ idle
+          - generic [ref=e100] [cursor=pointer]:
+            - generic [ref=e101]:
+              - generic "idle" [ref=e102]
+              - generic [ref=e104]: pr_reviewer_fast
+            - generic [ref=e105]:
+              - 'generic "Model: haiku" [ref=e106]': haiku
+              - generic [ref=e107]: ○ idle
+          - generic [ref=e108] [cursor=pointer]:
+            - generic [ref=e109]:
+              - generic "idle" [ref=e110]
+              - generic [ref=e112]: chatgpt
+            - generic [ref=e113]:
+              - 'generic "Model: haiku" [ref=e114]': haiku
+              - generic [ref=e115]: ○ idle
+          - generic [ref=e116] [cursor=pointer]:
+            - generic [ref=e117]:
+              - generic "idle" [ref=e118]
+              - generic [ref=e120]: gemini
+            - generic [ref=e121]:
+              - 'generic "Model: haiku" [ref=e122]': haiku
+              - generic [ref=e123]: ○ idle
+          - generic [ref=e124] [cursor=pointer]:
+            - generic [ref=e125]:
+              - generic "idle" [ref=e126]
+              - generic [ref=e128]: groq
+            - generic [ref=e129]:
+              - 'generic "Model: haiku" [ref=e130]': haiku
+              - generic [ref=e131]: ○ idle
+          - generic [ref=e132] [cursor=pointer]:
+            - generic [ref=e133]:
+              - generic "idle" [ref=e134]
+              - generic [ref=e136]: kimi
+            - generic [ref=e137]:
+              - 'generic "Model: haiku" [ref=e138]': haiku
+              - generic [ref=e139]: ○ idle
+          - generic [ref=e140] [cursor=pointer]:
+            - generic [ref=e141]:
+              - generic "idle" [ref=e142]
+              - generic [ref=e144]: windsurf
+            - generic [ref=e145]:
+              - 'generic "Model: haiku" [ref=e146]': haiku
+              - generic [ref=e147]: ○ idle
+          - generic [ref=e148] [cursor=pointer]:
+            - generic [ref=e149]:
+              - generic "idle" [ref=e150]
+              - generic [ref=e152]: openrouter_dev
+            - generic [ref=e153]:
+              - 'generic "Model: haiku" [ref=e154]': haiku
+              - generic [ref=e155]: ○ idle
+          - generic [ref=e156] [cursor=pointer]:
+            - generic [ref=e157]:
+              - generic "idle" [ref=e158]
+              - generic [ref=e160]: product_manager
+            - generic [ref=e161]:
+              - 'generic "Model: haiku" [ref=e162]': haiku
+              - generic [ref=e163]: ○ idle
+          - generic [ref=e164] [cursor=pointer]:
+            - generic [ref=e165]:
+              - generic "idle" [ref=e166]
+              - generic [ref=e168]: designer
+            - generic [ref=e169]:
+              - 'generic "Model: haiku" [ref=e170]': haiku
+              - generic [ref=e171]: ○ idle
+      - generic [ref=e172]:
+        - heading "PM Task Launcher idle" [level=2] [ref=e173]:
+          - text: PM Task Launcher
+          - generic [ref=e174]: idle
+        - generic [ref=e175]:
+          - combobox [ref=e176]:
+            - option "Full Project Review" [selected]
+            - option "Backlog Grooming"
+            - option "Sprint Planning"
+            - option "Prompt Audit"
+            - option "Agent Analysis"
+            - option "Custom Task..."
+          - combobox [ref=e177]:
+            - option "Sonnet" [selected]
+            - option "Haiku"
+            - option "Opus"
+          - generic [ref=e178]:
+            - button "Run Task" [ref=e179] [cursor=pointer]
+            - button "Stop" [ref=e180] [cursor=pointer]
+      - generic [ref=e181]:
+        - heading "Orchestrator Flow" [level=2] [ref=e182]
+        - generic [ref=e183]:
+          - generic [ref=e184]:
+            - generic [ref=e185]: 🎯
+            - generic [ref=e186]: Orchestrator
+            - generic [ref=e187]: (AI-145)
+          - generic [ref=e188]:
+            - generic [ref=e189]:
+              - generic [ref=e190]: ├─►
+              - img [ref=e192]:
+                - generic [ref=e195]: ✓
+              - generic [ref=e197]:
+                - generic [ref=e198]: ops
+                - generic [ref=e199]: Starting AI-145
+                - generic [ref=e200]: 3s
+            - generic [ref=e201]:
+              - generic [ref=e202]: ├─►
+              - img [ref=e204]:
+                - generic [ref=e207]: ✓
+              - generic [ref=e209]:
+                - generic [ref=e210]: coding
+                - generic [ref=e211]: Implementing AI-145
+                - generic [ref=e212]: 312s
+            - generic [ref=e213]:
+              - generic [ref=e214]: ├─►
+              - img [ref=e216]:
+                - generic [ref=e219]: ✓
+              - generic [ref=e221]:
+                - generic [ref=e222]: github
+                - generic [ref=e223]: Commit + PR
+                - generic [ref=e224]: 18s
+            - generic [ref=e225]:
+              - generic [ref=e226]: ├─►
+              - img [ref=e228]:
+                - generic [ref=e231]: ✓
+              - generic [ref=e233]:
+                - generic [ref=e234]: ops
+                - generic [ref=e235]: Transition to Review
+                - generic [ref=e236]: 2s
+            - generic [ref=e237]:
+              - generic [ref=e238]: ├─►
+              - img [ref=e240]:
+                - generic [ref=e243]: ✓
+              - generic [ref=e245]:
+                - generic [ref=e246]: pr_reviewer_fast
+                - generic [ref=e247]: Review PR
+                - generic [ref=e248]: 8s
+            - generic [ref=e249]:
+              - generic [ref=e250]: └─►
+              - img [ref=e252]:
+                - generic [ref=e255]: ●
+              - generic [ref=e257]:
+                - generic [ref=e258]: ops
+                - generic [ref=e259]: Mark Done + Notify
+                - generic [ref=e260]: 1s [ACTIVE]
+      - generic [ref=e261]:
+        - generic [ref=e262]:
+          - generic [ref=e263]:
+            - heading "Activity Feed" [level=2] [ref=e264]
+            - generic [ref=e265]: LIVE
+            - generic [ref=e266]: 5 events
+          - generic "Filter activity feed" [ref=e267]:
+            - button "All" [ref=e268] [cursor=pointer]
+            - button "Success" [ref=e269] [cursor=pointer]
+            - button "Error" [ref=e270] [cursor=pointer]
+            - button "Running" [ref=e271] [cursor=pointer]
+        - generic "Live activity feed" [ref=e272]:
+          - generic [ref=e273]:
+            - generic [ref=e274]: 14:23
+            - generic [ref=e275]: coding
+            - generic [ref=e276]: ✓
+            - generic [ref=e277]: AI-42
+            - generic [ref=e278]: AI-42
+          - generic [ref=e279]:
+            - generic [ref=e280]: 14:22
+            - generic [ref=e281]: github
+            - generic [ref=e282]: ✓
+            - generic [ref=e283]: AI-42
+            - generic [ref=e284]: AI-42
+          - generic [ref=e285]:
+            - generic [ref=e286]: 14:21
+            - generic [ref=e287]: linear
+            - generic [ref=e288]: ✓
+            - generic [ref=e289]: AI-41
+            - generic [ref=e290]: AI-41
+          - generic [ref=e291]:
+            - generic [ref=e292]: 14:19
+            - generic [ref=e293]: ops
+            - generic [ref=e294]: ✓
+            - generic [ref=e295]: AI-40
+            - generic [ref=e296]: AI-40
+          - generic [ref=e297]:
+            - generic [ref=e298]: 14:15
+            - generic [ref=e299]: coding
+            - generic [ref=e300]: ✗
+            - generic [ref=e301]: AI-39
+            - generic [ref=e302]: AI-39
+      - generic [ref=e304]:
+        - heading "Agent Leaderboard" [level=2] [ref=e305]
+        - generic "Sort leaderboard by" [ref=e306]:
+          - button "XP" [ref=e307] [cursor=pointer]
+          - button "Rate" [ref=e308] [cursor=pointer]
+          - button "Cost" [ref=e309] [cursor=pointer]
+      - generic [ref=e310]:
+        - heading "Analytics Charts" [level=2] [ref=e311]
+        - generic [ref=e312]:
+          - generic [ref=e313]: Token Usage by Agent
+          - img "Token usage by agent" [ref=e315]:
+            - generic [ref=e316]: Coding
+            - generic [ref=e318]: 48.2k
+            - generic [ref=e319]: PR Reviewer
+            - generic [ref=e321]: 37.6k
+            - generic [ref=e322]: Research
+            - generic [ref=e324]: 29.8k
+            - generic [ref=e325]: Orchestrator
+            - generic [ref=e327]: 24.1k
+            - generic [ref=e328]: Docs Writer
+            - generic [ref=e330]: 19.3k
+            - generic [ref=e331]: Linear
+            - generic [ref=e333]: 15.4k
+            - generic [ref=e334]: GitHub
+            - generic [ref=e336]: 12.8k
+            - generic [ref=e337]: Slack
+            - generic [ref=e339]: 9.7k
+            - generic [ref=e340]: Ops
+            - generic [ref=e342]: 8.2k
+            - generic [ref=e343]: Tester
+            - generic [ref=e345]: 7.6k
+        - generic [ref=e346]:
+          - generic [ref=e347]: Cost Trend (Recent Sessions)
+          - img "Cost trend over recent sessions" [ref=e349]:
+            - generic [ref=e350]: $0.19
+            - generic [ref=e351]: $0.14
+            - generic [ref=e352]: $0.09
+            - generic [ref=e353]: $0.05
+            - generic [ref=e354]: $0.00
+            - generic [ref=e364]: S1
+            - generic [ref=e365]: S2
+            - generic [ref=e366]: S3
+            - generic [ref=e367]: S4
+            - generic [ref=e368]: S5
+            - generic [ref=e369]: S6
+            - generic [ref=e370]: S7
+            - generic [ref=e371]: S8
+        - generic [ref=e372]:
+          - generic [ref=e373]: Success Rate by Agent
+          - img "Success rate by agent" [ref=e375]:
+            - generic [ref=e377]: 96%
+            - generic [ref=e378]: GitHub
+            - generic [ref=e380]: 94%
+            - generic [ref=e381]: Slack
+            - generic [ref=e383]: 91%
+            - generic [ref=e384]: Linear
+            - generic [ref=e386]: 88%
+            - generic [ref=e387]: Deploy
+            - generic [ref=e389]: 85%
+            - generic [ref=e390]: Orche…
+            - generic [ref=e392]: 83%
+            - generic [ref=e393]: Ops
+            - generic [ref=e395]: 79%
+            - generic [ref=e396]: Secur…
+            - generic [ref=e398]: 74%
+            - generic [ref=e399]: PR Re…
+            - generic [ref=e401]: 71%
+            - generic [ref=e402]: Coding
+            - generic [ref=e404]: 68%
+            - generic [ref=e405]: Tester
+            - generic [ref=e407]: 62%
+            - generic [ref=e408]: Resea…
+            - generic [ref=e410]: 58%
+            - generic [ref=e411]: Analy…
+            - generic [ref=e413]: 44%
+            - generic [ref=e414]: Docs …
+    - generic [ref=e416]:
+      - generic [ref=e418]:
+        - generic [ref=e419]:
+          - generic [ref=e420]: System
+          - generic [ref=e421]: 11:38:03 PM
+        - generic [ref=e422]: Welcome to the Agent Dashboard. The system is ready.
+      - generic [ref=e423]:
+        - generic [ref=e425]:
+          - generic [ref=e426]:
+            - generic [ref=e427]: "Provider:"
+            - combobox "Select AI provider" [ref=e428] [cursor=pointer]:
+              - option "Claude" [selected]
+              - option "ChatGPT"
+              - option "Gemini"
+              - option "Groq"
+              - option "KIMI"
+              - option "Windsurf"
+          - generic [ref=e429]:
+            - generic [ref=e430]: "Model:"
+            - combobox "Select AI model" [ref=e431] [cursor=pointer]:
+              - option "Haiku 4.5"
+              - option "Sonnet 4.5" [selected]
+              - option "Opus 4.6"
+          - generic "3 of 6 providers have active API keys" [ref=e432]: 3/6 providers active
+        - generic [ref=e433]:
+          - textbox "Type a message..." [ref=e434]
+          - button "Send" [ref=e435] [cursor=pointer]
+  - contentinfo [ref=e436]:
+    - generic [ref=e437]:
+      - button "Pause All" [ref=e438] [cursor=pointer]
+      - button "Resume All" [ref=e439] [cursor=pointer]
+    - generic [ref=e440]: System Ready
+```
