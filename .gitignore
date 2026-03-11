@@ -26,6 +26,14 @@ screenshots/
 # Agent metrics
 .agent_metrics.json
 
+# Private keys and credentials
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+credentials.json
+
 # AI-225: Multi-project config (local file, not committed)
 .agent_projects.json
 
