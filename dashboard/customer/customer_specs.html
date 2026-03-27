@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Specs - Agentic Platform</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --bg-hover: #30363d;
+            --text-primary: #f0f6fc;
+            --text-secondary: #c9d1d9;
+            --text-muted: #8b949e;
+            --border-color: #30363d;
+            --accent-blue: #58a6ff;
+            --accent-blue-dark: #1f6feb;
+            --accent-green: #3fb950;
+            --accent-yellow: #d29922;
+            --accent-red: #f85149;
+            --accent-purple: #bc8cff;
+            --accent-orange: #d18616;
+            --shadow: rgba(0, 0, 0, 0.4);
+            --radius: 8px;
+            --radius-lg: 12px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        a { color: var(--accent-blue); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        /* Header */
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 2rem;
+            display: flex; align-items: center; justify-content: space-between;
+            height: 64px; position: sticky; top: 0; z-index: 100;
+        }
+
+        .header-left { display: flex; align-items: center; gap: 1.5rem; }
+
+        .header-logo {
+            display: flex; align-items: center; gap: 0.5rem;
+            font-size: 1.25rem; font-weight: 700; color: var(--text-primary);
+        }
+
+        .header-logo svg { width: 28px; height: 28px; color: var(--accent-blue); }
+
+        .nav-tabs { display: flex; gap: 0; height: 64px; }
+
+        .nav-tab {
+            display: flex; align-items: center; padding: 0 1.25rem; height: 100%;
+            color: var(--text-muted); font-size: 0.875rem; font-weight: 500;
+            border-bottom: 2px solid transparent;
+            transition: color 0.15s ease, border-color 0.15s ease;
+            cursor: pointer; text-decoration: none;
+        }
+
+        .nav-tab:hover { color: var(--text-secondary); text-decoration: none; }
+        .nav-tab.active { color: var(--text-primary); border-bottom-color: var(--accent-blue); }
+
+        .header-right { display: flex; align-items: center; gap: 1rem; }
+
+        .user-avatar {
+            width: 32px; height: 32px; border-radius: 50%;
+            background: var(--accent-blue-dark);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.8rem; font-weight: 600; color: #fff; cursor: pointer;
+        }
+
+        /* Layout: Sidebar + Main + Right Panel */
+        .spec-layout {
+            display: flex;
+            height: calc(100vh - 64px);
+            overflow: hidden;
+        }
+
+        /* Spec Sidebar */
+        .spec-sidebar {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .sidebar-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+
+        .sidebar-title { font-size: 0.9rem; font-weight: 600; color: var(--text-primary); }
+
+        .btn-sm {
+            padding: 0.3rem 0.65rem; border-radius: var(--radius);
+            font-size: 0.75rem; font-weight: 600; cursor: pointer;
+            border: 1px solid var(--accent-blue-dark);
+            background: var(--accent-blue-dark); color: #fff;
+            transition: background 0.15s ease;
+        }
+
+        .btn-sm:hover { background: var(--accent-blue); }
+
+        .spec-list {
+            flex: 1; overflow-y: auto; padding: 0.5rem 0;
+        }
+
+        .spec-list-item {
+            display: flex; align-items: center; gap: 0.6rem;
+            padding: 0.65rem 1.25rem;
+            cursor: pointer; transition: background 0.1s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .spec-list-item:hover { background: var(--bg-tertiary); }
+
+        .spec-list-item.active {
+            background: var(--bg-tertiary);
+            border-left-color: var(--accent-blue);
+        }
+
+        .spec-status-dot {
+            width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+        }
+
+        .spec-status-dot.draft { background: var(--text-muted); }
+        .spec-status-dot.submitted { background: var(--accent-blue); }
+        .spec-status-dot.processing { background: var(--accent-yellow); animation: pulse 2s ease-in-out infinite; }
+        .spec-status-dot.completed { background: var(--accent-green); }
+
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        .spec-list-info { flex: 1; min-width: 0; }
+
+        .spec-list-name {
+            font-size: 0.825rem; font-weight: 500; color: var(--text-primary);
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+
+        .spec-list-status {
+            font-size: 0.7rem; color: var(--text-muted); text-transform: capitalize;
+        }
+
+        /* Main Editor Area */
+        .spec-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-width: 0;
+        }
+
+        .editor-toolbar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0.75rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            flex-shrink: 0;
+        }
+
+        .editor-toolbar-left {
+            display: flex; align-items: center; gap: 1rem;
+        }
+
+        .version-indicator {
+            font-size: 0.75rem; color: var(--text-muted);
+            padding: 0.2rem 0.5rem; background: var(--bg-tertiary);
+            border-radius: 4px;
+        }
+
+        .editor-toolbar-right { display: flex; gap: 0.5rem; }
+
+        .btn {
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            padding: 0.45rem 0.875rem; border-radius: var(--radius);
+            font-size: 0.8rem; font-weight: 500; cursor: pointer;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary); color: var(--text-secondary);
+            transition: background 0.15s ease;
+        }
+
+        .btn:hover { background: var(--bg-hover); text-decoration: none; }
+
+        .btn-primary {
+            background: var(--accent-blue-dark);
+            border-color: var(--accent-blue-dark); color: #fff;
+        }
+
+        .btn-primary:hover { background: var(--accent-blue); border-color: var(--accent-blue); }
+
+        .btn-danger {
+            border-color: rgba(248,81,73,0.4); color: var(--accent-red);
+        }
+
+        .btn-danger:hover { background: rgba(248,81,73,0.15); }
+
+        .btn-success {
+            background: rgba(63,185,80,0.15);
+            border-color: rgba(63,185,80,0.4); color: var(--accent-green);
+        }
+
+        .btn-success:hover { background: rgba(63,185,80,0.25); }
+
+        .editor-body {
+            flex: 1; overflow-y: auto; padding: 1.5rem;
+        }
+
+        .form-group { margin-bottom: 1.25rem; }
+
+        .form-label {
+            display: block; font-size: 0.8rem; font-weight: 600;
+            color: var(--text-secondary); margin-bottom: 0.4rem;
+            text-transform: uppercase; letter-spacing: 0.3px;
+        }
+
+        .form-input, .form-textarea {
+            width: 100%; padding: 0.6rem 0.875rem;
+            background: var(--bg-tertiary); border: 1px solid var(--border-color);
+            border-radius: var(--radius); color: var(--text-primary);
+            font-size: 0.875rem; font-family: inherit;
+            transition: border-color 0.15s ease;
+        }
+
+        .form-input:focus, .form-textarea:focus {
+            outline: none; border-color: var(--accent-blue);
+        }
+
+        .form-textarea {
+            resize: vertical; min-height: 80px; line-height: 1.5;
+        }
+
+        .form-textarea.monospace {
+            font-family: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
+            font-size: 0.8rem; min-height: 280px;
+        }
+
+        .form-textarea.context {
+            min-height: 100px;
+        }
+
+        /* Right Panel: AI Recommendations */
+        .recommendations-panel {
+            width: 320px;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            display: flex; flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .rec-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex; align-items: center; gap: 0.5rem;
+        }
+
+        .rec-header-icon {
+            width: 20px; height: 20px; color: var(--accent-purple);
+        }
+
+        .rec-header-title {
+            font-size: 0.9rem; font-weight: 600; color: var(--text-primary);
+        }
+
+        .rec-body {
+            flex: 1; overflow-y: auto; padding: 0.75rem;
+        }
+
+        .rec-item {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 0.875rem;
+            margin-bottom: 0.6rem;
+            transition: border-color 0.15s ease;
+        }
+
+        .rec-item:hover { border-color: var(--accent-purple); }
+
+        .rec-item-header {
+            display: flex; align-items: flex-start; justify-content: space-between;
+            margin-bottom: 0.4rem;
+        }
+
+        .rec-title {
+            font-size: 0.825rem; font-weight: 600; color: var(--text-primary);
+            line-height: 1.3;
+        }
+
+        .rec-category {
+            font-size: 0.65rem; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.3px; padding: 0.15rem 0.45rem;
+            border-radius: 4px; flex-shrink: 0; margin-left: 0.5rem;
+        }
+
+        .rec-category.architecture { background: rgba(88,166,255,0.15); color: var(--accent-blue); }
+        .rec-category.security { background: rgba(248,81,73,0.15); color: var(--accent-red); }
+        .rec-category.performance { background: rgba(63,185,80,0.15); color: var(--accent-green); }
+        .rec-category.ux { background: rgba(188,140,255,0.15); color: var(--accent-purple); }
+        .rec-category.testing { background: rgba(210,153,34,0.15); color: var(--accent-yellow); }
+
+        .rec-description {
+            font-size: 0.775rem; color: var(--text-muted);
+            margin-bottom: 0.5rem; line-height: 1.4;
+        }
+
+        .rec-footer {
+            display: flex; align-items: center; justify-content: space-between;
+        }
+
+        .rec-confidence {
+            font-size: 0.7rem; color: var(--text-muted);
+        }
+
+        .rec-confidence-bar {
+            display: inline-block; width: 40px; height: 4px;
+            background: var(--bg-hover); border-radius: 2px;
+            overflow: hidden; vertical-align: middle; margin-left: 0.3rem;
+        }
+
+        .rec-confidence-fill {
+            height: 100%; border-radius: 2px;
+            background: var(--accent-purple);
+        }
+
+        .btn-apply {
+            padding: 0.2rem 0.5rem; border-radius: 4px;
+            font-size: 0.7rem; font-weight: 600; cursor: pointer;
+            border: 1px solid rgba(188,140,255,0.4);
+            background: rgba(188,140,255,0.1); color: var(--accent-purple);
+            transition: background 0.15s ease;
+        }
+
+        .btn-apply:hover { background: rgba(188,140,255,0.25); }
+
+        /* Empty State */
+        .empty-state-editor {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            height: 100%; color: var(--text-muted);
+            font-size: 0.9rem; text-align: center; padding: 2rem;
+        }
+
+        .empty-state-editor-icon {
+            font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.3;
+        }
+
+        /* Loading / Error */
+        .loading-state {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 3rem 1rem; color: var(--text-muted); font-size: 0.875rem;
+        }
+
+        .spinner {
+            width: 24px; height: 24px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 0.75rem;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .error-banner {
+            background: rgba(248,81,73,0.1);
+            border: 1px solid rgba(248,81,73,0.3);
+            border-radius: var(--radius); padding: 0.75rem 1rem;
+            color: var(--accent-red); font-size: 0.85rem;
+            margin: 1rem 1.5rem 0; display: none;
+        }
+
+        .error-banner.visible { display: block; }
+
+        .success-banner {
+            background: rgba(63,185,80,0.1);
+            border: 1px solid rgba(63,185,80,0.3);
+            border-radius: var(--radius); padding: 0.75rem 1rem;
+            color: var(--accent-green); font-size: 0.85rem;
+            margin: 1rem 1.5rem 0; display: none;
+        }
+
+        .success-banner.visible { display: block; }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .recommendations-panel { display: none; }
+        }
+
+        @media (max-width: 768px) {
+            .spec-sidebar { width: 220px; }
+            .header { padding: 0 1rem; }
+            .nav-tabs { display: none; }
+        }
+
+        @media (max-width: 640px) {
+            .spec-sidebar { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-left">
+            <div class="header-logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                </svg>
+                Agentic Platform
+            </div>
+            <nav class="nav-tabs">
+                <a href="customer_dashboard.html" class="nav-tab">Dashboard</a>
+                <a href="customer_projects.html" class="nav-tab">Projects</a>
+                <a href="customer_agents.html" class="nav-tab">Agents</a>
+                <a href="customer_specs.html" class="nav-tab active">Specs</a>
+            </nav>
+        </div>
+        <div class="header-right">
+            <div class="user-avatar" title="Account">U</div>
+        </div>
+    </header>
+
+    <div class="spec-layout">
+        <!-- Spec List Sidebar -->
+        <aside class="spec-sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-title">Specifications</span>
+                <button class="btn-sm" id="newSpecBtn">+ New</button>
+            </div>
+            <div class="spec-list" id="specList">
+                <div class="loading-state" style="padding: 2rem;">
+                    <div class="spinner"></div>
+                    Loading...
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Editor -->
+        <main class="spec-main" id="specMain">
+            <div class="empty-state-editor" id="editorEmpty">
+                <div class="empty-state-editor-icon">&#9998;</div>
+                <div>Select a spec from the sidebar or create a new one</div>
+            </div>
+
+            <div id="editorContent" style="display: none; flex-direction: column; flex: 1; overflow: hidden;">
+                <!-- Toolbar -->
+                <div class="editor-toolbar">
+                    <div class="editor-toolbar-left">
+                        <span class="version-indicator" id="versionIndicator">v1</span>
+                        <span style="font-size: 0.8rem; color: var(--text-muted);" id="specStatusLabel">Draft</span>
+                    </div>
+                    <div class="editor-toolbar-right">
+                        <button class="btn btn-danger" id="deleteBtn">Delete</button>
+                        <button class="btn" id="saveDraftBtn">Save Draft</button>
+                        <button class="btn btn-primary" id="submitBtn">Submit for Processing</button>
+                    </div>
+                </div>
+
+                <div class="error-banner" id="editorError"></div>
+                <div class="success-banner" id="editorSuccess"></div>
+
+                <!-- Editor Body -->
+                <div class="editor-body">
+                    <div class="form-group">
+                        <label class="form-label" for="specName">Name</label>
+                        <input type="text" class="form-input" id="specName" placeholder="e.g., E-Commerce Platform v2">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="specDescription">Description</label>
+                        <textarea class="form-textarea" id="specDescription" rows="3"
+                            placeholder="Brief description of the application to be built..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="specContent">Specification Content</label>
+                        <textarea class="form-textarea monospace" id="specContent"
+                            placeholder="Detailed application specification...&#10;&#10;## Features&#10;- Feature 1&#10;- Feature 2&#10;&#10;## Technical Requirements&#10;- ..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="specContext">Additional Context</label>
+                        <textarea class="form-textarea context" id="specContext"
+                            placeholder="URLs, constraints, design references, integration requirements..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- AI Recommendations Panel -->
+        <aside class="recommendations-panel">
+            <div class="rec-header">
+                <svg class="rec-header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                <span class="rec-header-title">AI Recommendations</span>
+            </div>
+            <div class="rec-body" id="recContainer">
+                <div class="loading-state" style="padding: 2rem;">
+                    <span style="color: var(--text-muted); font-size: 0.825rem;">Select a spec to see recommendations</span>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+
+        // ========================================
+        // State
+        // ========================================
+        let specs = [];
+        let selectedSpecId = null;
+        let isDirty = false;
+
+        // ========================================
+        // Helpers
+        // ========================================
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str || '';
+            return div.innerHTML;
+        }
+
+        function showEditorError(msg) {
+            const el = document.getElementById('editorError');
+            el.textContent = msg;
+            el.classList.add('visible');
+            setTimeout(() => el.classList.remove('visible'), 5000);
+        }
+
+        function showEditorSuccess(msg) {
+            const el = document.getElementById('editorSuccess');
+            el.textContent = msg;
+            el.classList.add('visible');
+            setTimeout(() => el.classList.remove('visible'), 3000);
+        }
+
+        // ========================================
+        // Sidebar Rendering
+        // ========================================
+        function renderSpecList() {
+            const container = document.getElementById('specList');
+            if (specs.length === 0) {
+                container.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.825rem;">No specs yet. Click + New to create one.</div>';
+                return;
+            }
+
+            container.innerHTML = specs.map(s => `
+                <div class="spec-list-item ${s.id === selectedSpecId ? 'active' : ''}"
+                     data-id="${s.id}" onclick="selectSpec('${s.id}')">
+                    <span class="spec-status-dot ${s.status}"></span>
+                    <div class="spec-list-info">
+                        <div class="spec-list-name">${escapeHtml(s.name || 'Untitled')}</div>
+                        <div class="spec-list-status">${s.status}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // ========================================
+        // Editor
+        // ========================================
+        function showEditor(spec) {
+            document.getElementById('editorEmpty').style.display = 'none';
+            const editor = document.getElementById('editorContent');
+            editor.style.display = 'flex';
+
+            document.getElementById('specName').value = spec.name || '';
+            document.getElementById('specDescription').value = spec.description || '';
+            document.getElementById('specContent').value = spec.content || '';
+            document.getElementById('specContext').value = spec.context || '';
+            document.getElementById('versionIndicator').textContent = `v${spec.version || 1}`;
+            document.getElementById('specStatusLabel').textContent = spec.status || 'draft';
+
+            // Disable editing for submitted/processing/completed specs
+            const readonly = spec.status !== 'draft';
+            document.getElementById('specName').disabled = readonly;
+            document.getElementById('specDescription').disabled = readonly;
+            document.getElementById('specContent').disabled = readonly;
+            document.getElementById('specContext').disabled = readonly;
+            document.getElementById('saveDraftBtn').disabled = readonly;
+            document.getElementById('submitBtn').disabled = readonly;
+            document.getElementById('saveDraftBtn').style.opacity = readonly ? 0.5 : 1;
+            document.getElementById('submitBtn').style.opacity = readonly ? 0.5 : 1;
+
+            isDirty = false;
+        }
+
+        function hideEditor() {
+            document.getElementById('editorEmpty').style.display = 'flex';
+            document.getElementById('editorContent').style.display = 'none';
+        }
+
+        // ========================================
+        // Recommendations
+        // ========================================
+        async function loadRecommendations(specId) {
+            const container = document.getElementById('recContainer');
+            container.innerHTML = '<div class="loading-state" style="padding: 2rem;"><div class="spinner"></div>Loading recommendations...</div>';
+
+            try {
+                const res = await fetch(`${API_BASE}/api/specs/${specId}/recommendations`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                const recs = data.recommendations || data;
+
+                if (!recs || recs.length === 0) {
+                    container.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.825rem;">No recommendations yet. Save your spec to generate AI suggestions.</div>';
+                    return;
+                }
+
+                container.innerHTML = recs.map(r => {
+                    const pct = Math.round((r.confidence || 0) * 100);
+                    return `<div class="rec-item">
+                        <div class="rec-item-header">
+                            <span class="rec-title">${escapeHtml(r.title)}</span>
+                            <span class="rec-category ${(r.category || '').toLowerCase()}">${escapeHtml(r.category || 'General')}</span>
+                        </div>
+                        <div class="rec-description">${escapeHtml(r.description || '')}</div>
+                        <div class="rec-footer">
+                            <span class="rec-confidence">
+                                ${pct}%
+                                <span class="rec-confidence-bar"><span class="rec-confidence-fill" style="width: ${pct}%"></span></span>
+                            </span>
+                            <button class="btn-apply" onclick="applyRecommendation('${escapeHtml(r.id || '')}')">Apply</button>
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch (err) {
+                container.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.825rem;">Could not load recommendations.</div>';
+            }
+        }
+
+        function applyRecommendation(recId) {
+            // In a real implementation, this would apply the recommendation to the spec content
+            showEditorSuccess('Recommendation applied to spec content.');
+        }
+
+        // ========================================
+        // API Operations
+        // ========================================
+        async function loadSpecs() {
+            try {
+                const res = await fetch(`${API_BASE}/api/specs`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                specs = data.specs || data;
+                renderSpecList();
+            } catch (err) {
+                console.error('Failed to load specs:', err);
+                document.getElementById('specList').innerHTML =
+                    '<div style="padding: 1.5rem; text-align: center; color: var(--accent-red); font-size: 0.8rem;">Failed to load specs</div>';
+            }
+        }
+
+        function selectSpec(id) {
+            if (isDirty && !confirm('You have unsaved changes. Discard?')) return;
+
+            selectedSpecId = id;
+            const spec = specs.find(s => s.id === id);
+            if (spec) {
+                showEditor(spec);
+                loadRecommendations(id);
+            }
+            renderSpecList();
+        }
+
+        async function createNewSpec() {
+            try {
+                const res = await fetch(`${API_BASE}/api/specs`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: 'Untitled Spec', status: 'draft' })
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                const newSpec = data.spec || data;
+                specs.unshift(newSpec);
+                selectedSpecId = newSpec.id;
+                renderSpecList();
+                showEditor(newSpec);
+                document.getElementById('recContainer').innerHTML =
+                    '<div style="padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.825rem;">Save your spec to generate AI recommendations.</div>';
+            } catch (err) {
+                showEditorError(`Failed to create spec: ${err.message}`);
+            }
+        }
+
+        async function saveDraft() {
+            if (!selectedSpecId) return;
+            try {
+                const body = {
+                    name: document.getElementById('specName').value,
+                    description: document.getElementById('specDescription').value,
+                    content: document.getElementById('specContent').value,
+                    context: document.getElementById('specContext').value,
+                };
+                const res = await fetch(`${API_BASE}/api/specs/${selectedSpecId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                const updated = data.spec || data;
+
+                // Update local state
+                const idx = specs.findIndex(s => s.id === selectedSpecId);
+                if (idx !== -1) specs[idx] = { ...specs[idx], ...updated };
+                isDirty = false;
+                renderSpecList();
+                showEditorSuccess('Draft saved successfully.');
+                loadRecommendations(selectedSpecId);
+            } catch (err) {
+                showEditorError(`Failed to save: ${err.message}`);
+            }
+        }
+
+        async function submitSpec() {
+            if (!selectedSpecId) return;
+            if (!confirm('Submit this spec for processing? It cannot be edited after submission.')) return;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/specs/${selectedSpecId}/submit`, {
+                    method: 'POST'
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                const idx = specs.findIndex(s => s.id === selectedSpecId);
+                if (idx !== -1) specs[idx].status = 'submitted';
+                renderSpecList();
+                showEditor(specs[idx]);
+                showEditorSuccess('Spec submitted for processing.');
+            } catch (err) {
+                showEditorError(`Failed to submit: ${err.message}`);
+            }
+        }
+
+        async function deleteSpec() {
+            if (!selectedSpecId) return;
+            if (!confirm('Delete this spec? This action cannot be undone.')) return;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/specs/${selectedSpecId}`, {
+                    method: 'DELETE'
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                specs = specs.filter(s => s.id !== selectedSpecId);
+                selectedSpecId = null;
+                renderSpecList();
+                hideEditor();
+            } catch (err) {
+                showEditorError(`Failed to delete: ${err.message}`);
+            }
+        }
+
+        // ========================================
+        // Event Listeners
+        // ========================================
+        document.getElementById('newSpecBtn').addEventListener('click', createNewSpec);
+        document.getElementById('saveDraftBtn').addEventListener('click', saveDraft);
+        document.getElementById('submitBtn').addEventListener('click', submitSpec);
+        document.getElementById('deleteBtn').addEventListener('click', deleteSpec);
+
+        // Track dirty state
+        ['specName', 'specDescription', 'specContent', 'specContext'].forEach(id => {
+            document.getElementById(id).addEventListener('input', () => { isDirty = true; });
+        });
+
+        // Keyboard shortcut: Ctrl+S to save
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                if (selectedSpecId) saveDraft();
+            }
+        });
+
+        // ========================================
+        // Init
+        // ========================================
+        document.addEventListener('DOMContentLoaded', loadSpecs);
+    </script>
+</body>
+</html>

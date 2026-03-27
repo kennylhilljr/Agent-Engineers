@@ -12,6 +12,7 @@ collisions.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 import subprocess
@@ -86,11 +87,30 @@ class WorktreeManager:
     can work on different branches simultaneously without conflicts.
     """
 
-    def __init__(self, project_dir: Path) -> None:
+    def __init__(self, project_dir: Path, tenant_id: str = "") -> None:
         self.project_dir = project_dir
-        self._worktrees_base = project_dir / WORKTREE_DIR_NAME
+        self.tenant_id = tenant_id
+
+        # Tenant-aware worktree base directory
+        if tenant_id:
+            self._worktrees_base = project_dir / tenant_id / WORKTREE_DIR_NAME
+        else:
+            self._worktrees_base = project_dir / WORKTREE_DIR_NAME
+
         self._allocated_ports: set[int] = set()
         self._worker_worktrees: dict[str, Path] = {}
+
+        # Tenant-aware port offset to avoid collisions between tenants
+        self._port_base = PORT_RANGE_START
+        if tenant_id:
+            # Hash the tenant_id to get a deterministic offset within a safe range.
+            # Use modulo to keep the offset small enough that the range stays valid.
+            tenant_hash = int(hashlib.sha256(tenant_id.encode()).hexdigest(), 16)
+            max_range = PORT_RANGE_END - PORT_RANGE_START + 1
+            # Offset the base port into a higher, non-overlapping block.
+            # Each tenant gets its own 100-port block starting at 3200+.
+            self._port_base = 3200 + (tenant_hash % 10000) * max_range
+        self._port_range_end = self._port_base + (PORT_RANGE_END - PORT_RANGE_START)
 
     def get_branch_for_ticket(self, ticket_key: str, ticket_title: str) -> str:
         """Generate a branch name for a ticket.
@@ -205,11 +225,13 @@ class WorktreeManager:
         Raises:
             WorktreeError: If no ports are available
         """
-        for port in range(PORT_RANGE_START, PORT_RANGE_END + 1):
+        for port in range(self._port_base, self._port_range_end + 1):
             if port not in self._allocated_ports:
                 self._allocated_ports.add(port)
                 return port
-        raise WorktreeError(f"No free ports in range {PORT_RANGE_START}-{PORT_RANGE_END}")
+        raise WorktreeError(
+            f"No free ports in range {self._port_base}-{self._port_range_end}"
+        )
 
     def release_port(self, port: int) -> None:
         """Release a previously allocated port."""

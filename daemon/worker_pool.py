@@ -82,6 +82,7 @@ class Ticket:
     priority: str = "medium"
     complexity: TicketComplexity = TicketComplexity.MEDIUM
     labels: list[str] = field(default_factory=list)
+    tenant_id: str = ""
 
     def __hash__(self) -> int:
         return hash(self.key)
@@ -110,6 +111,7 @@ class TypedWorker:
     tickets_completed: int = 0
     worktree_path: Path | None = None
     port: int | None = None
+    tenant_id: str = ""
 
     @property
     def is_idle(self) -> bool:
@@ -148,6 +150,7 @@ class PoolConfig:
     min_workers: int = 1
     max_workers: int = 3
     default_model: str = "sonnet"
+    warm_pool_size: int = 2
 
     @staticmethod
     def from_dict(data: dict) -> PoolConfig:
@@ -155,6 +158,7 @@ class PoolConfig:
             min_workers=data.get("min_workers", 1),
             max_workers=data.get("max_workers", 3),
             default_model=data.get("default_model", "sonnet"),
+            warm_pool_size=data.get("warm_pool_size", 2),
         )
 
 

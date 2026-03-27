@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platform Administration - Overview</title>
+    <style>
+        /* ========================================
+           CSS RESET & BASE STYLES
+           ======================================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --bg-hover: #30363d;
+            --text-primary: #f0f6fc;
+            --text-secondary: #c9d1d9;
+            --text-muted: #8b949e;
+            --border-color: #30363d;
+            --accent-blue: #58a6ff;
+            --accent-blue-dark: #1f6feb;
+            --accent-green: #3fb950;
+            --accent-yellow: #d29922;
+            --accent-red: #f85149;
+            --accent-orange: #d18616;
+            --accent-purple: #bc8cff;
+            --shadow: rgba(0, 0, 0, 0.4);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* ========================================
+           HEADER
+           ======================================== */
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .header-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--accent-blue);
+        }
+
+        .admin-badge {
+            background: linear-gradient(135deg, var(--accent-red), var(--accent-orange));
+            color: #fff;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .header-nav {
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .header-nav a {
+            color: var(--text-muted);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .header-nav a:hover {
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+        }
+
+        .header-nav a.active {
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .admin-user {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .admin-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--accent-purple);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.8rem;
+            color: #fff;
+        }
+
+        /* ========================================
+           MAIN CONTENT
+           ======================================== */
+        .main-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* ========================================
+           HEALTH CARDS
+           ======================================== */
+        .health-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.25rem;
+            margin-bottom: 2rem;
+        }
+
+        .health-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            transition: border-color 0.2s ease;
+        }
+
+        .health-card:hover {
+            border-color: var(--accent-blue);
+        }
+
+        .health-card-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .health-card-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.2;
+        }
+
+        .health-card-value.green { color: var(--accent-green); }
+        .health-card-value.blue { color: var(--accent-blue); }
+        .health-card-value.yellow { color: var(--accent-yellow); }
+        .health-card-value.purple { color: var(--accent-purple); }
+
+        .health-card-change {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        .health-card-change.up { color: var(--accent-green); }
+        .health-card-change.down { color: var(--accent-red); }
+
+        /* ========================================
+           SECTION
+           ======================================== */
+        .section {
+            margin-bottom: 2rem;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* ========================================
+           TWO COLUMN LAYOUT
+           ======================================== */
+        .two-col {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 900px) {
+            .two-col {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ========================================
+           CHART PLACEHOLDER
+           ======================================== */
+        .chart-area {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            min-height: 300px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-area-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .chart-placeholder {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px dashed var(--border-color);
+            border-radius: 6px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* ========================================
+           ALERT FEED
+           ======================================== */
+        .alert-feed {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .alert-feed-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .alert-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .alert-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            font-size: 0.85rem;
+            border-left: 3px solid transparent;
+        }
+
+        .alert-item.critical { border-left-color: var(--accent-red); }
+        .alert-item.warning { border-left-color: var(--accent-yellow); }
+        .alert-item.info { border-left-color: var(--accent-blue); }
+
+        .alert-icon {
+            flex-shrink: 0;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+
+        .alert-icon.critical { background: rgba(248, 81, 73, 0.2); color: var(--accent-red); }
+        .alert-icon.warning { background: rgba(210, 153, 34, 0.2); color: var(--accent-yellow); }
+        .alert-icon.info { background: rgba(88, 166, 255, 0.2); color: var(--accent-blue); }
+
+        .alert-body {
+            flex: 1;
+        }
+
+        .alert-message {
+            color: var(--text-secondary);
+        }
+
+        .alert-time {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        /* ========================================
+           QUICK ACTIONS
+           ======================================== */
+        .quick-actions {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1.25rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue-dark);
+            color: #fff;
+            border-color: var(--accent-blue-dark);
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border-color: var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+            border-color: var(--text-muted);
+        }
+
+        .btn-warning {
+            background: rgba(210, 153, 34, 0.15);
+            color: var(--accent-yellow);
+            border-color: rgba(210, 153, 34, 0.3);
+        }
+
+        .btn-warning:hover {
+            background: rgba(210, 153, 34, 0.25);
+        }
+
+        /* ========================================
+           LOADING & ERROR STATES
+           ======================================== */
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem;
+            gap: 1rem;
+        }
+
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .loading-text {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .error-container {
+            background: rgba(248, 81, 73, 0.1);
+            border: 1px solid rgba(248, 81, 73, 0.3);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .error-title {
+            color: var(--accent-red);
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .error-message {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .error-retry {
+            margin-top: 1rem;
+        }
+
+        /* ========================================
+           RESPONSIVE
+           ======================================== */
+        @media (max-width: 768px) {
+            .header {
+                padding: 0.75rem 1rem;
+            }
+
+            .header-nav {
+                order: 3;
+                width: 100%;
+                overflow-x: auto;
+            }
+
+            .main-content {
+                padding: 1rem;
+            }
+
+            .health-cards {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .health-cards {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ========================================
+           SCROLLBAR
+           ======================================== */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--bg-hover);
+        }
+    </style>
+</head>
+<body>
+    <!-- HEADER -->
+    <header class="header">
+        <div class="header-left">
+            <span class="header-title">Platform Administration</span>
+            <span class="admin-badge">ADMIN</span>
+        </div>
+        <nav class="header-nav">
+            <a href="platform_dashboard.html" class="active">Overview</a>
+            <a href="platform_tenants.html">Tenants</a>
+            <a href="platform_agents.html">Agent Pools</a>
+            <a href="platform_memory.html">Memory</a>
+        </nav>
+        <div class="header-right">
+            <div class="admin-user">
+                <div class="admin-avatar">PA</div>
+                <span>Platform Admin</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content" id="main-content">
+        <!-- Loading State -->
+        <div class="loading-container" id="loading-state">
+            <div class="spinner"></div>
+            <span class="loading-text">Loading platform health data...</span>
+        </div>
+
+        <!-- Error State (hidden by default) -->
+        <div class="error-container" id="error-state" style="display: none;">
+            <div class="error-title">Failed to load platform data</div>
+            <div class="error-message" id="error-message">Unable to connect to the platform API.</div>
+            <div class="error-retry">
+                <button class="btn btn-primary" onclick="loadDashboard()">Retry</button>
+            </div>
+        </div>
+
+        <!-- Dashboard Content (hidden until loaded) -->
+        <div id="dashboard-content" style="display: none;">
+            <!-- Quick Actions -->
+            <div class="quick-actions">
+                <button class="btn btn-primary" onclick="showAddTenant()">+ Add Tenant</button>
+                <button class="btn btn-secondary" onclick="warmPool()">Warm Pool</button>
+                <button class="btn btn-warning" onclick="viewAlerts()">View All Alerts</button>
+            </div>
+
+            <!-- Health Cards -->
+            <div class="health-cards" id="health-cards">
+                <div class="health-card">
+                    <div class="health-card-label">Total Tenants</div>
+                    <div class="health-card-value blue" id="total-tenants">--</div>
+                    <div class="health-card-change" id="tenants-change"></div>
+                </div>
+                <div class="health-card">
+                    <div class="health-card-label">Active Agents</div>
+                    <div class="health-card-value green" id="active-agents">--</div>
+                    <div class="health-card-change" id="agents-change"></div>
+                </div>
+                <div class="health-card">
+                    <div class="health-card-label">Total Projects</div>
+                    <div class="health-card-value purple" id="total-projects">--</div>
+                    <div class="health-card-change" id="projects-change"></div>
+                </div>
+                <div class="health-card">
+                    <div class="health-card-label">System Uptime</div>
+                    <div class="health-card-value yellow" id="system-uptime">--</div>
+                    <div class="health-card-change" id="uptime-change"></div>
+                </div>
+            </div>
+
+            <!-- Two Column: Chart + Alerts -->
+            <div class="two-col">
+                <!-- Resource Utilization Chart -->
+                <div class="chart-area">
+                    <div class="chart-area-title">Resource Utilization</div>
+                    <div class="chart-placeholder" id="chart-container">
+                        Chart renders here -- integrate with Chart.js or D3.js
+                    </div>
+                </div>
+
+                <!-- Alert Feed -->
+                <div class="alert-feed">
+                    <div class="alert-feed-title">Recent Alerts</div>
+                    <div class="alert-list" id="alert-list">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        /* ========================================
+           STATE
+           ======================================== */
+        let healthData = null;
+        let alertsData = [];
+
+        /* ========================================
+           API HELPERS
+           ======================================== */
+        async function apiFetch(url) {
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error(`API error: ${resp.status} ${resp.statusText}`);
+            return resp.json();
+        }
+
+        /* ========================================
+           LOAD DASHBOARD
+           ======================================== */
+        async function loadDashboard() {
+            const loading = document.getElementById('loading-state');
+            const error = document.getElementById('error-state');
+            const content = document.getElementById('dashboard-content');
+
+            loading.style.display = 'flex';
+            error.style.display = 'none';
+            content.style.display = 'none';
+
+            try {
+                const [health, tenants] = await Promise.all([
+                    apiFetch('/api/platform/health'),
+                    apiFetch('/api/platform/tenants')
+                ]);
+
+                healthData = health;
+
+                document.getElementById('total-tenants').textContent = health.total_tenants ?? tenants.length ?? '--';
+                document.getElementById('active-agents').textContent = health.active_agents ?? '--';
+                document.getElementById('total-projects').textContent = health.total_projects ?? '--';
+                document.getElementById('system-uptime').textContent = formatUptime(health.uptime_seconds);
+
+                if (health.tenants_change) {
+                    const el = document.getElementById('tenants-change');
+                    el.textContent = `${health.tenants_change > 0 ? '+' : ''}${health.tenants_change} this week`;
+                    el.className = 'health-card-change ' + (health.tenants_change >= 0 ? 'up' : 'down');
+                }
+
+                renderAlerts(health.alerts || []);
+
+                loading.style.display = 'none';
+                content.style.display = 'block';
+            } catch (err) {
+                loading.style.display = 'none';
+                error.style.display = 'block';
+                document.getElementById('error-message').textContent = err.message;
+                console.error('Dashboard load failed:', err);
+
+                // Show demo data in development
+                showDemoData();
+            }
+        }
+
+        /* ========================================
+           DEMO / FALLBACK DATA
+           ======================================== */
+        function showDemoData() {
+            const content = document.getElementById('dashboard-content');
+            const error = document.getElementById('error-state');
+            error.style.display = 'none';
+
+            document.getElementById('total-tenants').textContent = '12';
+            document.getElementById('active-agents').textContent = '47';
+            document.getElementById('total-projects').textContent = '183';
+            document.getElementById('system-uptime').textContent = '14d 7h';
+
+            document.getElementById('tenants-change').textContent = '+2 this week';
+            document.getElementById('tenants-change').className = 'health-card-change up';
+            document.getElementById('agents-change').textContent = '23 coding, 12 review';
+            document.getElementById('agents-change').className = 'health-card-change';
+            document.getElementById('projects-change').textContent = '+31 this month';
+            document.getElementById('projects-change').className = 'health-card-change up';
+            document.getElementById('uptime-change').textContent = '99.97% SLA';
+            document.getElementById('uptime-change').className = 'health-card-change up';
+
+            renderAlerts([
+                { level: 'critical', message: 'Tenant "acme-corp" exceeded agent quota (15/10)', time: '2 min ago' },
+                { level: 'warning', message: 'Coding pool at 89% capacity -- consider scaling', time: '8 min ago' },
+                { level: 'warning', message: 'Tenant "startup-io" has 3 stuck agents (>30min idle)', time: '15 min ago' },
+                { level: 'info', message: 'Warm pool replenished: 5 agents pre-warmed', time: '22 min ago' },
+                { level: 'info', message: 'Tenant "bigco" provisioned successfully', time: '1 hour ago' },
+                { level: 'warning', message: 'Memory store approaching 80% capacity (7.8GB/10GB)', time: '2 hours ago' },
+                { level: 'info', message: 'Scheduled maintenance window starts in 6 hours', time: '3 hours ago' },
+            ]);
+
+            content.style.display = 'block';
+        }
+
+        /* ========================================
+           RENDER HELPERS
+           ======================================== */
+        function renderAlerts(alerts) {
+            const list = document.getElementById('alert-list');
+            if (!alerts.length) {
+                list.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 2rem;">No recent alerts</div>';
+                return;
+            }
+
+            list.innerHTML = alerts.map(a => `
+                <div class="alert-item ${a.level}">
+                    <div class="alert-icon ${a.level}">
+                        ${a.level === 'critical' ? '!' : a.level === 'warning' ? '!' : 'i'}
+                    </div>
+                    <div class="alert-body">
+                        <div class="alert-message">${escapeHtml(a.message)}</div>
+                        <div class="alert-time">${escapeHtml(a.time || formatTimeAgo(a.timestamp))}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function formatUptime(seconds) {
+            if (!seconds) return '--';
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            if (days > 0) return `${days}d ${hours}h`;
+            const mins = Math.floor((seconds % 3600) / 60);
+            return `${hours}h ${mins}m`;
+        }
+
+        function formatTimeAgo(ts) {
+            if (!ts) return '';
+            const diff = Date.now() - new Date(ts).getTime();
+            const mins = Math.floor(diff / 60000);
+            if (mins < 60) return `${mins} min ago`;
+            const hours = Math.floor(mins / 60);
+            if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+            return `${Math.floor(hours / 24)} day${Math.floor(hours / 24) > 1 ? 's' : ''} ago`;
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        /* ========================================
+           QUICK ACTIONS
+           ======================================== */
+        function showAddTenant() {
+            window.location.href = 'platform_tenants.html?action=create';
+        }
+
+        function warmPool() {
+            window.location.href = 'platform_agents.html?action=warm';
+        }
+
+        function viewAlerts() {
+            // Scroll to alerts or expand full alert view
+            document.querySelector('.alert-feed').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        /* ========================================
+           INIT
+           ======================================== */
+        document.addEventListener('DOMContentLoaded', loadDashboard);
+    </script>
+</body>
+</html>

@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platform Administration - Tenants</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --bg-hover: #30363d;
+            --text-primary: #f0f6fc;
+            --text-secondary: #c9d1d9;
+            --text-muted: #8b949e;
+            --border-color: #30363d;
+            --accent-blue: #58a6ff;
+            --accent-blue-dark: #1f6feb;
+            --accent-green: #3fb950;
+            --accent-yellow: #d29922;
+            --accent-red: #f85149;
+            --accent-orange: #d18616;
+            --accent-purple: #bc8cff;
+            --shadow: rgba(0, 0, 0, 0.4);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* ========================================
+           HEADER
+           ======================================== */
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .header-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--accent-blue);
+        }
+
+        .admin-badge {
+            background: linear-gradient(135deg, var(--accent-red), var(--accent-orange));
+            color: #fff;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .header-nav {
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .header-nav a {
+            color: var(--text-muted);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .header-nav a:hover {
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+        }
+
+        .header-nav a.active {
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .admin-user {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .admin-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--accent-purple);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.8rem;
+            color: #fff;
+        }
+
+        /* ========================================
+           MAIN CONTENT
+           ======================================== */
+        .main-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* ========================================
+           TOOLBAR
+           ======================================== */
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .toolbar-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .search-input {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.6rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            width: 280px;
+            font-family: inherit;
+            transition: border-color 0.2s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .search-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .filter-select {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.6rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            cursor: pointer;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        /* ========================================
+           BUTTONS
+           ======================================== */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1.25rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue-dark);
+            color: #fff;
+            border-color: var(--accent-blue-dark);
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border-color: var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+            border-color: var(--text-muted);
+        }
+
+        .btn-danger {
+            background: rgba(248, 81, 73, 0.15);
+            color: var(--accent-red);
+            border-color: rgba(248, 81, 73, 0.3);
+        }
+
+        .btn-danger:hover {
+            background: rgba(248, 81, 73, 0.25);
+        }
+
+        .btn-sm {
+            padding: 0.35rem 0.75rem;
+            font-size: 0.8rem;
+        }
+
+        /* ========================================
+           TABLE
+           ======================================== */
+        .table-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .table-scroll {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead th {
+            background: var(--bg-tertiary);
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+        }
+
+        tbody td {
+            padding: 0.75rem 1rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+        }
+
+        tbody tr:hover {
+            background: var(--bg-tertiary);
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .tenant-name {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .tenant-slug {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* ========================================
+           STATUS BADGES
+           ======================================== */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.2rem 0.65rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .status-badge.active {
+            background: rgba(63, 185, 80, 0.15);
+            color: var(--accent-green);
+            border: 1px solid rgba(63, 185, 80, 0.3);
+        }
+
+        .status-badge.suspended {
+            background: rgba(210, 153, 34, 0.15);
+            color: var(--accent-yellow);
+            border: 1px solid rgba(210, 153, 34, 0.3);
+        }
+
+        .status-badge.deprovisioning {
+            background: rgba(248, 81, 73, 0.15);
+            color: var(--accent-red);
+            border: 1px solid rgba(248, 81, 73, 0.3);
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        .status-badge.active .status-dot { background: var(--accent-green); }
+        .status-badge.suspended .status-dot { background: var(--accent-yellow); }
+        .status-badge.deprovisioning .status-dot { background: var(--accent-red); }
+
+        .actions-cell {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        /* ========================================
+           MODAL
+           ======================================== */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.open {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 560px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 16px 48px var(--shadow);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .modal-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        /* ========================================
+           FORM
+           ======================================== */
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 0.4rem;
+        }
+
+        .form-input {
+            width: 100%;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.6rem 0.85rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            transition: border-color 0.2s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .form-hint {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.3rem;
+        }
+
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            margin-top: 0.5rem;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            accent-color: var(--accent-blue);
+            width: 16px;
+            height: 16px;
+        }
+
+        /* ========================================
+           SLIDE-IN DETAIL PANEL
+           ======================================== */
+        .detail-panel-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 900;
+        }
+
+        .detail-panel-overlay.open {
+            display: block;
+        }
+
+        .detail-panel {
+            position: fixed;
+            top: 0;
+            right: -500px;
+            width: 480px;
+            max-width: 90vw;
+            height: 100vh;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            z-index: 950;
+            transition: right 0.3s ease;
+            overflow-y: auto;
+            box-shadow: -4px 0 24px var(--shadow);
+        }
+
+        .detail-panel.open {
+            right: 0;
+        }
+
+        .detail-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            background: var(--bg-secondary);
+        }
+
+        .detail-panel-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .detail-panel-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .detail-panel-close:hover {
+            color: var(--text-primary);
+        }
+
+        .detail-panel-body {
+            padding: 1.5rem;
+        }
+
+        .detail-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .detail-section-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.75rem;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.9rem;
+        }
+
+        .detail-row-label {
+            color: var(--text-muted);
+        }
+
+        .detail-row-value {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .detail-activity-item {
+            padding: 0.6rem 0;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.85rem;
+        }
+
+        .detail-activity-item:last-child {
+            border-bottom: none;
+        }
+
+        .detail-activity-time {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* ========================================
+           LOADING & ERROR STATES
+           ======================================== */
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem;
+            gap: 1rem;
+        }
+
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .error-container {
+            background: rgba(248, 81, 73, 0.1);
+            border: 1px solid rgba(248, 81, 73, 0.3);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .error-title {
+            color: var(--accent-red);
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .error-message {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .error-retry {
+            margin-top: 1rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+        }
+
+        /* ========================================
+           SCROLLBAR
+           ======================================== */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--bg-hover);
+        }
+
+        /* ========================================
+           RESPONSIVE
+           ======================================== */
+        @media (max-width: 768px) {
+            .header {
+                padding: 0.75rem 1rem;
+            }
+
+            .header-nav {
+                order: 3;
+                width: 100%;
+                overflow-x: auto;
+            }
+
+            .main-content {
+                padding: 1rem;
+            }
+
+            .toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .toolbar-left {
+                flex-wrap: wrap;
+            }
+
+            .search-input {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- HEADER -->
+    <header class="header">
+        <div class="header-left">
+            <span class="header-title">Platform Administration</span>
+            <span class="admin-badge">ADMIN</span>
+        </div>
+        <nav class="header-nav">
+            <a href="platform_dashboard.html">Overview</a>
+            <a href="platform_tenants.html" class="active">Tenants</a>
+            <a href="platform_agents.html">Agent Pools</a>
+            <a href="platform_memory.html">Memory</a>
+        </nav>
+        <div class="header-right">
+            <div class="admin-user">
+                <div class="admin-avatar">PA</div>
+                <span>Platform Admin</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+        <!-- Loading State -->
+        <div class="loading-container" id="loading-state">
+            <div class="spinner"></div>
+            <span class="loading-text">Loading tenant data...</span>
+        </div>
+
+        <!-- Error State -->
+        <div class="error-container" id="error-state" style="display: none;">
+            <div class="error-title">Failed to load tenants</div>
+            <div class="error-message" id="error-message">Unable to connect to the platform API.</div>
+            <div class="error-retry">
+                <button class="btn btn-primary" onclick="loadTenants()">Retry</button>
+            </div>
+        </div>
+
+        <!-- Tenant Content -->
+        <div id="tenant-content" style="display: none;">
+            <!-- Toolbar -->
+            <div class="toolbar">
+                <div class="toolbar-left">
+                    <input type="text" class="search-input" id="search-input" placeholder="Search tenants by name or slug..." oninput="filterTenants()">
+                    <select class="filter-select" id="status-filter" onchange="filterTenants()">
+                        <option value="">All Statuses</option>
+                        <option value="active">Active</option>
+                        <option value="suspended">Suspended</option>
+                        <option value="deprovisioning">Deprovisioning</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="openCreateModal()">+ Create Tenant</button>
+            </div>
+
+            <!-- Table -->
+            <div class="table-container">
+                <div class="table-scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Slug</th>
+                                <th>Status</th>
+                                <th>Projects</th>
+                                <th>Active Agents</th>
+                                <th>Agent Hours</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tenant-tbody">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty-state" id="empty-state" style="display: none;">
+                    No tenants match your search criteria.
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- CREATE TENANT MODAL -->
+    <div class="modal-overlay" id="create-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">Create Tenant</span>
+                <button class="modal-close" onclick="closeCreateModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label" for="tenant-name">Tenant Name</label>
+                    <input type="text" class="form-input" id="tenant-name" placeholder="Acme Corporation">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="tenant-slug">Slug</label>
+                    <input type="text" class="form-input" id="tenant-slug" placeholder="acme-corp">
+                    <div class="form-hint">URL-safe identifier. Auto-generated from name if left blank.</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="max-projects">Max Projects</label>
+                    <input type="number" class="form-input" id="max-projects" value="50" min="1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="max-agents">Max Concurrent Agents</label>
+                    <input type="number" class="form-input" id="max-agents" value="10" min="1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Allowed Models</label>
+                    <div class="checkbox-group">
+                        <label class="checkbox-label"><input type="checkbox" name="model" value="haiku" checked> Haiku</label>
+                        <label class="checkbox-label"><input type="checkbox" name="model" value="sonnet" checked> Sonnet</label>
+                        <label class="checkbox-label"><input type="checkbox" name="model" value="opus"> Opus</label>
+                        <label class="checkbox-label"><input type="checkbox" name="model" value="gpt-4o"> GPT-4o</label>
+                        <label class="checkbox-label"><input type="checkbox" name="model" value="gemini-flash"> Gemini Flash</label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeCreateModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="createTenant()">Create Tenant</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DETAIL SLIDE-IN PANEL -->
+    <div class="detail-panel-overlay" id="detail-overlay" onclick="closeDetailPanel()"></div>
+    <div class="detail-panel" id="detail-panel">
+        <div class="detail-panel-header">
+            <span class="detail-panel-title" id="detail-title">Tenant Details</span>
+            <button class="detail-panel-close" onclick="closeDetailPanel()">&times;</button>
+        </div>
+        <div class="detail-panel-body" id="detail-body">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+
+    <script>
+        /* ========================================
+           STATE
+           ======================================== */
+        let tenants = [];
+        let filteredTenants = [];
+
+        /* ========================================
+           API
+           ======================================== */
+        async function apiFetch(url, options = {}) {
+            const resp = await fetch(url, {
+                headers: { 'Content-Type': 'application/json', ...options.headers },
+                ...options
+            });
+            if (!resp.ok) throw new Error(`API error: ${resp.status} ${resp.statusText}`);
+            return resp.json();
+        }
+
+        /* ========================================
+           LOAD TENANTS
+           ======================================== */
+        async function loadTenants() {
+            const loading = document.getElementById('loading-state');
+            const error = document.getElementById('error-state');
+            const content = document.getElementById('tenant-content');
+
+            loading.style.display = 'flex';
+            error.style.display = 'none';
+            content.style.display = 'none';
+
+            try {
+                const data = await apiFetch('/api/platform/tenants');
+                tenants = data.tenants || data;
+                filteredTenants = [...tenants];
+                renderTable();
+                loading.style.display = 'none';
+                content.style.display = 'block';
+            } catch (err) {
+                loading.style.display = 'none';
+                console.error('Tenant load failed:', err);
+                showDemoData();
+            }
+        }
+
+        /* ========================================
+           DEMO DATA
+           ======================================== */
+        function showDemoData() {
+            tenants = [
+                { id: 't1', name: 'Acme Corporation', slug: 'acme-corp', status: 'active', projects: 24, active_agents: 8, agent_hours: 1284, created: '2025-11-15', max_projects: 50, max_agents: 15, allowed_models: ['haiku', 'sonnet', 'opus'] },
+                { id: 't2', name: 'StartupIO', slug: 'startup-io', status: 'active', projects: 12, active_agents: 5, agent_hours: 567, created: '2026-01-03', max_projects: 25, max_agents: 10, allowed_models: ['haiku', 'sonnet'] },
+                { id: 't3', name: 'BigCo Enterprises', slug: 'bigco', status: 'active', projects: 67, active_agents: 15, agent_hours: 4521, created: '2025-09-22', max_projects: 100, max_agents: 25, allowed_models: ['haiku', 'sonnet', 'opus', 'gpt-4o'] },
+                { id: 't4', name: 'DevShop Pro', slug: 'devshop', status: 'suspended', projects: 8, active_agents: 0, agent_hours: 312, created: '2026-02-10', max_projects: 20, max_agents: 5, allowed_models: ['haiku'] },
+                { id: 't5', name: 'Legacy Systems Inc', slug: 'legacy-sys', status: 'deprovisioning', projects: 3, active_agents: 0, agent_hours: 89, created: '2025-08-01', max_projects: 10, max_agents: 3, allowed_models: ['haiku', 'sonnet'] },
+                { id: 't6', name: 'CloudNine Labs', slug: 'cloudnine', status: 'active', projects: 31, active_agents: 11, agent_hours: 2103, created: '2025-12-05', max_projects: 50, max_agents: 15, allowed_models: ['haiku', 'sonnet', 'opus'] },
+                { id: 't7', name: 'MicroTeam', slug: 'microteam', status: 'active', projects: 5, active_agents: 2, agent_hours: 156, created: '2026-03-01', max_projects: 10, max_agents: 3, allowed_models: ['haiku', 'sonnet'] },
+            ];
+            filteredTenants = [...tenants];
+            renderTable();
+
+            document.getElementById('loading-state').style.display = 'none';
+            document.getElementById('tenant-content').style.display = 'block';
+
+            // Auto-open create modal if URL param
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('action') === 'create') openCreateModal();
+        }
+
+        /* ========================================
+           RENDER TABLE
+           ======================================== */
+        function renderTable() {
+            const tbody = document.getElementById('tenant-tbody');
+            const empty = document.getElementById('empty-state');
+
+            if (!filteredTenants.length) {
+                tbody.innerHTML = '';
+                empty.style.display = 'block';
+                return;
+            }
+            empty.style.display = 'none';
+
+            tbody.innerHTML = filteredTenants.map(t => `
+                <tr>
+                    <td><span class="tenant-name">${escapeHtml(t.name)}</span></td>
+                    <td><span class="tenant-slug">${escapeHtml(t.slug)}</span></td>
+                    <td>
+                        <span class="status-badge ${t.status}">
+                            <span class="status-dot"></span>
+                            ${t.status}
+                        </span>
+                    </td>
+                    <td>${t.projects}</td>
+                    <td>${t.active_agents}</td>
+                    <td>${formatNumber(t.agent_hours)}h</td>
+                    <td>${t.created}</td>
+                    <td>
+                        <div class="actions-cell">
+                            <button class="btn btn-secondary btn-sm" onclick="openDetailPanel('${t.id}')">Details</button>
+                            ${t.status === 'active'
+                                ? `<button class="btn btn-danger btn-sm" onclick="suspendTenant('${t.id}')">Suspend</button>`
+                                : t.status === 'suspended'
+                                    ? `<button class="btn btn-primary btn-sm" onclick="reactivateTenant('${t.id}')">Reactivate</button>`
+                                    : ''
+                            }
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        /* ========================================
+           FILTER
+           ======================================== */
+        function filterTenants() {
+            const query = document.getElementById('search-input').value.toLowerCase();
+            const status = document.getElementById('status-filter').value;
+
+            filteredTenants = tenants.filter(t => {
+                const matchQuery = !query || t.name.toLowerCase().includes(query) || t.slug.toLowerCase().includes(query);
+                const matchStatus = !status || t.status === status;
+                return matchQuery && matchStatus;
+            });
+
+            renderTable();
+        }
+
+        /* ========================================
+           CREATE TENANT
+           ======================================== */
+        function openCreateModal() {
+            document.getElementById('create-modal').classList.add('open');
+        }
+
+        function closeCreateModal() {
+            document.getElementById('create-modal').classList.remove('open');
+        }
+
+        async function createTenant() {
+            const name = document.getElementById('tenant-name').value.trim();
+            const slug = document.getElementById('tenant-slug').value.trim() || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+            const max_projects = parseInt(document.getElementById('max-projects').value, 10);
+            const max_agents = parseInt(document.getElementById('max-agents').value, 10);
+            const allowed_models = Array.from(document.querySelectorAll('input[name="model"]:checked')).map(cb => cb.value);
+
+            if (!name) {
+                alert('Tenant name is required.');
+                return;
+            }
+
+            const payload = { name, slug, max_projects, max_agents, allowed_models };
+
+            try {
+                await apiFetch('/api/platform/tenants', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                closeCreateModal();
+                loadTenants();
+            } catch (err) {
+                // Demo mode: add locally
+                const newTenant = {
+                    id: 't' + (tenants.length + 1),
+                    ...payload,
+                    status: 'active',
+                    projects: 0,
+                    active_agents: 0,
+                    agent_hours: 0,
+                    created: new Date().toISOString().split('T')[0]
+                };
+                tenants.unshift(newTenant);
+                filteredTenants = [...tenants];
+                renderTable();
+                closeCreateModal();
+            }
+        }
+
+        /* ========================================
+           TENANT ACTIONS
+           ======================================== */
+        async function suspendTenant(id) {
+            if (!confirm('Suspend this tenant? All running agents will be stopped.')) return;
+            try {
+                await apiFetch(`/api/platform/tenants/${id}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ status: 'suspended' })
+                });
+                loadTenants();
+            } catch (err) {
+                const t = tenants.find(t => t.id === id);
+                if (t) { t.status = 'suspended'; t.active_agents = 0; }
+                filterTenants();
+            }
+        }
+
+        async function reactivateTenant(id) {
+            try {
+                await apiFetch(`/api/platform/tenants/${id}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ status: 'active' })
+                });
+                loadTenants();
+            } catch (err) {
+                const t = tenants.find(t => t.id === id);
+                if (t) t.status = 'active';
+                filterTenants();
+            }
+        }
+
+        /* ========================================
+           DETAIL PANEL
+           ======================================== */
+        function openDetailPanel(id) {
+            const t = tenants.find(t => t.id === id);
+            if (!t) return;
+
+            document.getElementById('detail-title').textContent = t.name;
+            document.getElementById('detail-body').innerHTML = `
+                <div class="detail-section">
+                    <div class="detail-section-title">Configuration</div>
+                    <div class="detail-row"><span class="detail-row-label">Slug</span><span class="detail-row-value">${escapeHtml(t.slug)}</span></div>
+                    <div class="detail-row"><span class="detail-row-label">Status</span><span class="detail-row-value"><span class="status-badge ${t.status}"><span class="status-dot"></span>${t.status}</span></span></div>
+                    <div class="detail-row"><span class="detail-row-label">Max Projects</span><span class="detail-row-value">${t.max_projects || '--'}</span></div>
+                    <div class="detail-row"><span class="detail-row-label">Max Agents</span><span class="detail-row-value">${t.max_agents || '--'}</span></div>
+                    <div class="detail-row"><span class="detail-row-label">Allowed Models</span><span class="detail-row-value">${(t.allowed_models || []).join(', ') || '--'}</span></div>
+                    <div class="detail-row"><span class="detail-row-label">Created</span><span class="detail-row-value">${t.created}</span></div>
+                </div>
+                <div class="detail-section">
+                    <div class="detail-section-title">Resource Usage</div>
+                    <div class="detail-row"><span class="detail-row-label">Projects</span><span class="detail-row-value">${t.projects} / ${t.max_projects || '--'}</span></div>
+                    <div class="detail-row"><span class="detail-row-label">Active Agents</span><span class="detail-row-value">${t.active_agents} / ${t.max_agents || '--'}</span></div>
+                    <div class="detail-row"><span class="detail-row-label">Total Agent Hours</span><span class="detail-row-value">${formatNumber(t.agent_hours)}h</span></div>
+                </div>
+                <div class="detail-section">
+                    <div class="detail-section-title">Recent Activity</div>
+                    <div class="detail-activity-item">
+                        <div>Agent completed PR review for project #${Math.floor(Math.random() * 100)}</div>
+                        <div class="detail-activity-time">12 min ago</div>
+                    </div>
+                    <div class="detail-activity-item">
+                        <div>New project created: "api-refactor"</div>
+                        <div class="detail-activity-time">1 hour ago</div>
+                    </div>
+                    <div class="detail-activity-item">
+                        <div>Coding agent session completed (42 min)</div>
+                        <div class="detail-activity-time">3 hours ago</div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('detail-overlay').classList.add('open');
+            document.getElementById('detail-panel').classList.add('open');
+        }
+
+        function closeDetailPanel() {
+            document.getElementById('detail-overlay').classList.remove('open');
+            document.getElementById('detail-panel').classList.remove('open');
+        }
+
+        /* ========================================
+           HELPERS
+           ======================================== */
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function formatNumber(n) {
+            if (n == null) return '--';
+            return n.toLocaleString();
+        }
+
+        /* ========================================
+           INIT
+           ======================================== */
+        document.addEventListener('DOMContentLoaded', loadTenants);
+    </script>
+</body>
+</html>

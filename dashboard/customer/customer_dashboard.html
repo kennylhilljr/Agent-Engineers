@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Dashboard - Agentic Platform</title>
+    <style>
+        /* ========================================
+           CSS RESET & BASE STYLES
+           ======================================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --bg-hover: #30363d;
+            --text-primary: #f0f6fc;
+            --text-secondary: #c9d1d9;
+            --text-muted: #8b949e;
+            --border-color: #30363d;
+            --accent-blue: #58a6ff;
+            --accent-blue-dark: #1f6feb;
+            --accent-green: #3fb950;
+            --accent-yellow: #d29922;
+            --accent-red: #f85149;
+            --accent-purple: #bc8cff;
+            --shadow: rgba(0, 0, 0, 0.4);
+            --radius: 8px;
+            --radius-lg: 12px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        a {
+            color: var(--accent-blue);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        /* ========================================
+           HEADER
+           ======================================== */
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 64px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .header-logo {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .header-logo svg {
+            width: 28px;
+            height: 28px;
+            color: var(--accent-blue);
+        }
+
+        .tenant-name {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            padding-left: 1.5rem;
+            border-left: 1px solid var(--border-color);
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 0;
+            height: 100%;
+        }
+
+        .nav-tab {
+            display: flex;
+            align-items: center;
+            padding: 0 1.25rem;
+            height: 100%;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            font-weight: 500;
+            border-bottom: 2px solid transparent;
+            transition: color 0.15s ease, border-color 0.15s ease;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .nav-tab:hover {
+            color: var(--text-secondary);
+            text-decoration: none;
+        }
+
+        .nav-tab.active {
+            color: var(--text-primary);
+            border-bottom-color: var(--accent-blue);
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--accent-blue-dark);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        /* ========================================
+           PAGE CONTENT
+           ======================================== */
+        .page-content {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .page-title-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+        }
+
+        .page-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .quick-actions {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            transition: background 0.15s ease, border-color 0.15s ease;
+        }
+
+        .btn:hover {
+            background: var(--bg-hover);
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue-dark);
+            border-color: var(--accent-blue-dark);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        /* ========================================
+           SUMMARY CARDS
+           ======================================== */
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .summary-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 1.25rem 1.5rem;
+            transition: border-color 0.15s ease;
+        }
+
+        .summary-card:hover {
+            border-color: var(--accent-blue);
+        }
+
+        .summary-card-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .summary-card-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.2;
+        }
+
+        .summary-card-sub {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        .summary-card-value.blue { color: var(--accent-blue); }
+        .summary-card-value.green { color: var(--accent-green); }
+        .summary-card-value.yellow { color: var(--accent-yellow); }
+        .summary-card-value.purple { color: var(--accent-purple); }
+
+        /* ========================================
+           CONTENT GRID (Activity + Quick Actions)
+           ======================================== */
+        .content-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .card-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .card-body {
+            padding: 1rem 1.5rem;
+        }
+
+        /* ========================================
+           ACTIVITY FEED
+           ======================================== */
+        .activity-list {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .activity-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.875rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+
+        .activity-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 0.8rem;
+        }
+
+        .activity-icon.project { background: rgba(88, 166, 255, 0.15); color: var(--accent-blue); }
+        .activity-icon.agent { background: rgba(63, 185, 80, 0.15); color: var(--accent-green); }
+        .activity-icon.spec { background: rgba(188, 140, 255, 0.15); color: var(--accent-purple); }
+        .activity-icon.error { background: rgba(248, 81, 73, 0.15); color: var(--accent-red); }
+
+        .activity-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .activity-text {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .activity-text strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .activity-time {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        /* ========================================
+           QUICK ACTIONS SIDEBAR
+           ======================================== */
+        .actions-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .action-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.875rem 1rem;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: background 0.15s ease;
+            text-decoration: none;
+            color: var(--text-secondary);
+        }
+
+        .action-item:hover {
+            background: var(--bg-hover);
+            text-decoration: none;
+            color: var(--text-primary);
+        }
+
+        .action-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 1rem;
+            background: rgba(88, 166, 255, 0.1);
+            color: var(--accent-blue);
+        }
+
+        .action-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .action-desc {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* ========================================
+           LOADING & EMPTY STATES
+           ======================================== */
+        .loading-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem 1rem;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 0.75rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .error-banner {
+            background: rgba(248, 81, 73, 0.1);
+            border: 1px solid rgba(248, 81, 73, 0.3);
+            border-radius: var(--radius);
+            padding: 0.75rem 1rem;
+            color: var(--accent-red);
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .error-banner.visible {
+            display: block;
+        }
+
+        /* ========================================
+           RESPONSIVE
+           ======================================== */
+        @media (max-width: 1024px) {
+            .summary-cards {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .header {
+                padding: 0 1rem;
+            }
+            .page-content {
+                padding: 1rem;
+            }
+            .summary-cards {
+                grid-template-columns: 1fr;
+            }
+            .nav-tabs {
+                display: none;
+            }
+            .tenant-name {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <div class="header-logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                    <path d="M2 17l10 5 10-5"/>
+                    <path d="M2 12l10 5 10-5"/>
+                </svg>
+                Agentic Platform
+            </div>
+            <span class="tenant-name" id="tenantName">Loading...</span>
+            <nav class="nav-tabs">
+                <a href="customer_dashboard.html" class="nav-tab active">Dashboard</a>
+                <a href="customer_projects.html" class="nav-tab">Projects</a>
+                <a href="customer_agents.html" class="nav-tab">Agents</a>
+                <a href="customer_specs.html" class="nav-tab">Specs</a>
+            </nav>
+        </div>
+        <div class="header-right">
+            <div class="user-avatar" id="userAvatar" title="Account">--</div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="page-content">
+        <div class="error-banner" id="errorBanner"></div>
+
+        <div class="page-title-row">
+            <h1 class="page-title">Dashboard</h1>
+            <div class="quick-actions">
+                <a href="customer_specs.html" class="btn btn-primary">+ New Spec</a>
+                <a href="customer_projects.html" class="btn">View All Projects</a>
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="summary-cards">
+            <div class="summary-card">
+                <div class="summary-card-label">Active Projects</div>
+                <div class="summary-card-value blue" id="activeProjects">--</div>
+                <div class="summary-card-sub" id="activeProjectsSub">Loading...</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-card-label">Running Agents</div>
+                <div class="summary-card-value green" id="runningAgents">--</div>
+                <div class="summary-card-sub" id="runningAgentsSub">Loading...</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-card-label">Specs Submitted</div>
+                <div class="summary-card-value purple" id="specsSubmitted">--</div>
+                <div class="summary-card-sub" id="specsSubmittedSub">Loading...</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-card-label">Agent Hours Used</div>
+                <div class="summary-card-value yellow" id="agentHours">--</div>
+                <div class="summary-card-sub" id="agentHoursSub">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Content Grid: Activity + Actions -->
+        <div class="content-grid">
+            <!-- Activity Feed -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Recent Activity</span>
+                    <a href="#" style="font-size: 0.8rem;">View All</a>
+                </div>
+                <div class="card-body" id="activityContainer">
+                    <div class="loading-state">
+                        <div class="spinner"></div>
+                        Loading activity...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Quick Actions</span>
+                </div>
+                <div class="card-body">
+                    <div class="actions-list">
+                        <a href="customer_specs.html" class="action-item">
+                            <div class="action-icon">+</div>
+                            <div>
+                                <div class="action-label">Submit New Spec</div>
+                                <div class="action-desc">Start a new AI-built application</div>
+                            </div>
+                        </a>
+                        <a href="customer_projects.html" class="action-item">
+                            <div class="action-icon" style="background: rgba(63,185,80,0.1); color: var(--accent-green);">&#9654;</div>
+                            <div>
+                                <div class="action-label">View Projects</div>
+                                <div class="action-desc">Monitor active and completed builds</div>
+                            </div>
+                        </a>
+                        <a href="customer_agents.html" class="action-item">
+                            <div class="action-icon" style="background: rgba(210,153,34,0.1); color: var(--accent-yellow);">&#9881;</div>
+                            <div>
+                                <div class="action-label">Agent Status</div>
+                                <div class="action-desc">Real-time agent monitoring</div>
+                            </div>
+                        </a>
+                        <a href="customer_specs.html" class="action-item">
+                            <div class="action-icon" style="background: rgba(188,140,255,0.1); color: var(--accent-purple);">&#9998;</div>
+                            <div>
+                                <div class="action-label">Manage Specs</div>
+                                <div class="action-desc">Edit drafts and review submissions</div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========================================
+        // Configuration
+        // ========================================
+        const API_BASE = window.location.origin;
+        const POLL_INTERVAL = 30000; // 30s
+
+        // ========================================
+        // State
+        // ========================================
+        let currentTenant = null;
+
+        // ========================================
+        // API Helpers
+        // ========================================
+        async function apiFetch(path) {
+            const res = await fetch(`${API_BASE}${path}`);
+            if (!res.ok) throw new Error(`API ${path} returned ${res.status}`);
+            return res.json();
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('errorBanner');
+            el.textContent = msg;
+            el.classList.add('visible');
+        }
+
+        function hideError() {
+            document.getElementById('errorBanner').classList.remove('visible');
+        }
+
+        function timeAgo(dateStr) {
+            const diff = Date.now() - new Date(dateStr).getTime();
+            const mins = Math.floor(diff / 60000);
+            if (mins < 1) return 'just now';
+            if (mins < 60) return `${mins}m ago`;
+            const hours = Math.floor(mins / 60);
+            if (hours < 24) return `${hours}h ago`;
+            const days = Math.floor(hours / 24);
+            return `${days}d ago`;
+        }
+
+        // ========================================
+        // Render Functions
+        // ========================================
+        function renderSummaryCards(projects, agents) {
+            const activeCount = projects.filter(p => p.status === 'active').length;
+            const completedCount = projects.filter(p => p.status === 'completed').length;
+            const runningCount = agents.filter(a => a.status === 'running').length;
+            const totalAgents = agents.length;
+
+            document.getElementById('activeProjects').textContent = activeCount;
+            document.getElementById('activeProjectsSub').textContent = `${completedCount} completed`;
+
+            document.getElementById('runningAgents').textContent = runningCount;
+            document.getElementById('runningAgentsSub').textContent = `${totalAgents} total allocated`;
+        }
+
+        function renderSpecsCard(specs) {
+            const submitted = specs.filter(s => s.status !== 'draft').length;
+            const processing = specs.filter(s => s.status === 'processing').length;
+
+            document.getElementById('specsSubmitted').textContent = submitted;
+            document.getElementById('specsSubmittedSub').textContent = `${processing} processing`;
+        }
+
+        function renderAgentHours(agents) {
+            const totalHours = agents.reduce((sum, a) => sum + (a.hours_used || 0), 0);
+            const limit = agents.length > 0 ? (agents[0].hours_limit || 1000) : 1000;
+
+            document.getElementById('agentHours').textContent = totalHours.toFixed(1);
+            document.getElementById('agentHoursSub').textContent = `of ${limit}h allocation`;
+        }
+
+        function renderActivity(events) {
+            const container = document.getElementById('activityContainer');
+            if (!events || events.length === 0) {
+                container.innerHTML = '<div class="empty-state">No recent activity</div>';
+                return;
+            }
+
+            const iconMap = {
+                project: { cls: 'project', symbol: '&#9632;' },
+                agent: { cls: 'agent', symbol: '&#9654;' },
+                spec: { cls: 'spec', symbol: '&#9998;' },
+                error: { cls: 'error', symbol: '!' }
+            };
+
+            container.innerHTML = `<div class="activity-list">
+                ${events.slice(0, 10).map(ev => {
+                    const icon = iconMap[ev.type] || iconMap.project;
+                    return `<div class="activity-item">
+                        <div class="activity-icon ${icon.cls}">${icon.symbol}</div>
+                        <div class="activity-content">
+                            <div class="activity-text"><strong>${escapeHtml(ev.title || ev.type)}</strong> ${escapeHtml(ev.description || '')}</div>
+                            <div class="activity-time">${timeAgo(ev.timestamp)}</div>
+                        </div>
+                    </div>`;
+                }).join('')}
+            </div>`;
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // ========================================
+        // Data Loading
+        // ========================================
+        async function loadDashboard() {
+            try {
+                const [projects, agents, activity] = await Promise.all([
+                    apiFetch('/api/tenant/projects'),
+                    apiFetch('/api/tenant/agents'),
+                    apiFetch('/api/tenant/activity')
+                ]);
+
+                hideError();
+
+                renderSummaryCards(
+                    projects.projects || projects,
+                    agents.agents || agents
+                );
+
+                const specsList = projects.specs || [];
+                renderSpecsCard(specsList);
+                renderAgentHours(agents.agents || agents);
+                renderActivity(activity.events || activity);
+
+                // Update tenant info
+                if (projects.tenant) {
+                    currentTenant = projects.tenant;
+                    document.getElementById('tenantName').textContent = currentTenant.name || 'My Organization';
+                    const initials = (currentTenant.user_name || 'U').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+                    document.getElementById('userAvatar').textContent = initials;
+                    document.getElementById('userAvatar').title = currentTenant.user_name || 'Account';
+                }
+            } catch (err) {
+                console.error('Dashboard load error:', err);
+                showError(`Failed to load dashboard data: ${err.message}. Retrying...`);
+
+                // Show placeholder data on initial load failure
+                document.getElementById('activeProjects').textContent = '0';
+                document.getElementById('activeProjectsSub').textContent = 'No data';
+                document.getElementById('runningAgents').textContent = '0';
+                document.getElementById('runningAgentsSub').textContent = 'No data';
+                document.getElementById('specsSubmitted').textContent = '0';
+                document.getElementById('specsSubmittedSub').textContent = 'No data';
+                document.getElementById('agentHours').textContent = '0';
+                document.getElementById('agentHoursSub').textContent = 'No data';
+
+                document.getElementById('activityContainer').innerHTML =
+                    '<div class="empty-state">Unable to load activity. Check your connection.</div>';
+            }
+        }
+
+        // ========================================
+        // Init
+        // ========================================
+        document.addEventListener('DOMContentLoaded', () => {
+            loadDashboard();
+            setInterval(loadDashboard, POLL_INTERVAL);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platform Administration - Agent Pools</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --bg-hover: #30363d;
+            --text-primary: #f0f6fc;
+            --text-secondary: #c9d1d9;
+            --text-muted: #8b949e;
+            --border-color: #30363d;
+            --accent-blue: #58a6ff;
+            --accent-blue-dark: #1f6feb;
+            --accent-green: #3fb950;
+            --accent-yellow: #d29922;
+            --accent-red: #f85149;
+            --accent-orange: #d18616;
+            --accent-purple: #bc8cff;
+            --accent-cyan: #56d4dd;
+            --shadow: rgba(0, 0, 0, 0.4);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* ========================================
+           HEADER
+           ======================================== */
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .header-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--accent-blue);
+        }
+
+        .admin-badge {
+            background: linear-gradient(135deg, var(--accent-red), var(--accent-orange));
+            color: #fff;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .header-nav {
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .header-nav a {
+            color: var(--text-muted);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .header-nav a:hover {
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+        }
+
+        .header-nav a.active {
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .admin-user {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .admin-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--accent-purple);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.8rem;
+            color: #fff;
+        }
+
+        /* ========================================
+           MAIN CONTENT
+           ======================================== */
+        .main-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* ========================================
+           POOL OVERVIEW CARDS
+           ======================================== */
+        .pool-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.25rem;
+            margin-bottom: 2rem;
+        }
+
+        .pool-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            transition: border-color 0.2s ease;
+        }
+
+        .pool-card:hover {
+            border-color: var(--accent-blue);
+        }
+
+        .pool-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .pool-card-name {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .pool-card-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        .pool-card-icon.coding { background: rgba(88, 166, 255, 0.15); color: var(--accent-blue); }
+        .pool-card-icon.review { background: rgba(188, 140, 255, 0.15); color: var(--accent-purple); }
+        .pool-card-icon.linear { background: rgba(63, 185, 80, 0.15); color: var(--accent-green); }
+        .pool-card-icon.warm { background: rgba(210, 153, 34, 0.15); color: var(--accent-yellow); }
+
+        .pool-card-count {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.2;
+        }
+
+        .pool-card-count span {
+            font-size: 1rem;
+            font-weight: 400;
+            color: var(--text-muted);
+        }
+
+        .pool-card-bar {
+            height: 4px;
+            background: var(--bg-tertiary);
+            border-radius: 2px;
+            margin-top: 0.75rem;
+            overflow: hidden;
+        }
+
+        .pool-card-bar-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+
+        .pool-card-bar-fill.blue { background: var(--accent-blue); }
+        .pool-card-bar-fill.purple { background: var(--accent-purple); }
+        .pool-card-bar-fill.green { background: var(--accent-green); }
+        .pool-card-bar-fill.yellow { background: var(--accent-yellow); }
+
+        .pool-card-meta {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+        }
+
+        /* ========================================
+           POOL CONTROLS
+           ======================================== */
+        .pool-controls {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .control-label {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .control-row {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .control-input {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            width: 80px;
+            transition: border-color 0.2s ease;
+        }
+
+        .control-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .control-select {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            cursor: pointer;
+        }
+
+        .control-select:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        /* ========================================
+           BUTTONS
+           ======================================== */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1.25rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue-dark);
+            color: #fff;
+            border-color: var(--accent-blue-dark);
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border-color: var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .btn-warning {
+            background: rgba(210, 153, 34, 0.15);
+            color: var(--accent-yellow);
+            border-color: rgba(210, 153, 34, 0.3);
+        }
+
+        .btn-warning:hover {
+            background: rgba(210, 153, 34, 0.25);
+        }
+
+        .btn-sm {
+            padding: 0.35rem 0.75rem;
+            font-size: 0.8rem;
+        }
+
+        /* ========================================
+           TABLE
+           ======================================== */
+        .section {
+            margin-bottom: 2rem;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .table-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .table-scroll {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead th {
+            background: var(--bg-tertiary);
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+        }
+
+        tbody td {
+            padding: 0.75rem 1rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+        }
+
+        tbody tr:hover {
+            background: var(--bg-tertiary);
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .worker-id {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* ========================================
+           STATUS BADGES
+           ======================================== */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.2rem 0.65rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .status-badge.running {
+            background: rgba(63, 185, 80, 0.15);
+            color: var(--accent-green);
+            border: 1px solid rgba(63, 185, 80, 0.3);
+        }
+
+        .status-badge.idle {
+            background: rgba(139, 148, 158, 0.15);
+            color: var(--text-muted);
+            border: 1px solid rgba(139, 148, 158, 0.3);
+        }
+
+        .status-badge.warming {
+            background: rgba(210, 153, 34, 0.15);
+            color: var(--accent-yellow);
+            border: 1px solid rgba(210, 153, 34, 0.3);
+        }
+
+        .status-badge.error {
+            background: rgba(248, 81, 73, 0.15);
+            color: var(--accent-red);
+            border: 1px solid rgba(248, 81, 73, 0.3);
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        .status-badge.running .status-dot { background: var(--accent-green); }
+        .status-badge.idle .status-dot { background: var(--text-muted); }
+        .status-badge.warming .status-dot { background: var(--accent-yellow); }
+        .status-badge.error .status-dot { background: var(--accent-red); }
+
+        .pool-type-badge {
+            display: inline-flex;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .pool-type-badge.coding { background: rgba(88, 166, 255, 0.15); color: var(--accent-blue); }
+        .pool-type-badge.review { background: rgba(188, 140, 255, 0.15); color: var(--accent-purple); }
+        .pool-type-badge.linear { background: rgba(63, 185, 80, 0.15); color: var(--accent-green); }
+        .pool-type-badge.warm { background: rgba(210, 153, 34, 0.15); color: var(--accent-yellow); }
+
+        /* ========================================
+           PER-TENANT UTILIZATION
+           ======================================== */
+        .utilization-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+
+        .utilization-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.25rem;
+        }
+
+        .utilization-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .utilization-tenant {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .utilization-count {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .utilization-bars {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .utilization-bar-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+        }
+
+        .utilization-bar-label {
+            width: 60px;
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+
+        .utilization-bar-track {
+            flex: 1;
+            height: 6px;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .utilization-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+
+        .utilization-bar-value {
+            width: 30px;
+            text-align: right;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            flex-shrink: 0;
+        }
+
+        /* ========================================
+           LOADING & ERROR STATES
+           ======================================== */
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem;
+            gap: 1rem;
+        }
+
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .error-container {
+            background: rgba(248, 81, 73, 0.1);
+            border: 1px solid rgba(248, 81, 73, 0.3);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .error-title {
+            color: var(--accent-red);
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .error-message {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .error-retry { margin-top: 1rem; }
+
+        /* ========================================
+           SCROLLBAR
+           ======================================== */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--bg-hover); }
+
+        /* ========================================
+           RESPONSIVE
+           ======================================== */
+        @media (max-width: 768px) {
+            .header { padding: 0.75rem 1rem; }
+            .header-nav { order: 3; width: 100%; overflow-x: auto; }
+            .main-content { padding: 1rem; }
+            .pool-cards { grid-template-columns: repeat(2, 1fr); }
+            .pool-controls { flex-direction: column; gap: 1rem; }
+            .utilization-grid { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 480px) {
+            .pool-cards { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <!-- HEADER -->
+    <header class="header">
+        <div class="header-left">
+            <span class="header-title">Platform Administration</span>
+            <span class="admin-badge">ADMIN</span>
+        </div>
+        <nav class="header-nav">
+            <a href="platform_dashboard.html">Overview</a>
+            <a href="platform_tenants.html">Tenants</a>
+            <a href="platform_agents.html" class="active">Agent Pools</a>
+            <a href="platform_memory.html">Memory</a>
+        </nav>
+        <div class="header-right">
+            <div class="admin-user">
+                <div class="admin-avatar">PA</div>
+                <span>Platform Admin</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+        <!-- Loading State -->
+        <div class="loading-container" id="loading-state">
+            <div class="spinner"></div>
+            <span class="loading-text">Loading agent pool data...</span>
+        </div>
+
+        <!-- Error State -->
+        <div class="error-container" id="error-state" style="display: none;">
+            <div class="error-title">Failed to load agent pools</div>
+            <div class="error-message" id="error-message">Unable to connect to the platform API.</div>
+            <div class="error-retry">
+                <button class="btn btn-primary" onclick="loadPools()">Retry</button>
+            </div>
+        </div>
+
+        <!-- Pool Content -->
+        <div id="pool-content" style="display: none;">
+            <!-- Pool Overview Cards -->
+            <div class="pool-cards" id="pool-cards">
+                <!-- Populated by JS -->
+            </div>
+
+            <!-- Pool Controls -->
+            <div class="pool-controls">
+                <div class="control-group">
+                    <span class="control-label">Resize Pool</span>
+                    <div class="control-row">
+                        <select class="control-select" id="resize-pool-select">
+                            <option value="coding">Coding</option>
+                            <option value="review">Review</option>
+                            <option value="linear">Linear</option>
+                        </select>
+                        <input type="number" class="control-input" id="resize-count" value="10" min="1" max="100">
+                        <button class="btn btn-secondary btn-sm" onclick="resizePool()">Resize</button>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <span class="control-label">Pre-warm Agents</span>
+                    <div class="control-row">
+                        <input type="number" class="control-input" id="warm-count" value="5" min="1" max="50">
+                        <button class="btn btn-warning btn-sm" onclick="warmAgents()">Warm</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Worker Table -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-title">Active Workers</span>
+                    <button class="btn btn-secondary btn-sm" onclick="loadPools()">Refresh</button>
+                </div>
+                <div class="table-container">
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Worker ID</th>
+                                    <th>Pool Type</th>
+                                    <th>Tenant</th>
+                                    <th>Status</th>
+                                    <th>Current Ticket</th>
+                                    <th>Model</th>
+                                    <th>Uptime</th>
+                                </tr>
+                            </thead>
+                            <tbody id="worker-tbody">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Per-Tenant Utilization -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-title">Per-Tenant Utilization</span>
+                </div>
+                <div class="utilization-grid" id="utilization-grid">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        /* ========================================
+           STATE
+           ======================================== */
+        let pools = {};
+        let workers = [];
+
+        /* ========================================
+           API
+           ======================================== */
+        async function apiFetch(url, options = {}) {
+            const resp = await fetch(url, {
+                headers: { 'Content-Type': 'application/json', ...options.headers },
+                ...options
+            });
+            if (!resp.ok) throw new Error(`API error: ${resp.status} ${resp.statusText}`);
+            return resp.json();
+        }
+
+        /* ========================================
+           LOAD POOLS
+           ======================================== */
+        async function loadPools() {
+            const loading = document.getElementById('loading-state');
+            const error = document.getElementById('error-state');
+            const content = document.getElementById('pool-content');
+
+            loading.style.display = 'flex';
+            error.style.display = 'none';
+            content.style.display = 'none';
+
+            try {
+                const data = await apiFetch('/api/platform/pools');
+                pools = data.pools || data;
+                workers = data.workers || [];
+                renderAll();
+                loading.style.display = 'none';
+                content.style.display = 'block';
+            } catch (err) {
+                loading.style.display = 'none';
+                console.error('Pool load failed:', err);
+                showDemoData();
+            }
+        }
+
+        /* ========================================
+           DEMO DATA
+           ======================================== */
+        function showDemoData() {
+            pools = {
+                coding: { name: 'Coding Pool', active: 23, total: 30, icon: 'coding', color: 'blue' },
+                review: { name: 'Review Pool', active: 8, total: 15, icon: 'review', color: 'purple' },
+                linear: { name: 'Linear Pool', active: 5, total: 10, icon: 'linear', color: 'green' },
+                warm:   { name: 'Warm Pool',   active: 7, total: 10, icon: 'warm',   color: 'yellow' }
+            };
+
+            workers = [
+                { id: 'wk-a1b2c3', pool: 'coding', tenant: 'acme-corp', status: 'running', ticket: 'ACM-142', model: 'sonnet', uptime: 2340 },
+                { id: 'wk-d4e5f6', pool: 'coding', tenant: 'bigco', status: 'running', ticket: 'BIG-87', model: 'opus', uptime: 5621 },
+                { id: 'wk-g7h8i9', pool: 'review', tenant: 'acme-corp', status: 'running', ticket: 'ACM-139', model: 'sonnet', uptime: 1200 },
+                { id: 'wk-j1k2l3', pool: 'coding', tenant: 'startup-io', status: 'running', ticket: 'SIO-55', model: 'haiku', uptime: 890 },
+                { id: 'wk-m4n5o6', pool: 'linear', tenant: 'cloudnine', status: 'running', ticket: 'CN-201', model: 'haiku', uptime: 340 },
+                { id: 'wk-p7q8r9', pool: 'coding', tenant: 'bigco', status: 'idle', ticket: '--', model: 'sonnet', uptime: 7800 },
+                { id: 'wk-s1t2u3', pool: 'warm', tenant: '--', status: 'warming', ticket: '--', model: 'sonnet', uptime: 120 },
+                { id: 'wk-v4w5x6', pool: 'warm', tenant: '--', status: 'warming', ticket: '--', model: 'haiku', uptime: 60 },
+                { id: 'wk-y7z8a1', pool: 'review', tenant: 'microteam', status: 'running', ticket: 'MT-12', model: 'haiku', uptime: 450 },
+                { id: 'wk-b2c3d4', pool: 'coding', tenant: 'cloudnine', status: 'error', ticket: 'CN-198', model: 'sonnet', uptime: 3200 },
+            ];
+
+            renderAll();
+            document.getElementById('loading-state').style.display = 'none';
+            document.getElementById('pool-content').style.display = 'block';
+
+            // Auto-trigger warm if URL param
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('action') === 'warm') {
+                document.getElementById('warm-count').focus();
+            }
+        }
+
+        /* ========================================
+           RENDER
+           ======================================== */
+        function renderAll() {
+            renderPoolCards();
+            renderWorkerTable();
+            renderUtilization();
+        }
+
+        function renderPoolCards() {
+            const container = document.getElementById('pool-cards');
+            const iconLabels = { coding: 'C', review: 'R', linear: 'L', warm: 'W' };
+
+            container.innerHTML = Object.entries(pools).map(([key, p]) => {
+                const pct = p.total > 0 ? Math.round((p.active / p.total) * 100) : 0;
+                return `
+                    <div class="pool-card">
+                        <div class="pool-card-header">
+                            <span class="pool-card-name">${escapeHtml(p.name)}</span>
+                            <div class="pool-card-icon ${p.icon || key}">${iconLabels[key] || key[0].toUpperCase()}</div>
+                        </div>
+                        <div class="pool-card-count">${p.active} <span>/ ${p.total}</span></div>
+                        <div class="pool-card-bar">
+                            <div class="pool-card-bar-fill ${p.color || 'blue'}" style="width: ${pct}%"></div>
+                        </div>
+                        <div class="pool-card-meta">${pct}% utilized${key === 'warm' ? ' (pre-warmed)' : ''}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderWorkerTable() {
+            const tbody = document.getElementById('worker-tbody');
+            tbody.innerHTML = workers.map(w => `
+                <tr>
+                    <td><span class="worker-id">${escapeHtml(w.id)}</span></td>
+                    <td><span class="pool-type-badge ${w.pool}">${w.pool}</span></td>
+                    <td>${w.tenant === '--' ? '<span style="color:var(--text-muted)">--</span>' : escapeHtml(w.tenant)}</td>
+                    <td>
+                        <span class="status-badge ${w.status}">
+                            <span class="status-dot"></span>
+                            ${w.status}
+                        </span>
+                    </td>
+                    <td>${w.ticket === '--' ? '<span style="color:var(--text-muted)">--</span>' : `<span style="font-family:monospace;font-size:0.85rem">${escapeHtml(w.ticket)}</span>`}</td>
+                    <td>${escapeHtml(w.model)}</td>
+                    <td>${formatUptime(w.uptime)}</td>
+                </tr>
+            `).join('');
+        }
+
+        function renderUtilization() {
+            const grid = document.getElementById('utilization-grid');
+
+            // Aggregate by tenant
+            const tenantMap = {};
+            workers.forEach(w => {
+                if (w.tenant === '--') return;
+                if (!tenantMap[w.tenant]) tenantMap[w.tenant] = { coding: 0, review: 0, linear: 0, total: 0 };
+                tenantMap[w.tenant][w.pool] = (tenantMap[w.tenant][w.pool] || 0) + 1;
+                tenantMap[w.tenant].total++;
+            });
+
+            const maxPerPool = { coding: pools.coding?.total || 30, review: pools.review?.total || 15, linear: pools.linear?.total || 10 };
+
+            grid.innerHTML = Object.entries(tenantMap).map(([name, u]) => `
+                <div class="utilization-card">
+                    <div class="utilization-card-header">
+                        <span class="utilization-tenant">${escapeHtml(name)}</span>
+                        <span class="utilization-count">${u.total} agent${u.total !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div class="utilization-bars">
+                        <div class="utilization-bar-row">
+                            <span class="utilization-bar-label">Coding</span>
+                            <div class="utilization-bar-track">
+                                <div class="utilization-bar-fill" style="width: ${Math.round((u.coding / maxPerPool.coding) * 100)}%; background: var(--accent-blue)"></div>
+                            </div>
+                            <span class="utilization-bar-value">${u.coding}</span>
+                        </div>
+                        <div class="utilization-bar-row">
+                            <span class="utilization-bar-label">Review</span>
+                            <div class="utilization-bar-track">
+                                <div class="utilization-bar-fill" style="width: ${Math.round((u.review / maxPerPool.review) * 100)}%; background: var(--accent-purple)"></div>
+                            </div>
+                            <span class="utilization-bar-value">${u.review}</span>
+                        </div>
+                        <div class="utilization-bar-row">
+                            <span class="utilization-bar-label">Linear</span>
+                            <div class="utilization-bar-track">
+                                <div class="utilization-bar-fill" style="width: ${Math.round((u.linear / maxPerPool.linear) * 100)}%; background: var(--accent-green)"></div>
+                            </div>
+                            <span class="utilization-bar-value">${u.linear || 0}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            if (!Object.keys(tenantMap).length) {
+                grid.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 2rem;">No active tenant utilization data</div>';
+            }
+        }
+
+        /* ========================================
+           POOL ACTIONS
+           ======================================== */
+        async function resizePool() {
+            const pool = document.getElementById('resize-pool-select').value;
+            const count = parseInt(document.getElementById('resize-count').value, 10);
+            if (!count || count < 1) return;
+
+            try {
+                await apiFetch('/api/platform/pools', {
+                    method: 'PATCH',
+                    body: JSON.stringify({ pool, total: count })
+                });
+                loadPools();
+            } catch (err) {
+                // Demo: update locally
+                if (pools[pool]) {
+                    pools[pool].total = count;
+                    renderPoolCards();
+                }
+            }
+        }
+
+        async function warmAgents() {
+            const count = parseInt(document.getElementById('warm-count').value, 10);
+            if (!count || count < 1) return;
+
+            try {
+                await apiFetch('/api/platform/warm', {
+                    method: 'POST',
+                    body: JSON.stringify({ count })
+                });
+                loadPools();
+            } catch (err) {
+                // Demo: add warm workers
+                pools.warm.active = Math.min(pools.warm.active + count, pools.warm.total + count);
+                pools.warm.total = Math.max(pools.warm.total, pools.warm.active);
+                renderPoolCards();
+                alert(`Demo: ${count} agents queued for pre-warming.`);
+            }
+        }
+
+        /* ========================================
+           HELPERS
+           ======================================== */
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function formatUptime(seconds) {
+            if (!seconds && seconds !== 0) return '--';
+            if (seconds < 60) return `${seconds}s`;
+            const mins = Math.floor(seconds / 60);
+            if (mins < 60) return `${mins}m`;
+            const hours = Math.floor(mins / 60);
+            const remainMins = mins % 60;
+            return `${hours}h ${remainMins}m`;
+        }
+
+        /* ========================================
+           INIT
+           ======================================== */
+        document.addEventListener('DOMContentLoaded', loadPools);
+    </script>
+</body>
+</html>

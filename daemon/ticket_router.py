@@ -188,8 +188,17 @@ class TicketRouter:
         self,
         ticket: Ticket,
         pools: dict[PoolType, WorkerPool],
+        allowed_models: list[str] | None = None,
     ) -> tuple[PoolType, str]:
         """Route the ticket and select the model to use.
+
+        Args:
+            ticket: Ticket to route.
+            pools: Available worker pools.
+            allowed_models: Optional list of permitted model names (e.g.
+                ``["haiku", "sonnet"]``). When provided, the selected model
+                is filtered to only models in this list. This is used to
+                enforce per-tenant model restrictions from TenantConfig.
 
         Returns:
             A tuple of (pool_type, model_id) where model_id is the full
@@ -198,12 +207,15 @@ class TicketRouter:
         # Check explicit rules first
         for rule in self.rules:
             if rule.matches(ticket):
-                model_id = AVAILABLE_MODELS.get(rule.model, AVAILABLE_MODELS["sonnet"])
+                model_name = rule.model
+                model_name = self._apply_model_filter(model_name, allowed_models)
+                model_id = AVAILABLE_MODELS.get(model_name, AVAILABLE_MODELS["sonnet"])
                 return rule.pool, model_id
 
         # Fall back to complexity-based routing
         complexity = estimate_complexity(ticket)
         model_name = select_model_for_complexity(complexity)
+        model_name = self._apply_model_filter(model_name, allowed_models)
         model_id = AVAILABLE_MODELS.get(model_name, AVAILABLE_MODELS["sonnet"])
 
         # Determine pool from complexity + labels
@@ -212,11 +224,47 @@ class TicketRouter:
         # Use pool's default model if available and no rule matched
         pool = pools.get(pool_type)
         if pool is not None and pool.config.default_model:
-            pool_model = AVAILABLE_MODELS.get(pool.config.default_model)
+            default_name = pool.config.default_model
+            default_name = self._apply_model_filter(default_name, allowed_models)
+            pool_model = AVAILABLE_MODELS.get(default_name)
             if pool_model:
                 model_id = pool_model
 
         return pool_type, model_id
+
+    @staticmethod
+    def _apply_model_filter(model_name: str, allowed_models: list[str] | None) -> str:
+        """Filter model selection to only permitted models.
+
+        If the selected model is not in the allowed list, falls back to the
+        highest-tier allowed model, then to "sonnet" as a last resort.
+
+        Args:
+            model_name: Originally selected model name.
+            allowed_models: Permitted model names, or None (no filtering).
+
+        Returns:
+            A model name that is in the allowed list (or the original if
+            no filtering is applied).
+        """
+        if allowed_models is None:
+            return model_name
+        if model_name in allowed_models:
+            return model_name
+
+        # Fall back: prefer sonnet > haiku > first available
+        for fallback in ("sonnet", "haiku"):
+            if fallback in allowed_models:
+                logger.debug(
+                    "Model '%s' not allowed, falling back to '%s'",
+                    model_name,
+                    fallback,
+                )
+                return fallback
+
+        if allowed_models:
+            return allowed_models[0]
+        return "sonnet"
 
     def _infer_pool(self, ticket: Ticket) -> PoolType:
         """Infer pool type from ticket labels when no rule matches."""

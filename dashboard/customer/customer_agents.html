@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agents - Agentic Platform</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --bg-hover: #30363d;
+            --text-primary: #f0f6fc;
+            --text-secondary: #c9d1d9;
+            --text-muted: #8b949e;
+            --border-color: #30363d;
+            --accent-blue: #58a6ff;
+            --accent-blue-dark: #1f6feb;
+            --accent-green: #3fb950;
+            --accent-yellow: #d29922;
+            --accent-red: #f85149;
+            --accent-purple: #bc8cff;
+            --shadow: rgba(0, 0, 0, 0.4);
+            --radius: 8px;
+            --radius-lg: 12px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        a { color: var(--accent-blue); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        /* Header */
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 2rem;
+            display: flex; align-items: center; justify-content: space-between;
+            height: 64px; position: sticky; top: 0; z-index: 100;
+        }
+
+        .header-left { display: flex; align-items: center; gap: 1.5rem; }
+
+        .header-logo {
+            display: flex; align-items: center; gap: 0.5rem;
+            font-size: 1.25rem; font-weight: 700; color: var(--text-primary);
+        }
+
+        .header-logo svg { width: 28px; height: 28px; color: var(--accent-blue); }
+
+        .nav-tabs { display: flex; gap: 0; height: 64px; }
+
+        .nav-tab {
+            display: flex; align-items: center; padding: 0 1.25rem; height: 100%;
+            color: var(--text-muted); font-size: 0.875rem; font-weight: 500;
+            border-bottom: 2px solid transparent;
+            transition: color 0.15s ease, border-color 0.15s ease;
+            cursor: pointer; text-decoration: none;
+        }
+
+        .nav-tab:hover { color: var(--text-secondary); text-decoration: none; }
+        .nav-tab.active { color: var(--text-primary); border-bottom-color: var(--accent-blue); }
+
+        .header-right { display: flex; align-items: center; gap: 1rem; }
+
+        .user-avatar {
+            width: 32px; height: 32px; border-radius: 50%;
+            background: var(--accent-blue-dark);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.8rem; font-weight: 600; color: #fff; cursor: pointer;
+        }
+
+        /* Page */
+        .page-content { max-width: 1280px; margin: 0 auto; padding: 2rem; }
+
+        .breadcrumb { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; }
+        .breadcrumb a { color: var(--text-muted); }
+        .breadcrumb a:hover { color: var(--accent-blue); }
+
+        .page-title-row {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 1.5rem;
+        }
+
+        .page-title { font-size: 1.5rem; font-weight: 600; }
+
+        .live-indicator {
+            display: inline-flex; align-items: center; gap: 0.4rem;
+            font-size: 0.8rem; color: var(--accent-green); font-weight: 500;
+        }
+
+        .live-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--accent-green);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        /* Utilization Bar */
+        .utilization-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .utilization-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .utilization-label { font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); }
+        .utilization-count { font-size: 0.85rem; color: var(--text-muted); }
+
+        .utilization-bar-bg {
+            height: 8px; background: var(--bg-tertiary);
+            border-radius: 4px; overflow: hidden;
+        }
+
+        .utilization-bar-fill {
+            height: 100%; border-radius: 4px;
+            background: var(--accent-blue);
+            transition: width 0.5s ease;
+        }
+
+        .utilization-bar-fill.high { background: var(--accent-yellow); }
+        .utilization-bar-fill.critical { background: var(--accent-red); }
+
+        /* Agent Cards Grid */
+        .agents-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .agent-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 1.25rem 1.5rem;
+            transition: border-color 0.15s ease;
+        }
+
+        .agent-card:hover { border-color: var(--accent-blue); }
+
+        .agent-card-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 0.75rem;
+        }
+
+        .agent-name-row {
+            display: flex; align-items: center; gap: 0.5rem;
+        }
+
+        .agent-status-dot {
+            width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+        }
+
+        .agent-status-dot.running { background: var(--accent-green); animation: pulse 2s ease-in-out infinite; }
+        .agent-status-dot.idle { background: var(--text-muted); }
+        .agent-status-dot.paused { background: var(--accent-yellow); }
+        .agent-status-dot.error { background: var(--accent-red); }
+
+        .agent-name { font-size: 1rem; font-weight: 600; color: var(--text-primary); }
+
+        .agent-status-label {
+            font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.3px; padding: 0.15rem 0.5rem;
+            border-radius: 10px;
+        }
+
+        .agent-status-label.running { background: rgba(63,185,80,0.15); color: var(--accent-green); }
+        .agent-status-label.idle { background: rgba(139,148,158,0.15); color: var(--text-muted); }
+        .agent-status-label.paused { background: rgba(210,153,34,0.15); color: var(--accent-yellow); }
+        .agent-status-label.error { background: rgba(248,81,73,0.15); color: var(--accent-red); }
+
+        .agent-detail-rows { display: flex; flex-direction: column; gap: 0.3rem; }
+
+        .agent-detail-row {
+            display: flex; justify-content: space-between;
+            font-size: 0.8rem;
+        }
+
+        .agent-detail-label { color: var(--text-muted); }
+        .agent-detail-value { color: var(--text-secondary); text-align: right; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* Activity Log */
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+        }
+
+        .card-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color);
+        }
+
+        .card-title { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); }
+
+        .card-body { padding: 0; }
+
+        .log-list { max-height: 400px; overflow-y: auto; }
+
+        .log-entry {
+            display: flex; align-items: flex-start; gap: 0.75rem;
+            padding: 0.75rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.825rem;
+        }
+
+        .log-entry:last-child { border-bottom: none; }
+
+        .log-time {
+            color: var(--text-muted); font-size: 0.75rem;
+            flex-shrink: 0; min-width: 70px;
+            font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+        }
+
+        .log-agent {
+            font-weight: 600; color: var(--accent-blue);
+            min-width: 100px; flex-shrink: 0;
+        }
+
+        .log-message { color: var(--text-secondary); flex: 1; }
+
+        /* Loading / Empty / Error */
+        .loading-state {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 4rem 1rem; color: var(--text-muted); font-size: 0.875rem;
+        }
+
+        .spinner {
+            width: 24px; height: 24px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 0.75rem;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .empty-state { text-align: center; padding: 3rem 1rem; color: var(--text-muted); font-size: 0.875rem; }
+
+        .error-banner {
+            background: rgba(248,81,73,0.1);
+            border: 1px solid rgba(248,81,73,0.3);
+            border-radius: var(--radius); padding: 0.75rem 1rem;
+            color: var(--accent-red); font-size: 0.85rem;
+            margin-bottom: 1rem; display: none;
+        }
+
+        .error-banner.visible { display: block; }
+
+        @media (max-width: 768px) {
+            .header { padding: 0 1rem; }
+            .page-content { padding: 1rem; }
+            .agents-grid { grid-template-columns: 1fr; }
+            .nav-tabs { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-left">
+            <div class="header-logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                </svg>
+                Agentic Platform
+            </div>
+            <nav class="nav-tabs">
+                <a href="customer_dashboard.html" class="nav-tab">Dashboard</a>
+                <a href="customer_projects.html" class="nav-tab">Projects</a>
+                <a href="customer_agents.html" class="nav-tab active">Agents</a>
+                <a href="customer_specs.html" class="nav-tab">Specs</a>
+            </nav>
+        </div>
+        <div class="header-right">
+            <div class="user-avatar" title="Account">U</div>
+        </div>
+    </header>
+
+    <div class="page-content">
+        <div class="error-banner" id="errorBanner"></div>
+
+        <div class="breadcrumb">
+            <a href="customer_dashboard.html">Dashboard</a> / <span>Agents</span>
+        </div>
+
+        <div class="page-title-row">
+            <h1 class="page-title">Agent Status</h1>
+            <div class="live-indicator">
+                <span class="live-dot"></span>
+                Live
+            </div>
+        </div>
+
+        <!-- Utilization Bar -->
+        <div class="utilization-card" id="utilizationCard">
+            <div class="utilization-header">
+                <span class="utilization-label">Concurrent Agent Utilization</span>
+                <span class="utilization-count" id="utilizationCount">-- / --</span>
+            </div>
+            <div class="utilization-bar-bg">
+                <div class="utilization-bar-fill" id="utilizationBar" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- Agent Cards -->
+        <div id="agentsContainer">
+            <div class="loading-state">
+                <div class="spinner"></div>
+                Loading agents...
+            </div>
+        </div>
+
+        <!-- Live Activity Log -->
+        <div class="card" style="margin-top: 1.5rem;">
+            <div class="card-header">
+                <span class="card-title">Live Activity Log</span>
+                <span style="font-size: 0.75rem; color: var(--text-muted);" id="logUpdateTime">--</span>
+            </div>
+            <div class="card-body">
+                <div class="log-list" id="logContainer">
+                    <div class="loading-state" style="padding: 2rem;">
+                        <div class="spinner"></div>
+                        Loading activity...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        const POLL_INTERVAL = 10000; // 10s for agent status
+
+        function showError(msg) {
+            const el = document.getElementById('errorBanner');
+            el.textContent = msg;
+            el.classList.add('visible');
+        }
+
+        function hideError() {
+            document.getElementById('errorBanner').classList.remove('visible');
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str || '';
+            return div.innerHTML;
+        }
+
+        function formatDuration(seconds) {
+            if (!seconds || seconds <= 0) return '--';
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            if (h > 0) return `${h}h ${m}m`;
+            return `${m}m`;
+        }
+
+        function renderUtilization(agents) {
+            const running = agents.filter(a => a.status === 'running').length;
+            const total = agents.length || 1;
+            const pct = Math.round((running / total) * 100);
+
+            document.getElementById('utilizationCount').textContent = `${running} / ${total} agents`;
+
+            const bar = document.getElementById('utilizationBar');
+            bar.style.width = `${pct}%`;
+            bar.className = 'utilization-bar-fill';
+            if (pct >= 90) bar.classList.add('critical');
+            else if (pct >= 70) bar.classList.add('high');
+        }
+
+        function renderAgents(agents) {
+            const container = document.getElementById('agentsContainer');
+            if (!agents || agents.length === 0) {
+                container.innerHTML = '<div class="empty-state">No agents allocated to your tenant.</div>';
+                return;
+            }
+
+            container.innerHTML = `<div class="agents-grid">
+                ${agents.map(a => `
+                    <div class="agent-card">
+                        <div class="agent-card-header">
+                            <div class="agent-name-row">
+                                <span class="agent-status-dot ${a.status}"></span>
+                                <span class="agent-name">${escapeHtml(a.name)}</span>
+                            </div>
+                            <span class="agent-status-label ${a.status}">${a.status}</span>
+                        </div>
+                        <div class="agent-detail-rows">
+                            <div class="agent-detail-row">
+                                <span class="agent-detail-label">Current Task</span>
+                                <span class="agent-detail-value" title="${escapeHtml(a.current_task || 'None')}">${escapeHtml(a.current_task || 'None')}</span>
+                            </div>
+                            <div class="agent-detail-row">
+                                <span class="agent-detail-label">Model</span>
+                                <span class="agent-detail-value">${escapeHtml(a.model || 'N/A')}</span>
+                            </div>
+                            <div class="agent-detail-row">
+                                <span class="agent-detail-label">Session Duration</span>
+                                <span class="agent-detail-value">${formatDuration(a.session_duration_seconds)}</span>
+                            </div>
+                            <div class="agent-detail-row">
+                                <span class="agent-detail-label">Hours Used</span>
+                                <span class="agent-detail-value">${a.hours_used != null ? a.hours_used.toFixed(1) + 'h' : '--'}</span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>`;
+        }
+
+        function renderLog(events) {
+            const container = document.getElementById('logContainer');
+            if (!events || events.length === 0) {
+                container.innerHTML = '<div class="empty-state">No recent activity</div>';
+                return;
+            }
+
+            container.innerHTML = events.slice(0, 50).map(ev => {
+                const time = new Date(ev.timestamp);
+                const timeStr = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                return `<div class="log-entry">
+                    <span class="log-time">${timeStr}</span>
+                    <span class="log-agent">${escapeHtml(ev.agent_name || ev.type || 'System')}</span>
+                    <span class="log-message">${escapeHtml(ev.message || ev.description || '')}</span>
+                </div>`;
+            }).join('');
+
+            document.getElementById('logUpdateTime').textContent =
+                'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        async function loadAgents() {
+            try {
+                const data = await fetch(`${API_BASE}/api/tenant/agents`).then(r => {
+                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                    return r.json();
+                });
+
+                hideError();
+                const agents = data.agents || data;
+                renderUtilization(agents);
+                renderAgents(agents);
+                renderLog(data.activity_log || []);
+            } catch (err) {
+                console.error('Agents load error:', err);
+                showError(`Failed to load agent data: ${err.message}`);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAgents();
+            setInterval(loadAgents, POLL_INTERVAL);
+        });
+    </script>
+</body>
+</html>

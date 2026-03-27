@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platform Administration - Shared Memory</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --bg-hover: #30363d;
+            --text-primary: #f0f6fc;
+            --text-secondary: #c9d1d9;
+            --text-muted: #8b949e;
+            --border-color: #30363d;
+            --accent-blue: #58a6ff;
+            --accent-blue-dark: #1f6feb;
+            --accent-green: #3fb950;
+            --accent-yellow: #d29922;
+            --accent-red: #f85149;
+            --accent-orange: #d18616;
+            --accent-purple: #bc8cff;
+            --accent-cyan: #56d4dd;
+            --accent-pink: #f778ba;
+            --shadow: rgba(0, 0, 0, 0.4);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* ========================================
+           HEADER
+           ======================================== */
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .header-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--accent-blue);
+        }
+
+        .admin-badge {
+            background: linear-gradient(135deg, var(--accent-red), var(--accent-orange));
+            color: #fff;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .header-nav {
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .header-nav a {
+            color: var(--text-muted);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .header-nav a:hover {
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+        }
+
+        .header-nav a.active {
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .admin-user {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .admin-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--accent-purple);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.8rem;
+            color: #fff;
+        }
+
+        /* ========================================
+           MAIN CONTENT
+           ======================================== */
+        .main-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* ========================================
+           STAT CARDS
+           ======================================== */
+        .stat-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.25rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.25rem;
+            transition: border-color 0.2s ease;
+        }
+
+        .stat-card:hover {
+            border-color: var(--accent-blue);
+        }
+
+        .stat-card-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.4rem;
+        }
+
+        .stat-card-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        .stat-card-value.blue { color: var(--accent-blue); }
+        .stat-card-value.green { color: var(--accent-green); }
+        .stat-card-value.purple { color: var(--accent-purple); }
+        .stat-card-value.cyan { color: var(--accent-cyan); }
+
+        .stat-card-sub {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        .category-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+            margin-top: 0.5rem;
+        }
+
+        .category-item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+        }
+
+        .category-name { color: var(--text-secondary); }
+        .category-count { color: var(--text-muted); font-weight: 500; }
+
+        .tag-cloud {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+            margin-top: 0.5rem;
+        }
+
+        .tag-chip {
+            display: inline-flex;
+            padding: 0.15rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        /* ========================================
+           FILTER BAR
+           ======================================== */
+        .filter-bar {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+
+        .filter-label {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .filter-select, .filter-input {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-family: inherit;
+            transition: border-color 0.2s ease;
+        }
+
+        .filter-select:focus, .filter-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .filter-input::placeholder { color: var(--text-muted); }
+        .filter-input.wide { width: 220px; }
+
+        .confidence-range {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .confidence-range input[type="range"] {
+            width: 100px;
+            accent-color: var(--accent-blue);
+        }
+
+        .confidence-value {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            width: 36px;
+            text-align: center;
+        }
+
+        .filter-actions {
+            display: flex;
+            gap: 0.5rem;
+            align-self: flex-end;
+        }
+
+        /* ========================================
+           BUTTONS
+           ======================================== */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue-dark);
+            color: #fff;
+            border-color: var(--accent-blue-dark);
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border-color: var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .btn-danger {
+            background: rgba(248, 81, 73, 0.15);
+            color: var(--accent-red);
+            border-color: rgba(248, 81, 73, 0.3);
+        }
+
+        .btn-danger:hover {
+            background: rgba(248, 81, 73, 0.25);
+        }
+
+        .btn-sm {
+            padding: 0.3rem 0.65rem;
+            font-size: 0.8rem;
+        }
+
+        /* ========================================
+           TABLE
+           ======================================== */
+        .section {
+            margin-bottom: 2rem;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .table-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .table-scroll {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead th {
+            background: var(--bg-tertiary);
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+        }
+
+        tbody td {
+            padding: 0.75rem 1rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        tbody tr {
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        tbody tr:hover {
+            background: var(--bg-tertiary);
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .entry-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* ========================================
+           CATEGORY BADGES
+           ======================================== */
+        .cat-badge {
+            display: inline-flex;
+            padding: 0.15rem 0.55rem;
+            border-radius: 12px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .cat-badge.pattern      { background: rgba(88, 166, 255, 0.15);  color: var(--accent-blue);   border: 1px solid rgba(88, 166, 255, 0.3); }
+        .cat-badge.error        { background: rgba(248, 81, 73, 0.15);   color: var(--accent-red);    border: 1px solid rgba(248, 81, 73, 0.3); }
+        .cat-badge.architecture { background: rgba(188, 140, 255, 0.15); color: var(--accent-purple); border: 1px solid rgba(188, 140, 255, 0.3); }
+        .cat-badge.convention   { background: rgba(63, 185, 80, 0.15);   color: var(--accent-green);  border: 1px solid rgba(63, 185, 80, 0.3); }
+        .cat-badge.dependency   { background: rgba(210, 153, 34, 0.15);  color: var(--accent-yellow); border: 1px solid rgba(210, 153, 34, 0.3); }
+        .cat-badge.workflow     { background: rgba(86, 212, 221, 0.15);  color: var(--accent-cyan);   border: 1px solid rgba(86, 212, 221, 0.3); }
+        .cat-badge.security     { background: rgba(247, 120, 186, 0.15); color: var(--accent-pink);   border: 1px solid rgba(247, 120, 186, 0.3); }
+
+        /* ========================================
+           CONFIDENCE BAR
+           ======================================== */
+        .confidence-bar {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .confidence-track {
+            width: 50px;
+            height: 5px;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            border-radius: 3px;
+        }
+
+        .confidence-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            width: 35px;
+        }
+
+        /* ========================================
+           DETAIL PANEL
+           ======================================== */
+        .detail-panel-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 900;
+        }
+
+        .detail-panel-overlay.open {
+            display: block;
+        }
+
+        .detail-panel {
+            position: fixed;
+            top: 0;
+            right: -560px;
+            width: 540px;
+            max-width: 95vw;
+            height: 100vh;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            z-index: 950;
+            transition: right 0.3s ease;
+            overflow-y: auto;
+            box-shadow: -4px 0 24px var(--shadow);
+        }
+
+        .detail-panel.open {
+            right: 0;
+        }
+
+        .detail-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            background: var(--bg-secondary);
+            z-index: 1;
+        }
+
+        .detail-panel-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            max-width: 400px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .detail-panel-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .detail-panel-close:hover {
+            color: var(--text-primary);
+        }
+
+        .detail-panel-body {
+            padding: 1.5rem;
+        }
+
+        .detail-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .detail-section-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.75rem;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.9rem;
+        }
+
+        .detail-row-label { color: var(--text-muted); }
+        .detail-row-value { color: var(--text-primary); font-weight: 500; }
+
+        .detail-content {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 1rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.7;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .detail-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+            margin-top: 0.5rem;
+        }
+
+        .detail-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.2rem 0.55rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        .detail-tag .remove-tag {
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            line-height: 1;
+        }
+
+        .detail-tag .remove-tag:hover {
+            color: var(--accent-red);
+        }
+
+        .detail-related {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .detail-related-item {
+            padding: 0.5rem 0.75rem;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        .detail-related-item:hover {
+            background: var(--bg-hover);
+        }
+
+        .detail-actions {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .confidence-editor {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .confidence-editor input[type="range"] {
+            width: 120px;
+            accent-color: var(--accent-blue);
+        }
+
+        .confidence-editor .value-display {
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            font-weight: 600;
+            width: 40px;
+        }
+
+        .add-tag-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .add-tag-input {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.35rem 0.65rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-family: inherit;
+            flex: 1;
+        }
+
+        .add-tag-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .add-tag-input::placeholder { color: var(--text-muted); }
+
+        /* ========================================
+           LOADING & ERROR STATES
+           ======================================== */
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem;
+            gap: 1rem;
+        }
+
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .error-container {
+            background: rgba(248, 81, 73, 0.1);
+            border: 1px solid rgba(248, 81, 73, 0.3);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .error-title {
+            color: var(--accent-red);
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .error-message {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .error-retry { margin-top: 1rem; }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+        }
+
+        /* ========================================
+           SCROLLBAR
+           ======================================== */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--bg-hover); }
+
+        /* ========================================
+           RESPONSIVE
+           ======================================== */
+        @media (max-width: 768px) {
+            .header { padding: 0.75rem 1rem; }
+            .header-nav { order: 3; width: 100%; overflow-x: auto; }
+            .main-content { padding: 1rem; }
+            .stat-cards { grid-template-columns: repeat(2, 1fr); }
+            .filter-bar { flex-direction: column; }
+            .filter-input.wide { width: 100%; }
+        }
+
+        @media (max-width: 480px) {
+            .stat-cards { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <!-- HEADER -->
+    <header class="header">
+        <div class="header-left">
+            <span class="header-title">Platform Administration</span>
+            <span class="admin-badge">ADMIN</span>
+        </div>
+        <nav class="header-nav">
+            <a href="platform_dashboard.html">Overview</a>
+            <a href="platform_tenants.html">Tenants</a>
+            <a href="platform_agents.html">Agent Pools</a>
+            <a href="platform_memory.html" class="active">Memory</a>
+        </nav>
+        <div class="header-right">
+            <div class="admin-user">
+                <div class="admin-avatar">PA</div>
+                <span>Platform Admin</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+        <!-- Loading State -->
+        <div class="loading-container" id="loading-state">
+            <div class="spinner"></div>
+            <span class="loading-text">Loading shared memory data...</span>
+        </div>
+
+        <!-- Error State -->
+        <div class="error-container" id="error-state" style="display: none;">
+            <div class="error-title">Failed to load memory store</div>
+            <div class="error-message" id="error-message">Unable to connect to the platform API.</div>
+            <div class="error-retry">
+                <button class="btn btn-primary" onclick="loadMemory()">Retry</button>
+            </div>
+        </div>
+
+        <!-- Memory Content -->
+        <div id="memory-content" style="display: none;">
+            <!-- Stat Cards -->
+            <div class="stat-cards" id="stat-cards">
+                <div class="stat-card">
+                    <div class="stat-card-label">Total Entries</div>
+                    <div class="stat-card-value blue" id="total-entries">--</div>
+                    <div class="stat-card-sub" id="entries-sub"></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-label">Categories</div>
+                    <div class="category-list" id="category-list"></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-label">Top Tags</div>
+                    <div class="tag-cloud" id="top-tags"></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-label">Avg Confidence</div>
+                    <div class="stat-card-value green" id="avg-confidence">--</div>
+                    <div class="stat-card-sub" id="confidence-sub"></div>
+                </div>
+            </div>
+
+            <!-- Filter Bar -->
+            <div class="filter-bar">
+                <div class="filter-group">
+                    <span class="filter-label">Category</span>
+                    <select class="filter-select" id="filter-category" onchange="applyFilters()">
+                        <option value="">All Categories</option>
+                        <option value="pattern">Pattern</option>
+                        <option value="error">Error</option>
+                        <option value="architecture">Architecture</option>
+                        <option value="convention">Convention</option>
+                        <option value="dependency">Dependency</option>
+                        <option value="workflow">Workflow</option>
+                        <option value="security">Security</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <span class="filter-label">Tag Search</span>
+                    <input type="text" class="filter-input wide" id="filter-tag" placeholder="Search by tag..." oninput="applyFilters()">
+                </div>
+                <div class="filter-group">
+                    <span class="filter-label">Min Confidence</span>
+                    <div class="confidence-range">
+                        <input type="range" id="filter-confidence" min="0" max="100" value="0" oninput="updateConfidenceDisplay(); applyFilters();">
+                        <span class="confidence-value" id="filter-confidence-display">0%</span>
+                    </div>
+                </div>
+                <div class="filter-actions">
+                    <button class="btn btn-secondary btn-sm" onclick="resetFilters()">Reset</button>
+                </div>
+            </div>
+
+            <!-- Memory Table -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-title">Memory Entries (<span id="entry-count">0</span>)</span>
+                    <button class="btn btn-secondary btn-sm" onclick="loadMemory()">Refresh</button>
+                </div>
+                <div class="table-container">
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Category</th>
+                                    <th>Source Tenant</th>
+                                    <th>Confidence</th>
+                                    <th>Usage Count</th>
+                                    <th>Created</th>
+                                </tr>
+                            </thead>
+                            <tbody id="memory-tbody"></tbody>
+                        </table>
+                    </div>
+                    <div class="empty-state" id="empty-state" style="display: none;">
+                        No memory entries match your filter criteria.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- DETAIL PANEL -->
+    <div class="detail-panel-overlay" id="detail-overlay" onclick="closeDetailPanel()"></div>
+    <div class="detail-panel" id="detail-panel">
+        <div class="detail-panel-header">
+            <span class="detail-panel-title" id="detail-title">Entry Details</span>
+            <button class="detail-panel-close" onclick="closeDetailPanel()">&times;</button>
+        </div>
+        <div class="detail-panel-body" id="detail-body"></div>
+    </div>
+
+    <script>
+        /* ========================================
+           STATE
+           ======================================== */
+        let entries = [];
+        let filteredEntries = [];
+
+        /* ========================================
+           API
+           ======================================== */
+        async function apiFetch(url, options = {}) {
+            const resp = await fetch(url, {
+                headers: { 'Content-Type': 'application/json', ...options.headers },
+                ...options
+            });
+            if (!resp.ok) throw new Error(`API error: ${resp.status} ${resp.statusText}`);
+            return resp.json();
+        }
+
+        /* ========================================
+           LOAD MEMORY
+           ======================================== */
+        async function loadMemory() {
+            const loading = document.getElementById('loading-state');
+            const error = document.getElementById('error-state');
+            const content = document.getElementById('memory-content');
+
+            loading.style.display = 'flex';
+            error.style.display = 'none';
+            content.style.display = 'none';
+
+            try {
+                const data = await apiFetch('/api/platform/memory');
+                entries = data.entries || data;
+                renderStats();
+                applyFilters();
+                loading.style.display = 'none';
+                content.style.display = 'block';
+            } catch (err) {
+                loading.style.display = 'none';
+                console.error('Memory load failed:', err);
+                showDemoData();
+            }
+        }
+
+        /* ========================================
+           DEMO DATA
+           ======================================== */
+        function showDemoData() {
+            entries = [
+                { id: 'm1', title: 'FastAPI async endpoint pattern with dependency injection', category: 'pattern', source_tenant: 'acme-corp', confidence: 92, usage_count: 47, created: '2026-02-15', tags: ['fastapi', 'async', 'python'], content: 'When creating FastAPI endpoints with async dependencies, use the Depends() pattern with async def for I/O-bound operations. Always use lifespan context manager for startup/shutdown. Pattern:\n\n@app.get("/items")\nasync def get_items(db: AsyncSession = Depends(get_db)):\n    ...' },
+                { id: 'm2', title: 'React useEffect cleanup prevents memory leaks on unmount', category: 'pattern', source_tenant: 'startup-io', confidence: 88, usage_count: 34, created: '2026-01-22', tags: ['react', 'hooks', 'memory-leak'], content: 'Always return a cleanup function from useEffect when subscribing to external data sources, WebSocket connections, or event listeners. This prevents memory leaks when the component unmounts.\n\nuseEffect(() => {\n  const sub = api.subscribe();\n  return () => sub.unsubscribe();\n}, []);' },
+                { id: 'm3', title: 'CORS misconfiguration allows credential leaking in production', category: 'security', source_tenant: 'bigco', confidence: 96, usage_count: 12, created: '2026-03-01', tags: ['cors', 'security', 'production'], content: 'Setting Access-Control-Allow-Origin to "*" with credentials mode "include" causes browsers to reject the response. Use explicit origin allowlists. Also: never expose Authorization header in Access-Control-Expose-Headers unless necessary.' },
+                { id: 'm4', title: 'SQLAlchemy N+1 query resolved with joinedload', category: 'error', source_tenant: 'acme-corp', confidence: 85, usage_count: 28, created: '2026-02-08', tags: ['sqlalchemy', 'performance', 'python'], content: 'N+1 query pattern detected when iterating over parent.children without eager loading. Fix: use options(joinedload(Parent.children)) in the initial query, or use selectinload() for collections. Measured improvement: 47 queries reduced to 2.' },
+                { id: 'm5', title: 'Monorepo structure with Turborepo for shared types', category: 'architecture', source_tenant: 'cloudnine', confidence: 79, usage_count: 19, created: '2026-01-10', tags: ['monorepo', 'turborepo', 'typescript'], content: 'For projects sharing TypeScript types between frontend and backend, use a packages/shared directory with its own tsconfig. Configure Turborepo pipeline so shared builds before dependents. Use workspace:* protocol in package.json dependencies.' },
+                { id: 'm6', title: 'ESLint + Prettier conflict resolution via eslint-config-prettier', category: 'convention', source_tenant: 'startup-io', confidence: 91, usage_count: 41, created: '2025-12-18', tags: ['eslint', 'prettier', 'tooling'], content: 'ESLint formatting rules conflict with Prettier. Install eslint-config-prettier and add "prettier" as the last entry in extends array. This disables all ESLint rules that conflict with Prettier formatting.' },
+                { id: 'm7', title: 'Node.js 20 native fetch breaks AbortController timeout', category: 'error', source_tenant: 'microteam', confidence: 72, usage_count: 8, created: '2026-03-12', tags: ['nodejs', 'fetch', 'timeout'], content: 'Node.js 20 native fetch does not respect AbortSignal.timeout() correctly in some edge cases. Workaround: use node-fetch or create manual AbortController with setTimeout. Tracked in nodejs/undici#2104.' },
+                { id: 'm8', title: 'Vite env variable prefix must be VITE_ for client exposure', category: 'convention', source_tenant: 'bigco', confidence: 94, usage_count: 56, created: '2025-11-30', tags: ['vite', 'env', 'frontend'], content: 'Vite only exposes environment variables prefixed with VITE_ to client-side code. Server-only secrets must NOT use this prefix. Access via import.meta.env.VITE_API_URL. Define types in env.d.ts for TypeScript support.' },
+                { id: 'm9', title: 'GitHub Actions CI matrix for Python 3.10-3.12 with uv', category: 'workflow', source_tenant: 'acme-corp', confidence: 87, usage_count: 23, created: '2026-02-20', tags: ['github-actions', 'ci', 'python', 'uv'], content: 'Use strategy.matrix with python-version: ["3.10", "3.11", "3.12"]. Install uv via astral-sh/setup-uv@v4. Cache with actions/cache using key: uv-${{ hashFiles("requirements.txt") }}. Run tests with: uv run pytest --cov.' },
+                { id: 'm10', title: 'Docker multi-stage build reduces image from 1.2GB to 89MB', category: 'dependency', source_tenant: 'cloudnine', confidence: 83, usage_count: 15, created: '2026-01-28', tags: ['docker', 'optimization', 'deployment'], content: 'Use multi-stage Dockerfile: first stage (python:3.12) for building/compiling, second stage (python:3.12-slim) for runtime. Copy only wheel files and installed packages. Add .dockerignore for node_modules, .git, __pycache__.' },
+            ];
+
+            renderStats();
+            applyFilters();
+
+            document.getElementById('loading-state').style.display = 'none';
+            document.getElementById('memory-content').style.display = 'block';
+        }
+
+        /* ========================================
+           RENDER STATS
+           ======================================== */
+        function renderStats() {
+            document.getElementById('total-entries').textContent = entries.length;
+            document.getElementById('entries-sub').textContent = `across ${new Set(entries.map(e => e.source_tenant)).size} tenants`;
+
+            // Categories
+            const cats = {};
+            entries.forEach(e => { cats[e.category] = (cats[e.category] || 0) + 1; });
+            document.getElementById('category-list').innerHTML = Object.entries(cats)
+                .sort((a, b) => b[1] - a[1])
+                .map(([name, count]) => `
+                    <div class="category-item">
+                        <span class="category-name"><span class="cat-badge ${name}">${name}</span></span>
+                        <span class="category-count">${count}</span>
+                    </div>
+                `).join('');
+
+            // Tags
+            const tagCounts = {};
+            entries.forEach(e => (e.tags || []).forEach(t => { tagCounts[t] = (tagCounts[t] || 0) + 1; }));
+            const topTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+            document.getElementById('top-tags').innerHTML = topTags.map(([tag, count]) =>
+                `<span class="tag-chip">${escapeHtml(tag)} (${count})</span>`
+            ).join('');
+
+            // Avg confidence
+            if (entries.length) {
+                const avg = Math.round(entries.reduce((s, e) => s + e.confidence, 0) / entries.length);
+                document.getElementById('avg-confidence').textContent = avg + '%';
+                document.getElementById('confidence-sub').textContent = `range: ${Math.min(...entries.map(e => e.confidence))}% \u2013 ${Math.max(...entries.map(e => e.confidence))}%`;
+            }
+        }
+
+        /* ========================================
+           FILTERS
+           ======================================== */
+        function applyFilters() {
+            const category = document.getElementById('filter-category').value;
+            const tagQuery = document.getElementById('filter-tag').value.toLowerCase();
+            const minConf = parseInt(document.getElementById('filter-confidence').value, 10);
+
+            filteredEntries = entries.filter(e => {
+                if (category && e.category !== category) return false;
+                if (tagQuery && !(e.tags || []).some(t => t.toLowerCase().includes(tagQuery))) return false;
+                if (e.confidence < minConf) return false;
+                return true;
+            });
+
+            renderTable();
+        }
+
+        function resetFilters() {
+            document.getElementById('filter-category').value = '';
+            document.getElementById('filter-tag').value = '';
+            document.getElementById('filter-confidence').value = 0;
+            document.getElementById('filter-confidence-display').textContent = '0%';
+            applyFilters();
+        }
+
+        function updateConfidenceDisplay() {
+            document.getElementById('filter-confidence-display').textContent =
+                document.getElementById('filter-confidence').value + '%';
+        }
+
+        /* ========================================
+           RENDER TABLE
+           ======================================== */
+        function renderTable() {
+            const tbody = document.getElementById('memory-tbody');
+            const empty = document.getElementById('empty-state');
+            document.getElementById('entry-count').textContent = filteredEntries.length;
+
+            if (!filteredEntries.length) {
+                tbody.innerHTML = '';
+                empty.style.display = 'block';
+                return;
+            }
+            empty.style.display = 'none';
+
+            tbody.innerHTML = filteredEntries.map(e => {
+                const confColor = e.confidence >= 90 ? 'var(--accent-green)' :
+                                  e.confidence >= 70 ? 'var(--accent-blue)' :
+                                  e.confidence >= 50 ? 'var(--accent-yellow)' : 'var(--accent-red)';
+                return `
+                    <tr onclick="openDetailPanel('${e.id}')">
+                        <td><span class="entry-title">${escapeHtml(e.title)}</span></td>
+                        <td><span class="cat-badge ${e.category}">${e.category}</span></td>
+                        <td>${escapeHtml(e.source_tenant)}</td>
+                        <td>
+                            <div class="confidence-bar">
+                                <div class="confidence-track">
+                                    <div class="confidence-fill" style="width: ${e.confidence}%; background: ${confColor}"></div>
+                                </div>
+                                <span class="confidence-label">${e.confidence}%</span>
+                            </div>
+                        </td>
+                        <td>${e.usage_count}</td>
+                        <td style="white-space:nowrap">${e.created}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        /* ========================================
+           DETAIL PANEL
+           ======================================== */
+        function openDetailPanel(id) {
+            const e = entries.find(x => x.id === id);
+            if (!e) return;
+
+            document.getElementById('detail-title').textContent = e.title;
+
+            const related = entries.filter(r => r.id !== e.id && (r.tags || []).some(t => (e.tags || []).includes(t))).slice(0, 3);
+
+            document.getElementById('detail-body').innerHTML = `
+                <div class="detail-section">
+                    <div class="detail-section-title">Metadata</div>
+                    <div class="detail-row"><span class="detail-row-label">Category</span><span class="detail-row-value"><span class="cat-badge ${e.category}">${e.category}</span></span></div>
+                    <div class="detail-row"><span class="detail-row-label">Source Tenant</span><span class="detail-row-value">${escapeHtml(e.source_tenant)}</span></div>
+                    <div class="detail-row"><span class="detail-row-label">Usage Count</span><span class="detail-row-value">${e.usage_count}</span></div>
+                    <div class="detail-row"><span class="detail-row-label">Created</span><span class="detail-row-value">${e.created}</span></div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="detail-section-title">Confidence</div>
+                    <div class="confidence-editor">
+                        <input type="range" min="0" max="100" value="${e.confidence}" oninput="this.nextElementSibling.textContent = this.value + '%'" onchange="updateEntryConfidence('${e.id}', parseInt(this.value))">
+                        <span class="value-display">${e.confidence}%</span>
+                        <button class="btn btn-secondary btn-sm" onclick="saveConfidence('${e.id}')">Save</button>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="detail-section-title">Content</div>
+                    <div class="detail-content">${escapeHtml(e.content || 'No content available.')}</div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="detail-section-title">Tags</div>
+                    <div class="detail-tags" id="detail-tags-${e.id}">
+                        ${(e.tags || []).map(t => `
+                            <span class="detail-tag">${escapeHtml(t)} <span class="remove-tag" onclick="event.stopPropagation(); removeTag('${e.id}', '${t}')">&times;</span></span>
+                        `).join('')}
+                    </div>
+                    <div class="add-tag-row">
+                        <input type="text" class="add-tag-input" id="new-tag-${e.id}" placeholder="Add tag..." onkeydown="if(event.key==='Enter')addTag('${e.id}')">
+                        <button class="btn btn-secondary btn-sm" onclick="addTag('${e.id}')">Add</button>
+                    </div>
+                </div>
+
+                ${related.length ? `
+                    <div class="detail-section">
+                        <div class="detail-section-title">Related Entries</div>
+                        <div class="detail-related">
+                            ${related.map(r => `
+                                <div class="detail-related-item" onclick="openDetailPanel('${r.id}')">
+                                    <span class="cat-badge ${r.category}" style="margin-right:0.5rem">${r.category}</span>
+                                    ${escapeHtml(r.title)}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+
+                <div class="detail-section">
+                    <div class="detail-section-title">Actions</div>
+                    <div class="detail-actions">
+                        <button class="btn btn-danger btn-sm" onclick="deleteEntry('${e.id}')">Delete Entry</button>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('detail-overlay').classList.add('open');
+            document.getElementById('detail-panel').classList.add('open');
+        }
+
+        function closeDetailPanel() {
+            document.getElementById('detail-overlay').classList.remove('open');
+            document.getElementById('detail-panel').classList.remove('open');
+        }
+
+        /* ========================================
+           ENTRY ACTIONS
+           ======================================== */
+        function updateEntryConfidence(id, value) {
+            const e = entries.find(x => x.id === id);
+            if (e) e.confidence = value;
+        }
+
+        async function saveConfidence(id) {
+            const e = entries.find(x => x.id === id);
+            if (!e) return;
+            try {
+                await apiFetch(`/api/platform/memory/${id}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ confidence: e.confidence })
+                });
+            } catch (err) {
+                // Demo: already updated in-memory
+            }
+            renderStats();
+            applyFilters();
+        }
+
+        async function deleteEntry(id) {
+            if (!confirm('Delete this memory entry? This cannot be undone.')) return;
+            try {
+                await apiFetch(`/api/platform/memory/${id}`, { method: 'DELETE' });
+            } catch (err) {
+                // Demo: remove locally
+            }
+            entries = entries.filter(x => x.id !== id);
+            renderStats();
+            applyFilters();
+            closeDetailPanel();
+        }
+
+        function addTag(id) {
+            const input = document.getElementById(`new-tag-${id}`);
+            const tag = input.value.trim().toLowerCase();
+            if (!tag) return;
+
+            const e = entries.find(x => x.id === id);
+            if (!e) return;
+            if (!e.tags) e.tags = [];
+            if (e.tags.includes(tag)) return;
+
+            e.tags.push(tag);
+            input.value = '';
+            openDetailPanel(id);
+            renderStats();
+
+            apiFetch(`/api/platform/memory/${id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ tags: e.tags })
+            }).catch(() => {});
+        }
+
+        function removeTag(id, tag) {
+            const e = entries.find(x => x.id === id);
+            if (!e || !e.tags) return;
+            e.tags = e.tags.filter(t => t !== tag);
+            openDetailPanel(id);
+            renderStats();
+
+            apiFetch(`/api/platform/memory/${id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ tags: e.tags })
+            }).catch(() => {});
+        }
+
+        /* ========================================
+           HELPERS
+           ======================================== */
+        function escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        /* ========================================
+           INIT
+           ======================================== */
+        document.addEventListener('DOMContentLoaded', loadMemory);
+    </script>
+</body>
+</html>

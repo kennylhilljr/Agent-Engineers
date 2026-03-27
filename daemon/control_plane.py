@@ -7,13 +7,17 @@ Provides endpoints for health checks, worker status, pool scaling,
 and dynamic configuration.
 
 Endpoints:
-    GET  /health           — Health check
-    GET  /workers          — List all workers and their status
-    GET  /pools            — Pool summary
-    GET  /queue            — Queue depth
-    POST /workers          — Add workers to a pool
-    POST /webhook/linear   — Linear webhook receiver (Proposal 9)
-    PATCH /pools/<name>    — Resize a pool
+    GET  /health                       — Health check
+    GET  /workers                      — List all workers and their status
+    GET  /pools                        — Pool summary
+    GET  /queue                        — Queue depth
+    POST /workers                      — Add workers to a pool
+    POST /webhook/linear               — Linear webhook receiver (Proposal 9)
+    PATCH /pools/<name>                — Resize a pool
+    GET  /tenants/<id>/workers         — Workers for a specific tenant
+    GET  /tenants/<id>/pools           — Pool status for a tenant
+    GET  /platform/pools               — Global pool overview
+    POST /platform/warm                — Pre-warm global agent pool
 """
 
 from __future__ import annotations
@@ -24,6 +28,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from daemon.tenant_pool import TenantPoolManager
     from daemon.worker_pool import WorkerPoolManager
 
 logger = logging.getLogger("control_plane")
@@ -40,9 +45,11 @@ class ControlPlane:
         self,
         pool_manager: WorkerPoolManager,
         port: int = 9100,
+        tenant_pool_manager: TenantPoolManager | None = None,
     ) -> None:
         self.pool_manager = pool_manager
         self.port = port
+        self.tenant_pool_manager = tenant_pool_manager
         self._server: asyncio.Server | None = None
 
     async def start(self) -> None:
@@ -138,6 +145,16 @@ class ControlPlane:
         elif path.startswith("/pools/") and method == "PATCH":
             pool_name = path.split("/pools/", 1)[1].rstrip("/")
             return self._handle_resize_pool(pool_name, body)
+        elif path.startswith("/tenants/") and path.endswith("/workers") and method == "GET":
+            tenant_id = path.split("/tenants/", 1)[1].rsplit("/workers", 1)[0]
+            return self._handle_tenant_workers(tenant_id)
+        elif path.startswith("/tenants/") and path.endswith("/pools") and method == "GET":
+            tenant_id = path.split("/tenants/", 1)[1].rsplit("/pools", 1)[0]
+            return self._handle_tenant_pools(tenant_id)
+        elif path == "/platform/pools" and method == "GET":
+            return self._handle_platform_pools()
+        elif path == "/platform/warm" and method == "POST":
+            return self._handle_platform_warm(body)
         else:
             return 404, {"error": "Not found"}
 
@@ -285,6 +302,77 @@ class ControlPlane:
             "pool": pool_name,
             "max_workers": max_workers,
             "current_workers": len(pool.workers),
+        }
+
+    def _handle_tenant_workers(self, tenant_id: str) -> tuple[int, dict]:
+        """GET /tenants/{tenant_id}/workers — Workers for a specific tenant."""
+        if self.tenant_pool_manager is None:
+            return 404, {"error": "Tenant pool manager not configured"}
+
+        status = self.tenant_pool_manager.tenant_status(tenant_id)
+        workers: list[dict[str, Any]] = []
+
+        tenant_pools = self.tenant_pool_manager._tenant_workers.get(tenant_id, {})
+        for pool_name, pool_workers in tenant_pools.items():
+            for w in pool_workers:
+                worker_info: dict[str, Any] = {
+                    "worker_id": w.worker_id,
+                    "pool": pool_name,
+                    "status": w.status.value,
+                    "tickets_completed": w.tickets_completed,
+                    "tenant_id": w.tenant_id,
+                }
+                if w.current_ticket:
+                    worker_info["current_ticket"] = {
+                        "key": w.current_ticket.key,
+                        "title": w.current_ticket.title,
+                    }
+                workers.append(worker_info)
+
+        return 200, {"tenant_id": tenant_id, "workers": workers}
+
+    def _handle_tenant_pools(self, tenant_id: str) -> tuple[int, dict]:
+        """GET /tenants/{tenant_id}/pools — Pool status for a tenant."""
+        if self.tenant_pool_manager is None:
+            return 404, {"error": "Tenant pool manager not configured"}
+
+        return 200, self.tenant_pool_manager.tenant_status(tenant_id)
+
+    def _handle_platform_pools(self) -> tuple[int, dict]:
+        """GET /platform/pools — Global pool overview."""
+        if self.tenant_pool_manager is None:
+            return 404, {"error": "Tenant pool manager not configured"}
+
+        return 200, self.tenant_pool_manager.global_status()
+
+    def _handle_platform_warm(self, body: bytes) -> tuple[int, dict]:
+        """POST /platform/warm — Pre-warm global agent pool."""
+        if self.tenant_pool_manager is None:
+            return 404, {"error": "Tenant pool manager not configured"}
+
+        try:
+            data = json.loads(body) if body else {}
+        except json.JSONDecodeError:
+            return 400, {"error": "Invalid JSON"}
+
+        count = data.get("count", 1)
+        pool_type_str = data.get("pool_type", "coding")
+
+        if not isinstance(count, int) or count < 1:
+            return 400, {"error": "count must be a positive integer"}
+
+        from daemon.worker_pool import PoolType
+
+        try:
+            pool_type = PoolType(pool_type_str)
+        except ValueError:
+            return 400, {"error": f"Unknown pool type: {pool_type_str}"}
+
+        created = self.tenant_pool_manager.pre_warm(count, pool_type)
+        return 200, {
+            "warmed": created,
+            "pool_type": pool_type_str,
+            "warm_pool": self.tenant_pool_manager.global_status().get("warm_pool", {}),
         }
 
     @staticmethod
