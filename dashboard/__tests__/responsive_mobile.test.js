@@ -13,7 +13,7 @@ describe('AI-228 Mobile Responsive Dashboard', () => {
         if (existingMeta) existingMeta.remove();
         const meta = document.createElement('meta');
         meta.name = 'viewport';
-        meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+        meta.content = 'width=device-width, initial-scale=1.0';
         document.head.appendChild(meta);
 
         // Set body HTML
@@ -128,14 +128,14 @@ describe('AI-228 Mobile Responsive Dashboard', () => {
             expect(meta.getAttribute('content')).toContain('width=device-width');
         });
 
-        test('viewport meta disables pinch-to-zoom with user-scalable=no', () => {
+        test('viewport meta does not disable pinch-to-zoom', () => {
             const meta = document.querySelector('meta[name="viewport"]');
-            expect(meta.getAttribute('content')).toContain('user-scalable=no');
+            expect(meta.getAttribute('content')).not.toContain('user-scalable=no');
         });
 
-        test('viewport meta sets maximum-scale=1.0 to prevent auto-zoom', () => {
+        test('viewport meta does not lock maximum-scale', () => {
             const meta = document.querySelector('meta[name="viewport"]');
-            expect(meta.getAttribute('content')).toContain('maximum-scale=1.0');
+            expect(meta.getAttribute('content')).not.toContain('maximum-scale=1.0');
         });
     });
 
