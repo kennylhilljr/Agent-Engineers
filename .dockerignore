@@ -1,0 +1,62 @@
+# Version control
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+.venv/
+venv/
+venv_linux/
+*.egg-info/
+dist/
+build/
+
+# Testing
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+screenshots/
+test-results/
+
+# Development
+.mypy_cache/
+.ruff_cache/
+.pre-commit-config.yaml
+Makefile
+CONTRIBUTING.md
+
+# IDE and OS
+.DS_Store
+*.swp
+*.swo
+
+# Generated output
+generations/
+node_modules/
+logs/
+data/
+
+# Documentation (not needed in runtime image)
+docs/
+*.md
+!requirements*.txt
+
+# Environment
+.env
+.env.tmp
+.env.example
+
+# Deployment config (not needed inside container)
+deploy/
+
+# Agent artifacts
+.agent_metrics.json
+.agent_metrics.lock
+.agent_projects.json
+.worktrees/
+AI-*_*.txt
+AI-*_*.md
