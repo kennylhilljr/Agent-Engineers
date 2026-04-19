@@ -1,0 +1,29 @@
+# Default owners for everything
+* @agent-engineers/maintainers
+
+# Core agent logic
+/agent.py           @agent-engineers/core
+/client.py          @agent-engineers/core
+/security.py        @agent-engineers/core
+/progress.py        @agent-engineers/core
+/prompts.py         @agent-engineers/core
+
+# Agent definitions and orchestration
+/agents/            @agent-engineers/core
+
+# Multi-tenant infrastructure
+/tenants/           @agent-engineers/platform
+
+# Dashboard and web UI
+/dashboard/         @agent-engineers/platform
+
+# External AI provider bridges
+/bridges/           @agent-engineers/integrations
+
+# Deployment and infrastructure
+/deploy/            @agent-engineers/infra
+
+# Security-sensitive files
+/security.py        @agent-engineers/security
+/sso/               @agent-engineers/security
+/audit/             @agent-engineers/security

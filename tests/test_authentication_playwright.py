@@ -86,7 +86,7 @@ async def start_test_server(with_auth: bool = False) -> subprocess.Popen:
             urllib.request.urlopen(f"{server_url}/api/health", timeout=1)
             print(f"Server started successfully on {server_url}")
             return process
-        except:
+        except Exception:
             time.sleep(0.5)
             if i == max_retries - 1:
                 # Kill process if it didn't start
@@ -95,7 +95,7 @@ async def start_test_server(with_auth: bool = False) -> subprocess.Popen:
                         os.killpg(os.getpgid(process.pid), signal.SIGTERM)
                     else:
                         process.terminate()
-                except:
+                except Exception:
                     pass
                 raise RuntimeError(f"Server failed to start after {max_retries * 0.5} seconds")
 
@@ -122,7 +122,7 @@ def stop_test_server(process: subprocess.Popen):
             print(f"Error stopping server: {e}")
             try:
                 process.kill()
-            except:
+            except Exception:
                 pass
 
 
